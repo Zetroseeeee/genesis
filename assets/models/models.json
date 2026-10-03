@@ -1186,6 +1186,48 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161418_99ebe952-5147-4a77-b794-56ad10e19065.png",
    "mesh": "23f5e834-89a6-473d-bc28-77b167580fc9",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161645_23f5e834-89a6-473d-bc28-77b167580fc9.glb"
+  },
+  {
+   "id": "bronze_well_a",
+   "title": "Village well",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": null,
+   "kinds": [
+    "well"
+   ],
+   "h": 2.9,
+   "ref": "be7d25bc-89c3-4149-8cec-29494202a6a0",
+   "prompt": "a village well: a circular well-head of rough field stones about 1.8 m across and 0.8 m high, a frame of two forked posts and a crossbar with a fibre rope and leather bucket, a stone-lined drinking trough, a few paving stones",
+   "concept": "39d1d141-fbf0-4bcf-962d-b57ff097d6ab",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161418_39d1d141-fbf0-4bcf-962d-b57ff097d6ab.png",
+   "mesh": "ff6f9684-fe15-4cb2-9632-1851bc9865ce",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161638_ff6f9684-fe15-4cb2-9632-1851bc9865ce.glb"
+  },
+  {
+   "id": "bronze_boat_a",
+   "title": "Sewn-plank trading boat",
+   "set": "bronze",
+   "eras": [
+    0,
+    5
+   ],
+   "cultures": null,
+   "kinds": [
+    "boat"
+   ],
+   "w": 12.0,
+   "scaleBy": "w",
+   "h": 5.5,
+   "ref": "b29afb73-544d-47dd-8728-7560af5f4613",
+   "prompt": "a Bronze Age trading boat about 12 m long and 3 m wide: a broad open hull of thick planks sewn and lashed, caulked with moss and pitch, high curved stem and stern, a short mast with a yard and furled linen sail, a steering oar, oars along the thwarts, clay jars and bundles amidships",
+   "concept": "21541857-f766-42d8-989a-6bbfaf0682e9",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161418_21541857-f766-42d8-989a-6bbfaf0682e9.png",
+   "mesh": "17657e73-476e-4058-9860-2ec37632c1d2",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161649_17657e73-476e-4058-9860-2ec37632c1d2.glb"
   }
  ]
 }
