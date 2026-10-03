@@ -1,0 +1,15 @@
+{"id":"stone_roundhouse_a","concept":"36afee3f-1178-4673-ac5d-8a7c59e4fe59","cts":"20261003_124221","mesh":"66b41197-a01f-4938-b1c3-7ac0bab63e96","mts":"20261003_125128"}
+{"id":"classical_med_doric_temple","concept":"190f769d-bbe0-4baa-9ae4-870d8bf10cea","cts":"20261003_124221","mesh":"b06e4dd1-d1e4-4336-9484-eac03513881e","mts":"20261003_125442","note":"first mesh attempt 573c01a2 failed; tripo comparison 78627c84"}
+{"id":"medieval_north_timberhouse_a","concept":"368ff7b1-22cb-42ac-ac04-49248222f1c6","cts":"20261003_124220","mesh":"b866d1ab-c895-43d0-b46d-678c61902746","mts":"20261003_124305","note":"pilot comparisons: tripo b40c24d8, meshy 5ab9ba3b"}
+{"id":"stone_roundhouse_b","concept":"e18c60f7-5b65-4df2-8e46-9567d9e8d3a3","cts":"20261003_130442","mesh":"4689cd12-d28e-4471-ac1d-3af6ee15be43"}
+{"id":"stone_longhouse_a","concept":"203c9638-c591-4293-9a85-2bcccd6df704","cts":"20261003_130442","mesh":"89b833bc-a328-4ca3-b9f0-ee7ca27b1026"}
+{"id":"stone_pithouse_a","concept":"2578724d-7797-49b9-96d2-7d4ffdd85f25","cts":"20261003_130443","mesh":"9e7ec712-20ae-476e-aa0b-a42bd9d915f2"}
+{"id":"stone_mudbrick_a","concept":"6f77815e-2e63-496d-b266-1c1e0324d8eb","cts":"20261003_130442","mesh":"30ce418a-222e-42f1-b3b9-6581c3eb2d0f"}
+{"id":"stone_mudbrick_b","concept":"7ce138f8-1025-4cf3-925d-41e336dcd656","cts":"20261003_130321","mesh":"671310f2-0ba5-4081-9e8b-86d1f9fb3219"}
+{"id":"stone_grasshut_a","concept":"35387ef5-5c03-4111-925d-91c7df115614","cts":"20261003_130944"}
+{"id":"stone_domehut_a","concept":"d5ba6fae-4578-4fc6-9688-b0530916f063","cts":"20261003_130945"}
+{"id":"stone_stilthouse_a","concept":"5fe657b0-f700-492f-9479-981523eefcae","cts":"20261003_130945"}
+{"id":"stone_tipi_a","concept":"46805723-21f0-44b1-a0bd-1087e7a5192d","cts":"20261003_130321","mesh":"d0cfaefb-c986-44c7-aae9-230710234a17"}
+{"id":"stone_wigwam_a","concept":"3f42f01a-a014-45e7-a454-3ddea4fdc6ab","cts":"20261003_130320","mesh":"3c005c86-4327-4166-84da-8ada619f38b8"}
+{"id":"stone_palmhut_a","concept":"d5673709-a686-444e-887a-edd0973101d6","cts":"20261003_130944"}
+{"id":"stone_circle_a","concept":"7270e88a-089a-4e73-a4b2-63abe1a83725","cts":"20261003_130321","mesh":"cb323abc-c95d-4aa6-b225-18f67f254dbd"}
