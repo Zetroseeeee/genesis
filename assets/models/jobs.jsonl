@@ -29,3 +29,7 @@
 {"id":"stone_watchtower_a","mesh":"6da70c9c-27bf-4cfd-83f8-a704276cff67"}
 {"id":"stone_granary_a","mesh":"cff6e38c-0851-4763-b03b-c7b9cee44b6b"}
 {"id":"stone_roundhouse_site","mesh":"2ee86755-8a68-4c84-a6e7-d49d7bbf7bdc"}
+{"id":"bronze_mudwall_a","concept":"be7d25bc-89c3-4149-8cec-29494202a6a0","ref":"6f77815e-2e63-496d-b266-1c1e0324d8eb"}
+{"id":"bronze_court_a","concept":"e8c06ff0-c45c-45e4-9f96-5fb0899054f9","ref":"6f77815e-2e63-496d-b266-1c1e0324d8eb"}
+{"id":"bronze_loghouse_a","concept":"b29afb73-544d-47dd-8728-7560af5f4613","ref":"203c9638-c591-4293-9a85-2bcccd6df704"}
+{"id":"tree_oak_a","concept":"86bf0d6d-5279-464c-a498-d82de2f181b4","ref":"36afee3f-1178-4673-ac5d-8a7c59e4fe59"}

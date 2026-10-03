@@ -19,7 +19,7 @@
     for (let k = 0; k < edge.length; k++) { const e = edge[k]; pos.push(pos[e * 3], pos[e * 3 + 1], 1); }
     for (let k = 0; k < edge.length; k++) {
       const e0 = edge[k], e1 = edge[(k + 1) % edge.length]; const s0 = base + k, s1 = base + (k + 1) % edge.length;
-      idx.push(e0, s0, e1, e1, s0, s1);
+      idx.push(e0, e1, s0, e1, s1, s0);                             // wound to face outward: a skirt is seen from outside its own tile, through the gap it closes
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -335,7 +335,7 @@
       vec4 n1 = noise2(wp + vec2(uTime * 0.02, 0.0)), n2 = noise2(gc(486.0) - vec2(0.0, uTime * 0.03));
       vec3 nWater = normalize(vec3((n1.r - 0.5 + n2.r - 0.5) * 0.25 * closeFade, (n1.g - 0.5 + n2.g - 0.5) * 0.25 * closeFade, 1.0));
       // close to the water: real wave normals (two scrolling scales), stronger on open sea than on rivers
-      float waveMix = smoothstep(0.02, 0.002, uCamAlt) * (0.35 + 0.65 * seaW);
+      float waveMix = smoothstep(0.02, 0.002, uCamAlt) * (0.6 + 0.4 * seaW);
       if (waveMix > 0.01) {
         vec3 w1 = texture2D(uWaterN, gc(600.0) + vec2(uTime * 0.03, uTime * 0.017)).rgb * 2.0 - 1.0;
         vec3 w2 = texture2D(uWaterN, gc(2400.0) * mat2(0.8, 0.6, -0.6, 0.8) - vec2(uTime * 0.05, -uTime * 0.021)).rgb * 2.0 - 1.0;
@@ -360,7 +360,8 @@
       float inlandMix = inlandW * mix(0.9, 0.7, closeFade);
       vec3 col = mix(land, inland, inlandMix) * landW + water * seaW;
       col += vec3(0.9) * foam * 0.5;
-      vec3 nLocal = normalize(nEnu * landW + nWater * (1.0 - landW));
+      float flatW = max(1.0 - landW, min(1.0, inlandW * 1.4));        // rivers and lakes lie flat and ripple, whatever the slope they cross
+      vec3 nLocal = normalize(mix(nEnu, nWater, flatW));
       // ---------- lighting ----------
       vec3 upL = normalize(vUnit);
       vec3 northL = normalize(vec3(0.0, 1.0, 0.0) - upL.y * upL);
@@ -405,7 +406,7 @@
       // specular on water
       vec3 viewDir = normalize(-vViewPos);
       vec3 refl = reflect(-sunV, nV);
-      float spec = pow(max(dot(refl, viewDir), 0.0), 90.0) * (seaW + inlandW * 0.6) * day;
+      float spec = pow(max(dot(refl, viewDir), 0.0), 90.0) * (seaW + inlandW * 0.14) * day;   // a river glints; it is not a mirror
       lit += vec3(0.9, 0.95, 1.0) * spec * 0.9;
       // night side: keep a little moonlight and city lights
       float night = 1.0 - smoothstep(-0.22, 0.02, sunUp);

@@ -205,6 +205,23 @@
   const SLOT_N = 12;
   const slotAngle = (i, axis, sl) => axis + Math.PI / 4 + sl * (Math.PI * 2 / SLOT_N) + (hash(i, 90 + sl) - 0.5) * 0.22;
 
+  // ---------- gates ----------
+  // The angles (radians, east toward north) at which lanes leave a town and its gates stand. A gridded town opens on
+  // its two main streets; an organic one wherever its lanes happened to run.
+  const isPlanned = (era, cul) => era === 3 || era >= 6 || (era >= 4 && cul === 6);   // Roman, Chinese and modern cities are gridded
+  function gateAngles(i, lvl, planned) {
+    const axis = hash(i, 3) * Math.PI; const n = lvl >= 3 ? 4 : lvl >= 2 ? 3 : 2; const out = [];
+    if (planned) { const q = [0, Math.PI, Math.PI / 2, Math.PI * 1.5]; for (let g = 0; g < n; g++) out.push(axis + q[g]); }
+    else for (let g = 0; g < n; g++) out.push(axis + g * Math.PI * 2 / n + (hash(i, 40 + g) - 0.5) * 0.5);
+    return out;
+  }
+  // where a road heading toward `bearing` leaves town i: [the gate's angle, how far out its lane runs (drawn metres)]
+  function gateToward(sim, i, c, bearing) {
+    const gs = gateAngles(i, sim.level[i], isPlanned(c.era, civCulture(sim, c))); let best = gs[0], bd = 9;
+    for (const a of gs) { const da = Math.abs(((a - bearing) + Math.PI * 3) % (Math.PI * 2) - Math.PI); if (da < bd) { bd = da; best = a; } }
+    return [best, radiusM(sim, i, c) * 1.12];
+  }
+
   // ---------- layout ----------
   const cache = new Map();
   function worksOf(sim, i) { return sim.works ? sim.works.get(i) || null : null; }
@@ -248,7 +265,7 @@
     // --- plan geometry (true metres) ---
     const axis = rnd(3) * Math.PI;                                  // street grid orientation
     const ca = Math.cos(axis), sa = Math.sin(axis);
-    const planned = era === 3 || era >= 6 || (era >= 4 && cul === 6);   // Roman, Chinese and modern cities are gridded
+    const planned = isPlanned(era, cul);
     const plaza = Math.max(14, Math.min(90, R * (planned ? 0.13 : 0.1)));
     const nTarget = Math.min(coarse ? 3000 : 9000, Math.round(people / PPB[era] * (0.85 + rnd(4) * 0.3)));
     let s = Math.sqrt(Math.PI * R * R * 0.62 / Math.max(8, nTarget));    // slot spacing (m)
@@ -258,8 +275,7 @@
     const wallWork = workProg('walls'); const wallLvl = wallsL || (wallWork >= 0 ? 1 : 0);
     const wallStyle = wallLvl ? WALLSTYLE[era] : 'none';
     const wallR = R * 1.06 + 6;
-    const gates = [];                                                 // angles of the gates (roads leave here)
-    const nGates = lvl >= 3 ? 4 : lvl >= 2 ? 3 : 2; for (let g = 0; g < nGates; g++) gates.push(axis + g * Math.PI * 2 / nGates + (rnd(40 + g) - 0.5) * 0.5);
+    const gates = gateAngles(i, lvl, planned);                        // angles of the gates (roads leave here)
     // organic street net: radial lanes (through the gates, plus more as the town grows) and ring lanes
     const lanes = gates.slice(); const nLanes = clamp(Math.round(R / 60), 4, 18); for (let k = 0; k < nLanes; k++) lanes.push(axis + (k + 0.5) / nLanes * Math.PI * 2 + (rnd(50 + k) - 0.5) * 0.3);
     const ringStep = clamp(R / 4, 80, 220);
@@ -286,6 +302,17 @@
     const near = (x, z, dd) => Math.hypot(x - dd.x, z - dd.z);
     for (const k in dist) { const d = dist[k]; d.x = Math.cos(d.a) * d.r; d.z = Math.sin(d.a) * d.r; d.rad = k === 'industry' ? Math.min(R * 0.3, 160) : k === 'palace' ? Math.min(plaza * 1.2, 60) : k === 'harbour' ? Math.min(R * 0.35, 120) : k === 'market' ? Math.max(plaza * 0.7, 30) : k === 'mine' ? Math.min(Math.max(24, R * 0.2), 70) : Math.min(Math.max(18, R * 0.16), 48); }
 
+    // --- landmark at the plaza edge, facing in; a wonder rises there over decades ---
+    const wonderProg = (sp & 16) ? 1 : workProg('wonder');
+    const lmKind = wonderProg >= 0 ? WONDER[cname][Math.min(8, (sp & 16) ? (sp >> 5) & 15 : era)] : LANDMARK[cname][band];
+    const lmAngle = axis + Math.PI * 0.9; const lmR = plaza * 0.9;
+    const landmarkSize = (kind, big) => {
+      const S = { menhirs: [plaza * 1.4, 3.5, plaza * 1.4], ziggurat: [46, 22, 46], pyramid: [110, 70, 110], steppyramid: [44, 26, 44], temple: [34, 17, 58], colosseum: [150, 45, 120], cathedral: [44, 60, 96], church: [16, 22, 34], basilica: [60, 55, 90], mosque: [50, 40, 50], tajmosque: [60, 55, 60], mudmosque: [36, 18, 36], onion: [24, 34, 40], hall: [48, 18, 26], pagoda: [22, 42, 22], stupa: [40, 26, 40], shikhara: [26, 42, 34], stepped: [60, 34, 60], mound: [70, 12, 70], pueblo: [40, 12, 30], palace: [110, 22, 40], keep: [26, 30, 26], station: [70, 18, 30], crystal: [120, 30, 60], irontower: [60, 300, 60], stadium: [190, 40, 150], spire: [70, 600, 70], lighthouse: [16, 55, 16], granary: [10, 8, 10] }[kind] || [30, 15, 30];
+      const m = big ? (kind === 'menhirs' ? 2.2 : kind === 'irontower' || kind === 'spire' ? 1.3 : 1.9) : 1;
+      return [S[0] * m, S[1] * m, S[2] * m];
+    };
+    const hasLm = lvl >= 2 || era === 0 || isCap;
+    const lmPlot = hasLm ? (() => { const [lw, , ld] = landmarkSize(lmKind, wonderProg >= 0); return { x: Math.cos(lmAngle) * (lmR + ld * 0.5), z: Math.sin(lmAngle) * (lmR + ld * 0.5), r: Math.max(lw, ld) * 0.5 }; })() : null;
     // --- houses on the slot grid ---
     const cellPass = (kind, x, z) => { for (const k in dist) { if (near(x, z, dist[k]) < dist[k].rad) return false; } return true; };
     const n = Math.ceil(R * 1.3 / s);
@@ -313,6 +340,7 @@
       const fill = 1 - smooth(R * 0.72 * lump, R * 1.25 * lump, r) * 0.92;
       if (hash(i, 300 + gx * 131 + gy) > fill) continue;
       if (!cellPass('h', x, z)) continue;
+      if (lmPlot && Math.hypot(x - lmPlot.x, z - lmPlot.z) < lmPlot.r + s * 0.45) continue;   // no house on the landmark's plot
       slots.push([r, x, z, gx, gy]);
     }
     slots.sort((a, b) => a[0] - b[0]);
@@ -347,15 +375,7 @@
       const hit = push(kind, x, z, w, h, d, yaw, colorOfP(pl, k + 10), packStyle(wm, rm, cul, 0), 0, prog); if (old) hit.era = Math.max(0, era - 1); count++; if (prog < 1) nSites++;
     }
 
-    // --- landmark at the plaza edge, facing in; a wonder rises there over decades ---
-    const wonderProg = (sp & 16) ? 1 : workProg('wonder');
-    const lmKind = wonderProg >= 0 ? WONDER[cname][Math.min(8, (sp & 16) ? (sp >> 5) & 15 : era)] : LANDMARK[cname][band];
-    const lmAngle = axis + Math.PI * 0.9; const lmR = plaza * 0.9;
-    const landmarkSize = (kind, big) => {
-      const S = { menhirs: [plaza * 1.4, 3.5, plaza * 1.4], ziggurat: [46, 22, 46], pyramid: [110, 70, 110], steppyramid: [44, 26, 44], temple: [34, 17, 58], colosseum: [150, 45, 120], cathedral: [44, 60, 96], church: [16, 22, 34], basilica: [60, 55, 90], mosque: [50, 40, 50], tajmosque: [60, 55, 60], mudmosque: [36, 18, 36], onion: [24, 34, 40], hall: [48, 18, 26], pagoda: [22, 42, 22], stupa: [40, 26, 40], shikhara: [26, 42, 34], stepped: [60, 34, 60], mound: [70, 12, 70], pueblo: [40, 12, 30], palace: [110, 22, 40], keep: [26, 30, 26], station: [70, 18, 30], crystal: [120, 30, 60], irontower: [60, 300, 60], stadium: [190, 40, 150], spire: [70, 600, 70], lighthouse: [16, 55, 16], granary: [10, 8, 10] }[kind] || [30, 15, 30];
-      const m = big ? (kind === 'menhirs' ? 2.2 : kind === 'irontower' || kind === 'spire' ? 1.3 : 1.9) : 1;
-      return [S[0] * m, S[1] * m, S[2] * m];
-    };
+    // --- the landmark itself (its plot was kept clear above) ---
     if (lvl >= 2 || era === 0 || isCap) {
       const [lw, lh, ld] = landmarkSize(lmKind, wonderProg >= 0);
       const lx = Math.cos(lmAngle) * (lmR + ld * 0.5), lz = Math.sin(lmAngle) * (lmR + ld * 0.5);
@@ -402,14 +422,22 @@
       const wm = wallStyle === 'palisade' ? WALL.wood : wallStyle === 'mud' ? WALL.adobe : WALL.stone;
       const newRing = !wallsL && wallWork >= 0;           // first walls: the ring closes around the town over the years
       const upgrading = wallsL && wallWork >= 0;          // higher walls: scaffolding here and there
-      const startSeg = Math.floor(rnd(45) * segs);
-      for (let k = 0; k < segs; k++) {
-        const a = k / segs * Math.PI * 2, a2 = (k + 1) / segs * Math.PI * 2; const am = (a + a2) / 2;
+      // the ring is cut so that every gate sits in the middle of its own stretch, exactly where its lane leaves the town;
+      // the arcs between gates are divided evenly
+      const TAU = Math.PI * 2; const dA = TAU / segs; const gs = gates.map((g) => ((g % TAU) + TAU) % TAU).sort((p, q) => p - q); const bounds = [];
+      for (let q = 0; q < gs.length; q++) {
+        const g = gs[q], gn = q + 1 < gs.length ? gs[q + 1] : gs[0] + TAU; const arc = gn - g - dA;
+        bounds.push([g - dA / 2, g + dA / 2, true]);
+        if (arc > dA * 0.2) { const nn = Math.max(1, Math.round(arc / dA)); for (let t = 0; t < nn; t++) bounds.push([g + dA / 2 + arc * t / nn, g + dA / 2 + arc * (t + 1) / nn, false]); }
+      }
+      const nSeg = bounds.length; const startSeg = Math.floor(rnd(45) * nSeg);
+      for (let k = 0; k < nSeg; k++) {
+        const a = bounds[k][0], a2 = bounds[k][1]; const am = (a + a2) / 2;
         let segProg = 1;
-        if (newRing) { const order = ((k - startSeg + segs) % segs) / segs; segProg = clamp((wallWork - order) / 0.12, 0, 1); if (segProg <= 0) continue; }
+        if (newRing) { const order = ((k - startSeg + nSeg) % nSeg) / nSeg; segProg = clamp((wallWork - order) / 0.12, 0, 1); if (segProg <= 0) continue; }
         else if (upgrading && !coarse && hash(i, 500 + k) < 0.25) segProg = clamp(wallWork + 0.3, 0.3, 0.95);
         // gate: a gap with a gatehouse
-        let isGate = false; for (const g of gates) { const da = Math.abs(((am - g) + Math.PI * 3) % (Math.PI * 2) - Math.PI); if (da < Math.PI / segs) isGate = true; }
+        const isGate = bounds[k][2];
         const x1 = Math.cos(a) * wallR, z1 = Math.sin(a) * wallR, x2 = Math.cos(a2) * wallR, z2 = Math.sin(a2) * wallR;
         const len = Math.hypot(x2 - x1, z2 - z1) * 1.04; const yaw = Math.atan2(z2 - z1, x2 - x1);
         if (isGate) { push('gatehouse', (x1 + x2) / 2, (z1 + z2) / 2, len, hW * 1.7, thick + 5, yaw, wCol, packStyle(wm, ROOF.slate, cul, 0), 0, segProg); walls.push({ x: (x1 + x2) / 2, z: (z1 + z2) / 2, gate: true }); continue; }
@@ -458,16 +486,21 @@
   }
 
   // settlement site: the sim's sub-cell point, nudged off river channels and, for coastal cells, inland so the town fits on land
-  const siteCache = new Map();
+  const siteCache = new Map(); let riversRef = null;
   function siteOf(sim, i, c, terrain, decal) {
+    if (decal) riversRef = decal; else decal = riversRef;        // every caller gets the same site, whether or not it has the rivers at hand
     const y = (i / W) | 0, x = i - y * W;
     const su = sim.siteU[i] >= 0 ? sim.siteU[i] : 0.5, sv = sim.siteU[i] >= 0 ? sim.siteV[i] : 0.5;
     let lon = (x + su) / W * 360 - 180, lat = 90 - (y + sv) / H * 180;
-    const R = c ? radiusM(sim, i, c) : 100; const key = `${su.toFixed(3)}|${sv.toFixed(3)}|${Math.round(R / 50)}|${terrain && terrain.stats ? terrain.stats.packsE + '/' + terrain.stats.packsI : 0}`;
+    const R = c ? radiusM(sim, i, c) : 100; const key = `${su.toFixed(3)}|${sv.toFixed(3)}|${Math.round(R / 50)}|${terrain && terrain.stats ? terrain.stats.packsE + '/' + terrain.stats.packsI : 0}|${decal && decal.segIndex ? 1 : 0}`;
     const hit = siteCache.get(i); if (hit && hit.key === key) return hit.pt;
     const cl = Math.max(0.15, Math.cos(lat * D2R)); const mLon = 1 / (6371000 * cl * D2R), mLat = 1 / (6371000 * D2R);
     const rv = decal ? decal.nearestRiver(lon, lat) : null;
-    if (rv && rv.d < rv.hw + 120) { const push = rv.hw + 160 - rv.d; lon += rv.px * push * mLon; lat += rv.py * push * mLat; }
+    // A village stands beside its river, not astride it. Towns are drawn far larger than life while rivers keep their
+    // true width, so the centre keeps a village's drawn radius clear of the channel; a town that outgrows that reaches
+    // the bank and then grows across. (A fixed distance: the centre must not wander as the town grows.)
+    if (decal) { const clear = 4500;
+      for (let pass = 0; pass < 4; pass++) { const rv = decal.nearestRiver(lon, lat); if (!rv || rv.d >= rv.hw + clear) break; const push = rv.hw + clear * 1.02 - rv.d; lon += rv.px * push * mLon; lat += rv.py * push * mLat; } }
     if (terrain && (sim.flags[i] & 4)) {
       // coastal cell: slide the town onto the land nearby (centroid of the dry samples in a grid around it)
       const lon0 = lon, lat0 = lat;
@@ -502,5 +535,5 @@
     for (const it of items) { it.x *= kS; it.z *= kS; it.w *= kS; it.d *= kS; it.h *= kH; }
     const out = { key, items, R: R * kS, k: kS }; ruinCache.set(i, out); if (ruinCache.size > 300) ruinCache.delete(ruinCache.keys().next().value); return out;
   }
-  window.TOWN = { siteOf, ruinLayout, CULTURES, WALL, ROOF, FLAG, cultureOf, civCulture, radiusM, radiusTrue, scaleOf, fieldsM, layout, packStyle, SLOT_N, cacheSize: () => cache.size, clearCache: () => cache.clear() };
+  window.TOWN = { siteOf, gateToward, ruinLayout, CULTURES, WALL, ROOF, FLAG, cultureOf, civCulture, radiusM, radiusTrue, scaleOf, fieldsM, layout, packStyle, SLOT_N, cacheSize: () => cache.size, clearCache: () => cache.clear() };
 })();

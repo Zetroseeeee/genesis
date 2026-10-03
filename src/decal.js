@@ -66,6 +66,7 @@
         }
       }
       this.segIndex = seg; this.SC = SC;
+      this.rect = null;                // the next update repaints everything, rivers included
     }
     // nearest river to (lon, lat) within the surrounding cells: {d (m), hw (m), px, py (unit vector away from the river, in metre space)} or null
     nearestRiver(lon, lat) {
@@ -191,22 +192,37 @@
           const farView = mpp > 40;                                  // from high up only towns get roads, and fewer of them
           if (farView && level[i] < 2) continue;
           for (let k = 0; k < Math.min(farView ? 2 : 3, cand.length); k++) {
-            const j = cand[k][1]; if (farView && level[j] < 2) continue; const [ax, ay] = site(i), [bx, by] = site(j);
+            const j = cand[k][1]; if (farView && level[j] < 2) continue; const [sax, say] = site(i), [sbx, sby] = site(j);
             // skip roads that would cross the sea (check the midpoint cell)
-            const mx = (ax + bx) / 2, my = (ay + by) / 2; const cx = Math.floor((mx / D2R + 180) / 360 * W), cy = Math.floor((90 - my / D2R) / 180 * H);
+            const mx = (sax + sbx) / 2, my = (say + sby) / 2; const cx = Math.floor((mx / D2R + 180) / 360 * W), cy = Math.floor((90 - my / D2R) / 180 * H);
             if (!land[cy * W + (((cx % W) + W) % W)]) continue;
             const tech = c.tech || 0; const wM = Math.max((4 + 6 * Math.min(1, tech * 3)) * 6, mpp * (farView ? 1.1 : 1.7)); const hw = wM * 0.5 / R_M;   // roads six times life width, to match the towns
-            // gentle curve through an offset midpoint
-            const h1 = hash(i, j) - 0.5; const dx = (bx - ax) * r.cl, dy = by - ay; const L = Math.hypot(dx, dy) || 1e-9;
+            // the road leaves each town through the gate that faces the other one (where that gate's lane ends), runs
+            // straight out for a stretch, then curves gently across country
+            const sep = Math.hypot((sbx - sax) * r.cl, sby - say); const be = Math.atan2(sby - say, (sbx - sax) * r.cl);
+            const [ga, gra] = TOWN.gateToward(sim, i, c, be), [gb, grb] = TOWN.gateToward(sim, j, c, be + Math.PI);
+            const ra = gra / R_M, rb = grb / R_M; const P = []; let q0, q3;
+            if (sep > (ra + rb) * 1.5) {
+              const out = Math.min(sep * 0.12, Math.max(ra, rb) * 0.5); const clA = Math.max(0.15, Math.cos(say)), clB = Math.max(0.15, Math.cos(sby));
+              const cA = Math.cos(ga), sA = Math.sin(ga), cB = Math.cos(gb), sB = Math.sin(gb);
+              P.push([sax + cA * ra / clA, say + sA * ra]); q0 = [sax + cA * (ra + out) / clA, say + sA * (ra + out)]; q3 = [sbx + cB * (rb + out) / clB, sby + sB * (rb + out)];
+            } else { q0 = [sax, say]; q3 = [sbx, sby]; }                // towns that touch: centre to centre, as the crow flies
+            const h1 = hash(i, j) - 0.5; const dx = (q3[0] - q0[0]) * r.cl, dy = q3[1] - q0[1]; const L = Math.hypot(dx, dy) || 1e-9;
             const px = -dy / L * L * 0.18 * h1 / r.cl, py = dx / L * L * 0.18 * h1;
-            const m1x = ax + (bx - ax) * 0.33 + px, m1y = ay + (by - ay) * 0.33 + py, m2x = ax + (bx - ax) * 0.66 + px * 0.8, m2y = ay + (by - ay) * 0.66 + py * 0.8;
+            P.push(q0, [q0[0] + (q3[0] - q0[0]) * 0.33 + px, q0[1] + (q3[1] - q0[1]) * 0.33 + py], [q0[0] + (q3[0] - q0[0]) * 0.66 + px * 0.8, q0[1] + (q3[1] - q0[1]) * 0.66 + py * 0.8], q3);
+            if (sep > (ra + rb) * 1.5) P.push([sbx + Math.cos(gb) * rb / Math.max(0.15, Math.cos(sby)), sby + Math.sin(gb) * rb]);
             const cls = c.era <= 2 ? 0.58 : c.era <= 6 ? 0.72 : 0.9;   // dirt track, cobbled road, asphalt (the terrain shader reads the class)
-            quad(ax, ay, m1x, m1y, hw, hw, cls, 1); quad(m1x, m1y, m2x, m2y, hw, hw, cls, 1); quad(m2x, m2y, bx, by, hw, hw, cls, 1); nroad++;
-            // the road as a curve for the movers (cached so their height samples survive rebuilds)
-            const rk = i * 1e6 + j; let rd = roadCache.get(rk);
-            if (!rd) { const P = [[ax, ay], [m1x, m1y], [m2x, m2y], [bx, by]]; const segL = [0, 1, 2].map(k => Math.hypot((P[k + 1][0] - P[k][0]) * r.cl, P[k + 1][1] - P[k][1])); const tot = segL[0] + segL[1] + segL[2] || 1e-9; rd = { i, j, era: c.era, lenKm: tot * 6371, f: (t) => { let d = t * tot; for (let k = 0; k < 3; k++) { if (d <= segL[k] || k === 2) { const u = segL[k] > 0 ? Math.min(1, d / segL[k]) : 0; return [(P[k][0] + (P[k + 1][0] - P[k][0]) * u) / D2R, (P[k][1] + (P[k + 1][1] - P[k][1]) * u) / D2R]; } d -= segL[k]; } return [bx / D2R, by / D2R]; } }; roadCache.set(rk, rd); if (roadCache.size > 600) roadCache.delete(roadCache.keys().next().value); }
+            for (let q = 0; q + 1 < P.length; q++) quad(P[q][0], P[q][1], P[q + 1][0], P[q + 1][1], hw, hw, cls, 1);
+            nroad++;
+            // the road as a curve for the movers (cached so their height samples survive rebuilds; remade when a gate moves)
+            const rk = i * 1e6 + j; let rd = roadCache.get(rk); const sig = P.length + ':' + P[0][0].toFixed(7) + ',' + P[0][1].toFixed(7) + ',' + P[P.length - 1][0].toFixed(7) + ',' + P[P.length - 1][1].toFixed(7);
+            if (!rd || rd.sig !== sig) {
+              const nS = P.length - 1; const segL = []; let tot = 0; for (let q = 0; q < nS; q++) { const l = Math.hypot((P[q + 1][0] - P[q][0]) * r.cl, P[q + 1][1] - P[q][1]); segL.push(l); tot += l; } tot = tot || 1e-9;
+              rd = { i, j, sig, era: c.era, lenKm: tot * 6371, f: (t) => { let d = t * tot; for (let q = 0; q < nS; q++) { if (d <= segL[q] || q === nS - 1) { const u = segL[q] > 0 ? Math.min(1, d / segL[q]) : 0; return [(P[q][0] + (P[q + 1][0] - P[q][0]) * u) / D2R, (P[q][1] + (P[q + 1][1] - P[q][1]) * u) / D2R]; } d -= segL[q]; } return [P[nS][0] / D2R, P[nS][1] / D2R]; } };
+              roadCache.delete(rk); roadCache.set(rk, rd); if (roadCache.size > 600) roadCache.delete(roadCache.keys().next().value);
+            }
             rd.era = c.era; rd.rail = c.era >= 6 && level[i] >= 2 && level[j] >= 2; roads.push(rd);
-            if (rd.rail) { const ox = -dy / L * 22 / R_M / r.cl, oy = dx / L * 22 / R_M; const hwr = Math.max(2.4, mpp * 0.9) / R_M; quad(ax + ox, ay + oy, m1x + ox, m1y + oy, hwr, hwr, 1.0, 1); quad(m1x + ox, m1y + oy, m2x + ox, m2y + oy, hwr, hwr, 1.0, 1); quad(m2x + ox, m2y + oy, bx + ox, by + oy, hwr, hwr, 1.0, 1); }
+            if (rd.rail) { const ox = -dy / L * 22 / R_M / r.cl, oy = dx / L * 22 / R_M; const hwr = Math.max(2.4, mpp * 0.9) / R_M; for (let q = 0; q + 1 < P.length; q++) quad(P[q][0] + ox, P[q][1] + oy, P[q + 1][0] + ox, P[q + 1][1] + oy, hwr, hwr, 1.0, 1); }
           }
         }
       }

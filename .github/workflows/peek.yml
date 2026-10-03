@@ -1,0 +1,50 @@
+# Fetches generated images (concept art and the like) from the generator's CDN, lays them out on one contact sheet and
+# keeps it as a release asset, so work in progress can be looked at from anywhere that reaches GitHub.
+name: Peek
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Name of the sheet (file name without extension)'
+        required: true
+      urls:
+        description: 'Image URLs, separated by spaces'
+        required: true
+      size:
+        description: 'Tile size in pixels'
+        required: false
+        default: '1024'
+      columns:
+        description: 'Tiles per row'
+        required: false
+        default: '2'
+permissions:
+  contents: write
+jobs:
+  sheet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch and lay out
+        env:
+          NAME: ${{ github.event.inputs.name }}
+          URLS: ${{ github.event.inputs.urls }}
+          SIZE: ${{ github.event.inputs.size }}
+          COLS: ${{ github.event.inputs.columns }}
+        run: |
+          set -euo pipefail
+          case "$NAME" in *[!A-Za-z0-9_-]*) echo "bad name"; exit 1;; esac
+          case "$SIZE$COLS" in *[!0-9]*) echo "bad size"; exit 1;; esac
+          mkdir -p in out; n=0
+          for u in $URLS; do
+            case "$u" in https://*) ;; *) echo "skipping $u"; continue;; esac
+            n=$((n+1)); curl -fsSL --retry 3 -o "in/$(printf '%02d' $n).img" "$u"
+          done
+          montage in/*.img -resize "${SIZE}x${SIZE}" -tile "${COLS}x" -geometry +6+6 -background '#202020' "out/$NAME.jpg"
+          ls -la out
+      - name: Keep
+        run: |
+          gh release view peek -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create peek -R "$GITHUB_REPOSITORY" --title "Work in progress" --notes "Contact sheets of generated images, for review." --latest=false
+          gh release upload peek out/*.jpg -R "$GITHUB_REPOSITORY" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

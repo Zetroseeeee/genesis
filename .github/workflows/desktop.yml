@@ -9,6 +9,7 @@ on:
       - 'vendor/**'
       - 'package.json'
       - 'tools/build.js'
+      - 'tools/scenes/**'
       - '.github/workflows/desktop.yml'
   workflow_dispatch: {}
 permissions:
@@ -32,12 +33,36 @@ jobs:
         run: npm run pack:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Sign (ad hoc) and wrap
+      - name: Sign (ad hoc)
         run: |
           set -euxo pipefail
           APP="release/mac-arm64/GENESIS.app"
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
+          mkdir -p out
+      # Start the packaged app on this Mac, wait for the world, the models and the art, open a village and keep a picture.
+      # The result is recorded with the build; it does not hold the build back (a hosted runner's GPU is not a gaming Mac).
+      - name: Launch check
+        id: launch
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          cat tools/testcam.js tools/scenes/village.js > out/scene.js
+          GENESIS_SMOKE_SHOT="$PWD/out/launch.png" GENESIS_SMOKE_SCRIPT="$PWD/out/scene.js" GENESIS_SMOKE_SETTLE=25 \
+            "release/mac-arm64/GENESIS.app/Contents/MacOS/GENESIS" --smoke 2>out/launch.err | tee out/launch.log
+          tail -n 40 out/launch.err || true
+          grep -q '"ok":true' out/launch.log
+      - name: Keep the launch check
+        if: always()
+        run: |
+          gh release view ci-logs >/dev/null 2>&1 || gh release create ci-logs --title "CI logs" --notes "Logs from workflow runs." --latest=false
+          for f in out/launch.log out/launch.png out/launch.err; do [ -s "$f" ] && gh release upload ci-logs "$f" --clobber || true; done
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Wrap
+        run: |
+          set -euxo pipefail
+          APP="release/mac-arm64/GENESIS.app"
           VERSION=$(node -p "require('./package.json').version")
           mkdir -p out/dmg && cp -R "$APP" out/dmg/ && ln -s /Applications out/dmg/Applications
           # hdiutil on hosted runners sometimes reports "Resource busy": try a few times
@@ -51,7 +76,8 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SHA=$(git rev-parse --short HEAD)
-          NOTES="GENESIS $VERSION for Apple Silicon Macs, built from $SHA. Open the .dmg and drag GENESIS to Applications. The app is not notarised by Apple: on first launch macOS will refuse it; open System Settings > Privacy & Security and choose Open Anyway."
+          CHECK="${{ steps.launch.outcome == 'success' && 'The packaged app was started on the build Mac and loaded the world, the models and the art.' || 'The automatic launch check did not pass on the build Mac; see the ci-logs release.' }}"
+          NOTES="GENESIS $VERSION for Apple Silicon Macs, built from $SHA. Open the .dmg and drag GENESIS to Applications. The app is not notarised by Apple: on first launch macOS will refuse it; open System Settings > Privacy & Security and choose Open Anyway. $CHECK"
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "GENESIS (latest build)" --notes "$NOTES"
           gh release edit latest --notes "$NOTES" --latest
           for f in $(gh release view latest --json assets --jq '.assets[].name'); do gh release delete-asset latest "$f" --yes; done

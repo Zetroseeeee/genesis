@@ -78,7 +78,7 @@
   const M = {
     ready: false, failed: false, defs: {}, byKind: {}, base: 'data/models/', group: null, shared: null, loader: null,
     // pixel heights at which each LOD takes over (l0 above the first, l1 above the second, ...)
-    lodPx: [520, 190, 60, 18, 0], lodBias: 1, maxLoads: 3, loading: 0, queue: [], dirty: false, anisotropy: 8,
+    lodPx: [520, 190, 60, 18, 0], lodBias: 1, maxLoads: 6, loading: 0, queue: [], dirty: false, anisotropy: 8,
     stats: { instances: 0, tris: 0, draws: 0, loaded: 0 }, VERT, FRAG,
   };
 
@@ -100,8 +100,10 @@
         M.defs[id] = def; for (const kind of def.kinds) (M.byKind[kind] = M.byKind[kind] || []).push(def);
       }
       M.ready = Object.keys(M.defs).length > 0;
-      // the coarsest step of every model is a few kilobytes: fetch them all now so no town ever opens on kit boxes
+      // the two coarsest steps of every model are a few kilobytes each: fetch them all now (coarsest first), so no town
+      // ever opens on kit boxes and what stands in while the finer files arrive already has the model's shape
       for (const id in M.defs) { const d = M.defs[id]; request(d, d.lods[d.lods.length - 1], false); }
+      for (const id in M.defs) { const d = M.defs[id]; if (d.lods.length > 1) request(d, d.lods[d.lods.length - 2], false); }
     } catch (e) { console.warn('models unavailable', e); M.failed = true; }
     return M;
   };

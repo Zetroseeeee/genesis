@@ -140,7 +140,8 @@
                 if (!staged && def.fit !== 'run' && def.fit !== 'gate') { const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count) { this.setInst(sc, si, lon, lat, hg, md[0] * 1.1, md[1] * Math.min(1, prog + 0.3) * 1.03, md[2] * 1.1, md[3], era >= 6 ? 0x8f949a : 0x8a6a44, era, seed + k * 0.013, TOWN.packStyle(era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; } }
                 if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: md[0], d: md[2], k: kRep, prog, era });
               }
-              if (wantCasters && nCasters < 5000 && prog > 0.3 && !def.open) { casters.push(lon, lat, md[0], md[1] * Math.min(1, prog + 0.2), md[2], md[3]); nCasters++; }     // open monuments (stone circles) cast no block shadow
+              // a block shadow for now: a model's roof slopes away from its eaves, so the block is lower and narrower than its bounds; open monuments (stone circles) cast none
+              if (wantCasters && nCasters < 5000 && prog > 0.3 && !def.open) { casters.push(lon, lat, md[0] * 0.86, md[1] * 0.6 * Math.min(1, prog + 0.2), md[2] * 0.86, md[3]); nCasters++; }
               continue;
             }
           }
@@ -183,7 +184,7 @@
     }
     // one model instance at lon/lat: sx, sy, sz are drawn metres per model metre along the model's own axes.
     // false = none of its files has loaded yet.
-    putModel(def, lon, lat, hg, yaw, sx, sy, sz, era, seed, mflags, prog, camPos, pxPerRad) {
+    putModel(def, lon, lat, hg, yaw, sx, sy, sz, era, seed, mflags, prog, camPos, pxPerRad, shear, shearZ) {
       const m = this._m; const el = m.elements; const kx = sx / R_M, ky = sy / R_M, kz = sz / R_M;
       const lo = lon * GEO.D2R, la = lat * GEO.D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
       const Ex = -slo, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
@@ -193,20 +194,32 @@
       el[4] = Ux * ky; el[5] = Uy * ky; el[6] = Uz * ky; el[7] = 0;
       el[8] = (sy2 * Ex - cy * Nx) * kz; el[9] = (-cy * Ny) * kz; el[10] = (sy2 * Ez - cy * Nz) * kz; el[11] = 0;
       el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
+      // a stretch of wall on a slope: its far end stands higher than its near end, posts still upright (a shear, not a tilt)
+      if (shear) { const q = shear / R_M; if (shearZ) { el[8] += Ux * q; el[9] += Uy * q; el[10] += Uz * q; } else { el[0] += Ux * q; el[1] += Uy * q; el[2] += Uz * q; } }
       const dx = camPos.x - el[12], dy = camPos.y - el[13], dz = camPos.z - el[14];
       const px = def.h * ky / Math.max(1e-9, Math.sqrt(dx * dx + dy * dy + dz * dz)) * pxPerRad;
       const L = MODELS.lodFor(def, px); if (!L) return false;
       MODELS.push(L, m, era, seed, mflags, prog);
       return true;
     }
+    // ground heights at the joints of a run, kept on the plan item until finer elevation arrives
+    runHeights(it, tag, lon, lat, planYaw, len, n, cl) {
+      const T = this.terrain; const store = it._rh || (it._rh = {}); const e = store[tag];
+      if (e && e.v === T.meshVersion && e.d === T.dispOn && e.h.length === n + 1) return e.h;
+      const h = new Float32Array(n + 1); const cy = Math.cos(planYaw), sy = Math.sin(planYaw); const vc = new Map();
+      for (let j = 0; j <= n; j++) { const o = (j / n - 0.5) * len; h[j] = Math.max(0, T.meshHeightAt(lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), vc)); }
+      store[tag] = { v: T.meshVersion, d: T.dispOn, h }; return h;
+    }
     // a run of one model end to end along a line (walls, fences): as many life-size copies as fit, stretched a
-    // little so they meet exactly. cx/cz: the line's direction (east, north); len in drawn metres.
-    runModel(def, lon, lat, hg, planYaw, len, kRep, cl, era, seed, mflags, prog, camPos, pxPerRad) {
-      const alongZ = def.d > def.w; const unit = (alongZ ? def.d : def.w) * kRep; const n = Math.max(1, Math.round(len / unit)); const stretch = len / (n * (alongZ ? def.d : def.w));
+    // little so they meet exactly, each one following the ground from joint to joint. len in drawn metres.
+    runModel(def, it, tag, lon, lat, planYaw, len, kRep, cl, era, seed, mflags, prog, camPos, pxPerRad) {
+      const alongZ = def.d > def.w; const one = alongZ ? def.d : def.w; const n = Math.max(1, Math.round(len / (one * kRep))); const stretch = len / (n * one);
       const cy = Math.cos(planYaw), sy = Math.sin(planYaw); const yaw = planYaw + (alongZ ? Math.PI / 2 : 0); let ok = false;
+      const hs = this.runHeights(it, tag, lon, lat, planYaw, len, n, cl);
       for (let j = 0; j < n; j++) {
-        const o = (j - (n - 1) / 2) * (len / n);
-        ok = this.putModel(def, lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), hg, yaw, alongZ ? kRep : stretch, kRep, alongZ ? stretch : kRep, era, seed + j * 0.171, mflags, prog, camPos, pxPerRad) || ok;
+        const o = (j - (n - 1) / 2) * (len / n); const hA = hs[j], hB = hs[j + 1];
+        ok = this.putModel(def, lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), (hA + hB) / 2, yaw, alongZ ? kRep : stretch, kRep, alongZ ? stretch : kRep, era, seed + j * 0.171, mflags,
+          prog, camPos, pxPerRad, (hB - hA) * this.exag / one, alongZ) || ok;
       }
       return ok ? n : 0;
     }
@@ -216,22 +229,24 @@
     placeModel(def, it, lon, lat, hg, era, seed, prog, kRep, camPos, pxPerRad, cl) {
       const flags = Math.floor(it.style / 1024); const landmark = flags & 1; const mf = (flags & 16) ? 1 : 0; const md = this._md || (this._md = [0, 0, 0, 0]);
       if (def.fit === 'run') {
-        const n = this.runModel(def, lon, lat, hg, it.yaw, it.w, kRep, cl, era, seed, mf, prog, camPos, pxPerRad);
+        const n = this.runModel(def, it, 'r', lon, lat, it.yaw, it.w, kRep, cl, era, seed, mf, prog, camPos, pxPerRad);
         md[0] = it.w; md[1] = def.h * kRep; md[2] = Math.min(def.w, def.d) * kRep; md[3] = it.yaw; return n;
       }
       if (def.fit === 'gate') {
         const gw = Math.max(def.w, def.d) * kRep; const alongZ = def.d > def.w; const yaw = it.yaw + (alongZ ? Math.PI / 2 : 0);
         if (!this.putModel(def, lon, lat, hg, yaw, kRep, kRep, kRep, era, seed, mf, prog, camPos, pxPerRad)) return 0;
         let n = 1; const side = def.sides ? MODELS.defs[def.sides] : null; const rest = (it.w - gw) / 2;
-        if (side && rest > gw * 0.2) { const cy = Math.cos(it.yaw), sy = Math.sin(it.yaw); for (const sgn of [-1, 1]) { const o = sgn * (gw / 2 + rest / 2); n += this.runModel(side, lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), hg, it.yaw, rest, kRep, cl, era, seed + sgn * 0.31, mf, prog, camPos, pxPerRad); } }
+        if (side && rest > gw * 0.2) { const cy = Math.cos(it.yaw), sy = Math.sin(it.yaw); for (const sgn of [-1, 1]) { const o = sgn * (gw / 2 + rest / 2); n += this.runModel(side, it, sgn < 0 ? 'a' : 'b', lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), it.yaw, rest, kRep, cl, era, seed + sgn * 0.31, mf, prog, camPos, pxPerRad); } }
         md[0] = it.w; md[1] = def.h * kRep; md[2] = Math.min(def.w, def.d) * kRep; md[3] = it.yaw; return n;
       }
       // turn the model so its long side lies along the plot's long side
       const turn = (def.d > def.w * 1.2 && it.w > it.d * 1.2) || (def.w > def.d * 1.2 && it.d > it.w * 1.2);
       const pw = turn ? it.d : it.w, pd = turn ? it.w : it.d;
       let u;
-      if (landmark || def.fit === 'box') u = Math.min(pw / def.w, pd / def.d);
-      else { const f = Math.min(pw / (def.w * kRep), pd / (def.d * kRep)); u = kRep * Math.max(0.8, Math.min(1.25, f)); }
+      // every model stands at life size on the town's drawn scale, with a little give to suit its plot: more for the
+      // building a town gathers around, and a wonder may be the outsized version of its kind
+      if (def.fit === 'box') u = Math.min(pw / def.w, pd / def.d);
+      else { const f = Math.min(pw / (def.w * kRep), pd / (def.d * kRep)); u = kRep * Math.max(landmark ? 0.75 : 0.8, Math.min((flags & 8) ? 2.2 : landmark ? 1.4 : 1.25, f)); }
       const yaw = it.yaw + (turn ? Math.PI / 2 : 0);
       if (!this.putModel(def, lon, lat, hg, yaw, u, u, u, era, seed, mf, prog, camPos, pxPerRad)) return 0;
       md[0] = def.w * u; md[1] = def.h * u; md[2] = def.d * u; md[3] = yaw; return 1;
