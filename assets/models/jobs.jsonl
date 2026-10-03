@@ -17,3 +17,11 @@
 {"id":"stone_domehut_a","mesh":"f67c4762-041a-4172-af76-f4e64450c590"}
 {"id":"stone_stilthouse_a","mesh":"7214f57e-ec2c-47d0-a208-7aaea9c6d323"}
 {"id":"stone_palmhut_a","mesh":"861aeb29-c843-43d4-a992-548ac4315a91"}
+{"id":"stone_mudround_a","concept":"036b761b-e325-4ddd-baae-156a03783aee","cts":"20261003_135223","mesh":"ca60b1fd-001e-45d1-90ac-2fbdaf058a7f"}
+{"id":"stone_tpillars_a","concept":"036fdd2b-9144-44fb-be98-c8caacf31b83","cts":"20261003_135222","mesh":"87edd9a2-f6d3-4e94-9d1e-69405d8840e0"}
+{"id":"stone_timbercircle_a","concept":"1a6d9407-1fce-43a7-8929-97e1234a6bb8","cts":"20261003_135223","mesh":"c054e85c-70e8-4abf-b69a-a8b0d06313fa"}
+{"id":"stone_palisade_a","concept":"4c68c5c8-2f73-425c-a11a-036f29be5d72","cts":"20261003_135222","mesh":"7755d2fb-3027-4734-aae7-473cbef2b60e"}
+{"id":"stone_gate_a","concept":"562efe47-a9fa-4dc8-9ac6-d9ec3cbc43e4"}
+{"id":"stone_watchtower_a","concept":"5fb233e1-802b-4772-8675-6442b0be496d"}
+{"id":"stone_granary_a","concept":"8fb2bf95-b2ca-4bea-a552-f66e4eb72dde"}
+{"id":"stone_roundhouse_site","concept":"c41aac94-3ae2-4fe2-a523-9a95defa0d81"}
