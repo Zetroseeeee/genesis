@@ -38,6 +38,7 @@
   // ---------- renderer ----------
   const stage = $('stage');
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
+  if (window.SHADOWS) SHADOWS.init(renderer, 4096);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.setClearColor(0x05070c, 1);
@@ -58,6 +59,7 @@
     uSeason: { value: new THREE.Vector4(1, 0, 0, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
   };
+  if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
 
   // ---------- loading ----------
   function setLoad(pct, step) { $('loadbar').style.transform = `scaleX(${pct / 100})`; if (step) $('loadstep').textContent = step; }
@@ -77,6 +79,7 @@
       const old = globals.uDet.value; globals.uDet.value = arr; if (old) old.dispose();
     } catch (e) { console.warn('detail array unavailable', e); }
   }
+  const _shC = new THREE.Vector3();
   function loadImageData(url) {
     return new Promise((res, rej) => { const im = new Image(); im.onload = () => { const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(im, 0, 0); res(ctx.getImageData(0, 0, im.width, im.height)); }; im.onerror = () => rej(new Error('failed ' + url)); im.src = url; });
   }
@@ -100,7 +103,7 @@
       terrain = new TERRAIN.Terrain({ scene, index, base: 'data/', globals, exag: 2.0, anisotropy: Math.min(8, renderer.capabilities.getMaxAnisotropy()) });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
-      trees = new TREES.Trees({ scene, terrain }); trees.load('data/veg.jpg', 'data/noise.png').catch((e) => console.warn('veg', e));
+      trees = new TREES.Trees({ scene, terrain, renderer }); trees.load('data/veg.jpg', 'data/noise.png').catch((e) => console.warn('veg', e));
       life = new LIFE.Life({ scene, terrain }); movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
@@ -872,6 +875,16 @@
     if (world.cloudTex && globals.uClouds.value !== world.cloudTex) globals.uClouds.value = world.cloudTex;
     globals.uCloudShift.value = world.cloudShift; globals.uCloudVis.value = world.cloudVis;
     world.updateBuildings(mapcam, false);
+    // sun shadows: a depth map of what stands around the point the camera looks at, pushed a little way down the view
+    if (window.SHADOWS && SHADOWS.ready) {
+      if (mapcam.alt < 0.03 && settings.quality === 'high') {
+        const f = GEO.enu(mapcam.lon, mapcam.lat); const hC = Math.max(0, terrain.heightAt(mapcam.lon, mapcam.lat));
+        const half = clamp(mapcam.dist * 2.2, 250 / GEO.R_M, 9000 / GEO.R_M);
+        const c = _shC.copy(f.up).multiplyScalar(1 + hC * terrain.exag / GEO.R_M).addScaledVector(f.north, Math.cos(mapcam.heading) * half * 0.4 * Math.min(1, mapcam.tilt)).addScaledVector(f.east, Math.sin(mapcam.heading) * half * 0.4 * Math.min(1, mapcam.tilt));
+        SHADOWS.enabled = true;
+        SHADOWS.update(renderer, scene, camera, c, half, globals.uSun.value, f.up, world.castersVersion + ':' + (trees ? trees.castersVersion : 0) + ':' + (window.MODELS ? MODELS.stats.loaded : 0), day);
+      } else SHADOWS.uniforms.uShadowP.value.x = 0;
+    }
     const low = clamp(1 - mapcam.alt / 0.05, 0, 1) * day;
     renderer.setClearColor(new THREE.Color(0.02 + 0.5 * low, 0.027 + 0.62 * low, 0.047 + 0.85 * low), 1);
     updateLabels(); updatePlots();

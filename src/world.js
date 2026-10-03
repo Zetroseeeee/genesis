@@ -28,7 +28,7 @@
         const m = new THREE.InstancedMesh(geo, this.bMat, MAXI[k]); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         // allocate instance colours up front so the shader compiles with per-instance colour from the first frame
         m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXI[k] * 3).fill(1), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
-        m.userData.kind = k; this.inst[k] = m; this.buildingGroup.add(m);
+        m.userData.kind = k; this.inst[k] = m; this.buildingGroup.add(m); if (window.SHADOWS && k !== 'lamp') SHADOWS.caster(m);
       }
       this.sunLight = new THREE.DirectionalLight(0xfff2dc, 1.4); this.scene.add(this.sunLight); this.scene.add(this.sunLight.target);
       this.hemi = new THREE.HemisphereLight(0xbcd3f2, 0x5a4a3a, 0.9); this.scene.add(this.hemi);
@@ -94,7 +94,7 @@
       const exag = this.exag; const m = this._m; const el = m.elements;
       const packsE = T.stats ? T.stats.packsE : 0; void packsE;
       let total = 0; const TOTAL_MAX = 70000; let nCasters = 0; const sites = this.sites = []; const SITE_MAX = 60;
-      const useModels = !!(window.MODELS && MODELS.ready && this.modelsOn); if (useModels) MODELS.begin();
+      const useModels = !!(window.MODELS && MODELS.ready && this.modelsOn); if (useModels) MODELS.begin(); this.buildPass = (this.buildPass || 0) + 1;
       const camPos = cam.camera.position; const pxPerRad = (window.innerHeight || 800) / (2 * Math.tan((cam.camera.fov || 45) * Math.PI / 360));
       // settlements nearest the camera first, so the town you are looking at always gets its full budget
       const cells = [];
@@ -130,12 +130,14 @@
           const hg = hts[k]; if (hg < 0.5 && it.kind !== 'pier' && it.kind !== 'boat' && it.kind !== 'ship') continue;
           const prog = it.prog === undefined ? 1 : it.prog;
           if (useModels) {
-            let def = MODELS.pick(it.kind, it.era !== undefined ? it.era : era, cul, hash(i, 4000 + k)), mprog = prog, staged = false;
+            if (it.kind === 'stall' && L.marketModel === this.buildPass) continue;      // the market model brings its own stalls
+            const mEra = it.era !== undefined ? it.era : era; let def = (it.as && MODELS.pick(it.as, mEra, cul, hash(i, 4000 + k))) || MODELS.pick(it.kind, mEra, cul, hash(i, 4000 + k)), mprog = prog, staged = false;
             // a model with its own building-site stage: the frame goes up first (rising from the ground), then the finished building replaces it
-            if (def && prog < 1 && def.site && MODELS.defs[def.site]) { staged = true; if (prog < 0.72) { def = MODELS.defs[def.site]; mprog = Math.min(1, prog / 0.3); } else mprog = 1; }
-            const nPut = def ? this.placeModel(def, it, lon, lat, hg, era, seed + k * 0.013, mprog, kRep, camPos, pxPerRad, cl) : 0;
+            let fitTo = null;
+            if (def && prog < 1 && def.site && MODELS.defs[def.site]) { staged = true; if (prog < 0.72) { fitTo = def; def = MODELS.defs[def.site]; mprog = Math.min(1, prog / 0.3); } else mprog = 1; }
+            const nPut = def ? this.placeModel(def, it, lon, lat, hg, era, seed + k * 0.013, mprog, kRep, camPos, pxPerRad, cl, fitTo) : 0;
             if (nPut) {
-              total += nPut; const md = this._md;
+              total += nPut; const md = this._md; if (it.as === 'market') L.marketModel = this.buildPass;
               if (prog < 1 && prog > 0.05 && prog < 0.97) {
                 if (!staged && def.fit !== 'run' && def.fit !== 'gate') { const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count) { this.setInst(sc, si, lon, lat, hg, md[0] * 1.1, md[1] * Math.min(1, prog + 0.3) * 1.03, md[2] * 1.1, md[3], era >= 6 ? 0x8f949a : 0x8a6a44, era, seed + k * 0.013, TOWN.packStyle(era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; } }
                 if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: md[0], d: md[2], k: kRep, prog, era });
@@ -214,11 +216,12 @@
     // little so they meet exactly, each one following the ground from joint to joint. len in drawn metres.
     runModel(def, it, tag, lon, lat, planYaw, len, kRep, cl, era, seed, mflags, prog, camPos, pxPerRad) {
       const alongZ = def.d > def.w; const one = alongZ ? def.d : def.w; const n = Math.max(1, Math.round(len / (one * kRep))); const stretch = len / (n * one);
+      const kUp = kRep * (it.th ? Math.max(0.8, Math.min(1.5, it.th / def.h)) : 1);       // a wall stands as high as it was planned: each level adds to it
       const cy = Math.cos(planYaw), sy = Math.sin(planYaw); const yaw = planYaw + (alongZ ? Math.PI / 2 : 0); let ok = false;
       const hs = this.runHeights(it, tag, lon, lat, planYaw, len, n, cl);
       for (let j = 0; j < n; j++) {
         const o = (j - (n - 1) / 2) * (len / n); const hA = hs[j], hB = hs[j + 1];
-        ok = this.putModel(def, lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), (hA + hB) / 2, yaw, alongZ ? kRep : stretch, kRep, alongZ ? stretch : kRep, era, seed + j * 0.171, mflags,
+        ok = this.putModel(def, lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), (hA + hB) / 2, yaw, alongZ ? kRep : stretch, kUp, alongZ ? stretch : kRep, era, seed + j * 0.171, mflags,
           prog, camPos, pxPerRad, (hB - hA) * this.exag / one, alongZ) || ok;
       }
       return ok ? n : 0;
@@ -226,7 +229,7 @@
     // a real model on a plan item. Houses stand at life size times the town's drawn scale (a little give either way to
     // suit the plot); landmarks fill the plot they were planned for; walls run end to end; a gate stands life-size in
     // the middle of its stretch of wall. Leaves the drawn size in this._md; returns instances placed (0 = not loaded).
-    placeModel(def, it, lon, lat, hg, era, seed, prog, kRep, camPos, pxPerRad, cl) {
+    placeModel(def, it, lon, lat, hg, era, seed, prog, kRep, camPos, pxPerRad, cl, fitTo) {
       const flags = Math.floor(it.style / 1024); const landmark = flags & 1; const mf = (flags & 16) ? 1 : 0; const md = this._md || (this._md = [0, 0, 0, 0]);
       if (def.fit === 'run') {
         const n = this.runModel(def, it, 'r', lon, lat, it.yaw, it.w, kRep, cl, era, seed, mf, prog, camPos, pxPerRad);
@@ -234,20 +237,30 @@
       }
       if (def.fit === 'gate') {
         const gw = Math.max(def.w, def.d) * kRep; const alongZ = def.d > def.w; const yaw = it.yaw + (alongZ ? Math.PI / 2 : 0);
-        if (!this.putModel(def, lon, lat, hg, yaw, kRep, kRep, kRep, era, seed, mf, prog, camPos, pxPerRad)) return 0;
-        let n = 1; const side = def.sides ? MODELS.defs[def.sides] : null; const rest = (it.w - gw) / 2;
+        const side = def.sides ? MODELS.defs[def.sides] : null;
+        const up = it.th && side ? Math.max(0.8, Math.min(1.5, it.th / side.h)) : 1;      // the gate rises with the wall it stands in
+        if (!this.putModel(def, lon, lat, hg, yaw, kRep, kRep * up, kRep, era, seed, mf, prog, camPos, pxPerRad)) return 0;
+        let n = 1; const rest = (it.w - gw) / 2;
         if (side && rest > gw * 0.2) { const cy = Math.cos(it.yaw), sy = Math.sin(it.yaw); for (const sgn of [-1, 1]) { const o = sgn * (gw / 2 + rest / 2); n += this.runModel(side, it, sgn < 0 ? 'a' : 'b', lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), it.yaw, rest, kRep, cl, era, seed + sgn * 0.31, mf, prog, camPos, pxPerRad); } }
         md[0] = it.w; md[1] = def.h * kRep; md[2] = Math.min(def.w, def.d) * kRep; md[3] = it.yaw; return n;
       }
       // turn the model so its long side lies along the plot's long side
-      const turn = (def.d > def.w * 1.2 && it.w > it.d * 1.2) || (def.w > def.d * 1.2 && it.d > it.w * 1.2);
+      const B = fitTo || def;                 // a building site is laid out for the building it will become
+      const turn = (B.d > B.w * 1.2 && it.w > it.d * 1.2) || (B.w > B.d * 1.2 && it.d > it.w * 1.2);
       const pw = turn ? it.d : it.w, pd = turn ? it.w : it.d;
       let u;
       // every model stands at life size on the town's drawn scale, with a little give to suit its plot: more for the
       // building a town gathers around, and a wonder may be the outsized version of its kind
-      if (def.fit === 'box') u = Math.min(pw / def.w, pd / def.d);
-      else { const f = Math.min(pw / (def.w * kRep), pd / (def.d * kRep)); u = kRep * Math.max(landmark ? 0.75 : 0.8, Math.min((flags & 8) ? 2.2 : landmark ? 1.4 : 1.25, f)); }
-      const yaw = it.yaw + (turn ? Math.PI / 2 : 0);
+      if (B.fit === 'box') u = Math.min(pw / B.w, pd / B.d);
+      else { const f = Math.min(pw / (B.w * kRep), pd / (B.d * kRep)); u = kRep * Math.max(landmark ? 0.75 : 0.8, Math.min((flags & 8) ? 2.2 : landmark ? 1.4 : 1.25, f)); }
+      let yaw = it.yaw + (turn ? Math.PI / 2 : 0);
+      if (fitTo) {
+        // the site fills the footprint of the finished building, its long side along the building's
+        const swap = (def.d > def.w * 1.15) !== (B.d > B.w * 1.15) && Math.abs(B.d - B.w) > 0.15 * Math.max(B.d, B.w);
+        const us = Math.min(B.w * u / (swap ? def.d : def.w), B.d * u / (swap ? def.w : def.d)); if (swap) yaw += Math.PI / 2;
+        if (!this.putModel(def, lon, lat, hg, yaw, us, us, us, era, seed, mf, prog, camPos, pxPerRad)) return 0;
+        md[0] = B.w * u; md[1] = def.h * us; md[2] = B.d * u; md[3] = it.yaw + (turn ? Math.PI / 2 : 0); return 1;
+      }
       if (!this.putModel(def, lon, lat, hg, yaw, u, u, u, era, seed, mf, prog, camPos, pxPerRad)) return 0;
       md[0] = def.w * u; md[1] = def.h * u; md[2] = def.d * u; md[3] = yaw; return 1;
     }

@@ -14,26 +14,53 @@
   const CLOTHES = [[0x6b5a44, 0x8a7355, 0x5a4a3a, 0xa08868], [0x8a5a3a, 0x6b6b4a, 0xb0925e, 0x5a3a5a, 0xa03a2a], [0xc9c0a8, 0x8a2a2a, 0x2a3a6a, 0x6a5a3a, 0xd9d0b8], [0x3a3a3a, 0x8a2a2a, 0x2a3a6a, 0x6a5a3a, 0xd9d0b8], [0x2a2a4a, 0x8a2a2a, 0x1a4a3a, 0xd9d0b8, 0x5a3a2a], [0x2a2a2a, 0x4a3a2a, 0x6a6a6a, 0x3a3a5a], [0x2a2a2a, 0x3a4a8a, 0xd9d9d9, 0x8a2a2a, 0x2a6a3a], [0x2a2a2a, 0x3a4a8a, 0xf0f0f0, 0xd93a2a, 0x2aa05a, 0xf0c02a]];
   const CARS = [0xd9d9d9, 0x2a2a2a, 0x8a8a8a, 0xb02a2a, 0x2a3a8a, 0xe0e0e0, 0x3a6a3a, 0xd0b040];
 
+  // ---------- people: small articulated figures (tunic, head, limbs), instanced; arms and legs swing as they walk ----------
+  // forward is +X, up +Y. aPart: x = which part (0 body, 1 head, 2/3 legs, 4/5 arms), y = height of the joint it swings from, z = 1 for bare skin
+  function figureGeometry() {
+    const pos = [], nor = [], part = [];
+    const box = (cx, cy, cz, sx, sy, sz, id, piv, skin, taper) => {
+      const hx = sx / 2, hy = sy / 2, hz = sz / 2; const t = taper === undefined ? 1 : taper;           // taper: the top is this much narrower than the bottom
+      const c = [[-hx, -hy, -hz], [hx, -hy, -hz], [hx, -hy, hz], [-hx, -hy, hz], [-hx * t, hy, -hz * t], [hx * t, hy, -hz * t], [hx * t, hy, hz * t], [-hx * t, hy, hz * t]];
+      const faces = [[0, 1, 2, 3, 0, -1, 0], [7, 6, 5, 4, 0, 1, 0], [4, 5, 1, 0, 0, 0, -1], [6, 7, 3, 2, 0, 0, 1], [5, 6, 2, 1, 1, 0, 0], [7, 4, 0, 3, -1, 0, 0]];
+      for (const f of faces) for (const k of [0, 1, 2, 0, 2, 3]) { const v = c[f[k]]; pos.push(cx + v[0], cy + v[1], cz + v[2]); nor.push(f[4], f[5], f[6]); part.push(id, piv, skin); }
+    };
+    box(0, 1.13, 0, 0.21, 0.54, 0.37, 0, 0, 0, 0.9);              // chest
+    box(0, 0.74, 0, 0.25, 0.32, 0.36, 0, 0, 0, 0.82);             // the skirt of the tunic
+    box(0, 0.40, 0.09, 0.11, 0.80, 0.12, 2, 0.80, 1); box(0, 0.40, -0.09, 0.11, 0.80, 0.12, 3, 0.80, 1);   // legs
+    box(0, 1.10, 0.235, 0.09, 0.56, 0.09, 4, 1.36, 1); box(0, 1.10, -0.235, 0.09, 0.56, 0.09, 5, 1.36, 1);  // arms
+    const head = new THREE.IcosahedronGeometry(0.118, 1).toNonIndexed(); const hp = head.attributes.position.array, hn = head.attributes.normal.array;
+    for (let i = 0; i < hp.length; i += 3) { pos.push(hp[i], hp[i + 1] * 1.12 + 1.57, hp[i + 2]); nor.push(hn[i], hn[i + 1], hn[i + 2]); part.push(1, 0, 1); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('aPart', new THREE.Float32BufferAttribute(part, 3));
+    return g;
+  }
   const P_VERT = `
-    attribute vec3 aCol; attribute float aPhase, aSize;
-    uniform float uFovK; varying vec3 vCol; varying float vSize, vPhase;
+    attribute vec3 aPart; attribute float aPhase;      // instanceColor is declared by three.js for an instanced mesh that has colours
+    uniform float uTime; varying vec3 vN, vCol, vView; varying float vSkin, vY;
     void main() {
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      float sz = aSize / ${R_M.toFixed(1)} * uFovK / max(-mv.z, 1e-7);
-      vSize = sz; vCol = aCol; vPhase = aPhase;
-      gl_PointSize = clamp(sz, 1.0, 22.0);
+      vec3 p = position, n = normal;
+      float swing = sin(uTime * 7.0 + aPhase * 6.2832);
+      float a = aPart.x < 1.5 ? 0.0 : (aPart.x < 2.5 ? swing : aPart.x < 3.5 ? -swing : aPart.x < 4.5 ? -swing * 0.7 : swing * 0.7) * 0.55;
+      if (a != 0.0) { float c = cos(a), s = sin(a); vec2 q = vec2(p.x, p.y - aPart.y); p.x = q.x * c - q.y * s; p.y = aPart.y + q.x * s + q.y * c; n.xy = vec2(n.x * c - n.y * s, n.x * s + n.y * c); }
+      p.y += abs(swing) * 0.025;                                    // the bob of a walk
+      vSkin = aPart.z; vY = position.y; vCol = instanceColor;
+      vec4 mv = modelViewMatrix * instanceMatrix * vec4(p, 1.0); vView = mv.xyz;
+      vN = normalize(normalMatrix * (mat3(instanceMatrix) * n));
       gl_Position = projectionMatrix * mv;
     }`;
   const P_FRAG = `
-    precision mediump float; uniform float uDay, uTime; varying vec3 vCol; varying float vSize, vPhase;
+    precision highp float; uniform vec3 uSunV, uUpV; uniform float uDay, uCamAlt;
+    varying vec3 vN, vCol, vView; varying float vSkin, vY;
     void main() {
-      vec2 p = gl_PointCoord; float x = abs(p.x - 0.5);
-      float head = step(p.y, 0.3) * step(x, 0.16);            // top of the sprite is the head
-      float body = step(0.3, p.y) * step(x, 0.22 + 0.06 * sin(uTime * 6.0 + vPhase * 6.28));
-      float a = max(head, body) * smoothstep(1.2, 3.0, vSize) * (0.35 + 0.65 * uDay);
-      if (a < 0.05) discard;
-      vec3 col = mix(vCol, vec3(0.78, 0.6, 0.45), head) * (0.35 + 0.65 * uDay);
-      gl_FragColor = vec4(col, a);
+      vec3 n = normalize(vN);
+      vec3 col = mix(vCol, vec3(0.74, 0.56, 0.42), vSkin);
+      if (vSkin > 0.5 && vY > 1.60) col = vec3(0.16, 0.12, 0.09);                  // hair
+      float diff = max(dot(n, uSunV), 0.0), sky = 0.5 + 0.5 * dot(n, uUpV);
+      vec3 amb = mix(vec3(0.07, 0.08, 0.12) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay);
+      vec3 lit = col * (amb + diff * 0.82 * uDay);
+      float distKm = length(vView) * 6371.0; float low = smoothstep(0.035, 0.002, uCamAlt);
+      float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;
+      gl_FragColor = vec4(mix(lit, mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), uDay), fog), 1.0);
     }`;
 
   const C_VERT = `
@@ -54,15 +81,12 @@
         m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAPS[k] * 3).fill(1), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
         this.inst[k] = { mesh: m, info }; scene.add(m);
       }
-      const g = new THREE.BufferGeometry();
-      this.ppos = new Float32Array(MAXPEOPLE * 3); this.pcol = new Float32Array(MAXPEOPLE * 3); this.pphase = new Float32Array(MAXPEOPLE); this.psize = new Float32Array(MAXPEOPLE).fill(2.1);
-      g.setAttribute('position', new THREE.BufferAttribute(this.ppos, 3).setUsage(THREE.DynamicDrawUsage));
-      g.setAttribute('aCol', new THREE.BufferAttribute(this.pcol, 3).setUsage(THREE.DynamicDrawUsage));
-      g.setAttribute('aPhase', new THREE.BufferAttribute(this.pphase, 1).setUsage(THREE.DynamicDrawUsage));
-      g.setAttribute('aSize', new THREE.BufferAttribute(this.psize, 1).setUsage(THREE.DynamicDrawUsage));
-      g.setDrawRange(0, 0);
-      this.puni = { uFovK: { value: 1000 }, uDay: { value: 1 }, uTime: { value: 0 } };
-      this.people = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: this.puni, vertexShader: P_VERT, fragmentShader: P_FRAG, transparent: true, depthWrite: false })); this.people.frustumCulled = false; this.people.renderOrder = 4; scene.add(this.people);
+      // people: one instanced figure
+      { const g = figureGeometry(); const ph = new THREE.InstancedBufferAttribute(new Float32Array(MAXPEOPLE), 1); ph.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aPhase', ph); this.pphase = ph;
+        const bu = world.bUniforms; this.puni = { uSunV: bu.uSunV, uUpV: bu.uUpV, uDay: bu.uDay, uCamAlt: bu.uCamAlt, uTime: { value: 0 } };
+        const pm = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ uniforms: this.puni, vertexShader: P_VERT, fragmentShader: P_FRAG }), MAXPEOPLE); pm.count = 0; pm.frustumCulled = false; pm.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        pm.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXPEOPLE * 3).fill(1), 3); pm.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        this.people = pm; scene.add(pm); if (window.SHADOWS) SHADOWS.caster(pm); this._pm = new THREE.Matrix4(); }
       // contrails: a ring buffer of puffs per plane
       const cg = new THREE.BufferGeometry(); const NC = CAPS.plane * TRAIL_N;
       this.cpos = new Float32Array(NC * 3); this.cage = new Float32Array(NC); this.csize = new Float32Array(NC);
@@ -202,7 +226,7 @@
     // ---------- per frame ----------
     update(cam, sim, decal, now, dt, day, viewportH, fovDeg) {
       if (!sim || !this.enabled) { this.clear(); return; }
-      this.puni.uDay.value = day; this.puni.uTime.value = now / 1000; this.puni.uFovK.value = viewportH / (2 * Math.tan(fovDeg * 0.5 * D2R));
+      this.puni.uTime.value = now / 1000;
       if (cam.dist > 0.6) { this.clear(); return; }
       const moved = GEO.distKm(cam.lon, cam.lat, this.last.lon, this.last.lat) > Math.max(0.12, cam.dist * 6371 * 0.3) || Math.abs(Math.log((cam.dist || 1e-6) / (this.last.dist || 1e-6))) > 0.4;
       if (moved || now - this.last.t > 6000) { this.last = { lon: cam.lon, lat: cam.lat, t: now, dist: cam.dist }; this.respawn(cam, sim, decal); }
@@ -210,10 +234,10 @@
       if (movedS || now - this.lastShips.t > 15000) { this.lastShips = { lon: cam.lon, lat: cam.lat, t: now }; this.respawnShips(cam, sim); }
       const movedP = GEO.distKm(cam.lon, cam.lat, this.lastPlanes.lon, this.lastPlanes.lat) > 400;
       if (movedP || now - this.lastPlanes.t > 12000) { this.lastPlanes = { lon: cam.lon, lat: cam.lat, t: now }; this.respawnPlanes(cam, sim); }
-      this.cuni.uDay.value = day; this.cuni.uFovK.value = this.puni.uFovK.value;
+      this.cuni.uDay.value = day; this.cuni.uFovK.value = viewportH / (2 * Math.tan(fovDeg * 0.5 * D2R));
       this.animate(dt, sim);
     }
-    clear() { if (this.stats.agents || this.stats.walkers || this.stats.ships || this.stats.planes) { for (const k in this.inst) this.inst[k].mesh.count = 0; this.people.geometry.setDrawRange(0, 0); this.contrails.geometry.setDrawRange(0, 0); this.agents = []; this.walkers = []; this.ships = []; this.planes = []; this.stats = { agents: 0, walkers: 0, ships: 0, planes: 0 }; } }
+    clear() { if (this.stats.agents || this.stats.walkers || this.stats.ships || this.stats.planes) { for (const k in this.inst) this.inst[k].mesh.count = 0; this.people.count = 0; this.contrails.geometry.setDrawRange(0, 0); this.agents = []; this.walkers = []; this.ships = []; this.planes = []; this.stats = { agents: 0, walkers: 0, ships: 0, planes: 0 }; } }
     // place one instance: lon/lat/height in metres, yaw from east toward north
     placeAt(kind, lon, lat, hg, yaw, w, h, d, color, era, krep) {
       const I = this.inst[kind]; if (!I) return; const idx = this.counts[kind] || 0; if (idx >= CAPS[kind]) return;
@@ -281,17 +305,26 @@
       { const g = this.contrails.geometry; g.attributes.position.needsUpdate = true; g.attributes.aAge.needsUpdate = true; g.attributes.aSize.needsUpdate = true; g.setDrawRange(0, ci); }
       for (const k in this.inst) { const I = this.inst[k]; I.mesh.count = this.counts[k] || 0; I.mesh.instanceMatrix.needsUpdate = true; I.mesh.instanceColor.needsUpdate = true; I.info.needsUpdate = true; }
       // people
-      let n = 0; const pp = this.ppos, pc = this.pcol, ph = this.pphase, ps = this.psize;
+      // people: each figure stands on the ground at life size on its town's scale, facing the way it walks
+      let n = 0; const pm = this.people, pmat = this._pm, pe = pmat.elements, pc = pm.instanceColor.array, ph = this.pphase.array;
       for (const a of this.walkers) {
         a.t += a.dir * a.speed * dt; if (a.t > a.len) { a.t = a.len; a.dir = -1; } else if (a.t < 0) { a.t = 0; a.dir = 1; }
         const u = a.t / a.len; const st = a.st; const dx = (st[2] - st[0]) / a.len, dz = (st[3] - st[1]) / a.len;
         const x = st[0] + dx * a.t - dz * a.side, z = st[1] + dz * a.t + dx * a.side; const hg = a.h0 + (a.h1 - a.h0) * u;
         const lon = a.sLon + x * mLon(a.cl), lat = a.sLat + z * mLat;
-        const sz = a.size || 2.1; const lo = lon * D2R, la = lat * D2R; const cla = Math.cos(la); const rr = 1 + (Math.max(hg, 0) * exag + sz * 0.5) / R_M;
-        pp[n * 3] = cla * Math.cos(lo) * rr; pp[n * 3 + 1] = Math.sin(la) * rr; pp[n * 3 + 2] = -cla * Math.sin(lo) * rr;
-        pc[n * 3] = ((a.color >> 16) & 255) / 255; pc[n * 3 + 1] = ((a.color >> 8) & 255) / 255; pc[n * 3 + 2] = (a.color & 255) / 255; ph[n] = a.phase; ps[n] = sz; n++;
+        const k = (a.size || 2.1) * 0.79 / R_M;                                   // sizes were set for the old sprites: this makes a life-size figure on the town's scale
+        const lo = lon * D2R, la = lat * D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
+        const Ex = -slo, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
+        const fx = dx * a.dir, fz = dz * a.dir;                                    // heading in (east, north)
+        const rr = 1 + Math.max(hg, 0) * exag / R_M;
+        pe[0] = (fx * Ex + fz * Nx) * k; pe[1] = (fz * Ny) * k; pe[2] = (fx * Ez + fz * Nz) * k; pe[3] = 0;
+        pe[4] = Ux * k; pe[5] = Uy * k; pe[6] = Uz * k; pe[7] = 0;
+        pe[8] = (fz * Ex - fx * Nx) * k; pe[9] = (-fx * Ny) * k; pe[10] = (fz * Ez - fx * Nz) * k; pe[11] = 0;
+        pe[12] = Ux * rr; pe[13] = Uy * rr; pe[14] = Uz * rr; pe[15] = 1;
+        pm.setMatrixAt(n, pmat);
+        pc[n * 3] = ((a.color >> 16) & 255) / 255; pc[n * 3 + 1] = ((a.color >> 8) & 255) / 255; pc[n * 3 + 2] = (a.color & 255) / 255; ph[n] = a.phase; n++;
       }
-      const g = this.people.geometry; g.attributes.position.needsUpdate = true; g.attributes.aCol.needsUpdate = true; g.attributes.aPhase.needsUpdate = true; g.attributes.aSize.needsUpdate = true; g.setDrawRange(0, n);
+      pm.count = n; pm.instanceMatrix.needsUpdate = true; pm.instanceColor.needsUpdate = true; this.pphase.needsUpdate = true;
       this.stats = { agents: this.agents.length, walkers: n, ships: this.ships.length, planes: this.planes.length };
     }
   }

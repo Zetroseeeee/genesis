@@ -96,6 +96,7 @@
     uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality;
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     const float PI = 3.14159265;
+    ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
     #ifdef USE_TEXARR
     // generated ground and land-use tiles (textures.js), sampled in a metric Mercator frame: a phase computed in double precision
     // at the tile centre (uPhN whole cells mod 16, uPhF the fraction) plus the precise local offset vGLf, in base cells of 1.5 m
@@ -311,21 +312,22 @@
       // built-up heart from then on, concrete paving in the industrial and modern city
       float paves = smoothstep(0.26, 0.34, sim.g); float modernGround = smoothstep(0.6, 0.7, sim.g);
       float paved = smoothstep(0.3, 0.42, dec.b) * paves;
-      vec3 urbanCol = mix(vec3(0.40, 0.35, 0.29), mix(vec3(0.47, 0.45, 0.41), vec3(0.43, 0.43, 0.43), modernGround), paved);
+      float arid = clamp(wDesert * 1.6, 0.0, 1.0);                         // dry country: trodden ground is pale dust, not dark earth
+      vec3 urbanCol = mix(mix(vec3(0.40, 0.35, 0.29), vec3(0.60, 0.52, 0.40), arid), mix(vec3(0.47, 0.45, 0.41), vec3(0.43, 0.43, 0.43), modernGround), paved);
       #ifdef USE_TEXARR
       if (gOn > 0.002 && dec.b > 0.04) {
         vec3 flags = mix(gtex(uLanduse, 9.0, 4.0), gtex(uLanduse, 12.0, 2.0), modernGround);
-        urbanCol = mix(urbanCol, mix(gtex(uGround, 14.0, 4.0) * 1.06, flags, paved), gOn);
+        urbanCol = mix(urbanCol, mix(mix(gtex(uGround, 14.0, 4.0) * 1.06, gtex(uGround, 3.0, 4.0) * 0.9, arid * 0.75), flags, paved), gOn);
       }
       #endif
       land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * mix(0.7, 0.9, smoothstep(0.3, 0.45, dec.b)) * (1.0 - ice));
       // burnt and ash-covered ground (fresh fire black, old scars grey-brown with new green coming through)
       vec3 burnCol = mix(vec3(0.30, 0.27, 0.22), vec3(0.11, 0.1, 0.095), smoothstep(0.3, 0.9, burnW)) * (0.75 + 0.5 * nMic.g);
       land = mix(land, burnCol * (0.8 + 0.4 * dl2), smoothstep(0.03, 0.25, burnW) * (0.7 + 0.3 * nMid.r) * (0.75 + 0.25 * smoothstep(0.3, 0.6, nMic.a)) * (1.0 - ice));
-      vec3 roadCol = mix(mix(vec3(0.44, 0.36, 0.26), vec3(0.56, 0.53, 0.48), smoothstep(0.55, 0.75, dec.b)), vec3(0.30, 0.30, 0.31), smoothstep(0.8, 0.95, dec.b));
+      vec3 roadCol = mix(mix(mix(vec3(0.44, 0.36, 0.26), vec3(0.58, 0.50, 0.38), arid), vec3(0.56, 0.53, 0.48), smoothstep(0.55, 0.75, dec.b)), vec3(0.30, 0.30, 0.31), smoothstep(0.8, 0.95, dec.b));
       #ifdef USE_TEXARR
       if (gOn > 0.002 && dec.b > 0.4) {   // dirt tracks, then cobbles, then asphalt; railway lines run on ballast
-        vec3 rt = dec.b > 0.95 ? gtex(uGround, 11.0, 4.0) * 0.8 : dec.b > 0.8 ? gtex(uLanduse, 10.0, 4.0) : dec.b > 0.62 ? gtex(uLanduse, 8.0, 2.0) : gtex(uGround, 14.0, 4.0) * 0.9;
+        vec3 rt = dec.b > 0.95 ? gtex(uGround, 11.0, 4.0) * 0.8 : dec.b > 0.8 ? gtex(uLanduse, 10.0, 4.0) : dec.b > 0.62 ? gtex(uLanduse, 8.0, 2.0) : mix(gtex(uGround, 14.0, 4.0) * 0.9, gtex(uGround, 3.0, 4.0) * 0.8, arid * 0.75);   // a track through dry country is beaten dust
         roadCol = mix(roadCol, rt, gOn);
       }
       #endif
@@ -416,7 +418,7 @@
         }
         shadow = mix(1.0, shadow, shadowMix);
       }
-      shadow = min(shadow, 1.0 - 0.62 * castS);
+      shadow = min(shadow, 1.0 - 0.62 * max(castS, sunHidden(vViewPos)));       // block shadows far off, true ones from the sun's depth map near the camera
       // cloud shadows (same texture the cloud shell uses, same drift)
       float cloudA = texture2D(uClouds, vec2(fract((vLon - uCloudShift) / (2.0 * PI)), vLat / PI + 0.5)).g;
       float cloudShadow = 1.0 - 0.55 * smoothstep(0.3, 0.8, cloudA) * uCloudVis;

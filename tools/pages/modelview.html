@@ -36,7 +36,7 @@ MODELS.init(scene, shared, { units: 0.001 });
       if (!L || L.k !== want) allReady = false; if (!L) continue;
       const x = (i % cols - cols / 2 + 0.5) * cell, z = (Math.floor(i / cols) - rows / 2 + 0.5) * cell;
       qt.setFromAxisAngle(yAxis, c * 1.3); m4.compose(new THREE.Vector3(x, 0, z), qt, new THREE.Vector3(1, 1, 1));
-      MODELS.push(L, m4, 4, 0.13 + i * 0.37, 0, prog);
+      MODELS.push(L, m4, +(q.get('era') || 4), 0.13 + i * 0.37, 0, prog);
     }
     MODELS.end(); renderer.render(scene, camera);
     document.getElementById('tag').textContent = defs.map((d) => `${d.id}  ${d.w}x${d.h}x${d.d} m  l${Math.min(lod, d.lods.length - 1)}: ${d.lods[Math.min(lod, d.lods.length - 1)].tris} tris`).join('\n');

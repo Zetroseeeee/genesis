@@ -291,6 +291,7 @@
         for (let i = 0; i + 5 < cs.length; i += 6) {
           const lon = cs[i] * D2R, lat = cs[i + 1] * D2R, w = cs[i + 2], h = cs[i + 3], d = cs[i + 4], yaw = cs[i + 5];
           if (lon < r.lon0 || lon > r.lon0 + r.w || lat < r.lat0 || lat > r.lat0 + r.h) continue;
+          if (window.SHADOWS && SHADOWS.covers(GEO.toVec(cs[i], cs[i + 1], this._sv || (this._sv = new THREE.Vector3())))) continue;   // the sun's depth map draws this one's true shadow
           const len = Math.min(h, 400) ; const steps = 3;
           for (let sIdx = 0; sIdx <= steps; sIdx++) { const t = sIdx / steps; rect(lon, lat, w * 0.5, d * 0.5, yaw, offE * len * t, offN * len * t); }
         }
