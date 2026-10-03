@@ -24,7 +24,7 @@ for (const set of [...new Set(man.models.filter((m) => m.src).map((m) => m.set))
       if (fs.existsSync(p) && fs.statSync(p).size === l.bytes) { kept++; continue; }
       curl(`${base}/models-${set}/${l.file}`, p); got++;
     }
-    merged.models[id] = Object.assign({}, entry, { kinds: m.kinds || [], cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', site: m.site || '', sides: m.sides || '', title: m.title });
+    merged.models[id] = Object.assign({}, entry, { kinds: m.kinds || [], cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', site: m.site || '', sides: m.sides || '', open: !!m.open, title: m.title });
   }
 }
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(merged));

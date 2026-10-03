@@ -175,7 +175,7 @@ async function local(ids) {
     const m = man.models.find((x) => x.id === id); if (!m) { log('unknown model ' + id); continue; }
     const src = [path.join(CACHE, srcName(m)), path.join(CACHE, `${id}.src.glb`)].find((p) => fs.existsSync(p));
     if (!src) { log(`no source for ${id} in ${CACHE}`); continue; }
-    log(`+ ${id}`); index.models[id] = Object.assign(await processModel(m, src, OUT), { kinds: m.kinds || [], cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', site: m.site || '', sides: m.sides || '', title: m.title });
+    log(`+ ${id}`); index.models[id] = Object.assign(await processModel(m, src, OUT), { kinds: m.kinds || [], cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', site: m.site || '', sides: m.sides || '', open: !!m.open, title: m.title });
   }
   fs.writeFileSync(indexPath, JSON.stringify(index));
 }

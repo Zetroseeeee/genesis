@@ -65,7 +65,8 @@
    "concept": "36afee3f-1178-4673-ac5d-8a7c59e4fe59",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124221_36afee3f-1178-4673-ac5d-8a7c59e4fe59.png",
    "mesh": "66b41197-a01f-4938-b1c3-7ac0bab63e96",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_125128_66b41197-a01f-4938-b1c3-7ac0bab63e96.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_125128_66b41197-a01f-4938-b1c3-7ac0bab63e96.glb",
+   "site": "stone_roundhouse_site"
   },
   {
    "id": "classical_med_doric_temple",
@@ -130,7 +131,8 @@
    "concept": "e18c60f7-5b65-4df2-8e46-9567d9e8d3a3",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130442_e18c60f7-5b65-4df2-8e46-9567d9e8d3a3.png",
    "mesh": "4689cd12-d28e-4471-ac1d-3af6ee15be43",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_131152_4689cd12-d28e-4471-ac1d-3af6ee15be43.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_131152_4689cd12-d28e-4471-ac1d-3af6ee15be43.glb",
+   "site": "stone_roundhouse_site"
   },
   {
    "id": "stone_longhouse_a",
@@ -281,7 +283,8 @@
    "concept": "7270e88a-089a-4e73-a4b2-63abe1a83725",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_7270e88a-089a-4e73-a4b2-63abe1a83725.png",
    "mesh": "cb323abc-c95d-4aa6-b225-18f67f254dbd",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130508_cb323abc-c95d-4aa6-b225-18f67f254dbd.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130508_cb323abc-c95d-4aa6-b225-18f67f254dbd.glb",
+   "open": true
   },
   {
    "id": "stone_grasshut_a",
@@ -407,7 +410,8 @@
    "concept": "036fdd2b-9144-44fb-be98-c8caacf31b83",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135222_036fdd2b-9144-44fb-be98-c8caacf31b83.png",
    "mesh": "87edd9a2-f6d3-4e94-9d1e-69405d8840e0",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135825_87edd9a2-f6d3-4e94-9d1e-69405d8840e0.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135825_87edd9a2-f6d3-4e94-9d1e-69405d8840e0.glb",
+   "open": true
   },
   {
    "id": "stone_timbercircle_a",
@@ -430,7 +434,8 @@
    "concept": "1a6d9407-1fce-43a7-8929-97e1234a6bb8",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135223_1a6d9407-1fce-43a7-8929-97e1234a6bb8.png",
    "mesh": "c054e85c-70e8-4abf-b69a-a8b0d06313fa",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135829_c054e85c-70e8-4abf-b69a-a8b0d06313fa.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135829_c054e85c-70e8-4abf-b69a-a8b0d06313fa.glb",
+   "open": true
   },
   {
    "id": "stone_palisade_a",
@@ -452,6 +457,80 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135222_4c68c5c8-2f73-425c-a11a-036f29be5d72.png",
    "mesh": "7755d2fb-3027-4734-aae7-473cbef2b60e",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135833_7755d2fb-3027-4734-aae7-473cbef2b60e.glb"
+  },
+  {
+   "id": "stone_gate_a",
+   "title": "Palisade gate",
+   "set": "stone",
+   "eras": [
+    0,
+    0
+   ],
+   "cultures": null,
+   "kinds": [
+    "gatehouse"
+   ],
+   "h": 5.0,
+   "w": 8.0,
+   "scaleBy": "w",
+   "fit": "gate",
+   "sides": "stone_palisade_a",
+   "concept": "562efe47-a9fa-4dc8-9ac6-d9ec3cbc43e4",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135858_562efe47-a9fa-4dc8-9ac6-d9ec3cbc43e4.png",
+   "mesh": "b1a19f67-da0e-4115-8881-b73033b6abed",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_140116_b1a19f67-da0e-4115-8881-b73033b6abed.glb"
+  },
+  {
+   "id": "stone_watchtower_a",
+   "title": "Timber lookout tower",
+   "set": "stone",
+   "eras": [
+    0,
+    0
+   ],
+   "cultures": null,
+   "kinds": [
+    "keep"
+   ],
+   "h": 7.0,
+   "concept": "5fb233e1-802b-4772-8675-6442b0be496d",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135857_5fb233e1-802b-4772-8675-6442b0be496d.png",
+   "mesh": "6da70c9c-27bf-4cfd-83f8-a704276cff67",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_140120_6da70c9c-27bf-4cfd-83f8-a704276cff67.glb"
+  },
+  {
+   "id": "stone_granary_a",
+   "title": "Raised granary",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": null,
+   "kinds": [
+    "granary"
+   ],
+   "h": 4.6,
+   "concept": "8fb2bf95-b2ca-4bea-a552-f66e4eb72dde",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135857_8fb2bf95-b2ca-4bea-a552-f66e4eb72dde.png",
+   "mesh": "cff6e38c-0851-4763-b03b-c7b9cee44b6b",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_140123_cff6e38c-0851-4763-b03b-c7b9cee44b6b.glb"
+  },
+  {
+   "id": "stone_roundhouse_site",
+   "title": "Roundhouse being built",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": null,
+   "kinds": [],
+   "h": 5.6,
+   "concept": "c41aac94-3ae2-4fe2-a523-9a95defa0d81",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135857_c41aac94-3ae2-4fe2-a523-9a95defa0d81.png",
+   "mesh": "2ee86755-8a68-4c84-a6e7-d49d7bbf7bdc",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_140127_2ee86755-8a68-4c84-a6e7-d49d7bbf7bdc.glb"
   }
  ]
 }

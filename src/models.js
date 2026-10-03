@@ -96,7 +96,7 @@
       const idx = await r.json();
       for (const id of Object.keys(idx.models || {})) {
         const e = idx.models[id]; if (!e.lods || !e.lods.length) continue;
-        const def = { id, w: e.w, h: e.h, d: e.d, kinds: e.kinds || [], cultures: e.cultures || null, eras: e.eras || [0, 8], fit: e.fit || '', site: e.site || '', sides: e.sides || '', mean: e.mean || null, lods: e.lods.map((l, k) => ({ k, file: l.file, tris: l.tris, state: '', mesh: null, mat: null, count: 0, cap: 0 })) };
+        const def = { id, w: e.w, h: e.h, d: e.d, kinds: e.kinds || [], cultures: e.cultures || null, eras: e.eras || [0, 8], fit: e.fit || '', site: e.site || '', sides: e.sides || '', open: !!e.open, mean: e.mean || null, lods: e.lods.map((l, k) => ({ k, file: l.file, tris: l.tris, state: '', mesh: null, mat: null, count: 0, cap: 0 })) };
         M.defs[id] = def; for (const kind of def.kinds) (M.byKind[kind] = M.byKind[kind] || []).push(def);
       }
       M.ready = Object.keys(M.defs).length > 0;

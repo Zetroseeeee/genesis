@@ -140,7 +140,7 @@
                 if (!staged && def.fit !== 'run' && def.fit !== 'gate') { const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count) { this.setInst(sc, si, lon, lat, hg, md[0] * 1.1, md[1] * Math.min(1, prog + 0.3) * 1.03, md[2] * 1.1, md[3], era >= 6 ? 0x8f949a : 0x8a6a44, era, seed + k * 0.013, TOWN.packStyle(era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; } }
                 if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: md[0], d: md[2], k: kRep, prog, era });
               }
-              if (wantCasters && nCasters < 5000 && prog > 0.3) { casters.push(lon, lat, md[0], md[1] * Math.min(1, prog + 0.2), md[2], md[3]); nCasters++; }
+              if (wantCasters && nCasters < 5000 && prog > 0.3 && !def.open) { casters.push(lon, lat, md[0], md[1] * Math.min(1, prog + 0.2), md[2], md[3]); nCasters++; }     // open monuments (stone circles) cast no block shadow
               continue;
             }
           }
