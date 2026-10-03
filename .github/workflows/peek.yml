@@ -40,11 +40,33 @@ jobs:
             case "$u" in https://*) ;; *) echo "skipping $u"; continue;; esac
             n=$((n+1)); curl -fsSL --retry 3 -o "in/$(printf '%02d' $n).img" "$u"
           done
-          montage in/*.img -resize "${SIZE}x${SIZE}" -tile "${COLS}x" -geometry +6+6 -background '#202020' "out/$NAME.jpg"
+          python3 -c 'import PIL' 2>/dev/null || python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow || python3 -m pip install --quiet --disable-pip-version-check pillow
+          python3 - <<'PY'
+          import glob, os
+          from PIL import Image
+          size, cols, name = int(os.environ['SIZE']), int(os.environ['COLS']), os.environ['NAME']
+          files = sorted(glob.glob('in/*.img')); tiles = []
+          for f in files:
+              im = Image.open(f).convert('RGB'); im.thumbnail((size, size), Image.LANCZOS); tiles.append(im)
+          rows = (len(tiles) + cols - 1) // cols; gap = 12
+          sheet = Image.new('RGB', (cols * size + (cols + 1) * gap, rows * size + (rows + 1) * gap), (32, 32, 32))
+          for k, im in enumerate(tiles):
+              x = gap + (k % cols) * (size + gap) + (size - im.width) // 2; y = gap + (k // cols) * (size + gap) + (size - im.height) // 2
+              sheet.paste(im, (x, y))
+          sheet.save(f'out/{name}.jpg', quality=88)
+          PY
           ls -la out
       - name: Keep
         run: |
           gh release view peek -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create peek -R "$GITHUB_REPOSITORY" --title "Work in progress" --notes "Contact sheets of generated images, for review." --latest=false
           gh release upload peek out/*.jpg -R "$GITHUB_REPOSITORY" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Keep the log when something fails
+        if: failure()
+        run: |
+          { echo "peek run $GITHUB_RUN_ID at $(date -u)"; ls -la in out 2>&1 || true; python3 --version; } > peek-failure.log
+          gh release view ci-logs -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create ci-logs -R "$GITHUB_REPOSITORY" --title "CI logs" --notes "Logs from workflow runs." --latest=false
+          gh release upload ci-logs peek-failure.log -R "$GITHUB_REPOSITORY" --clobber
         env:
           GH_TOKEN: ${{ github.token }}
