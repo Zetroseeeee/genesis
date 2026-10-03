@@ -73,3 +73,11 @@
 {"id":"bronze_mudbrick_site","concept":"07ece328-66d8-45c3-b03b-39653d8d9c08","ref":"e8c06ff0-c45c-45e4-9f96-5fb0899054f9"}
 {"id":"bronze_timber_site","concept":"3bc34a7a-8287-45cf-aaf9-691fb8e9ffce","ref":"b29afb73-544d-47dd-8728-7560af5f4613"}
 {"id":"bronze_mound_a","concept":"fdd5b71a-ad16-42ac-8b26-77dde3ca9f88","ref":"d2857705-9bf1-4c36-8d52-2fd9327ea483"}
+{"id":"tree_palm_a","mesh":"53c861a7-d2eb-49f0-9415-771bff9ab6e0"}
+{"id":"bronze_mudbrick_site","mesh":"11897ec4-02f5-4f91-b68b-df3aba229a7c"}
+{"id":"bronze_timber_site","mesh":"4c0357e3-f991-4fb4-a5c2-d916b202da4f"}
+{"id":"bronze_mound_a","mesh":"e25c7556-7030-4612-9771-e1c9e7023406"}
+{"id":"bronze_barn_a","concept":"ce345b5e-0da1-4f9b-bf37-f5b88b20488a","ref":"b29afb73-544d-47dd-8728-7560af5f4613"}
+{"id":"bronze_well_a","concept":"39d1d141-fbf0-4bcf-962d-b57ff097d6ab","ref":"be7d25bc-89c3-4149-8cec-29494202a6a0"}
+{"id":"bronze_pier_a","concept":"99ebe952-5147-4a77-b794-56ad10e19065","ref":"b29afb73-544d-47dd-8728-7560af5f4613"}
+{"id":"bronze_boat_a","concept":"21541857-f766-42d8-989a-6bbfaf0682e9","ref":"b29afb73-544d-47dd-8728-7560af5f4613"}

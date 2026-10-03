@@ -951,6 +951,92 @@
    "mesh": "5d6d3927-5672-4f6d-875d-a3592f1a72ed",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153338_5d6d3927-5672-4f6d-875d-a3592f1a72ed.glb",
    "variantOf": "bronze_court_a"
+  },
+  {
+   "id": "bronze_pyramid_a",
+   "title": "Great pyramid",
+   "set": "bronze",
+   "eras": [
+    1,
+    3
+   ],
+   "cultures": [
+    "med",
+    "mena",
+    "africa"
+   ],
+   "kinds": [
+    "pyramid"
+   ],
+   "h": 138.0,
+   "ref": "47f25e33-7766-4bc7-bbe2-554de3ad55ea",
+   "prompt": "an Egyptian pyramid of the Old Kingdom as newly finished: a true smooth-sided pyramid on a square base, sides at about 52 degrees, cased in fine white limestone with hair-thin joints, faintly weather-stained near the base, a small gilded capstone, a low limestone plinth",
+   "concept": "892c11f5-091e-4d13-8490-f137cc1fc6c3",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154843_892c11f5-091e-4d13-8490-f137cc1fc6c3.png",
+   "mesh": "d9d69b04-8fdc-4d2e-becc-66cfa938f930",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155828_d9d69b04-8fdc-4d2e-becc-66cfa938f930.glb"
+  },
+  {
+   "id": "bronze_market_a",
+   "title": "Market shelter and stalls",
+   "set": "bronze",
+   "eras": [
+    1,
+    3
+   ],
+   "cultures": null,
+   "kinds": [
+    "market"
+   ],
+   "w": 16.0,
+   "scaleBy": "w",
+   "h": 6.0,
+   "ref": "b29afb73-544d-47dd-8728-7560af5f4613",
+   "prompt": "a Bronze Age market: an open-sided shelter about 14 by 7 m with a reed-thatch roof on rough timber posts, under and beside it trestle tables laden with baskets of grain and fruit, pottery, bundles of wool and cloth, dried fish, copper ingots, two striped cloth awnings on poles",
+   "concept": "403d997d-984e-4a37-aa5a-1ada72a9dd1e",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154843_403d997d-984e-4a37-aa5a-1ada72a9dd1e.png",
+   "mesh": "f0487e6c-706f-4c64-90a2-885f72be89f8",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155832_f0487e6c-706f-4c64-90a2-885f72be89f8.glb"
+  },
+  {
+   "id": "tree_spruce_a",
+   "title": "Norway spruce",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_conifer"
+   ],
+   "h": 24.0,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a mature Norway spruce about 24 m tall, dense narrow conical crown of dark green needles in layered drooping branches reaching almost to the ground, straight trunk with reddish-brown scaly bark visible only at the base",
+   "concept": "92d82252-86b4-404a-937b-24c575110753",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154842_92d82252-86b4-404a-937b-24c575110753.png",
+   "mesh": "eb55b342-a473-40f0-9da6-018a60e8b975",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155835_eb55b342-a473-40f0-9da6-018a60e8b975.glb"
+  },
+  {
+   "id": "tree_acacia_a",
+   "title": "Umbrella thorn acacia",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_savanna"
+   ],
+   "h": 9.0,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a mature umbrella thorn acacia about 9 m tall and 12 m across, wide flat-topped crown of fine dense grey-green foliage on a few strong spreading branches, short thick trunk with dark fissured bark forking low",
+   "concept": "0ce0f2c2-f5fe-4f54-8c73-f8dd0e9eecfb",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154843_0ce0f2c2-f5fe-4f54-8c73-f8dd0e9eecfb.png",
+   "mesh": "edf79d01-7ec8-4496-8fe6-13d1fe291f46",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155839_edf79d01-7ec8-4496-8fe6-13d1fe291f46.glb"
   }
  ]
 }
