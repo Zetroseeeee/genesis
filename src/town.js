@@ -347,6 +347,7 @@
       if (hash(i, 300 + gx * 131 + gy) > fill) continue;
       if (!cellPass('h', x, z)) continue;
       if (lmPlot && Math.hypot(x - lmPlot.x, z - lmPlot.z) < lmPlot.r + s * 0.45) continue;   // no house on the landmark's plot
+      if (wallStyle !== 'none' && Math.abs(r - wallR) < s * 0.7 + 3) continue;               // nor on the line of the wall: a clear strip runs along it
       slots.push([r, x, z, gx, gy]);
     }
     slots.sort((a, b) => a[0] - b[0]);

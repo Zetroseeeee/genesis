@@ -38,10 +38,9 @@
   // ---------- renderer ----------
   const stage = $('stage');
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
-  if (window.SHADOWS) {      // the sun's depth map: 4096 texels across on a real GPU, a quarter of that when the browser is drawing in software
-    let soft = false; try { const gl = renderer.getContext(); const x = gl.getExtension('WEBGL_debug_renderer_info'); soft = /SwiftShader|llvmpipe|Software/i.test(String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))); } catch (e) {}
-    SHADOWS.init(renderer, window.GENESIS_SHADOW || (soft ? 1024 : 4096));
-  }
+  // a browser drawing in software (the test harness) gets a lighter load: a quarter-size shadow map, thinner forests
+  let softGL = false; try { const gl = renderer.getContext(); const x = gl.getExtension('WEBGL_debug_renderer_info'); softGL = /SwiftShader|llvmpipe|Software/i.test(String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))); } catch (e) {}
+  if (window.SHADOWS) SHADOWS.init(renderer, window.GENESIS_SHADOW || (softGL ? 1024 : 4096));      // the sun's depth map: 4096 texels across on a real GPU
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.setClearColor(0x05070c, 1);
@@ -106,7 +105,7 @@
       terrain = new TERRAIN.Terrain({ scene, index, base: 'data/', globals, exag: 2.0, anisotropy: Math.min(8, renderer.capabilities.getMaxAnisotropy()) });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
-      trees = new TREES.Trees({ scene, terrain, renderer }); trees.load('data/veg.jpg', 'data/noise.png').catch((e) => console.warn('veg', e));
+      trees = new TREES.Trees({ scene, terrain, renderer }); if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.4; trees.load('data/veg.jpg', 'data/noise.png').catch((e) => console.warn('veg', e));
       life = new LIFE.Life({ scene, terrain }); movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
@@ -758,7 +757,7 @@
 
   // ---------- settings ----------
   function loadSettings() { try { Object.assign(settings, JSON.parse(localStorage.getItem('genesis-settings') || '{}')); } catch (e) {} applySettings(); }
-  function applySettings() { document.body.classList.toggle('continuous', !!settings.continuous); globals.uQuality.value = settings.quality === 'high' ? 1 : 0; if (trees) trees.enabled = settings.quality === 'high'; if (movers) movers.enabled = settings.quality === 'high'; if (fx) fx.enabled = true; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.quality === 'high' ? 2 : 1.25)); if (window.MODELS) MODELS.lodBias = renderer.getPixelRatio();   /* model detail is chosen by device pixels */ document.documentElement.style.setProperty('--ui-scale', settings.uiScale); document.body.classList.toggle('glass', !!settings.glass && !matchMedia('(pointer: coarse)').matches); if (mapcam) mapcam.autoTilt = settings.autoTilt; if (window.TEX && TEX.ready) applyTextures(); try { localStorage.setItem('genesis-settings', JSON.stringify(settings)); } catch (e) {} }
+  function applySettings() { document.body.classList.toggle('continuous', !!settings.continuous); globals.uQuality.value = settings.quality === 'high' ? 1 : 0; if (trees) trees.enabled = settings.quality === 'high'; if (movers) movers.enabled = settings.quality === 'high'; if (fx) fx.enabled = true; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.quality === 'high' ? 2 : 1.25)); if (window.MODELS) MODELS.lodBias = renderer.getPixelRatio() * (softGL && !window.GENESIS_LOD ? 0.45 : 1);   /* model detail is chosen by device pixels (a software renderer gets coarser models) */ document.documentElement.style.setProperty('--ui-scale', settings.uiScale); document.body.classList.toggle('glass', !!settings.glass && !matchMedia('(pointer: coarse)').matches); if (mapcam) mapcam.autoTilt = settings.autoTilt; if (window.TEX && TEX.ready) applyTextures(); try { localStorage.setItem('genesis-settings', JSON.stringify(settings)); } catch (e) {} }
 
   // ---------- UI binding ----------
   function bindUI() {

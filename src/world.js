@@ -120,10 +120,13 @@
         }
         if ((!L.mask || L.maskI !== T.stats.packsI) && this.decal && this.decal.rivers && this.decal.rivers.length) { L.mask = new Uint8Array(n); L.maskI = T.stats.packsI; for (let k = 0; k < n; k++) { const it = items[k]; const lo = cLon + it.x / (R_M * cl * GEO.D2R), la = cLat + it.z / (R_M * GEO.D2R); const afloat = it.kind === 'pier' || it.kind === 'boat' || it.kind === 'ship'; if (!afloat && T.isWater(lo, la)) { L.mask[k] = 1; continue; } const rv = this.decal.nearestRiver(lo, la); if (rv && rv.d < rv.hw + Math.max(it.w, it.d) * 0.5 + 4 && !afloat) L.mask[k] = 1; } }
         const mask = L.mask; const hts = L.hts;
+        if (useModels && !coarse && L.fitEra !== c.era + ':' + Object.keys(MODELS.defs).length) { L.fit = this.fitHouses(L, i, c.era, L.culture || 0); L.fitEra = c.era + ':' + Object.keys(MODELS.defs).length; }
+        const fits = useModels && !coarse ? L.fit : null;
         const era = c.era; const seed = (i % 997) / 997; const kRep = L.k || 1; const cul = L.culture || 0;
         const wantCasters = dKm < 40 && !coarse;
         for (let k = 0; k < n; k++) {
           if (mask && mask[k]) continue;
+          if (fits && fits[k]) continue;                       // its model would stand in a neighbour's
           const it = items[k]; const im = this.inst[it.kind]; if (!im) continue;
           const idx = counts[it.kind]; if (idx >= im.instanceMatrix.count) continue;
           const lon = cLon + it.x / (R_M * cl * GEO.D2R), lat = cLat + it.z / (R_M * GEO.D2R);
@@ -230,6 +233,41 @@
       }
       return ok ? n : 0;
     }
+    // How a model sits on its plot: turned so its long side lies along the plot's long side, at life size on the town's
+    // drawn scale with a little give to suit the plot (more for the building a town gathers around; a wonder may be
+    // the outsized version of its kind). u: drawn metres per model metre.
+    modelFit(B, it, kRep, flags) {
+      const landmark = flags & 1; const F = this._fit || (this._fit = { turn: false, u: 1 });
+      F.turn = (B.d > B.w * 1.2 && it.w > it.d * 1.2) || (B.w > B.d * 1.2 && it.d > it.w * 1.2);
+      const pw = F.turn ? it.d : it.w, pd = F.turn ? it.w : it.d;
+      if (B.fit === 'box') F.u = Math.min(pw / B.w, pd / B.d);
+      else { const f = Math.min(pw / (B.w * kRep), pd / (B.d * kRep)); F.u = kRep * Math.max(landmark ? 0.75 : 0.8, Math.min((flags & 8) ? 2.2 : landmark ? 1.4 : 1.25, f)); }
+      return F;
+    }
+    // Plots are planned for the kit's sizes; the models have their own (a longhouse is 24 m long whatever its plot). So
+    // that no two stand in each other: the great buildings keep their ground, then each house in turn, from the centre
+    // out, stays only if it clears what already stands. Returns one flag per plan item (1 = leave this plot empty).
+    fitHouses(L, i, era, cul) {
+      const items = L.items, n = items.length; const skip = new Uint8Array(n); const kRep = L.k || 1;
+      const cell = 28 * kRep; const grid = new Map(); const rects = [];
+      const rectOf = (def, it, flags) => { const f = this.modelFit(def, it, kRep, flags); const yaw = it.yaw + (f.turn ? Math.PI / 2 : 0); const hw = def.w * f.u * 0.45, hd = def.d * f.u * 0.45; return { x: it.x, z: it.z, ax: Math.cos(yaw), az: Math.sin(yaw), hw, hd, r: Math.hypot(hw, hd) }; };
+      const span = (R, a, b) => R.hw * Math.abs(a * R.ax + b * R.az) + R.hd * Math.abs(a * R.az - b * R.ax);      // half the rectangle's shadow on a direction
+      const apart = (P, Q, a, b) => Math.abs((Q.x - P.x) * a + (Q.z - P.z) * b) > span(P, a, b) + span(Q, a, b);
+      const overlap = (P, Q) => { const dx = Q.x - P.x, dz = Q.z - P.z; if (dx * dx + dz * dz > (P.r + Q.r) * (P.r + Q.r)) return false; return !(apart(P, Q, P.ax, P.az) || apart(P, Q, P.az, -P.ax) || apart(P, Q, Q.ax, Q.az) || apart(P, Q, Q.az, -Q.ax)); };
+      const cells = (R, fn) => { const x0 = Math.floor((R.x - R.r) / cell), x1 = Math.floor((R.x + R.r) / cell), z0 = Math.floor((R.z - R.r) / cell), z1 = Math.floor((R.z + R.r) / cell); for (let cz = z0; cz <= z1; cz++) for (let cx = x0; cx <= x1; cx++) if (fn(cx * 73856093 ^ cz * 19349663)) return true; return false; };
+      const add = (R) => { const id = rects.length; rects.push(R); cells(R, (key) => { let a = grid.get(key); if (!a) grid.set(key, a = []); a.push(id); return false; }); };
+      const defOf = (it, k) => { const mEra = it.era !== undefined ? it.era : era; return (it.as && MODELS.pick(it.as, mEra, cul, hash(i, 4000 + k))) || MODELS.pick(it.kind, mEra, cul, hash(i, 4000 + k)); };
+      const great = (it) => { const flags = Math.floor(it.style / 1024); return (flags & 1) || it.as || it.tag; };
+      for (let k = 0; k < n; k++) { const it = items[k]; if (!great(it)) continue; const def = defOf(it, k); if (!def || def.fit === 'run' || def.fit === 'gate') continue; add(rectOf(def, it, Math.floor(it.style / 1024))); }
+      for (let k = 0; k < n; k++) {
+        const it = items[k]; if (great(it)) continue; const flags = Math.floor(it.style / 1024); if (flags & (2 | 16)) continue;       // far-town blocks and ruins are the kit's
+        const def = defOf(it, k); if (!def || def.fit) continue;
+        const R = rectOf(def, it, flags);
+        if (cells(R, (key) => { const a = grid.get(key); if (a) for (let j = 0; j < a.length; j++) if (overlap(R, rects[a[j]])) return true; return false; })) { skip[k] = 1; continue; }
+        add(R);
+      }
+      return skip;
+    }
     // a real model on a plan item. Houses stand at life size times the town's drawn scale (a little give either way to
     // suit the plot); landmarks fill the plot they were planned for; walls run end to end; a gate stands life-size in
     // the middle of its stretch of wall. Leaves the drawn size in this._md; returns instances placed (0 = not loaded).
@@ -248,15 +286,8 @@
         if (side && rest > gw * 0.2) { const cy = Math.cos(it.yaw), sy = Math.sin(it.yaw); for (const sgn of [-1, 1]) { const o = sgn * (gw / 2 + rest / 2); n += this.runModel(side, it, sgn < 0 ? 'a' : 'b', lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), it.yaw, rest, kRep, cl, era, seed + sgn * 0.31, mf, prog, camPos, pxPerRad); } }
         md[0] = it.w; md[1] = def.h * kRep; md[2] = Math.min(def.w, def.d) * kRep; md[3] = it.yaw; return n;
       }
-      // turn the model so its long side lies along the plot's long side
       const B = fitTo || def;                 // a building site is laid out for the building it will become
-      const turn = (B.d > B.w * 1.2 && it.w > it.d * 1.2) || (B.w > B.d * 1.2 && it.d > it.w * 1.2);
-      const pw = turn ? it.d : it.w, pd = turn ? it.w : it.d;
-      let u;
-      // every model stands at life size on the town's drawn scale, with a little give to suit its plot: more for the
-      // building a town gathers around, and a wonder may be the outsized version of its kind
-      if (B.fit === 'box') u = Math.min(pw / B.w, pd / B.d);
-      else { const f = Math.min(pw / (B.w * kRep), pd / (B.d * kRep)); u = kRep * Math.max(landmark ? 0.75 : 0.8, Math.min((flags & 8) ? 2.2 : landmark ? 1.4 : 1.25, f)); }
+      const fit = this.modelFit(B, it, kRep, flags); const turn = fit.turn, u = fit.u;
       let yaw = it.yaw + (turn ? Math.PI / 2 : 0);
       if (fitTo) {
         // the site fills the footprint of the finished building, its long side along the building's

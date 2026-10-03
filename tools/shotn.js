@@ -1,7 +1,8 @@
 // Several screenshots in one browser session: node tools/shotn.js <name> <setup script> <wait ms> <label=script> [<label=script> ...]
 // After the setup script and the wait, each step's script runs, 'pause' ms pass (env PAUSE, default 4000), and shots/<name>_<label>.png is saved.
 // TEX=<manifest> picks the texture set (default: the labelled synthetic one); W/H set the viewport; CLIP=x,y,w,h crops;
-// SHADOW=4096 gives the shadow map its full size (software GL gets a quarter by default); DIST=<dir> serves another build.
+// The software renderer gets a lighter load by default; for the real thing: SHADOW=4096 (shadow map size), TREES=1
+// (forest density), LOD=1 (finest models). DIST=<dir> serves another build.
 const { chromium } = require('playwright'); const http = require('http'); const fs = require('fs'); const path = require('path');
 const name = process.argv[2], script = process.argv[3] || '', t1 = +(process.argv[4] || 8000); const steps = process.argv.slice(5).map((s) => { const k = s.indexOf('='); return [s.slice(0, k), s.slice(k + 1)]; });
 const root = path.resolve(process.env.DIST || 'dist'); const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.json': 'application/json' };
@@ -10,7 +11,7 @@ server.listen(0, async () => {
   const port = server.address().port;
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: +(process.env.W || 1280), height: +(process.env.H || 800) } });
-  await page.addInitScript(([u, sh]) => { window.GENESIS_TEX_URL = u; if (sh) window.GENESIS_SHADOW = sh; }, [process.env.TEX || 'data/tex/atlas_local.json', +(process.env.SHADOW || 0)]);      // SHADOW=4096: the shadow map a real GPU gets
+  await page.addInitScript(([u, sh, tr, lod]) => { window.GENESIS_TEX_URL = u; if (sh) window.GENESIS_SHADOW = sh; if (tr) window.GENESIS_TREES = tr; if (lod) window.GENESIS_LOD = lod; }, [process.env.TEX || 'data/tex/atlas_local.json', +(process.env.SHADOW || 0), +(process.env.TREES || 0), +(process.env.LOD || 0)]);      // SHADOW=4096: the shadow map a real GPU gets
   const logs = []; page.on('pageerror', e => logs.push('PAGEERROR: ' + e.message)); page.on('console', m => { if (m.type() === 'error' && !/fonts|ERR_TUNNEL/.test(m.text())) logs.push(m.text()); });
   await page.goto(`http://127.0.0.1:${port}/local.html`, { waitUntil: 'load' }); await page.waitForTimeout(2500);
   try { await page.evaluate(fs.readFileSync('tools/testcam.js', 'utf8')); } catch (e) { logs.push('TESTCAM ' + e.message); }

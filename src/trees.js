@@ -47,7 +47,19 @@
   // The card's depth along its instance z axis says whether the picture is mirrored (two trees from one photograph).
   const IMP_VERT = `
     uniform float uPivot, uOrtho; uniform vec3 uSunV;
-    varying vec2 vUv; varying vec3 vCol, vView, vNrm, vMid;
+    varying vec2 vUv; varying vec3 vCol, vView, vNrm; varying float vHid;
+    #ifdef CARD_SHADOW
+    // is the tree in something's shadow? Asked once per tree (at its crown, toward the sun), not once per pixel of it
+    uniform sampler2D uShadowMap; uniform mat4 uShadowMat; uniform vec4 uShadowP;
+    float hidden(vec3 vp) {
+      if (uShadowP.x < 0.5) return 0.0;
+      vec4 sc = uShadowMat * vec4(vp, 1.0); vec3 s = sc.xyz * 0.5 + 0.5;
+      if (s.x <= 0.01 || s.x >= 0.99 || s.y <= 0.01 || s.y >= 0.99 || s.z <= 0.0 || s.z >= 1.0) return 0.0;
+      float z = s.z - uShadowP.z, t = uShadowP.y * 3.0;
+      return (step(texture2D(uShadowMap, s.xy).r, z) + step(texture2D(uShadowMap, s.xy + vec2(t, 0.0)).r, z) + step(texture2D(uShadowMap, s.xy - vec2(t, 0.0)).r, z)
+        + step(texture2D(uShadowMap, s.xy + vec2(0.0, t)).r, z) + step(texture2D(uShadowMap, s.xy - vec2(0.0, t)).r, z)) * 0.2;
+    }
+    #endif
     void main() {
       mat4 mvi = modelViewMatrix * instanceMatrix;
       vec4 c = mvi * vec4(0.0, 0.0, 0.0, 1.0);
@@ -68,14 +80,17 @@
       #endif
       // a crown is round: the card is shaded as the near half of a ball
       vNrm = normalize(rightV * x * 1.7 + upB * (position.y - 0.42) * 1.3 + toCam * 0.75);
-      vMid = c.xyz + upV * hgt * 0.55 + uSunV * wid * 0.6;                    // where the tree asks whether something stands between it and the sun
+      #ifdef CARD_SHADOW
+      vHid = hidden(c.xyz + upV * hgt * 0.55 + uSunV * wid * 0.6);            // from its crown, a little way toward the sun (its own card is not in the way)
+      #else
+      vHid = 0.0;
+      #endif
       gl_Position = projectionMatrix * vec4(p, 1.0);
     }`;
   const IMP_FRAG = `
     precision highp float;
     uniform sampler2D uImp; uniform vec2 uImpSize; uniform vec3 uSunV, uUpV; uniform float uDay, uCamAlt, uUnits;
-    varying vec2 vUv; varying vec3 vCol, vView, vNrm, vMid;
-    ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
+    varying vec2 vUv; varying vec3 vCol, vView, vNrm; varying float vHid;
     void main() {
       vec4 t = texture2D(uImp, vUv);
       // a small picture of a tree averages its twigs and leaf edges thin: lower the bar as the picture shrinks, so a
@@ -85,7 +100,7 @@
       vec3 col = t.rgb * vCol; vec3 n = normalize(vNrm);
       float sky = 0.5 + 0.5 * dot(n, uUpV);
       float diff = 0.45 + 0.55 * max(dot(n, uSunV), 0.0) + 0.25 * max(dot(uUpV, uSunV), 0.0);     // the photograph is already softly lit: the sun adds a bright side
-      diff *= 1.0 - 0.6 * sunHidden(vMid);
+      diff *= 1.0 - 0.6 * vHid;
       vec3 amb = mix(vec3(0.07, 0.08, 0.12) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay);
       vec3 lit = col * (amb + diff * 0.72 * uDay);
       float distKm = length(vView) * uUnits; float low = smoothstep(0.035, 0.002, uCamAlt);
@@ -205,10 +220,10 @@
       const sh = MODELS.shared; const g = new THREE.PlaneGeometry(1, 1); g.translate(0, 0.5, 0);
       const uniforms = { uImp: { value: card.tex }, uImpSize: { value: new THREE.Vector2(card.tex.image ? card.tex.image.width : 1024, card.tex.image ? card.tex.image.height : 1024) }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units } };
       if (window.SHADOWS) Object.assign(uniforms, SHADOWS.uniforms);
-      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide, extensions: { derivatives: true } });   // a mirrored card is wound the other way
+      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide, extensions: { derivatives: true }, defines: window.SHADOWS ? { CARD_SHADOW: 1 } : {} });   // a mirrored card is wound the other way
       I = new THREE.InstancedMesh(g, mat, TIERS[ti].max); I.count = 0; I.frustumCulled = false; I.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       I.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(TIERS[ti].max * 3).fill(1), 3); I.instanceColor.setUsage(THREE.DynamicDrawUsage);
-      I.userData.aspect = card.aspect; this.scene.add(I); this.imps[ti].set(def.id, I);
+      I.userData.aspect = card.aspect; I.renderOrder = ti; this.scene.add(I); this.imps[ti].set(def.id, I);      // near tier first: what it covers, the far tiers need not draw
       if (window.SHADOWS && ti === 0) {             // the near trees throw true shadows: the same card, turned to the sun
         const depth = new THREE.ShaderMaterial({ uniforms: { uImp: uniforms.uImp, uPivot: uniforms.uPivot, uOrtho: { value: 1 }, uSunV: { value: new THREE.Vector3(0, 0, 1) } }, vertexShader: IMP_VERT, fragmentShader: IMP_DEPTH, side: THREE.DoubleSide });
         SHADOWS.caster(I, depth);
@@ -229,8 +244,13 @@
       const camPos = cam.camera ? cam.camera.position : null; const pxPerRad = (window.innerHeight || 800) / (2 * Math.tan(((cam.camera && cam.camera.fov) || 45) * Math.PI / 360));
       const kTier = t.k * exag * 0.5;                // how many times life size this tier draws a tree, away from any town
       const budget = this.budget === undefined ? 1 : this.budget;
-      for (let gy = gy0 - n; gy <= gy0 + n && count + countB + countM < maxN; gy++) {
-        for (let gx = gx0 - n; gx <= gx0 + n && count + countB + countM < maxN; gx++) {
+      // the plots nearest the eye first: within each kind of tree the cards are then drawn front to back, and a card
+      // behind nearer ones costs next to nothing (a forest seen from low down is many trees deep at every pixel)
+      const span = 2 * n + 1; const order = (this._orders || (this._orders = []))[ti] || (this._orders[ti] = new Float64Array(span * span));
+      const eye = camPos ? GEO.fromVec(camPos) : [lon0, lat0]; const ex = (((eye[0] - lon0 + 540) % 360) - 180) / dLon, ey = (eye[1] - lat0) / dLat;
+      { let o = 0; for (let jy = -n; jy <= n; jy++) for (let jx = -n; jx <= n; jx++) { const ddx = jx - ex, ddy = jy - ey; order[o] = Math.round((ddx * ddx + ddy * ddy) * 16) * 65536 + o; o++; } order.sort(); }
+      for (let oi = 0; oi < order.length && count + countB + countM < maxN; oi++) {
+        { const cellIdx = order[oi] % 65536; const gx = gx0 - n + (cellIdx % span), gy = gy0 - n + Math.floor(cellIdx / span);
           const h1 = hash2(gx, gy, 3 + ti);
           const lat = gy * dLat + (hash2(gx, gy, 11) - 0.5) * dLat * 0.9, lon = gx * dLon + (hash2(gx, gy, 12) - 0.5) * dLon * 0.9;
           const dxm = (lon - lon0) * D2R * cl * R_M, dym = (lat - lat0) * D2R * R_M; const d2 = dxm * dxm + dym * dym;

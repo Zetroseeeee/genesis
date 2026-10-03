@@ -285,21 +285,35 @@
         float near = 1.0 - smoothstep(0.08 + cult * 0.25, 0.2 + cult * 0.4, dSite);
         near = mix(near, clamp(dec.a * 1.5, 0.0, 1.0), inDecal);   // inside the decal, fields hug the real settlement
         near *= (0.3 + 0.7 * smoothstep(0.1, 0.45, sim.a)) * (0.45 + 0.55 * green);   // farmland follows fertile, watered ground
-        float fine = smoothstep(0.0012, 0.0004, uCamAlt);                 // smaller plots when close
-        vec2 fc = sc0 * mix(96.0, 288.0, fine) + (nMid.rg - 0.5) * 0.35; vec2 cellId = floor(fc); float hcell = hash21(cellId);
-        float fieldOn = step(1.0 - cult * 0.8, hcell) * near;
+        float fine = smoothstep(0.0012, 0.0004, uCamAlt);                 // close in, every field shows its plots
+        // fields are long rectangles on lines that bend with the land, not with the map; each is cut into plots, three by two,
+        // most of them under the field's own crop. Farmland comes in stretches (neighbouring fields share their luck), not as a chequerboard.
+        vec2 fq = sc0 * vec2(96.0, 150.0) + (nMac.rg - 0.5) * 5.0 + (nMid.rg - 0.5) * 0.8;
+        vec2 bigId = floor(fq), bf = fract(fq); vec2 sq = fq * vec2(3.0, 2.0); vec2 smallId = floor(sq), sf = fract(sq);
+        float own = step(hash21(smallId + 2.2), 0.42) * fine;              // this plot grows something of its own
+        float fieldOn = step(1.0 - cult * 0.8, mix(hash21(bigId), hash21(floor(bigId * 0.34) + 41.0), 0.5)) * near;
+        fieldOn *= 1.0 - 0.85 * fine * step(hash21(smallId + 8.8), 0.1);  // the odd plot lies fallow
         fieldOn *= (1.0 - smoothstep(0.05, 0.13, slope)) * (1.0 - smoothstep(treeLine - 900.0, treeLine - 300.0, vH)) * smoothstep(0.03, 0.012, uCamAlt);
-        vec3 fieldCol = mix(vec3(0.60, 0.55, 0.30), vec3(0.45, 0.56, 0.24), hash21(cellId + 3.1)) * (0.85 + 0.3 * hash21(cellId + 7.7));
-        vec2 ff = fract(fc); float fb = smoothstep(0.0, 0.08, min(min(ff.x, 1.0 - ff.x), min(ff.y, 1.0 - ff.y)));
+        vec3 colB = mix(vec3(0.60, 0.55, 0.30), vec3(0.45, 0.56, 0.24), hash21(bigId + 3.1)) * (0.85 + 0.3 * hash21(bigId + 7.7));
+        vec3 colS = mix(vec3(0.60, 0.55, 0.30), vec3(0.45, 0.56, 0.24), hash21(smallId + 3.1)) * (0.85 + 0.3 * hash21(smallId + 7.7));
+        vec3 fieldCol = mix(colB, colS, own) * (1.0 + (hash21(smallId + 4.4) - 0.5) * 0.14 * fine);
+        float fbB = smoothstep(0.0, 0.03, min(min(bf.x, 1.0 - bf.x), min(bf.y, 1.0 - bf.y)));
+        float fbS = smoothstep(0.0, 0.07, min(min(sf.x, 1.0 - sf.x), min(sf.y, 1.0 - sf.y)));
+        float fb = fbB * mix(1.0, fbS, fine * 0.75);                       // tracks and hedges between fields, balks between plots
         float fieldA = 0.7;
         #ifdef USE_TEXARR
         if (gOn > 0.002 && fieldOn > 0.001) {
           // every plot grows something: paddies where it is warm and wet, orchards and vines in the temperate belt, grain everywhere
-          float hc = hash21(cellId + 5.3), hs = hash21(cellId + 9.1);
           float wet = step(0.45, green) * step(warm, 0.35) * step(latN0, 0.45);
-          float fl = (wet > 0.5 && hc < 0.6) ? 3.0 : hc < 0.35 ? 0.0 : hc < 0.55 ? 1.0 : hc < 0.68 ? 2.0 : hc < 0.84 ? 6.0 : (latN0 > 0.3 && latN0 < 0.55 && hc < 0.92) ? 4.0 : 5.0;
-          vec3 ft = gtexS(uLanduse, fl, fl == 5.0 ? 16.0 : 8.0, step(0.5, hs));
-          fieldCol = mix(fieldCol, ft * (0.9 + 0.2 * hash21(cellId + 7.7)), gOn); fieldA = mix(0.7, 0.92, gOn);
+          float hcB = hash21(bigId + 5.3), hsB = hash21(bigId + 9.1);
+          float flB = (wet > 0.5 && hcB < 0.6) ? 3.0 : hcB < 0.35 ? 0.0 : hcB < 0.55 ? 1.0 : hcB < 0.68 ? 2.0 : hcB < 0.84 ? 6.0 : (latN0 > 0.3 && latN0 < 0.55 && hcB < 0.92) ? 4.0 : 5.0;
+          vec3 ft = gtexS(uLanduse, flB, flB == 5.0 ? 16.0 : 8.0, step(0.5, hsB)) * (0.9 + 0.2 * hash21(bigId + 7.7));
+          if (own > 0.01) {
+            float hc = hash21(smallId + 5.3), hs = hash21(smallId + 9.1);
+            float fl = (wet > 0.5 && hc < 0.6) ? 3.0 : hc < 0.35 ? 0.0 : hc < 0.55 ? 1.0 : hc < 0.68 ? 2.0 : hc < 0.84 ? 6.0 : (latN0 > 0.3 && latN0 < 0.55 && hc < 0.92) ? 4.0 : 5.0;
+            ft = mix(ft, gtexS(uLanduse, fl, fl == 5.0 ? 16.0 : 8.0, step(0.5, hs)) * (0.9 + 0.2 * hash21(smallId + 7.7)), own);
+          }
+          fieldCol = mix(fieldCol, ft * (1.0 + (hash21(smallId + 4.4) - 0.5) * 0.14 * fine), gOn); fieldA = mix(0.7, 0.92, gOn);
         }
         #endif
         land = mix(land, fieldCol * (0.8 + 0.2 * fb), fieldOn * closeFade * fieldA * (1.0 - ice) * landW);
