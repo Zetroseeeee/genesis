@@ -82,7 +82,12 @@ export async function keyCard(input, opts = {}) {
   for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
     const so = ((y + y0) * W + x + x0) * 3, a = alpha[(y + y0) * W + x + x0], o = (y * cw + x) * 3; al[y * cw + x] = a;
     for (let c = 0; c < 3; c++) { const v = data[so + c], b = bg[(y + y0) * 3 + c]; rgb[o + c] = a > 0.05 ? Math.min(255, Math.max(0, (v - (1 - a) * b) / Math.max(a, 0.25))) : 0; }
-    if (screen && rgb[o + 2] > Math.max(rgb[o], rgb[o + 1])) rgb[o + 2] = Math.max(rgb[o], rgb[o + 1]);      // no part of a tree is bluer than it is red or green: what is, came off the screen
+    if (screen) {
+      // no part of a tree is bluer than it is green (bark and winter twigs are brown or grey, never mauve), and a leaf
+      // is a good deal less blue than green: what is bluer came off the screen
+      const r = rgb[o], g = rgb[o + 1]; let lim = g + Math.max(0, r - g) * 0.15; if (g > r * 1.25) lim = Math.min(lim, g * 0.8);
+      if (rgb[o + 2] > lim) rgb[o + 2] = lim;
+    }
   }
   const filled = new Uint8Array(cw * ch); for (let i = 0; i < cw * ch; i++) filled[i] = al[i] > 0.9 ? 1 : 0;      // only solid texels seed the fill; the half-covered rim takes its colour from them
   for (let pass = 0; pass < 48; pass++) {

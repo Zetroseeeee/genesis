@@ -41,7 +41,7 @@ const LODS = [
 const log = (...a) => console.log(...a);
 const sh = (cmd, args, opts) => execFileSync(cmd, args, Object.assign({ encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 28 }, opts || {}));
 const readManifest = () => JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h', ...(m.plan ? [m.plan] : []), ...(m.sink ? [m.sink] : []), ...(m.card ? ['card', 2] : []), ...(m.straighten ? ['straighten', 1] : [])])).digest('hex').slice(0, 12);
+const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h', ...(m.plan ? [m.plan] : []), ...(m.sink ? [m.sink] : []), ...(m.card ? ['card', 3] : []), ...(m.straighten ? ['straighten', 1] : [])])).digest('hex').slice(0, 12);
 const srcName = (m) => `${m.id}.${(m.mesh || 'x').slice(0, 8)}.src.glb`;
 
 let _io = null;

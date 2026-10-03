@@ -378,9 +378,7 @@
      "cultures": [
       "mena",
       "easia",
-      "seasia",
-      "america",
-      "namerica"
+      "seasia"
      ]
     },
     {
@@ -604,7 +602,8 @@
       "east",
       "easia",
       "seasia",
-      "africa"
+      "africa",
+      "namerica"
      ]
     }
    ]
@@ -1331,6 +1330,33 @@
     "mound",
     "palace",
     "stepped"
+   ],
+   "also": [
+    {
+     "kinds": [
+      "shrine"
+     ],
+     "eras": [
+      0,
+      0
+     ],
+     "cultures": [
+      "america",
+      "namerica"
+     ]
+    },
+    {
+     "kinds": [
+      "shrine"
+     ],
+     "eras": [
+      1,
+      2
+     ],
+     "cultures": [
+      "america"
+     ]
+    }
    ],
    "w": 38,
    "scaleBy": "w",
