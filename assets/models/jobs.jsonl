@@ -81,3 +81,7 @@
 {"id":"bronze_well_a","concept":"39d1d141-fbf0-4bcf-962d-b57ff097d6ab","ref":"be7d25bc-89c3-4149-8cec-29494202a6a0"}
 {"id":"bronze_pier_a","concept":"99ebe952-5147-4a77-b794-56ad10e19065","ref":"b29afb73-544d-47dd-8728-7560af5f4613"}
 {"id":"bronze_boat_a","concept":"21541857-f766-42d8-989a-6bbfaf0682e9","ref":"b29afb73-544d-47dd-8728-7560af5f4613"}
+{"id":"bronze_barn_a","mesh":"a5284fff-dd06-4057-93f9-5748bcdfc492"}
+{"id":"bronze_well_a","mesh":"ff6f9684-fe15-4cb2-9632-1851bc9865ce"}
+{"id":"bronze_pier_a","mesh":"23f5e834-89a6-473d-bc28-77b167580fc9"}
+{"id":"bronze_boat_a","mesh":"17657e73-476e-4058-9860-2ec37632c1d2"}
