@@ -291,11 +291,15 @@
       land = mix(land, land * vec3(0.88, 0.97, 0.78), bandW * inDecal * 0.45 * (1.0 - ice));
       land = mix(land, land * vec3(0.78, 0.98, 0.66) + vec3(0.01, 0.05, 0.0), dec.a * 0.45 * (1.0 - ice) * (1.0 - cult));
       // built-up ground (dec.b low values: packed earth, courtyards, lanes) and roads (high values)
-      vec3 urbanCol = mix(vec3(0.40, 0.35, 0.29), vec3(0.43, 0.43, 0.43), smoothstep(0.2, 0.42, dec.b));
+      // what a town stands on follows its age: bare trodden earth until the classical world, stone flags in its
+      // built-up heart from then on, concrete paving in the industrial and modern city
+      float paves = smoothstep(0.26, 0.34, sim.g); float modernGround = smoothstep(0.6, 0.7, sim.g);
+      float paved = smoothstep(0.3, 0.42, dec.b) * paves;
+      vec3 urbanCol = mix(vec3(0.40, 0.35, 0.29), mix(vec3(0.47, 0.45, 0.41), vec3(0.43, 0.43, 0.43), modernGround), paved);
       #ifdef USE_TEXARR
-      if (gOn > 0.002 && dec.b > 0.04) {   // trodden earth around early towns, paving slabs once they are built up
-        float paved = smoothstep(0.3, 0.42, dec.b);
-        urbanCol = mix(urbanCol, mix(gtex(uGround, 14.0, 4.0) * 1.06, gtex(uLanduse, 12.0, 2.0), paved), gOn);
+      if (gOn > 0.002 && dec.b > 0.04) {
+        vec3 flags = mix(gtex(uLanduse, 9.0, 4.0), gtex(uLanduse, 12.0, 2.0), modernGround);
+        urbanCol = mix(urbanCol, mix(gtex(uGround, 14.0, 4.0) * 1.06, flags, paved), gOn);
       }
       #endif
       land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * mix(0.7, 0.9, smoothstep(0.3, 0.45, dec.b)) * (1.0 - ice));

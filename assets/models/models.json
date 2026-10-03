@@ -233,7 +233,7 @@
    "kinds": [
     "tipi"
    ],
-   "h": 6.0,
+   "h": 5.2,
    "concept": "46805723-21f0-44b1-a0bd-1087e7a5192d",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_46805723-21f0-44b1-a0bd-1087e7a5192d.png",
    "mesh": "d0cfaefb-c986-44c7-aae9-230710234a17",
@@ -271,13 +271,11 @@
    "kinds": [
     "menhirs"
    ],
-   "h": 4.2,
-   "w": 26,
+   "h": 5.0,
    "concept": "7270e88a-089a-4e73-a4b2-63abe1a83725",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_7270e88a-089a-4e73-a4b2-63abe1a83725.png",
    "mesh": "cb323abc-c95d-4aa6-b225-18f67f254dbd",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130508_cb323abc-c95d-4aa6-b225-18f67f254dbd.glb",
-   "scaleBy": "w"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130508_cb323abc-c95d-4aa6-b225-18f67f254dbd.glb"
   }
  ]
 }
