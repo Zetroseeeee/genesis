@@ -10,12 +10,14 @@ const OUT = path.join(ROOT, 'data/models');
 const man = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/models/models.json'), 'utf8'));
 const repo = process.env.GITHUB_REPOSITORY || man.repo;
 const base = `https://github.com/${repo}/releases/download`;
-const curl = (url, out) => execFileSync('curl', ['-fsSL', '--retry', '3', '-o', out, url], { stdio: ['ignore', 'ignore', 'ignore'] });
+// (a file can be missing for a moment while the Models workflow replaces it: wait and try again before giving up)
+const curlOnce = (url, out) => execFileSync('curl', ['-fsSL', '--retry', '3', '-o', out, url], { stdio: ['ignore', 'ignore', 'ignore'] });
+const curl = (url, out, tries = 7) => { for (let k = 1; ; k++) { try { return curlOnce(url, out); } catch (e) { if (k >= tries) throw e; execFileSync('sleep', ['20']); } } };
 fs.mkdirSync(OUT, { recursive: true });
 const merged = { models: {} }; let got = 0, kept = 0;
 for (const set of [...new Set(man.models.filter((m) => m.src || m.card).map((m) => m.set))]) {
   const tmp = path.join(OUT, `.index-${set}.json`);
-  try { curl(`${base}/models-${set}/index.json`, tmp); } catch (e) { console.log(`no published models for set ${set} yet`); continue; }
+  try { curl(`${base}/models-${set}/index.json`, tmp, 2); } catch (e) { console.log(`no published models for set ${set} yet`); continue; }
   const idx = JSON.parse(fs.readFileSync(tmp, 'utf8')); fs.rmSync(tmp, { force: true });
   for (const [id, entry] of Object.entries(idx.models)) {
     const m = man.models.find((x) => x.id === id); if (!m) continue;      // where and when the model belongs comes from the manifest
