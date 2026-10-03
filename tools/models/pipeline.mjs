@@ -39,7 +39,7 @@ const LODS = [
 const log = (...a) => console.log(...a);
 const sh = (cmd, args, opts) => execFileSync(cmd, args, Object.assign({ encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 28 }, opts || {}));
 const readManifest = () => JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h'])).digest('hex').slice(0, 12);
+const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h', ...(m.plan ? [m.plan] : [])])).digest('hex').slice(0, 12);
 const srcName = (m) => `${m.id}.${(m.mesh || 'x').slice(0, 8)}.src.glb`;
 
 let _io = null;
@@ -71,7 +71,10 @@ async function normalise(doc, m) {
   const s = m.scaleBy === 'w' ? m.w / Math.max(size[0], size[2]) : m.h / size[1];
   const yaw = (m.yaw || 0) * Math.PI / 180; const c = Math.cos(yaw), sn = Math.sin(yaw);
   const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2, y0 = b.min[1];
-  const M = [s * c, 0, -s * sn, 0, 0, s, 0, 0, s * sn, 0, s * c, 0, -s * (c * cx + sn * cz), -s * y0, -s * (-sn * cx + c * cz), 1];
+  let M = [s * c, 0, -s * sn, 0, 0, s, 0, 0, s * sn, 0, s * c, 0, -s * (c * cx + sn * cz), -s * y0, -s * (-sn * cx + c * cz), 1];
+  // plan: [w, d] sets the footprint outright (with h the height) where a generated mesh got its proportions wrong
+  // (a pyramid on an oblong base). No yaw with it.
+  if (m.plan) { const sx = m.plan[0] / size[0], sy = m.h / size[1], sz = m.plan[1] / size[2]; M = [sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, -sx * cx, -sy * y0, -sz * cz, 1]; }
   for (const node of root.listNodes()) {
     const mesh = node.getMesh(); if (!mesh) continue;
     transformMesh(mesh, mul(M, node.getWorldMatrix()));

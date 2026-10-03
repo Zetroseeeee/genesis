@@ -993,7 +993,11 @@
    "concept": "892c11f5-091e-4d13-8490-f137cc1fc6c3",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154843_892c11f5-091e-4d13-8490-f137cc1fc6c3.png",
    "mesh": "d9d69b04-8fdc-4d2e-becc-66cfa938f930",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155828_d9d69b04-8fdc-4d2e-becc-66cfa938f930.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155828_d9d69b04-8fdc-4d2e-becc-66cfa938f930.glb",
+   "plan": [
+    217.0,
+    217.0
+   ]
   },
   {
    "id": "bronze_market_a",
@@ -1127,7 +1131,7 @@
    "kinds": [
     "mound"
    ],
-   "w": 44.0,
+   "w": 38.0,
    "scaleBy": "w",
    "h": 15.0,
    "ref": "d2857705-9bf1-4c36-8d52-2fd9327ea483",
