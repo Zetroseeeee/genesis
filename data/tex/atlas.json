@@ -1,0 +1,329 @@
+{
+ "_doc": "GENESIS texture atlases (2048x2048 WebP, 4x4 cells of 512) and UI art. \"m\" = metres one tile covers. Hosted on the Higgsfield CDN (CORS *) until pulled into data/tex/.",
+ "cell": 512,
+ "n": 4,
+ "atlases": {
+  "wall": {
+   "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/bacdf2bf-232d-406f-b36e-361f06e021ce.webp",
+   "layers": [
+    {
+     "id": "adobe",
+     "m": 3
+    },
+    {
+     "id": "plaster",
+     "m": 3
+    },
+    {
+     "id": "daub",
+     "m": 3
+    },
+    {
+     "id": "stone",
+     "m": 3
+    },
+    {
+     "id": "brick",
+     "m": 2
+    },
+    {
+     "id": "concrete",
+     "m": 4
+    },
+    {
+     "id": "glass",
+     "m": 4
+    },
+    {
+     "id": "planks",
+     "m": 2.5
+    },
+    {
+     "id": "ashlar",
+     "m": 3
+    },
+    {
+     "id": "marble",
+     "m": 3
+    },
+    {
+     "id": "yellowbrick",
+     "m": 2
+    },
+    {
+     "id": "rammed",
+     "m": 3
+    },
+    {
+     "id": "polygonal",
+     "m": 3
+    },
+    {
+     "id": "clapboard",
+     "m": 2.5
+    },
+    {
+     "id": "corrugated",
+     "m": 2
+    },
+    {
+     "id": "sandstone",
+     "m": 3
+    }
+   ]
+  },
+  "roof": {
+   "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/50e81eda-0943-43a9-9e0f-1e5029b084c6.webp",
+   "layers": [
+    {
+     "id": "thatch",
+     "m": 2.5
+    },
+    {
+     "id": "pantile",
+     "m": 2
+    },
+    {
+     "id": "slate",
+     "m": 2
+    },
+    {
+     "id": "flatroof",
+     "m": 4
+    },
+    {
+     "id": "metal",
+     "m": 2
+    },
+    {
+     "id": "greytile",
+     "m": 2
+    },
+    {
+     "id": "shingle",
+     "m": 2
+    },
+    {
+     "id": "copper",
+     "m": 3
+    },
+    {
+     "id": "plaintile",
+     "m": 2
+    },
+    {
+     "id": "earthroof",
+     "m": 3
+    },
+    {
+     "id": "solar",
+     "m": 4
+    },
+    {
+     "id": "greenglaze",
+     "m": 2
+    },
+    {
+     "id": "palm",
+     "m": 2.5
+    },
+    {
+     "id": "roman",
+     "m": 2
+    },
+    {
+     "id": "gilt",
+     "m": 2
+    },
+    {
+     "id": "zinc",
+     "m": 3
+    }
+   ]
+  },
+  "ground": {
+   "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/4fc5e704-5cdd-415c-90da-3d052ce766a2.webp",
+   "layers": [
+    {
+     "id": "meadow",
+     "m": 6
+    },
+    {
+     "id": "steppe",
+     "m": 6
+    },
+    {
+     "id": "scrub",
+     "m": 6
+    },
+    {
+     "id": "sand",
+     "m": 6
+    },
+    {
+     "id": "hamada",
+     "m": 6
+    },
+    {
+     "id": "rock",
+     "m": 6
+    },
+    {
+     "id": "snow",
+     "m": 6
+    },
+    {
+     "id": "forestfloor",
+     "m": 6
+    },
+    {
+     "id": "tundra",
+     "m": 6
+    },
+    {
+     "id": "savanna",
+     "m": 6
+    },
+    {
+     "id": "marsh",
+     "m": 6
+    },
+    {
+     "id": "scree",
+     "m": 6
+    },
+    {
+     "id": "volcanic",
+     "m": 6
+    },
+    {
+     "id": "shingle",
+     "m": 6
+    },
+    {
+     "id": "dirt",
+     "m": 6
+    },
+    {
+     "id": "cracked",
+     "m": 6
+    }
+   ]
+  },
+  "landuse": {
+   "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/b7304215-94ce-4e87-bfd8-a2bb4c665702.webp",
+   "layers": [
+    {
+     "id": "wheat",
+     "m": 12
+    },
+    {
+     "id": "crops",
+     "m": 12
+    },
+    {
+     "id": "ploughed",
+     "m": 12
+    },
+    {
+     "id": "paddy",
+     "m": 12
+    },
+    {
+     "id": "vineyard",
+     "m": 16
+    },
+    {
+     "id": "orchard",
+     "m": 24
+    },
+    {
+     "id": "pasture",
+     "m": 12
+    },
+    {
+     "id": "allotments",
+     "m": 16
+    },
+    {
+     "id": "cobbles",
+     "m": 3
+    },
+    {
+     "id": "flagstone",
+     "m": 4
+    },
+    {
+     "id": "asphalt",
+     "m": 4
+    },
+    {
+     "id": "track",
+     "m": 6
+    },
+    {
+     "id": "pavement",
+     "m": 4
+    },
+    {
+     "id": "railway",
+     "m": 6
+    },
+    {
+     "id": "plaza",
+     "m": 4
+    },
+    {
+     "id": "rubble",
+     "m": 6
+    }
+   ]
+  },
+  "misc": {
+   "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/f6634c45-2b08-4c22-801d-56a766635a6c.webp",
+   "layers": [
+    {
+     "id": "ocean",
+     "m": 20
+    },
+    {
+     "id": "shallows",
+     "m": 10
+    },
+    {
+     "id": "clouds",
+     "m": 0
+    }
+   ]
+  }
+ },
+ "ui": {
+  "era0": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/5996518b-a67d-48e2-81a9-217b49d2bead.webp",
+  "era1": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/374800a3-bcb8-41fc-babd-7e2e0385589b.webp",
+  "era2": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/704195c3-9f7a-48ca-82f1-5adec482dc70.webp",
+  "era3": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/fc1301aa-bd12-40ef-9543-a33858343c12.webp",
+  "era4": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/da5efed8-cd24-4288-a246-b1aa7255f618.webp",
+  "era5": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/73d10a70-8c05-4830-8039-1c37a9fe7c63.webp",
+  "era6": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/75cda5bf-e505-4b21-ae78-22779f1ba7af.webp",
+  "era7": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/3776f625-24fe-423c-a25a-453dadee36b9.webp",
+  "era8": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/ada3c89f-a2e0-4314-b737-cbe1f013f013.webp",
+  "card_settle": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/b1447ec1-cdff-420c-9769-224a0d508b4c.webp",
+  "card_farm": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/3459eac4-9445-434e-adc1-60678e315204.webp",
+  "card_walls": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/f4be2ac8-a507-47ff-b959-ff35366dcdb4.webp",
+  "card_port": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/bbfd3cba-784b-4e47-b9fc-497b3cd560b0.webp",
+  "card_market": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/2c0e677e-64df-4cfd-b8be-dbb78944dea3.webp",
+  "card_temple": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/595a3b59-a97c-4bac-b9b3-8f4a60df78a9.webp",
+  "card_academy": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/0ad3859c-228a-4627-8451-cfca13eafbfc.webp",
+  "card_mine": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/1894a4a5-bc15-4ce0-99e5-72714b0aa8b9.webp",
+  "card_wonder": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/b6091477-7dc7-4563-9c3d-6062bed0a228.webp",
+  "card_capital": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/626c9a41-5ec2-4520-97f1-56bd2b35d4e9.webp",
+  "card_levy": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/220abde6-4e43-4521-a5cd-1175f7573a18.webp",
+  "ev_volcano": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/1d50f8ed-21ee-42a9-b8db-63fb32e737cf.webp",
+  "ev_flood": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/10510e22-31bf-4ebc-98a7-80cb0d18555f.webp",
+  "ev_plague": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/3847c363-b6fd-4c6a-a6be-918e45e26598.webp",
+  "ev_comet": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/ed10d625-bc03-4ce5-ab97-06eac4c0ca36.webp",
+  "ev_war": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/f36e4a45-e6f7-48ff-ad28-8ff9c1343470.webp",
+  "ev_famine": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/5084c934-3555-474f-a79c-0bf172da2a2c.webp",
+  "hero": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/b84da82c-8ba9-4922-8275-33cbf57fc0da.webp"
+ }
+}
