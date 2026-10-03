@@ -25,6 +25,16 @@ jobs:
       - name: Install pipeline dependencies
         run: npm ci --prefix tools/models
       - name: Mirror sources, build LODs, publish
-        run: node tools/models/pipeline.mjs ci
+        run: |
+          set -o pipefail
+          node tools/models/pipeline.mjs ci 2>&1 | tee models.log
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Publish the run log
+        if: always()
+        run: |
+          gh release view ci-logs >/dev/null 2>&1 || gh release create ci-logs --title "CI logs" --notes "Logs from workflow runs." --latest=false
+          grep -v -E "^(prune|weld|dedup|flatten|join|simplify|textureCompress|meshopt|reorder|quantize)" models.log > models-last.log || true
+          gh release upload ci-logs models-last.log --clobber
         env:
           GH_TOKEN: ${{ github.token }}

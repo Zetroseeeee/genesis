@@ -100,6 +100,8 @@
         M.defs[id] = def; for (const kind of def.kinds) (M.byKind[kind] = M.byKind[kind] || []).push(def);
       }
       M.ready = Object.keys(M.defs).length > 0;
+      // the coarsest step of every model is a few kilobytes: fetch them all now so no town ever opens on kit boxes
+      for (const id in M.defs) { const d = M.defs[id]; request(d, d.lods[d.lods.length - 1], false); }
     } catch (e) { console.warn('models unavailable', e); M.failed = true; }
     return M;
   };

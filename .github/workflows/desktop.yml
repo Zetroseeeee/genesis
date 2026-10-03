@@ -34,12 +34,18 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Sign (ad hoc) and wrap
         run: |
+          set -euxo pipefail
           APP="release/mac-arm64/GENESIS.app"
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
           VERSION=$(node -p "require('./package.json').version")
           mkdir -p out/dmg && cp -R "$APP" out/dmg/ && ln -s /Applications out/dmg/Applications
-          hdiutil create -volname "GENESIS" -srcfolder out/dmg -ov -format UDZO "out/GENESIS-$VERSION-mac-arm64.dmg"
+          # hdiutil on hosted runners sometimes reports "Resource busy": try a few times
+          for attempt in 1 2 3 4 5; do
+            if hdiutil create -volname "GENESIS" -srcfolder out/dmg -ov -format UDZO "out/GENESIS-$VERSION-mac-arm64.dmg"; then break; fi
+            if [ "$attempt" = 5 ]; then exit 1; fi
+            sleep 10
+          done
           ls -la out
       - name: Publish
         run: |
@@ -50,5 +56,13 @@ jobs:
           gh release edit latest --notes "$NOTES" --latest
           for f in $(gh release view latest --json assets --jq '.assets[].name'); do gh release delete-asset latest "$f" --yes; done
           gh release upload latest out/*.dmg --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Keep the log when something fails
+        if: failure()
+        run: |
+          { echo "run $GITHUB_RUN_ID at $(date -u)"; ls -la release out 2>&1 || true; } > desktop-failure.log
+          gh release view ci-logs >/dev/null 2>&1 || gh release create ci-logs --title "CI logs" --notes "Logs from failed workflow runs." --latest=false
+          gh release upload ci-logs desktop-failure.log --clobber
         env:
           GH_TOKEN: ${{ github.token }}

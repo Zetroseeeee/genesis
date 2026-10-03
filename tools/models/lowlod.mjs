@@ -66,9 +66,14 @@ function clusterTo(P, I, targetTris) {
 }
 function simplifyTo(P, I, targetTris) {
   let idx = I, err = 0.01;
-  for (let pass = 0; pass < 6 && idx.length / 3 > targetTris * 1.1; pass++) { idx = MeshoptSimplifier.simplify(idx, P, 3, targetTris * 3, err, ['Prune'])[0]; err *= 2.5; }
+  for (let pass = 0; pass < 6 && idx.length / 3 > targetTris * 1.1; pass++) {
+    const next = MeshoptSimplifier.simplify(idx, P, 3, targetTris * 3, err, pass < 3 ? ['Prune'] : [])[0];
+    if (next.length / 3 < targetTris * 0.6) break;      // pruned or collapsed too far (a model made of thin separate parts): keep the step before
+    idx = next; err *= 2.5;
+  }
   let m = compact(P, idx);
-  if (m.I.length / 3 > targetTris * 1.6) m = compact(...Object.values(clusterTo(m.P, m.I, targetTris)));
+  if (m.I.length / 3 > targetTris * 1.6) { const c = clusterTo(m.P, m.I, targetTris); if (c.I.length >= 36) m = compact(c.P, c.I); }
+  if (m.I.length < 36) throw new Error('nothing left after simplification');
   return m;
 }
 // normals with hard edges where faces meet at more than the crease angle (walls against roofs), smooth elsewhere

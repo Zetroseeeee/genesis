@@ -114,7 +114,8 @@ async function processModel(m, srcPath, outDir) {
   for (let k = 0; k < LODS.length; k++) {
     const file = `${m.id}.l${k}.glb`, out = path.join(outDir, file), lod = LODS[k]; let r;
     if (lod.bake) {
-      const b = await bakeLowLod(base, lod.tris, lod.tex); if (!mean) mean = b.mean;
+      let b; try { b = await bakeLowLod(base, lod.tris, lod.tex); } catch (e) { log(`   l${k}: skipped (${e.message})`); continue; }      // the ladder may be a step short; the game copes
+      if (!mean) mean = b.mean;
       await b.doc.transform(textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 90, effort: 60 }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
       await io.write(out, b.doc);
       r = { tris: b.tris, bytes: fs.statSync(out).size, tex: lod.tex, maps: 'baked' };
