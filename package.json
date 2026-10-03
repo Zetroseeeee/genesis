@@ -1,19 +1,62 @@
 {
   "name": "genesis",
   "productName": "GENESIS",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
-  "description": "GENESIS — a god-game on the real Earth, from 10,000 BC",
+  "description": "GENESIS \u2014 a god-game on the real Earth, from 10,000 BC",
   "main": "desktop/main.js",
   "scripts": {
     "build": "node tools/build.js",
     "test": "node tools/build.js && ONLY=2,7 node tools/test_sim.js",
     "test:e2e": "node tools/build.js && node tools/test_e2e.js",
-    "start": "node tools/build.js && electron ."
+    "start": "node tools/build.js && electron .",
+    "fetch": "node tools/textures/fetch.mjs && node tools/models/fetch.mjs",
+    "pack:mac": "node tools/build.js && electron-builder --mac --arm64 --dir"
   },
   "devDependencies": {
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3",
     "pngjs": "^7.0.0"
+  },
+  "author": "Emile Majed",
+  "build": {
+    "appId": "com.emilemajed.genesis",
+    "productName": "GENESIS",
+    "directories": {
+      "output": "release"
+    },
+    "asar": false,
+    "files": [
+      "desktop/**/*",
+      "dist/**/*",
+      "!dist/data",
+      "!dist/data/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": [
+          "**/*",
+          "!tex/test_*",
+          "!tex/shot_*",
+          "!tex/atlas_local.json",
+          "!tex/atlas_shot.json"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.strategy-games",
+      "target": [
+        "dir"
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "electronLanguages": [
+      "en"
+    ]
   }
 }

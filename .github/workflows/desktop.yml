@@ -1,0 +1,54 @@
+# Builds the downloadable Mac app and attaches it to the "latest" release.
+name: Desktop build
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'desktop/**'
+      - 'vendor/**'
+      - 'package.json'
+      - 'tools/build.js'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: desktop
+  cancel-in-progress: true
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Fetch art and models
+        run: npm run fetch
+      - name: Package
+        run: npm run pack:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Sign (ad hoc) and wrap
+        run: |
+          APP="release/mac-arm64/GENESIS.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p out/dmg && cp -R "$APP" out/dmg/ && ln -s /Applications out/dmg/Applications
+          hdiutil create -volname "GENESIS" -srcfolder out/dmg -ov -format UDZO "out/GENESIS-$VERSION-mac-arm64.dmg"
+          ls -la out
+      - name: Publish
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SHA=$(git rev-parse --short HEAD)
+          NOTES="GENESIS $VERSION for Apple Silicon Macs, built from $SHA. Open the .dmg and drag GENESIS to Applications. The app is not notarised by Apple: on first launch macOS will refuse it; open System Settings > Privacy & Security and choose Open Anyway."
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "GENESIS (latest build)" --notes "$NOTES"
+          gh release edit latest --notes "$NOTES" --latest
+          for f in $(gh release view latest --json assets --jq '.assets[].name'); do gh release delete-asset latest "$f" --yes; done
+          gh release upload latest out/*.dmg --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
