@@ -61,8 +61,10 @@ function smoke(win) {
 }
 
 function createWindow() {
+  // (the self-check may ask for a window larger than the build machine's screen, so its pictures are a proper size)
+  const size = SMOKE && /^\d+x\d+$/.test(process.env.GENESIS_SMOKE_SIZE || '') ? process.env.GENESIS_SMOKE_SIZE.split('x').map(Number) : [1680, 1050];
   const win = new BrowserWindow({
-    width: 1680, height: 1050, minWidth: 1024, minHeight: 640, backgroundColor: '#05070b', title: 'GENESIS', show: false,
+    width: size[0], height: size[1], minWidth: 1024, minHeight: 640, backgroundColor: '#05070b', title: 'GENESIS', show: false, enableLargerThanScreen: SMOKE,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
   });
   win.once('ready-to-show', () => win.show());

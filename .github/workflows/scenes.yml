@@ -1,0 +1,62 @@
+# Pictures of the game on a real Apple GPU. Packages this commit, starts the app once per scene of tools/scenes/tour.txt,
+# lets it settle, keeps a picture and the frame rate in the "scenes" release (scene-<name>.png, scenes.log).
+name: Scenes
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Scenes to take (names separated by spaces); empty = all of tools/scenes/tour.txt'
+        required: false
+        default: ''
+      size:
+        description: 'Window size'
+        required: false
+        default: '1680x1050'
+permissions:
+  contents: write
+concurrency:
+  group: scenes
+  cancel-in-progress: true
+jobs:
+  shots:
+    runs-on: macos-15
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Fetch art and models
+        run: npm run fetch
+      - name: Package
+        run: npm run pack:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Sign (ad hoc)
+        run: codesign --force --deep --sign - release/mac-arm64/GENESIS.app
+      - name: Take the pictures
+        env:
+          ONLY: ${{ github.event.inputs.only }}
+          GENESIS_SMOKE_SIZE: ${{ github.event.inputs.size }}
+        run: |
+          set -uo pipefail
+          mkdir -p out
+          grep -v '^#' tools/scenes/tour.txt > out/list.txt
+          while IFS='|' read -r name scene opts script settle <&3; do
+            name=$(echo "$name" | xargs); [ -z "$name" ] && continue
+            if [ -n "$ONLY" ]; then case " $ONLY " in *" $name "*) ;; *) continue;; esac; fi
+            scene=$(echo "$scene" | xargs); settle=$(echo "${settle:-30}" | xargs)
+            { cat tools/testcam.js; echo; echo "window.__scene = ${opts:-null};"; cat "$scene"; echo; echo "${script:-}"; } > "out/$name.js"
+            GENESIS_SMOKE_SHOT="$PWD/out/scene-$name.png" GENESIS_SMOKE_SCRIPT="$PWD/out/$name.js" GENESIS_SMOKE_SETTLE="$settle" \
+              release/mac-arm64/GENESIS.app/Contents/MacOS/GENESIS --smoke < /dev/null 2>/dev/null | grep GENESIS-SMOKE | sed "s/^/$name /" >> out/scenes.log || true
+            tail -n 1 out/scenes.log | cut -c1-400
+          done 3< out/list.txt
+      - name: Keep them
+        if: always()
+        run: |
+          gh release view scenes >/dev/null 2>&1 || gh release create scenes --title "Scenes" --notes "Pictures of the game taken on the build Mac (tools/scenes/tour.txt)." --latest=false
+          echo "commit $(git rev-parse --short HEAD) at $(date -u +%FT%TZ)" >> out/scenes.log
+          gh release upload scenes out/scenes.log out/scene-*.png --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

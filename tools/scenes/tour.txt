@@ -1,0 +1,33 @@
+# The tour: one line per picture.  name | scene script | window.__scene | script run after the scene | seconds to settle
+# (tools/scenes/town.js: __sceneLook(what, distance, tilt, turn); tools/scenes/forest.js: __forest(lon, lat, alt, tilt, heading, season))
+stone        | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0,pop:1,walls:1,special:4,alt:620,tilt:1.25,out:1.0} | | 30
+stone_centre | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0,pop:1,walls:1,special:4} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+north        | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14,alt:620,tilt:1.25,out:1.0} | | 30
+north_centre | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+north_hall   | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => __sceneLook('palace', 3.5, 1.1, -0.5), 7000); | 32
+north_market | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => __sceneLook('market', 3.5, 1.1, 0.3), 7000); | 32
+mena         | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,alt:620,tilt:1.25,out:1.0} | | 30
+mena_centre  | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+mena_street  | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,alt:260,tilt:1.3,out:0.5,turn:0.5} | | 30
+med_centre   | tools/scenes/town.js | {lon:22.4,lat:38.2,tech:0.1,pop:6,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+med_wonder   | tools/scenes/town.js | {lon:22.4,lat:38.2,tech:0.1,pop:6,walls:2,special:62} | setTimeout(() => __sceneLook('town', 1.6, 1.15, 0.6), 7000); | 32
+easia        | tools/scenes/town.js | {lon:113,lat:35,tech:0.1,pop:6,walls:2,special:14,alt:620,tilt:1.25,out:1.0} | | 30
+easia_centre | tools/scenes/town.js | {lon:113,lat:35,tech:0.1,pop:6,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+seasia_centre | tools/scenes/town.js | {lon:104,lat:14,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+sasia_centre | tools/scenes/town.js | {lon:80,lat:26,tech:0.1,pop:6,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+africa_centre | tools/scenes/town.js | {lon:0,lat:10,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+america_centre | tools/scenes/town.js | {lon:-99,lat:19.3,tech:0.1,pop:6,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+namerica     | tools/scenes/town.js | {lon:-90,lat:38.6,tech:0.1,pop:5,walls:2,special:14,alt:620,tilt:1.25,out:1.0} | | 30
+namerica_centre | tools/scenes/town.js | {lon:-90,lat:38.6,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+east_centre  | tools/scenes/town.js | {lon:37,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+port         | tools/scenes/town.js | {lon:23.72,lat:37.97,tech:0.1,pop:6,walls:2,special:9} | setTimeout(() => __sceneLook('pier', 9, 1.15, 0.6), 7000); | 32
+town_whole   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('town', 2.5, 0.9, 0), 7000); | 32
+boreal       | tools/scenes/forest.js | null | const f = () => __forest(26.5, 63.0, 420, 1.3, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+temperate    | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 420, 1.3, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+autumn       | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 420, 1.3, 0.4, 0.84); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+winter       | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 420, 1.3, 0.4, 0.0); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+mediterranean | tools/scenes/forest.js | null | const f = () => __forest(11.0, 43.3, 420, 1.3, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+rainforest   | tools/scenes/forest.js | null | const f = () => __forest(22.0, 0.5, 520, 1.3, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+savanna      | tools/scenes/forest.js | null | const f = () => __forest(35.0, -3.0, 420, 1.3, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+china        | tools/scenes/forest.js | null | const f = () => __forest(113.0, 28.0, 420, 1.3, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+oasis        | tools/scenes/forest.js | null | const f = () => __forest(44.6, 33.2, 420, 1.3, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
