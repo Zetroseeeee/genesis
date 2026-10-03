@@ -161,7 +161,7 @@
     }`;
   const FRAG = `
     precision highp float;
-    uniform vec3 uSunV, uUpV; uniform float uDay, uCamAlt, uTime;
+    uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uCamAlt, uTime, uSnow, uDusk;
     varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView;
     const vec3 LUM = vec3(0.299, 0.587, 0.114);
     #ifdef USE_TEXARR
@@ -201,8 +201,8 @@
       // aInfo is constant per instance but arrives through varyings: round before decoding so exact comparisons hold
       vec3 n = normalize(vN); float era = floor(vInfo.x + 0.5), seed = vInfo.y, style = floor(vInfo.z + 0.5);
       float wallMat = mod(style, 8.0); float roofMat = mod(floor(style / 8.0), 8.0); float culture = mod(floor(style / 64.0), 16.0); float flags = floor(style / 1024.0);
-      float isBlock = mod(floor(flags / 2.0), 2.0), isNeon = mod(floor(flags / 4.0), 2.0), isLandmark = mod(flags, 2.0), isRuin = mod(floor(flags / 16.0), 2.0), isSite = mod(floor(flags / 32.0), 2.0);
-      float roof = smoothstep(0.22, 0.4, vLN.y);                        // sloped and flat tops
+      float isBlock = mod(floor(flags / 2.0), 2.0), isNeon = mod(floor(flags / 4.0), 2.0), isLandmark = mod(flags, 2.0), isRuin = mod(floor(flags / 16.0), 2.0), isSite = mod(floor(flags / 32.0), 2.0), isThing = mod(floor(flags / 64.0), 2.0);   // thing: a cart or a boat, not a building (no door, no windows, no roof of its own)
+      float roof = smoothstep(0.22, 0.4, vLN.y) * (1.0 - isThing);      // sloped and flat tops
       float bottom = step(vLN.y, -0.5);
       // face coordinates in metres
       vec2 fuv = abs(vLN.x) > 0.5 ? vec2(vLocal.z * vScale.z, vLocal.y * vScale.y) : abs(vLN.z) > 0.5 ? vec2(vLocal.x * vScale.x, vLocal.y * vScale.y) : vec2(vLocal.x * vScale.x, vLocal.z * vScale.z);
@@ -238,7 +238,7 @@
       #endif
       // windows: none before the Classical era (huts have no glass), sparse until Medieval, dense from the Industrial era
       float density = era < 1.0 ? 0.0 : era < 3.0 ? 0.2 : era < 4.0 ? 0.45 : era < 6.0 ? 0.6 : era < 7.0 ? 0.8 : 0.9;
-      if (wallMat == 6.0 || isSite > 0.5) density = 0.0;
+      if (wallMat == 6.0 || isSite > 0.5 || isThing > 0.5) density = 0.0;
       vec2 cellSz = isLandmark > 0.5 ? vec2(4.5, 6.0) : era >= 7.0 ? vec2(2.4, 3.1) : era >= 6.0 ? vec2(2.6, 3.4) : vec2(2.8, 3.2);
       vec2 g = vec2(fuv.x, yM) / cellSz; vec2 gi = floor(g); vec2 gf = fract(g);
       float floors = floor(wallH / cellSz.y);
@@ -248,7 +248,7 @@
       float win = step(0.5 - wsz, gf.x) * step(gf.x, 0.5 + wsz) * step(0.5 - wtall, gf.y) * step(gf.y, 0.5 + wtall * 0.55) * rowOk * (1.0 - roof) * (1.0 - bottom) * step(faceId, 4.5) * flatWall;
       win *= step(h21(gi + seed * 7.0 + faceId * 13.0), density) * (1.0 - smoothstep(0.5, 1.6, px));
       // a door on the front face
-      float door = step(abs(fuv.x - 0.9), 0.55) * step(yM, 2.1) * (1.0 - roof) * flatWall * step(abs(faceId - 3.0), 0.5) * step(2.6, vScale.x) * step(era, 6.5) * (1.0 - smoothstep(0.4, 1.2, px)) * (1.0 - isSite);
+      float door = step(abs(fuv.x - 0.9), 0.55) * step(yM, 2.1) * (1.0 - roof) * flatWall * step(abs(faceId - 3.0), 0.5) * step(2.6, vScale.x) * step(era, 6.5) * (1.0 - smoothstep(0.4, 1.2, px)) * (1.0 - isSite) * (1.0 - isThing);
       col = mix(col, vec3(0.13, 0.1, 0.08), win * 0.88 * (1.0 - isRuin * 0.6));
       col = mix(col, vec3(0.16, 0.11, 0.07), door);
       // ---------- roofs ----------
@@ -273,6 +273,8 @@
       #endif
       if (isBlock > 0.5) { float sub = step(0.55, vnoise(fuv * 0.12 + seed * 3.0)); rc = mix(rc * 0.9, vCol * 0.7, sub * 0.6); }
       col = mix(col, rc, roof);
+      // winter where winters are white: snow lies on the roofs
+      if (uSnow > 0.01) col = mix(col, vec3(0.9, 0.92, 0.96), uSnow * roof * 0.92 * smoothstep(0.25, 0.55, vnoise(ruv * 0.35 + seed * 9.0) + uSnow * 0.5));
       // building sites: bare material, no finish, a dusty foot
       if (isSite > 0.5) { col = mix(col, vec3(0.62, 0.56, 0.47), 0.45 + 0.45 * roof) * (0.9 + 0.2 * vnoise(fuv * 1.3 + seed * 4.0)); col *= 1.0 - 0.15 * smoothstep(0.3, 0.0, vLocal.y); }
       // ruins: weathered, mossy at the foot, roofs gone to the same stone
@@ -282,8 +284,8 @@
       // ---------- lighting ----------
       float diff = max(dot(n, uSunV), 0.0);
       float sky = 0.5 + 0.5 * dot(n, uUpV);
-      vec3 amb = mix(vec3(0.07, 0.08, 0.12), vec3(0.40, 0.43, 0.5), uDay) * (0.7 + 0.5 * sky);
-      vec3 lit = col * (amb + diff * 1.15 * uDay) * ao;
+      vec3 amb = mix(vec3(0.20, 0.25, 0.40), vec3(0.40, 0.43, 0.5), uDay) * (0.7 + 0.5 * sky) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
+      vec3 lit = col * (amb + diff * 1.15 * uSunCol) * ao;
       // night: oil light from the Bronze Age, electric from the Industrial era; glass towers glow
       float night = 1.0 - uDay;
       float lampOn = step(era >= 6.0 ? 0.66 : 0.55, h21(gi * 3.1 + seed * 11.0 + faceId));

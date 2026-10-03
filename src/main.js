@@ -38,7 +38,7 @@
   // ---------- renderer ----------
   const stage = $('stage');
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
-  // a browser drawing in software (the test harness) gets a lighter load: no shadow map, thinner forests, coarser models
+  // a browser drawing in software (the test harness) gets a lighter load: a quarter of the pixels, no shadow map, thinner forests, coarser models
   let softGL = false; try { const gl = renderer.getContext(); const x = gl.getExtension('WEBGL_debug_renderer_info'); softGL = /SwiftShader|llvmpipe|Software/i.test(String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))); } catch (e) {}
   if (window.SHADOWS && (window.GENESIS_SHADOW || !softGL)) SHADOWS.init(renderer, window.GENESIS_SHADOW || 4096);      // the sun's depth map, 4096 texels across (a software renderer goes without unless asked)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -58,7 +58,7 @@
     uFertView: { value: 0 }, uPolitical: { value: 1 }, uLabelsOn: { value: 1 },
     uClouds: { value: null }, uCloudShift: { value: 0 }, uCloudVis: { value: 0 },
     uDecal: { value: null }, uDecalRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uDecalOn: { value: 0 }, uQuality: { value: 1 }, uDecal2: { value: null }, uWaterN: { value: null },
-    uSeason: { value: new THREE.Vector4(1, 0, 0, 0) },
+    uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
@@ -102,11 +102,11 @@
       for (let i = 0; i < N; i++) { worldData.elev[i] = wd.data[i * 4]; worldData.fert[i] = wd.data[i * 4 + 1] / 255; worldData.flags[i] = wd.data[i * 4 + 2]; worldData.land[i] = wd.data[i * 4 + 2] & 1; }
       setLoad(50, 'peoples');
       world = new WORLD.World({ scene, terrain: { exag: 2.0, heightAt: () => 0 } });
-      terrain = new TERRAIN.Terrain({ scene, index, base: 'data/', globals, exag: 2.0, anisotropy: Math.min(8, renderer.capabilities.getMaxAnisotropy()) });
+      terrain = new TERRAIN.Terrain({ scene, index, base: 'data/', globals, exag: 2.0, anisotropy: Math.min(8, renderer.capabilities.getMaxAnisotropy()), soft: softGL && !window.GENESIS_GRID });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
-      trees = new TREES.Trees({ scene, terrain, renderer }); if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; trees.load('data/veg.jpg', 'data/noise.png').catch((e) => console.warn('veg', e));
-      life = new LIFE.Life({ scene, terrain }); movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
+      trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png').catch((e) => console.warn('veg', e));
+      life = new LIFE.Life({ scene, terrain }); if (softGL) life.budget = 0.5; movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
       mapcam.onClick = onClick; mapcam.locked = true; mapcam.autoTilt = settings.autoTilt;
@@ -757,7 +757,7 @@
 
   // ---------- settings ----------
   function loadSettings() { try { Object.assign(settings, JSON.parse(localStorage.getItem('genesis-settings') || '{}')); } catch (e) {} applySettings(); }
-  function applySettings() { document.body.classList.toggle('continuous', !!settings.continuous); globals.uQuality.value = settings.quality === 'high' ? 1 : 0; if (trees) trees.enabled = settings.quality === 'high'; if (movers) movers.enabled = settings.quality === 'high'; if (fx) fx.enabled = true; renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.quality === 'high' ? 2 : 1.25)); if (window.MODELS) MODELS.lodBias = renderer.getPixelRatio() * (softGL && !window.GENESIS_LOD ? 0.45 : 1);   /* model detail is chosen by device pixels (a software renderer gets coarser models) */ document.documentElement.style.setProperty('--ui-scale', settings.uiScale); document.body.classList.toggle('glass', !!settings.glass && !matchMedia('(pointer: coarse)').matches); if (mapcam) mapcam.autoTilt = settings.autoTilt; if (window.TEX && TEX.ready) applyTextures(); try { localStorage.setItem('genesis-settings', JSON.stringify(settings)); } catch (e) {} }
+  function applySettings() { document.body.classList.toggle('continuous', !!settings.continuous); globals.uQuality.value = settings.quality === 'high' ? 1 : 0; if (trees) trees.enabled = settings.quality === 'high'; if (movers) movers.enabled = settings.quality === 'high'; if (fx) fx.enabled = true; renderer.setPixelRatio(softGL ? (window.GENESIS_PIXELS || 0.5) : Math.min(window.devicePixelRatio || 1, settings.quality === 'high' ? 2 : 1.25));      /* (a software renderer draws a quarter of the pixels unless asked) */ if (window.MODELS) MODELS.lodBias = softGL && !window.GENESIS_LOD ? 0.45 : renderer.getPixelRatio();   /* model detail is chosen by device pixels (a software renderer gets coarser models) */ document.documentElement.style.setProperty('--ui-scale', settings.uiScale); document.body.classList.toggle('glass', !!settings.glass && !matchMedia('(pointer: coarse)').matches); if (mapcam) mapcam.autoTilt = settings.autoTilt; if (window.TEX && TEX.ready) applyTextures(); try { localStorage.setItem('genesis-settings', JSON.stringify(settings)); } catch (e) {} }
 
   // ---------- UI binding ----------
   function bindUI() {
@@ -854,7 +854,13 @@
     camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();      // everything this frame (sun in view space, shadow lookup) works from the camera where it now is
     // seasons: one year every four minutes of real time; the sun's declination swings with it and the ground follows
     if (!window.__seasonLock) seasonPhase = (seasonPhase + dt / 240) % 1; const decl = -0.4 * Math.cos(seasonPhase * Math.PI * 2);
-    { const wN = 0.5 + 0.5 * Math.cos(seasonPhase * Math.PI * 2); const gauss = (x, c) => Math.exp(-Math.pow(((x - c + 1.5) % 1) - 0.5, 2) / 0.006); globals.uSeason.value.set(wN, gauss(seasonPhase, 0.82), 1 - wN, gauss(seasonPhase, 0.32)); if (trees) trees.season = globals.uSeason.value; }
+    { const wN = 0.5 + 0.5 * Math.cos(seasonPhase * Math.PI * 2); const gauss = (x, c) => Math.exp(-Math.pow(((x - c + 1.5) % 1) - 0.5, 2) / 0.006); globals.uSeason.value.set(wN, gauss(seasonPhase, 0.82), 1 - wN, gauss(seasonPhase, 0.32)); 
+      // the leaves are down from late autumn until spring is well under way (north; the south half a year later): not with the sun's height, which is halfway down at the height of the autumn colours
+      const leafOff = (p) => { const t = p >= 0.5 ? (p - 0.86) / 0.08 : 1 - (p - 0.27) / 0.09; const u = Math.min(1, Math.max(0, t)); return u * u * (3 - 2 * u); };
+      // and the cold of the year runs a month behind the sun: the depth of winter is late January, not the solstice
+      const coldN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.08) * Math.PI * 2);
+      globals.uBare.value.set(leafOff(seasonPhase), leafOff((seasonPhase + 0.5) % 1), coldN, 1 - coldN);
+      if (trees) { trees.season = globals.uSeason.value; trees.bareness = globals.uBare.value; } }
     if (!window.__sunLock) { sunAngle += dt * 0.012; const cd = Math.sqrt(1 - decl * decl); globals.uSun.value.set(Math.cos(sunAngle) * cd, decl, Math.sin(sunAngle) * cd).normalize(); }
     globals.uTime.value = now / 1000; globals.uCamAlt.value = mapcam.alt;
     const sp = speed();
@@ -871,18 +877,23 @@
     terrain.update(camera, stage.clientHeight);
     if (decal) decal.update(mapcam, sim, now, sim ? sim.year + ':' + world.texVersion : 0, globals.uSun.value, world, trees);
     if (trees) trees.update(mapcam, sim, now);
-    if (life && mode === 'play') life.update(mapcam, sim, now, world.bUniforms.uDay.value, stage.clientHeight, camera.fov);
+    const devH = stage.clientHeight * renderer.getPixelRatio();      // point sprites are sized in device pixels
+    if (life && mode === 'play') life.update(mapcam, sim, now, world.bUniforms.uDay.value, devH, camera.fov);
     const day = world.updateSky(mapcam, globals.uSun.value, now / 1000);
-    if (movers && mode === 'play') movers.update(mapcam, sim, decal, now, dt, world.bUniforms.uDay.value, stage.clientHeight, camera.fov);
-    if (fx && mode === 'play') { fx.update(mapcam, sim, now, dt, world.bUniforms.uDay.value, stage.clientHeight, camera.fov); if (fx.shake > 0.001) { const a = fx.shake * fx.shake * mapcam.dist * 0.02; camera.position.x += (Math.random() - 0.5) * a; camera.position.y += (Math.random() - 0.5) * a; camera.position.z += (Math.random() - 0.5) * a; camera.updateMatrixWorld(); } }
+    if (movers && mode === 'play') movers.update(mapcam, sim, decal, now, dt, world.bUniforms.uDay.value, devH, camera.fov);
+    if (fx && mode === 'play') { fx.update(mapcam, sim, now, dt, world.bUniforms.uDay.value, devH, camera.fov); if (fx.shake > 0.001) { const a = fx.shake * fx.shake * mapcam.dist * 0.02; camera.position.x += (Math.random() - 0.5) * a; camera.position.y += (Math.random() - 0.5) * a; camera.position.z += (Math.random() - 0.5) * a; camera.updateMatrixWorld(); } }
     if (world.cloudTex && globals.uClouds.value !== world.cloudTex) globals.uClouds.value = world.cloudTex;
     globals.uCloudShift.value = world.cloudShift; globals.uCloudVis.value = world.cloudVis;
     world.updateBuildings(mapcam, false);
+    // whether snow lies here now (by the climate of the place and the time of year): roofs go white with the ground
+    if (trees && trees.ready && mapcam.alt < 0.03) { const cold = TREES.Trees.COLD[trees.climateAt(mapcam.lon, mapcam.lat)], season = mapcam.lat >= 0 ? globals.uBare.value.z : globals.uBare.value.w; const thr = 1.02 - 0.55 * cold;
+        const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+        world.bUniforms.uSnow.value = sm(thr, thr + 0.1, season) * sm(0.08, 0.5, cold); }
     // the colour of the ground hereabouts, for the light it throws back onto walls in shade (looked up now and then)
     if (trees && trees.ready && ((frameNo = (frameNo + 1) % 20) === 0) && mapcam.alt < 0.03) {
       const fw = trees.forestAt(mapcam.lon, mapcam.lat, Math.max(1, terrain.heightAt(mapcam.lon, mapcam.lat))); const g = world.bUniforms.uGround.value;
       if (fw && fw.warm !== undefined) { const o = Math.max(0, 1 - fw.f - fw.g), w = fw.warm;
-        g.set(fw.f * 0.16 + fw.g * (0.36 + 0.19 * w) + o * (0.5 + 0.36 * w), fw.f * 0.22 + fw.g * (0.40 + 0.06 * w) + o * (0.48 + 0.16 * w), fw.f * 0.10 + fw.g * (0.20 + 0.06 * w) + o * (0.44 - 0.06 * w)); }
+        g.set(fw.f * 0.16 + fw.g * (0.36 + 0.19 * w) + o * (0.5 + 0.36 * w), fw.f * 0.22 + fw.g * (0.40 + 0.06 * w) + o * (0.48 + 0.16 * w), fw.f * 0.10 + fw.g * (0.20 + 0.06 * w) + o * (0.44 - 0.06 * w)); const sn = world.bUniforms.uSnow.value; if (sn > 0.01) g.set(g.x + (0.85 - g.x) * sn, g.y + (0.88 - g.y) * sn, g.z + (0.93 - g.z) * sn); }      // (snow throws back far more light than earth)
     }
     // sun shadows: a depth map of what stands around the point the camera looks at, pushed a little way down the view
     if (window.SHADOWS && SHADOWS.ready) {

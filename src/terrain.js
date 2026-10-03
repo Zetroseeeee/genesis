@@ -81,7 +81,7 @@
     uniform sampler2D uElev; uniform vec4 uElevRect; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag;
     uniform sampler2D uImg; uniform vec4 uImgRect;
     uniform float uDLon, uDLat, uLevel;
-    uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason;   // winter N, autumn N, winter S, autumn S (0..1)
+    uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason; uniform vec4 uBare;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
     uniform sampler2D uOwner, uPal, uSim, uInfo, uNoise;
     // the four photographic detail textures (forest, dunes, rock, grass) travel as one array where the GPU has arrays:
     // Apple's GPUs allow a fragment shader 16 textures, and this one needs every unit it can spare
@@ -161,10 +161,16 @@
       vec4 dec2 = inDecal > 0.5 ? texture2D(uDecal2, dcu) : vec4(0.0);   // r burn/ash, b cast shadows, a flood water
       float castS = dec2.b; float burnW = dec2.r; float floodW = dec2.a;
       float riverLine = bandW * (1.0 - inDecal) * (1.0 - smoothstep(0.3, 0.7, closeFade0));   // raster river water only from a distance; close in it is floodplain
-      float vecRiver = dec.r * inDecal;
+      // a river in the decal: 1 on its centre line, 0.5 at the water's edge, 0 where its bank ends. The edge wanders a
+      // little, and the river narrows where the land rises steeply from it (it is drawn wider than life: see decal.js)
+      float rivR = dec.r * inDecal * (1.0 + wn2.b * 0.2 + wn.a * 0.22);
+      float vecRiver = smoothstep(0.47, 0.53, rivR - smoothstep(0.05, 0.2, slope) * 0.27);
+      float bankW = smoothstep(0.03, 0.42, rivR) * (1.0 - vecRiver);
+      float bridgeW = smoothstep(0.34, 0.46, dec.b) * vecRiver;           // where a road meets the river it crosses: a causeway of timber, later a bridge of stone
+      vecRiver *= 1.0 - bridgeW;
       float inlandW = max(lakeW, max(riverLine, max(vecRiver, floodW * 0.95)));
       vec2 geo = vec2((vLon / PI + 1.0) * 0.5, 0.5 - vLat / PI);   // global equirect uv (v down)
-      vec4 info = texture2D(uInfo, geo);                             // r shelf, g ice, b land
+      vec4 info = texture2D(uInfo, geo);                             // r shelf, g ice, b how hard the winters are, a how humid the climate (tools/climate/build.py)
       // magnification: how many screen pixels per imagery texel (approx via derivatives)
       vec2 duv = fwidth(vUV * uImgRect.zw * 4096.0);
       float texPerPx = max(duv.x, duv.y);                            // >1 minified, <1 magnified
@@ -210,7 +216,11 @@
       // fields that came later. So where nobody farms, the lighter greens count as forest too.
       vec4 sim = texture2D(uSim, geo);
       float cult = sim.b;
-      float wild = (1.0 - smoothstep(0.22, 0.48, warm)) * (1.0 - clamp(cult * 1.4, 0.0, 1.0));
+      // the climate of the place (info.a, from the Koppen-Geiger map): how dry the country really is, whatever today's
+      // photograph shows. 1 true desert, ~0.6 steppe, ~0.3 savanna and the lands of dry summers, 0 humid.
+      float clim = clamp(1.0 - info.a + (nMac.b - 0.5) * 0.12 + (nMid.a - 0.5) * 0.06, 0.0, 1.0);
+      float desertK = smoothstep(0.7, 0.86, clim), steppeK = smoothstep(0.44, 0.56, clim) * (1.0 - desertK);
+      float wild = (1.0 - smoothstep(0.22, 0.48, warm)) * (1.0 - clamp(cult * 1.4, 0.0, 1.0)) * (1.0 - smoothstep(0.35, 0.6, clim));
       float wForest = green * (1.0 - smoothstep(0.32 + 0.2 * wild, 0.6 + 0.3 * wild, lum)) * (1.0 - aboveTree) * (1.0 - steep * 0.7);
       float wGrass  = green * smoothstep(0.28 + 0.2 * wild, 0.55 + 0.3 * wild, lum) * (1.0 - steep * 0.6) + green * aboveTree * 0.6 * (1.0 - steep);
       float wDesert = warm * (1.0 - green) * (1.0 - steep) * (1.0 - smoothstep(1800.0, 3000.0, vH));
@@ -236,8 +246,8 @@
       vec3 dF = DET(uDetA), dG = DET(uDetD), dS = DET(uDetB), dR = DET(uDetC) * 0.78;
       #endif
       #undef DET
-      // between the tropics dry open country is savanna, not sand sea (the great deserts lie further out, or are drier still)
-      float dryGrass = (1.0 - smoothstep(0.17, 0.23, latN0 + (nMid.b - 0.5) * 0.04)) * (1.0 - smoothstep(0.66, 0.84, warm));
+      // bare dry ground is sand and stone only in true desert; in steppe and savanna it is dry grass
+      float dryGrass = 1.0 - desertK;
       dS = mix(dS, dG * vec3(1.18, 1.02, 0.72), dryGrass);
       vec3 det = dF * wForest + dG * wGrass + dS * wDesert + dR * wRock;
       float dl = dot(det, vec3(0.299, 0.587, 0.114));
@@ -253,7 +263,7 @@
       vec3 rock = dR * (0.9 + 0.3 * dl);
       land = mix(land, rock, smoothstep(0.3, 0.6, slope) * (1.0 - ice) * 0.5 * detailFade);
       // autumn and winter colours for the deciduous belt; grass dries off in winter
-      float fall = autumn * decid; float bare = winter * decid;
+      float fall = autumn * decid; float bare = mix(uBare.y, uBare.x, hemi) * smoothstep(0.18, 0.4, latN0) * decid;
       land = mix(land, land * vec3(1.38, 0.96, 0.5), fall * (wForest * 0.8 + wGrass * 0.12));
       land = mix(land, mix(land, vec3(0.42, 0.36, 0.3), 0.6), bare * wForest * 0.7);
       land = mix(land, land * vec3(1.06, 0.96, 0.74), winter * wGrass * 0.55);
@@ -264,13 +274,28 @@
       float gOn = smoothstep(0.005, 0.0012, uCamAlt) * uTexMix;
       if (gOn > 0.002) {
         float dith = (nMic.r - 0.5) * 0.35 + (nFin.g - 0.5) * 0.15;
-        float gL = (latN0 + dith < 0.3 && warm > 0.3) ? 9.0 : (lum + dith > 0.5 && green < 0.7) ? 1.0 : 0.0;    // savanna, steppe, meadow
+        float tropic = 1.0 - smoothstep(0.27, 0.31, latN0 + dith * 0.1);
+        float gL = (clim + dith * 0.3 > 0.22 && tropic > 0.5 && warm > 0.3) ? 9.0 : (clim + dith * 0.3 > 0.42 || (lum + dith > 0.5 && green < 0.7)) ? 1.0 : 0.0;    // savanna, steppe, meadow
         float fL = (vH > treeLine - 600.0 || latN0 + dith > 0.62) ? 8.0 : 7.0;                                  // tundra above the trees and in the far north, else forest floor
-        float dL = dryGrass + dith > 0.5 ? 9.0 : (lum > 0.62 && green < 0.25 && warm < 0.4) ? 15.0 : (nMid.b + dith > 0.62 ? 4.0 : 3.0);       // dry savanna, salt flat, stony desert, sand
         float rL = (nMid.a + dith > 0.58) ? 11.0 : 5.0;                                                           // scree, bare rock
         float wD = wDesert > 0.02 ? wDesert : 0.0, wR = wRock > 0.02 ? wRock : 0.0;
         vec3 tex = gtex(uGround, gL, 4.0) * wGrass + gtex(uGround, fL, 4.0) * wForest;
-        if (wD > 0.0) tex += gtex(uGround, dL, 4.0) * wD;
+        if (wD > 0.0) {
+          // the dry ground of the place. True desert: dunes where the photograph is brightest, stony plain and stretches of
+          // scrub elsewhere, salt flats where it is white; steppe: dry grass and scrub; savanna: red earth and grass tufts;
+          // a humid country lying bare: pale dry grass. Kinds of ground run into each other, they do not meet at an edge.
+          float patchN = smoothstep(0.4, 0.6, nMid.b + (nMic.r - 0.5) * 0.25);
+          float isDesert = step(0.5, desertK + dith * 0.4), isSteppe = step(0.5, steppeK + dith * 0.4) * (1.0 - isDesert);
+          float isSav = step(0.22, clim + dith * 0.3) * step(0.5, tropic) * (1.0 - isDesert) * (1.0 - isSteppe);
+          float salt = isDesert * step(0.62, lum) * step(green, 0.25) * step(warm, 0.4);
+          float sandW = isDesert * (1.0 - salt) * smoothstep(0.5, 0.66, lum + (nMac.r - 0.5) * 0.2 + (nMid.g - 0.5) * 0.08);
+          // three layers and their shares, chosen without branching (the texture lookups stay in step with their neighbours)
+          float LA = mix(mix(mix(1.0, 9.0, isSav), 1.0, isSteppe), mix(4.0, 15.0, salt), isDesert);
+          float LB = mix(mix(1.0, 2.0, isSteppe), 2.0, isDesert);
+          float wB = patchN * (isDesert * (1.0 - salt) * (1.0 - sandW) + isSteppe * 0.8 + isSav * 0.45);
+          vec3 dryTex = gtex(uGround, LA, 4.0) * (1.0 - wB - sandW) + gtex(uGround, LB, 4.0) * wB + gtex(uGround, 3.0, 4.0) * sandW;
+          tex += dryTex * wD;
+        }
         if (wR > 0.0) tex += gtex(uGround, rL, 4.0) * wR;
         tex /= max(wGrass + wForest + wD + wR, 1e-3);
         float bl = dot(texture(uGround, vec3(gcr(), gL)).rgb, vec3(0.299, 0.587, 0.114));                       // a rotated coarse copy breaks the repeat
@@ -331,6 +356,17 @@
       // floodplain along raster river bands (the real channel is drawn by the decal), fertile halo along big rivers, roads
       land = mix(land, land * vec3(0.88, 0.97, 0.78), bandW * inDecal * 0.45 * (1.0 - ice));
       land = mix(land, land * vec3(0.78, 0.98, 0.66) + vec3(0.01, 0.05, 0.0), dec.a * 0.45 * (1.0 - ice) * (1.0 - cult));
+      // the riverbank: grass and reeds in wet ground, green even where the country is desert (and greener along a great
+      // river's whole valley floor there); a dark wet margin at the water's edge
+      { float dry0 = clamp(wDesert * 1.6, 0.0, 1.0);
+        float wet = max(bankW * (0.55 + 0.4 * dry0), dec.a * inDecal * dry0 * 0.55 * (1.0 - cult)) * (1.0 - ice) * (0.75 + 0.5 * nMic.g);
+        vec3 reed = dG * vec3(0.62, 0.82, 0.48);
+        #ifdef USE_TEXARR
+        // marsh grass at the water, dry grass and scrub taking over up the bank
+        if (gOn > 0.002) reed = mix(reed, mix(gtex(uGround, 1.0, 4.0) * vec3(0.82, 0.9, 0.62), gtex(uGround, 10.0, 4.0) * vec3(0.9, 0.95, 0.8), smoothstep(0.2, 0.42, rivR + (nMic.b - 0.5) * 0.2)), gOn);
+        #endif
+        land = mix(land, reed * (0.85 + 0.3 * dl2), clamp(wet, 0.0, 0.9) * (0.55 + 0.45 * smoothstep(0.25, 0.6, nMid.g + (nMic.r - 0.5) * 0.5)));
+        land *= 1.0 - 0.3 * smoothstep(0.38, 0.5, rivR) * (1.0 - vecRiver) * (1.0 - bridgeW); }
       // built-up ground (dec.b low values: packed earth, courtyards, lanes) and roads (high values)
       // what a town stands on follows its age: bare trodden earth until the classical world, stone flags in its
       // built-up heart from then on, concrete paving in the industrial and modern city
@@ -356,6 +392,19 @@
       }
       #endif
       land = mix(land, roadCol * (0.85 + 0.3 * dl), smoothstep(0.4, 0.7, dec.b) * (1.0 - ice));
+      // winter where winters are white: snow lies over the country for as long as the climate keeps it (weeks in a mild
+      // one, and then in patches; half the year in the taiga). Beaten tracks and trodden town ground show through.
+      { float cold = info.b; float thr = 1.02 - 0.55 * cold;
+        float lying = smoothstep(thr, thr + 0.1, mix(uBare.w, uBare.z, hemi)) * smoothstep(0.08, 0.5, cold);
+        if (lying > 0.003) {
+          float cover = smoothstep(1.0 - lying * 1.15, 1.15 - lying * 1.15, nMid.r * 0.55 + nMic.g * 0.3 + nFin.b * 0.15);
+          cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - 0.4 * wForest * (1.0 - bare));
+          vec3 snowCol = vec3(0.92, 0.94, 0.97) * (0.82 + dl2 * 0.2);
+          #ifdef USE_TEXARR
+          if (gOn > 0.002) snowCol = mix(snowCol, gtex(uGround, 6.0, 4.0) * 1.04, gOn * 0.85);
+          #endif
+          land = mix(land, snowCol, cover * 0.96 * (1.0 - ice));
+        } }
       // beach: a sand strip where the land runs down into the sea
       float beach = (1.0 - smoothstep(0.42, 0.8, a)) * landW * closeFade * (1.0 - ice) * (1.0 - lakeW) * (1.0 - bandW);
       vec3 beachCol = vec3(0.82, 0.76, 0.6) * (0.85 + 0.3 * dl);
@@ -371,10 +420,18 @@
       #ifdef USE_TEXARR
       { float shal = smoothstep(0.9, 1.0, shelf) * seaW * gOn;   // sunlit sand and caustics in the shallows, drifting slowly
         #ifdef DET_SHALLOWS
-        if (shal > 0.01) water = mix(water, texture(uDet, vec3(gcf(8.0) + vec2(uTime * 0.012, -uTime * 0.008), 4.0)).rgb * 0.85, shal * 0.5); }
+        #define SHAL(c) texture(uDet, vec3(c, 4.0)).rgb
         #else
-        if (shal > 0.01) water = mix(water, texture2D(uShallows, gcf(8.0) + vec2(uTime * 0.012, -uTime * 0.008)).rgb * 0.85, shal * 0.5); }
+        #define SHAL(c) texture2D(uShallows, c).rgb
         #endif
+        if (shal > 0.01) {
+          // seen from higher up the same square of caustics repeats into a grid of dots: a coarser copy takes over with
+          // height, and a turned one lays its own light and dark across both
+          vec2 drift = vec2(uTime * 0.012, -uTime * 0.008); float farK = smoothstep(0.00003, 0.00016, uCamAlt);
+          vec3 sh = mix(SHAL(gcf(8.0) + drift), SHAL(gcf(16.0) + drift * 0.5), farK) * (0.72 + 0.56 * dot(SHAL(gcr() - drift * 0.3), vec3(0.299, 0.587, 0.114)));
+          water = mix(water, sh * 0.85, shal * mix(0.5, 0.3, farK));
+        } }
+        #undef SHAL
       #endif
       // waves: animated normal perturbation
       vec2 wp = gc(180.0);
@@ -391,10 +448,10 @@
       float foam = smoothstep(0.55, 0.9, n2.b) * smoothstep(0.35, 0.6, a) * (1.0 - smoothstep(0.6, 0.75, a)) * closeFade;
       vec3 inland = mix(vec3(0.07, 0.30, 0.38), vec3(0.12, 0.42, 0.45), n1.r);
       // vector rivers: shallow bright banks, dark deep channel, a pale wet bank line
-      float rdepth = smoothstep(0.3, 1.0, dec.r) * (0.45 + 0.55 * dec.g);
-      vec3 riverCol = mix(vec3(0.16, 0.40, 0.40), vec3(0.03, 0.16, 0.30), rdepth);
-      riverCol += vec3(0.25, 0.22, 0.15) * smoothstep(0.28, 0.42, dec.r) * (1.0 - smoothstep(0.42, 0.62, dec.r));
-      inland = mix(inland, riverCol, vecRiver * inDecal);
+      float rdepth = smoothstep(0.52, 0.95, rivR) * (0.5 + 0.5 * dec.g);
+      vec3 riverCol = mix(vec3(0.20, 0.37, 0.34), vec3(0.03, 0.15, 0.25), rdepth);
+      riverCol = mix(riverCol, vec3(0.36, 0.34, 0.24), arid * 0.4 * (1.0 - rdepth * 0.5));        // the rivers of dry countries run brown with silt
+      inland = mix(inland, riverCol, vecRiver);
       inland = mix(inland, vec3(0.36, 0.33, 0.22), floodW * 0.85);
       // polar sea ice
       float iceEdge = 0.86 - 0.22 * winter;                               // the pack ice spreads toward the equator in the hemisphere's winter
@@ -403,8 +460,9 @@
       vec3 iceCol = mix(vec3(0.74, 0.82, 0.9), vec3(0.9, 0.93, 0.96), floe);
       water = mix(water, iceCol, seaIce * mix(0.55, 1.0, floe));
       // ---------- compose surface ----------
-      float inlandMix = inlandW * mix(0.9, 0.7, closeFade);
+      float inlandMix = max(inlandW * mix(0.9, 0.7, closeFade), vecRiver * 0.97);   // a river is water from bank to bank, not a tint on the ground
       vec3 col = mix(land, inland, inlandMix) * landW + water * seaW;
+      col = mix(col, mix(vec3(0.33, 0.25, 0.17), vec3(0.50, 0.48, 0.44), paves) * (0.78 + 0.44 * nFin.r), bridgeW * landW);     // the deck of the crossing
       col += vec3(0.9) * foam * 0.5;
       float flatW = max(1.0 - landW, min(1.0, inlandW * 1.4));        // rivers and lakes lie flat and ripple, whatever the slope they cross
       vec3 nLocal = normalize(mix(nEnu, nWater, flatW));
@@ -447,8 +505,13 @@
       float cloudA = texture2D(uClouds, vec2(fract((vLon - uCloudShift) / (2.0 * PI)), vLat / PI + 0.5)).g;
       float cloudShadow = 1.0 - 0.55 * smoothstep(0.3, 0.8, cloudA) * uCloudVis;
       diff *= shadow * cloudShadow;
-      vec3 ambC = vec3(0.16 + 0.1 * day) * mix(vec3(1.0), vec3(0.9, 0.95, 1.1), 1.0 - shadow * 0.7);
-      vec3 lit = col * (ambC + diff * 1.05 * mix(1.0, 0.5, seaW * 0.3));
+      // the light of the hour (models.js, buildings.js and the trees take the same from the world's uniforms): a low sun
+      // is warm and, the eye opening to it, strong; night is blue and enough to see by; dusk lends a rose glow
+      float kW = smoothstep(0.02, 0.42, sunUp);
+      vec3 sunCol = vec3(1.0, 0.56 + 0.44 * kW, 0.30 + 0.70 * kW) * (smoothstep(-0.03, 0.05, sunUp) * (1.0 + 1.1 * (1.0 - smoothstep(0.04, 0.5, sunUp))));
+      float dusk = smoothstep(-0.12, 0.02, sunUp) * (1.0 - smoothstep(0.08, 0.4, sunUp));
+      vec3 ambC = (mix(mix(vec3(0.19, 0.24, 0.39), vec3(0.10, 0.12, 0.19), smoothstep(0.02, 0.2, uCamAlt)), vec3(0.26), day)      /* (from orbit the night side stays dark under its lights) */ + vec3(0.24, 0.17, 0.18) * dusk) * mix(vec3(1.0), vec3(0.9, 0.95, 1.1), 1.0 - shadow * 0.7);
+      vec3 lit = col * (ambC + diff * 1.05 * sunCol * mix(1.0, 0.5, seaW * 0.3));
       // specular on water
       vec3 viewDir = normalize(-vViewPos);
       vec3 refl = reflect(-sunV, nV);
@@ -536,7 +599,10 @@
       this.opts = opts; this.index = opts.index; this.base = opts.base || 'data/';
       this.scene = opts.scene; this.group = new THREE.Group(); this.scene.add(this.group);
       // denser meshes for the close tiles, so the finer regional elevation and the micro-relief actually show as geometry
-      this.geoms = { 32: buildTileGeometry(32), 64: buildTileGeometry(64), 128: buildTileGeometry(128) };
+      this.geoms = { 16: buildTileGeometry(16), 32: buildTileGeometry(32), 64: buildTileGeometry(64), 128: buildTileGeometry(128) };
+      // how finely a tile of a level is meshed. A software renderer runs the vertex shader (five elevation lookups and
+      // three of noise per vertex) on the CPU: it gets a quarter of the grid each way, and stands everything on that.
+      this.soft = !!opts.soft; this.gridOf = (L) => this.soft ? (L >= 9 ? 32 : 16) : (L >= 9 ? 128 : L >= 7 ? 64 : 32);
       this.tiles = new Map(); this.packs = new Map(); this.loading = 0; this.maxLoading = 6;
       this.exag = opts.exag || 2.0;
       this.frame = 0; this.visible = [];
@@ -660,7 +726,7 @@
       };
       Object.assign(uniforms, this.globals);
       const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, extensions: { derivatives: true }, defines: this.defines() });
-      const mesh = new THREE.Mesh(this.geoms[L >= 9 ? 128 : L >= 7 ? 64 : 32], mat);
+      const mesh = new THREE.Mesh(this.geoms[this.gridOf(L)], mat);
       mesh.position.copy(center); mesh.quaternion.copy(q); mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
       // world-space extent
       const corners = [GEO.toVec(b.lon0, b.lat0), GEO.toVec(b.lon1, b.lat0), GEO.toVec(b.lon0, b.lat1), GEO.toVec(b.lon1, b.lat1)];
@@ -823,7 +889,7 @@
     }
     gpuHeightAt(lon, lat, vcache) {
       const t = this.tileAtPoint(lon, lat); if (!t) return this.meshHeightAt0(lon, lat, vcache);
-      const b = GEO.tileBounds(t.L, t.tx, t.ty); const G = t.L >= 9 ? 128 : t.L >= 7 ? 64 : 32;
+      const b = GEO.tileBounds(t.L, t.tx, t.ty); const G = this.gridOf(t.L);
       const fx = (lon - b.lon0) / b.w * G, fy = (b.lat0 - lat) / b.h * G; const i = Math.min(G - 1, Math.max(0, Math.floor(fx))), j = Math.min(G - 1, Math.max(0, Math.floor(fy))); const fu = fx - i, fv = fy - j;
       const vh = (ii, jj) => { const key = t.key + ':' + ii + ':' + jj; if (vcache && vcache.has(key)) return vcache.get(key); const h = this.gpuVertexH(t, ii / G, jj / G); if (vcache) vcache.set(key, h); return h; };
       const ha = vh(i, j), hb = vh(i + 1, j), hc = vh(i, j + 1), hd = vh(i + 1, j + 1);
@@ -832,7 +898,7 @@
     meshHeightAt(lon, lat, vcache) { return this.gpuHeightAt(lon, lat, vcache); }
     // fallback when no drawn tile covers the point yet: the finest grid, analytically
     meshHeightAt0(lon, lat, vcache) {
-      const sp = 360 / (2 << this.maxLevel) / 128;
+      const sp = 360 / (2 << this.maxLevel) / this.gridOf(this.maxLevel);
       const fx = (lon + 180) / sp, fy = (90 - lat) / sp; const i = Math.floor(fx), j = Math.floor(fy); const fu = fx - i, fv = fy - j;
       const vh = (ii, jj) => { const key = ii * 1048576 + jj; if (vcache && vcache.has(key)) return vcache.get(key); const h0 = this.heightAt(-180 + ii * sp, 90 - jj * sp); const h = h0 > 1 ? Math.max(h0, 0.5) : h0; if (vcache) vcache.set(key, h); return h; };
       const ha = vh(i, j), hb = vh(i + 1, j), hc = vh(i, j + 1), hd = vh(i + 1, j + 1);

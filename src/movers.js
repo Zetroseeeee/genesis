@@ -49,15 +49,15 @@
       gl_Position = projectionMatrix * mv;
     }`;
   const P_FRAG = `
-    precision highp float; uniform vec3 uSunV, uUpV; uniform float uDay, uCamAlt;
+    precision highp float; uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uCamAlt, uDusk;
     varying vec3 vN, vCol, vView; varying float vSkin, vY;
     void main() {
       vec3 n = normalize(vN);
       vec3 col = mix(vCol, vec3(0.74, 0.56, 0.42), vSkin);
       if (vSkin > 0.5 && vY > 1.60) col = vec3(0.16, 0.12, 0.09);                  // hair
       float diff = max(dot(n, uSunV), 0.0), sky = 0.5 + 0.5 * dot(n, uUpV);
-      vec3 amb = mix(vec3(0.07, 0.08, 0.12) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay);
-      vec3 lit = col * (amb + diff * 0.82 * uDay);
+      vec3 amb = mix(vec3(0.20, 0.25, 0.40) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
+      vec3 lit = col * (amb + diff * 0.82 * uSunCol);
       float distKm = length(vView) * 6371.0; float low = smoothstep(0.035, 0.002, uCamAlt);
       float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;
       gl_FragColor = vec4(mix(lit, mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), uDay), fog), 1.0);
@@ -110,7 +110,7 @@
       }
       // people: one instanced figure
       { const g = figureGeometry(); const ph = new THREE.InstancedBufferAttribute(new Float32Array(MAXPEOPLE), 1); ph.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aPhase', ph); this.pphase = ph;
-        const bu = world.bUniforms; this.puni = { uSunV: bu.uSunV, uUpV: bu.uUpV, uDay: bu.uDay, uCamAlt: bu.uCamAlt, uTime: { value: 0 } };
+        const bu = world.bUniforms; this.puni = { uSunV: bu.uSunV, uUpV: bu.uUpV, uDay: bu.uDay, uCamAlt: bu.uCamAlt, uTime: { value: 0 }, uSunCol: bu.uSunCol, uDusk: bu.uDusk };
         const pm = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ uniforms: this.puni, vertexShader: P_VERT, fragmentShader: P_FRAG }), MAXPEOPLE); pm.count = 0; pm.frustumCulled = false; pm.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         pm.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXPEOPLE * 3).fill(1), 3); pm.instanceColor.setUsage(THREE.DynamicDrawUsage);
         this.people = pm; scene.add(pm); this._pm = new THREE.Matrix4();
@@ -280,7 +280,7 @@
       el[8] = (sy * Ex - cy * Nx) * ds; el[9] = (-cy * Ny) * ds; el[10] = (sy * Ez - cy * Nz) * ds; el[11] = 0;
       const rr = 1 + (Math.max(hg, 0) * this.exag) / R_M; el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
       I.mesh.setMatrixAt(idx, this._m); const ca = I.mesh.instanceColor.array; ca[idx * 3] = ((color >> 16) & 255) / 255; ca[idx * 3 + 1] = ((color >> 8) & 255) / 255; ca[idx * 3 + 2] = (color & 255) / 255;
-      I.info.setXYZW(idx, era, (idx % 97) / 97, TOWN.packStyle(kind === 'cart' ? 7 : kind === 'plane' ? 1 : 4, 4, 0, 0), krep || 1); this.counts[kind] = idx + 1;
+      I.info.setXYZW(idx, era, (idx % 97) / 97, TOWN.packStyle(kind === 'cart' || kind === 'boat' ? 7 : kind === 'plane' ? 1 : 4, kind === 'cart' || kind === 'boat' ? 6 : 4, 0, kind === 'cart' || kind === 'boat' ? 64 : 0), krep || 1); this.counts[kind] = idx + 1;
     }
     animate(dt, sim) {
       for (const k in this.inst) this.counts[k] = 0;
@@ -332,8 +332,8 @@
         if (addPuff) { const rr = 1 + cruise * exag / R_M; const j = s.head; s.trail[j * 3] = p.x * rr; s.trail[j * 3 + 1] = p.y * rr; s.trail[j * 3 + 2] = p.z * rr; s.trailAge[j] = 0; s.head = (j + 1) % TRAIL_N; }
         for (let k = 0; k < TRAIL_N; k++) { const ag = s.trailAge[k]; if (ag >= 1) continue; cp[ci * 3] = s.trail[k * 3]; cp[ci * 3 + 1] = s.trail[k * 3 + 1]; cp[ci * 3 + 2] = s.trail[k * 3 + 2]; cag[ci] = ag; cs[ci] = 600 + 2600 * ag; ci++; }
       }
-      { const g = this.contrails.geometry; g.attributes.position.needsUpdate = true; g.attributes.aAge.needsUpdate = true; g.attributes.aSize.needsUpdate = true; g.setDrawRange(0, ci); }
-      for (const k in this.inst) { const I = this.inst[k]; I.mesh.count = this.counts[k] || 0; I.mesh.instanceMatrix.needsUpdate = true; I.mesh.instanceColor.needsUpdate = true; I.info.needsUpdate = true; }
+      { const g = this.contrails.geometry; GEO.touch(g.attributes.position, ci); GEO.touch(g.attributes.aAge, ci); GEO.touch(g.attributes.aSize, ci); g.setDrawRange(0, ci); }
+      for (const k in this.inst) { const I = this.inst[k]; const c = this.counts[k] || 0; I.mesh.count = c; GEO.touch(I.mesh.instanceMatrix, c); GEO.touch(I.mesh.instanceColor, c); GEO.touch(I.info, c); }
       // people
       // people: each figure stands on the ground at life size on its town's scale, facing the way it walks
       let n = 0; const pm = this.people, pmat = this._pm, pe = pmat.elements, pc = pm.instanceColor.array, ph = this.pphase.array;
@@ -354,7 +354,7 @@
         pm.setMatrixAt(n, pmat);
         pc[n * 3] = ((a.color >> 16) & 255) / 255; pc[n * 3 + 1] = ((a.color >> 8) & 255) / 255; pc[n * 3 + 2] = (a.color & 255) / 255; ph[n] = a.phase; n++;
       }
-      pm.count = n; pm.instanceMatrix.needsUpdate = true; pm.instanceColor.needsUpdate = true; this.pphase.needsUpdate = true; this.pshadow.count = n;
+      pm.count = n; GEO.touch(pm.instanceMatrix, n); GEO.touch(pm.instanceColor, n); GEO.touch(this.pphase, n); this.pshadow.count = n;
       this.stats = { agents: this.agents.length, walkers: n, ships: this.ships.length, planes: this.planes.length };
     }
   }

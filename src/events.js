@@ -188,8 +188,8 @@
       for (let k = sim.worldEvents.length - 1; k >= 0 && k > sim.worldEvents.length - 80; k--) { const e = sim.worldEvents[k]; if (e.type !== 'era' || yr - e.year > 1 || e.civ < 0) continue; const c = sim.civs[e.civ]; if (!c || c.capital < 0) continue; const [lon, lat] = TOWN.siteOf(sim, c.capital, c, T, null); if (!near(lon, lat, reach)) continue; scenes++; const R = TOWN.radiusM(sim, c.capital, c); if (c.era >= 5) { const cols = [0xffd36a, 0xff6a6a, 0x7ad0ff, 0xb8ff7a, 0xffffff, 0xff9ad0]; for (let q = 0; q < 9; q++) { const a = hash(c.capital, q) * Math.PI * 2, rr = hash(c.capital, q + 9) * R * 0.7; const cl = Math.cos(lat * D2R); this.emit(70, lon + Math.cos(a) * rr / (R_M * cl * D2R), lat + Math.sin(a) * rr / (R_M * D2R), 4, 5, 6, 220 + 120 * hash(c.capital, q + 20), 14, c.capital * 7 + q, cols[q % cols.length]); } } else { this.emit(30, lon, lat, 1, 2, 10, 14, 7, c.capital * 9); this.emit(20, lon, lat, 6, 3, 8, 60, 3, c.capital * 9 + 1); this.emit(16, lon, lat, 12, 0, 6, 160, 30, c.capital * 9 + 2); } }
       // earthquake: dust rising from every struck town for a year, and small fires among the rubble
       for (const [ci, y0] of sim.rubble) { if (yr - y0 > 1) continue; if (!sim.level[ci] || sim.owner[ci] < 0) continue; const c = sim.civs[sim.owner[ci]]; if (!c) continue; const [lon, lat] = TOWN.siteOf(sim, ci, c, T, null); if (!near(lon, lat, reach)) continue; scenes++; const R = TOWN.radiusM(sim, ci, c); this.emit(50, lon, lat, 4, 4, R * 0.9, 40, R * 0.12, ci * 23); this.emit(10, lon, lat, 10, 0, R * 0.8, 300, 40, ci * 29); this.emit(16, lon, lat, 2, 2, R * 0.8, 8, 6, ci * 31); }
-      const g = this.points.geometry; for (const k of ['position', 'aUp', 'aEast', 'aNorth', 'aSeed', 'aCol']) g.attributes[k].needsUpdate = true; g.setDrawRange(0, this.n); this.count = this.n;
-      for (const k in this.inst) { const I = this.inst[k]; I.mesh.count = this.counts[k] || 0; I.mesh.instanceMatrix.needsUpdate = true; I.mesh.instanceColor.needsUpdate = true; I.info.needsUpdate = true; }
+      const g = this.points.geometry; for (const k of ['position', 'aUp', 'aEast', 'aNorth', 'aSeed', 'aCol']) GEO.touch(g.attributes[k], this.n); g.setDrawRange(0, this.n); this.count = this.n;
+      for (const k in this.inst) { const I = this.inst[k]; const c = this.counts[k] || 0; I.mesh.count = c; GEO.touch(I.mesh.instanceMatrix, c); GEO.touch(I.mesh.instanceColor, c); GEO.touch(I.info, c); }
       this.stats = { particles: this.n, soldiers: 0, scenes };
     }
     animateSoldiers(dt) {
@@ -204,7 +204,7 @@
           sc[n * 3] = col.col[0]; sc[n * 3 + 1] = col.col[1]; sc[n * 3 + 2] = col.col[2]; ph[n] = hash(k, 3); n++;
         }
       }
-      const g = this.soldiers.geometry; g.attributes.position.needsUpdate = true; g.attributes.aCol.needsUpdate = true; g.attributes.aPhase.needsUpdate = true; g.setDrawRange(0, n); this.stats.soldiers = n;
+      const g = this.soldiers.geometry; GEO.touch(g.attributes.position, n); GEO.touch(g.attributes.aCol, n); GEO.touch(g.attributes.aPhase, n); g.setDrawRange(0, n); this.stats.soldiers = n;
     }
   }
   window.EVENTS = { Effects };

@@ -15,7 +15,7 @@
   // ---------- materials (decoded by the building shader) ----------
   const WALL = { adobe: 0, plaster: 1, timber: 2, stone: 3, brick: 4, concrete: 5, glass: 6, wood: 7 };
   const ROOF = { thatch: 0, tile: 1, slate: 2, flat: 3, metal: 4, glazed: 5, shingle: 6, copper: 7 };
-  const FLAG = { landmark: 1, block: 2, neon: 4, wonder: 8, ruin: 16, site: 32 };
+  const FLAG = { landmark: 1, block: 2, neon: 4, wonder: 8, ruin: 16, site: 32, thing: 64 };
   const packStyle = (wall, roof, culture, flags) => wall + roof * 8 + culture * 64 + (flags || 0) * 1024;
 
   // ---------- cultures: where a people first settled decides how they build ----------
@@ -357,12 +357,12 @@
     for (const [r, x, z, gx, gy] of slots) {
       if (count >= maxN) break;
       const cent = 1 - clamp(r / R, 0, 1); const k = 1000 + gx * 131 + gy;
-      const yaw = -axis + (planned ? (hash(i, k) < 0.5 ? 0 : Math.PI / 2) : (hash(i, k) - 0.5) * 0.9 + (hash(i, k + 1) < 0.5 ? 0 : Math.PI / 2));
+      const yaw = axis + (planned ? (hash(i, k) < 0.5 ? 0 : Math.PI / 2) : (hash(i, k) - 0.5) * 0.9 + (hash(i, k + 1) < 0.5 ? 0 : Math.PI / 2));
       if (r > coarseFrom || coarse) {
         // one instance per block at the edge of big cities (and for far towns)
         if ((gx % 2 + 2) % 2 || (gy % 2 + 2) % 2) continue;
         const hh = era >= 6 ? (6 + 14 * cent) * (0.7 + hash(i, k + 2) * 0.6) : 5 + 4 * cent;
-        push(era >= 6 ? 'block' : 'blockold', x, z, s * 1.7, hh, s * 1.7, -axis, colorOf(k + 3), packStyle(era >= 7 ? WALL.concrete : houses[0][2], houses[0][3], cul, FLAG.block)); count++; continue;
+        push(era >= 6 ? 'block' : 'blockold', x, z, s * 1.7, hh, s * 1.7, axis, colorOf(k + 3), packStyle(era >= 7 ? WALL.concrete : houses[0][2], houses[0][3], cul, FLAG.block)); count++; continue;
       }
       // construction state of this plot: part of the newest ring, or being rebuilt for the new age
       let prog = 1, old = false;
@@ -390,15 +390,17 @@
       const lmWall = ['menhirs', 'mound'].includes(lmKind) ? WALL.stone : lmKind === 'mudmosque' || lmKind === 'stepped' && cul === 4 ? WALL.adobe : lmKind === 'irontower' ? WALL.brick : lmKind === 'crystal' || lmKind === 'spire' ? WALL.glass : lmKind === 'station' ? WALL.brick : ['hall', 'pagoda', 'onion'].includes(lmKind) ? WALL.wood : lmKind === 'stadium' ? WALL.concrete : ['mosque', 'tajmosque', 'basilica', 'palace', 'stupa'].includes(lmKind) ? WALL.plaster : WALL.stone;
       const lmRoof = ['hall', 'pagoda'].includes(lmKind) ? ROOF.glazed : ['onion', 'basilica', 'mosque', 'tajmosque', 'stupa'].includes(lmKind) ? ROOF.copper : lmKind === 'cathedral' || lmKind === 'church' || lmKind === 'station' ? ROOF.slate : lmKind === 'temple' || lmKind === 'palace' ? ROOF.tile : ROOF.flat;
       const lmCol = { menhirs: 0x8b857a, pyramid: 0xe7d9b0, ziggurat: 0xcdb082, steppyramid: 0xb9b0a0, temple: 0xf1ebdd, colosseum: 0xe6dcc4, cathedral: 0xc9c2b3, church: 0xd6cfc0, basilica: 0xebe3d0, mosque: 0xf3efe6, tajmosque: 0xf7f4ee, mudmosque: 0xb8845a, onion: 0xf1ede2, hall: 0xb3462f, pagoda: 0xa64534, stupa: 0xf3efe6, shikhara: 0xd8c39a, stepped: 0xa39a88, mound: 0x6f7f4a, pueblo: 0xc48f5f, palace: 0xf1e6cf, keep: 0x8c8478, station: 0x9a5a48, crystal: 0xd9e6ee, irontower: 0x6b5a4a, stadium: 0xd8dbdf, spire: 0xcbd7e0, lighthouse: 0xf2efe8 }[lmKind] || 0xd9d2c2;
-      push(lmKind, lx, lz, lw, lh, ld, -(lmAngle + Math.PI / 2), lmCol, packStyle(lmWall, lmRoof, cul, wonderProg >= 0 ? FLAG.wonder | FLAG.landmark : FLAG.landmark), 0, wonderProg >= 0 ? wonderProg : 1).tag = 'landmark';
+      push(lmKind, lx, lz, lw, lh, ld, lmAngle - Math.PI / 2, lmCol, packStyle(lmWall, lmRoof, cul, wonderProg >= 0 ? FLAG.wonder | FLAG.landmark : FLAG.landmark), 0, wonderProg >= 0 ? wonderProg : 1).tag = 'landmark';
       // plaza furniture
       const propKind = era === 0 ? null : era <= 2 ? 'well' : era <= 5 ? 'fountain' : 'statue';
       if (propKind && !coarse) push(propKind, Math.cos(lmAngle + Math.PI) * plaza * 0.25, Math.sin(lmAngle + Math.PI) * plaza * 0.25, propKind === 'well' ? 3 : propKind === 'statue' ? 4 : 8, propKind === 'well' ? 2.5 : propKind === 'statue' ? 9 : 4, propKind === 'well' ? 3 : propKind === 'statue' ? 4 : 8, 0, 0xbfb6a6, packStyle(WALL.stone, ROOF.flat, cul, 0));
-      if (era >= 1 && era <= 5 && cul === 3 && !coarse && lvl >= 3) push('obelisk', Math.cos(lmAngle + Math.PI * 0.5) * plaza * 0.5, Math.sin(lmAngle + Math.PI * 0.5) * plaza * 0.5, 3, 18, 3, 0, 0xd9c8a8, packStyle(WALL.stone, ROOF.flat, cul, 0));
+      // an obelisk on the square: the Nile lands raised them (and Aksum its stelae), nobody else in the old world did
+      { const oy = (i / W) | 0, ox = i - oy * W; const olon = (ox + 0.5) / W * 360 - 180, olat = 90 - (oy + 0.5) / H * 180;
+        if (era >= 1 && era <= 5 && cul === 3 && !coarse && lvl >= 3 && olon > 24 && olon < 40 && olat > 10 && olat < 32) push('obelisk', Math.cos(lmAngle + Math.PI * 0.5) * plaza * 0.5, Math.sin(lmAngle + Math.PI * 0.5) * plaza * 0.5, 4.2, 20, 4.2, 0, 0xd9c8a8, packStyle(WALL.stone, ROOF.flat, cul, 0)); }
     }
     // --- districts ---
     const quarter = (d, main, mainSize, mainCol, wm, rm, support, nSup) => {
-      const yaw = -(d.a + Math.PI / 2);
+      const yaw = d.a - Math.PI / 2;                    // the head of a quarter faces the middle of the town (a building's front is its local +z)
       const head = push(main, d.x, d.z, mainSize[0], mainSize[1], mainSize[2], yaw, mainCol, packStyle(wm, rm, cul, FLAG.landmark), 0, d.prog);
       if (coarse || d.prog < 0.75) return head;
       for (let k = 0; k < nSup; k++) { const a = d.a + (k / nSup) * Math.PI * 2 + 0.5; const rr = d.rad * 1.15 + s * 0.4; const e = pickW(houses, rnd(700 + k)); const sx = d.x + Math.cos(a) * rr, sz = d.z + Math.sin(a) * rr;
@@ -409,19 +411,23 @@
     if (dist.temple) { const tk = era <= 2 ? (cul === 3 || cul === 5 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'stepped') : era === 3 ? 'temple' : LANDMARK[cname][band] === 'menhirs' ? 'temple' : (['cathedral', 'basilica', 'onion', 'station', 'stadium', 'spire', 'palace'].includes(LANDMARK[cname][band]) ? (cul === 3 || cul === 5 && era >= 5 ? 'mosque' : 'church') : LANDMARK[cname][band]); const sz = landmarkSize(tk, false); const th = quarter(dist.temple, tk, [sz[0] * 0.7, sz[1] * 0.8, sz[2] * 0.7], tk === 'church' ? 0xd6cfc0 : tk === 'temple' ? 0xf1ebdd : 0xe6dcc4, tk === 'mosque' ? WALL.plaster : WALL.stone, tk === 'church' ? ROOF.slate : tk === 'mosque' ? ROOF.copper : ROOF.tile, null, 8); th.tag = 'temple'; if (era <= 2) th.as = 'shrine'; }
     if (dist.academy) quarter(dist.academy, era >= 6 ? 'palazzo' : era >= 3 ? 'temple' : 'courtyard', era >= 6 ? [36, 16, 22] : [26, 11, 34], 0xe7e0d2, era >= 6 ? WALL.brick : WALL.stone, era >= 6 ? ROOF.slate : ROOF.tile, null, 8).as = 'academy';
     if (dist.palace) (quarter(dist.palace, era <= 2 ? (cul === 6 ? 'hall' : cul === 3 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'palace') : era <= 4 ? (cul === 6 ? 'hall' : 'keep') : era <= 5 ? (cul === 6 ? 'hall' : 'palace') : 'palace', era <= 2 ? [30, 10, 24] : era <= 4 ? [24, 26, 24] : [60, 18, 26], era >= 5 ? 0xf1e6cf : 0xd9cba8, WALL.stone, cul === 6 ? ROOF.glazed : ROOF.tile, null, coarse ? 0 : 4)).as = 'palace';
-    if (dist.keep) { push('keep', dist.keep.x, dist.keep.z, 22, 28, 22, -axis, 0x8c8478, packStyle(WALL.stone, ROOF.flat, cul, FLAG.landmark)); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; push('roundtower', dist.keep.x + Math.cos(a) * 19, dist.keep.z + Math.sin(a) * 19, 7, 20, 7, 0, 0x85807a, packStyle(WALL.stone, ROOF.slate, cul, 0)); } }
-    if (dist.market && !coarse) { const d = dist.market; push('hall', d.x, d.z, Math.max(14, d.rad * 0.9), 6 + (era >= 3 ? 4 : 0), Math.max(10, d.rad * 0.6), -(d.a + Math.PI / 2), 0xd9b98c, packStyle(era >= 3 ? WALL.stone : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, FLAG.landmark), 0, d.prog).as = 'market'; if (d.prog >= 0.6) for (let k = 0; k < 8; k++) { const a = d.a + k * 0.7; const rr = d.rad * (0.5 + rnd(800 + k) * 0.5); push('stall', d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, 3.2, 2.8, 2.4, rnd(810 + k) * 3, [0xc84a3a, 0xd9a94a, 0x5a8a5a, 0xe6dcc4][k % 4], packStyle(WALL.wood, ROOF.thatch, cul, 0)); } }
-    if (dist.mine && !coarse) { const d = dist.mine; const yaw = -(d.a + Math.PI / 2); push(era >= 6 ? 'chimney' : 'keep', d.x, d.z, era >= 6 ? 4 : 8, era >= 6 ? 30 : 14, era >= 6 ? 4 : 8, yaw, era >= 6 ? 0x4a4440 : 0x6e5537, packStyle(era >= 6 ? WALL.brick : WALL.timber, ROOF.flat, cul, FLAG.landmark), 0, d.prog).as = 'mine'; for (let k = 0; k < 2; k++) push('barn', d.x + Math.cos(d.a + 1.2 + k * 2) * d.rad * 0.5, d.z + Math.sin(d.a + 1.2 + k * 2) * d.rad * 0.5, 12, 5, 8, yaw + k, 0x7a6247, packStyle(WALL.wood, ROOF.shingle, cul, 0), 0, d.prog); for (let k = 0; k < 4; k++) push('rubble', d.x + Math.cos(d.a + k * 1.5) * d.rad * 0.8, d.z + Math.sin(d.a + k * 1.5) * d.rad * 0.8, 9, 3.5, 9, rnd(830 + k) * 3, 0x6f685e, packStyle(WALL.stone, ROOF.flat, cul, FLAG.ruin)); }
-    if (dist.industry) { const d = dist.industry; const nF = coarse ? 2 : 3 + Math.min(4, lvl); for (let k = 0; k < nF; k++) { const a = d.a + (k - nF / 2) * 0.5; const rr = R * 0.12 * (k % 2 ? 1 : 0.4); push('factory', d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, 42, 11, 26, -axis + (k % 2 ? 0 : Math.PI / 2), era >= 7 ? 0x9ea3a8 : 0x7a4a3c, packStyle(era >= 7 ? WALL.concrete : WALL.brick, ROOF.metal, cul, 0)); if (era === 6 || rnd(850 + k) < 0.4) push('chimney', d.x + Math.cos(a) * rr + 14, d.z + Math.sin(a) * rr + 9, 3.5, 36, 3.5, 0, 0x5a4a44, packStyle(WALL.brick, ROOF.flat, cul, 0)); } }
+    if (dist.keep) { push('keep', dist.keep.x, dist.keep.z, 22, 28, 22, axis, 0x8c8478, packStyle(WALL.stone, ROOF.flat, cul, FLAG.landmark)); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; push('roundtower', dist.keep.x + Math.cos(a) * 19, dist.keep.z + Math.sin(a) * 19, 7, 20, 7, 0, 0x85807a, packStyle(WALL.stone, ROOF.slate, cul, 0)); } }
+    if (dist.market && !coarse) { const d = dist.market; push('hall', d.x, d.z, Math.max(14, d.rad * 0.9), 6 + (era >= 3 ? 4 : 0), Math.max(10, d.rad * 0.6), d.a - Math.PI / 2, 0xd9b98c, packStyle(era >= 3 ? WALL.stone : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, FLAG.landmark), 0, d.prog).as = 'market'; if (d.prog >= 0.6) for (let k = 0; k < 8; k++) { const a = d.a + k * 0.7; const rr = d.rad * (0.5 + rnd(800 + k) * 0.5); push('stall', d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, 3.2, 2.8, 2.4, rnd(810 + k) * 3, [0xc84a3a, 0xd9a94a, 0x5a8a5a, 0xe6dcc4][k % 4], packStyle(WALL.wood, ROOF.thatch, cul, 0)); } }
+    if (dist.mine && !coarse) { const d = dist.mine; const yaw = d.a - Math.PI / 2; push(era >= 6 ? 'chimney' : 'keep', d.x, d.z, era >= 6 ? 4 : 8, era >= 6 ? 30 : 14, era >= 6 ? 4 : 8, yaw, era >= 6 ? 0x4a4440 : 0x6e5537, packStyle(era >= 6 ? WALL.brick : WALL.timber, ROOF.flat, cul, FLAG.landmark), 0, d.prog).as = 'mine'; for (let k = 0; k < 2; k++) push('barn', d.x + Math.cos(d.a + 1.2 + k * 2) * d.rad * 0.5, d.z + Math.sin(d.a + 1.2 + k * 2) * d.rad * 0.5, 12, 5, 8, yaw + k, 0x7a6247, packStyle(WALL.wood, ROOF.shingle, cul, 0), 0, d.prog); for (let k = 0; k < 4; k++) push('rubble', d.x + Math.cos(d.a + k * 1.5) * d.rad * 0.8, d.z + Math.sin(d.a + k * 1.5) * d.rad * 0.8, 9, 3.5, 9, rnd(830 + k) * 3, 0x6f685e, packStyle(WALL.stone, ROOF.flat, cul, FLAG.ruin)); }
+    if (dist.industry) { const d = dist.industry; const nF = coarse ? 2 : 3 + Math.min(4, lvl); for (let k = 0; k < nF; k++) { const a = d.a + (k - nF / 2) * 0.5; const rr = R * 0.12 * (k % 2 ? 1 : 0.4); push('factory', d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, 42, 11, 26, axis + (k % 2 ? 0 : Math.PI / 2), era >= 7 ? 0x9ea3a8 : 0x7a4a3c, packStyle(era >= 7 ? WALL.concrete : WALL.brick, ROOF.metal, cul, 0)); if (era === 6 || rnd(850 + k) < 0.4) push('chimney', d.x + Math.cos(a) * rr + 14, d.z + Math.sin(a) * rr + 9, 3.5, 36, 3.5, 0, 0x5a4a44, packStyle(WALL.brick, ROOF.flat, cul, 0)); } }
     let harbour = null;
     if (dist.harbour) {
       const d = dist.harbour; const dirx = Math.cos(d.a), dirz = Math.sin(d.a); const pr = d.prog; const hb0 = items.length;
       const nP = coarse ? 1 : 2 + Math.min(3, lvl);
-      for (let k = 0; k < nP; k++) { const off = (k - (nP - 1) / 2) * 22; const px = d.x + dirx * 40 - dirz * off, pz = d.z + dirz * 40 + dirx * off; const pp = clamp((pr - k * 0.12) / 0.5, 0, 1); if (pp <= 0) continue; push('pier', px, pz, 70 * Math.max(0.3, pp), 1.6, 4, -d.a, 0x6a563e, packStyle(WALL.wood, ROOF.flat, cul, 0), 0); if (!coarse && pr >= 0.8) push(era >= 6 ? 'ship' : 'boat', px + dirx * 30, pz + dirz * 30 + 5, era >= 6 ? 34 : 9, era >= 6 ? 8 : 2.5, era >= 6 ? 8 : 3, -d.a, era >= 6 ? 0x5b6068 : 0x7c5a38, packStyle(WALL.wood, ROOF.flat, cul, 0)); }
+      for (let k = 0; k < nP; k++) { const off = (k - (nP - 1) / 2) * 22; const px = d.x + dirx * 40 - dirz * off, pz = d.z + dirz * 40 + dirx * off; const pp = clamp((pr - k * 0.12) / 0.5, 0, 1); if (pp <= 0) continue; push('pier', px, pz, 70 * Math.max(0.3, pp), 1.6, 4, d.a, 0x6a563e, packStyle(WALL.wood, ROOF.flat, cul, 0), 0);
+        // boats lie alongside, clear of the planking: one near the head of each pier, and in a busier harbour another further in on the other side
+        if (!coarse && pr >= 0.8) { const big = era >= 6; const side = (big ? 9 : 6.5) * (k % 2 ? -1 : 1);
+          push(big ? 'ship' : 'boat', px + dirx * 20 - dirz * side, pz + dirz * 20 + dirx * side, big ? 34 : 9, big ? 8 : 2.5, big ? 8 : 3, d.a, big ? 0x5b6068 : 0x7c5a38, packStyle(WALL.wood, ROOF.flat, cul, 0));
+          if (!big && lvl >= 2) push('boat', px - dirx * 2 + dirz * side, pz - dirz * 2 - dirx * side, 9, 2.5, 3, d.a + Math.PI, 0x7c5a38, packStyle(WALL.wood, ROOF.flat, cul, 0)); } }
       const shedKind = houses.reduce((b, e) => e[1] > b[1] ? e : b, houses[0])[0];      // early harbours: sheds built the way the houses are
-      const nW = coarse ? 1 : 3 + lvl; for (let k = 0; k < nW; k++) { const off = (k - nW / 2) * (era <= 2 && shedKind === 'longhouse' ? 30 : 18); const pp = clamp((pr - 0.2 - k * 0.1) / 0.5, 0, 1); if (pp <= 0) continue; push(era >= 6 ? 'warehouse' : era <= 2 ? shedKind : 'gable', d.x - dirx * 22 - dirz * off, d.z - dirz * 22 + dirx * off, 16, era >= 6 ? 9 : 6, 10, -d.a + Math.PI / 2, era >= 6 ? 0x8a6a4e : colorOf(900 + k), packStyle(era >= 6 ? WALL.brick : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, 0), 0, pp); }
+      const nW = coarse ? 1 : 3 + lvl; for (let k = 0; k < nW; k++) { const off = (k - nW / 2) * (era <= 2 && shedKind === 'longhouse' ? 30 : 18); const pp = clamp((pr - 0.2 - k * 0.1) / 0.5, 0, 1); if (pp <= 0) continue; push(era >= 6 ? 'warehouse' : era <= 2 ? shedKind : 'gable', d.x - dirx * 22 - dirz * off, d.z - dirz * 22 + dirx * off, 16, era >= 6 ? 9 : 6, 10, d.a + Math.PI / 2, era >= 6 ? 0x8a6a4e : colorOf(900 + k), packStyle(era >= 6 ? WALL.brick : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, 0), 0, pp); }
       if (era >= 3 && lvl >= 3 && pr >= 1) push('lighthouse', d.x + dirx * 120 - dirz * 60, d.z + dirz * 120 + dirx * 60, 8, 26, 8, 0, 0xf2efe8, packStyle(WALL.stone, ROOF.copper, cul, FLAG.landmark));
-      if (era >= 7 && !coarse && pr >= 1) for (let k = 0; k < 3; k++) push('crane', d.x + dirx * 60 - dirz * (k - 1) * 40, d.z + dirz * 60 + dirx * (k - 1) * 40, 6, 40, 6, -d.a, 0xd9552f, packStyle(WALL.concrete, ROOF.flat, cul, 0));
+      if (era >= 7 && !coarse && pr >= 1) for (let k = 0; k < 3; k++) push('crane', d.x + dirx * 60 - dirz * (k - 1) * 40, d.z + dirz * 60 + dirx * (k - 1) * 40, 6, 40, 6, d.a, 0xd9552f, packStyle(WALL.concrete, ROOF.flat, cul, 0));
       // the planner only knows which way the sea lies; the world layer finds the shore and moves these there (hb: harbour item)
       for (let k = hb0; k < items.length; k++) items[k].hb = 1;
       harbour = { a: d.a, x: d.x * kS, z: d.z * kS };
@@ -466,12 +472,15 @@
     if (!coarse && era <= 7 && lvl >= 1) {
       const farmProg = workProg('farm'); const nDone = 2 + infra * 2 + (era >= 4 ? 1 : 0); const nF = nDone + (farmProg >= 0 ? 2 : 0);
       for (let k = 0; k < nF; k++) {
-        const a = rnd(950 + k) * Math.PI * 2; const rr = R * (1.35 + rnd(960 + k) * 0.9 + 0.12 * Math.floor(k / 4)) + 40;
+        let a = rnd(950 + k) * Math.PI * 2; const rr = R * (1.35 + rnd(960 + k) * 0.9 + 0.12 * Math.floor(k / 4)) + 40;
+        for (const g of gates) { const da = Math.atan2(Math.sin(a - g), Math.cos(a - g)); if (Math.abs(da) < 0.22) a = g + (da < 0 ? -0.22 : 0.22); }      // not on the road that leaves through a gate
         const fx = Math.cos(a) * rr, fz = Math.sin(a) * rr; const e = pickW(houses, rnd(970 + k)); const pp = k >= nDone ? clamp(farmProg * 1.3 - (k - nDone) * 0.3, 0.05, 1) : 1;
-        push(e[0] === 'block' || e[0] === 'tower' || e[0] === 'skyscraper' || e[0] === 'tenement' ? 'gable' : e[0], fx, fz, 9, 6, 7, rnd(980 + k) * 3, colorOf(990 + k), packStyle(e[2], e[3], cul, 0), 0, pp);
-        if (era >= 1) push('barn', fx + 14, fz + 6, 14, 6.5, 8, rnd(981 + k) * 3, era >= 5 ? 0x8a3f33 : 0x7a6247, packStyle(WALL.wood, era >= 5 ? ROOF.metal : ROOF.thatch, cul, 0), 0, pp);
-        if (era >= 4 && era <= 6 && rnd(995 + k) < 0.3) push('windmill', fx - 18, fz - 10, 7, 16, 7, rnd(996 + k) * 3, 0xd9d0bd, packStyle(WALL.stone, ROOF.thatch, cul, 0), 0, pp);
-        if (era >= 1 && infra >= 3 && rnd(997 + k) < 0.5) push('granary', fx - 10, fz + 12, 6, 6, 6, 0, 0xc9b48c, packStyle(WALL.adobe, ROOF.thatch, cul, 0), 0, pp);
+        // the yard: the house, its barn across the yard from the long side, a granary past one gable end, a mill on the far side
+        const fy = rnd(980 + k) * 3, ux = Math.cos(fy), uz = Math.sin(fy);
+        push(e[0] === 'block' || e[0] === 'tower' || e[0] === 'skyscraper' || e[0] === 'tenement' ? 'gable' : e[0], fx, fz, 9, 6, 7, fy, colorOf(990 + k), packStyle(e[2], e[3], cul, 0), 0, pp);
+        if (era >= 1) push('barn', fx - uz * 21, fz + ux * 21, 14, 6.5, 8, fy + (rnd(981 + k) < 0.5 ? 0 : Math.PI / 2), era >= 5 ? 0x8a3f33 : 0x7a6247, packStyle(WALL.wood, era >= 5 ? ROOF.metal : ROOF.thatch, cul, 0), 0, pp);
+        if (era >= 4 && era <= 6 && rnd(995 + k) < 0.3) push('windmill', fx + uz * 24, fz - ux * 24, 7, 16, 7, rnd(996 + k) * 3, 0xd9d0bd, packStyle(WALL.stone, ROOF.thatch, cul, 0), 0, pp);
+        if (era >= 1 && infra >= 3 && rnd(997 + k) < 0.5) push('granary', fx + ux * 19, fz + uz * 19, 6, 6, 6, 0, 0xc9b48c, packStyle(WALL.adobe, ROOF.thatch, cul, 0), 0, pp);
       }
     }
     if (!coarse && era >= 8 && lvl >= 2) for (let k = 0; k < 6; k++) { const a = rnd(1050 + k) * Math.PI * 2; const rr = R * (1.5 + rnd(1060 + k) * 0.9) + 80; push('turbine', Math.cos(a) * rr, Math.sin(a) * rr, 3, 90, 3, rnd(1070 + k) * 3, 0xf0f2f4, packStyle(WALL.concrete, ROOF.flat, cul, 0)); }

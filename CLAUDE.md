@@ -18,11 +18,18 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   minutes to arrive and until then plots stand empty, so wait ~170 s before the first shot, run it in the
   background (`nohup ... &`), and judge nothing from a frame taken while files are still coming in.
   `SHADOW=4096` turns the shadow map on at its real size (software GL goes without), `TREES=1` and `LOD=1` give full forests and the finest models, `DIST=<dir>` serves a snapshot build.
+  What the software renderer gets less of, so that a frame takes a second and not a minute: a quarter of the pixels
+  (not for screenshots), a terrain mesh a quarter as fine each way (the vertex shader's texture lookups run on the
+  CPU), few trees and none that fill the picture (`trees.coverCap`), coarser models, no shadow map. Instance buffers
+  are sent with `GEO.touch(attr, n)` (the used part only): whole-buffer uploads stalled it for half a minute at a time.
 - `tools/peek.sh <name> <url> ...` — contact sheet of generated images via the Peek workflow (`shots/peek/<name>.jpg`).
 - `node tools/coverage.js [eras] [--all] [--wonder]` — which planned buildings are real models and which still fall
   back to the kit, for a capital of every culture with every work built. Run it after touching the manifest or the
   planner: eras 0–2 must show nothing but `stall` (the market model brings its own) and `rubble`.
 - `node tools/dbg3.js "<script>" "<probe>" <wait>` — run a script in the page and print a probe object.
+- `tools/macshots.sh [scene names]` — the real thing: pictures of this commit taken on an Apple GPU by the Scenes
+  workflow (`tools/scenes/tour.txt` lists the scenes: towns of every people and age, forests, seasons, dusk and night,
+  dry countries, rivers). Look at these before believing anything about how the game looks.
 - `npm start` — desktop window (Electron).
 
 Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md`.
@@ -46,9 +53,12 @@ Conventions that matter:
 - **Units.** The globe has radius 1 (Earth radius = 6,371,000 m = `R_M`). Town plans are in metres from the town centre.
 - **Representational scale.** Towns are planned at true scale and drawn `scaleOf(Rt) = 20/(1+Rt/1200)` times larger
   (a village ~19×, a metropolis ~3×) so they read from region height. Shader patterns divide by that factor.
+- **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
+  local +z: at `yaw = a - π/2` a building standing at angle `a` from the centre faces the centre. Great buildings
+  are never turned to fit their plot (their front stays on the square); houses may be.
 - **Eras** 0–8: Stone, Bronze, Iron, Classical, Medieval, Renaissance, Industrial, Modern, Information.
   **Cultures** 0–9: med, north, east, mena, africa, sasia, easia, seasia, america, namerica.
-- **Style packing.** `wall + roof*8 + culture*64 + flags*1024`; flags: landmark 1, block 2, neon 4, wonder 8, ruin 16, site 32.
+- **Style packing.** `wall + roof*8 + culture*64 + flags*1024`; flags: landmark 1, block 2, neon 4, wonder 8, ruin 16, site 32, thing 64 (a cart or a boat: no door, windows or roof).
 - Keep modules independent (pure data in `town.js` and `sim.js`, rendering elsewhere): the game will grow to tens of GB of assets.
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
@@ -64,6 +74,16 @@ Conventions that matter:
 - Trees are cut-out photographs on camera-facing cards (`card: true` in the manifest, most without a mesh). Each
   says where it grows (`tree: { zones, region, deciduous, bare }`); `zoneOf()` in `trees.js` gives the flora zone
   of a point (boreal, temperate, med, easia, dry, savanna, rain). Near a town they are drawn at the town's scale.
+- **Climate.** `data/climate.png` is the Köppen-Geiger class of every eighth of a degree, and `data/info.png`
+  carries two fields made from it: alpha = how dry the country is (the ground shader blends sand, stony plain,
+  scrub, steppe and savanna by it; the photograph only says where the ground is bare), blue = how hard the winters
+  are (snow lies on the ground and on roofs by it, in season). Trees take their zone and their density from the
+  class (`zoneOf`, `Trees.THIN`). Rebuild both with `tools/climate/build.py` (the source and its licence are in the
+  file's header). The year: `uSeason` (sun), `uBare` (leaves down N/S, the cold of the year N/S, a month behind the sun).
+- **Rivers** are drawn wider than life (`drawnWidth()` in `decal.js`: brooks four times, great rivers twice), like
+  roads and towns. The decal's red channel is a distance to the water (1 centre line, 0.5 the water's edge, 0 the end
+  of the bank), from which the ground shader draws the water, a green bank and, where a road crosses, a deck.
+  Everything that asks where the water is (`decal.nearestRiver`) gets the drawn width; walls are cut at the bank.
 - **Shadows.** The sun's depth map holds what stands still (models, kit, near trees) and is redrawn only when the
   camera, the sun or the placements change (`castersVersion` follows a signature of everything placed). Things
   that move get their own cheap shadow (walkers: a streak on the ground in `movers.js`).

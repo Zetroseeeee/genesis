@@ -11,7 +11,7 @@ server.listen(0, async () => {
   const port = server.address().port;
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: +(process.env.W || 1280), height: +(process.env.H || 800) } });
-  await page.addInitScript(([u, sh, tr, lod]) => { window.GENESIS_TEX_URL = u; if (sh) window.GENESIS_SHADOW = sh; if (tr) window.GENESIS_TREES = tr; if (lod) window.GENESIS_LOD = lod; }, [process.env.TEX || 'data/tex/atlas_local.json', +(process.env.SHADOW || 0), +(process.env.TREES || 0), +(process.env.LOD || 0)]);      // SHADOW=4096: the shadow map a real GPU gets
+  await page.addInitScript(([u, sh, tr, lod, px]) => { window.GENESIS_TEX_URL = u; if (sh) window.GENESIS_SHADOW = sh; if (tr) window.GENESIS_TREES = tr; if (lod) window.GENESIS_LOD = lod; window.GENESIS_PIXELS = px; }, [process.env.TEX || 'data/tex/atlas_local.json', +(process.env.SHADOW || 0), +(process.env.TREES || 0), +(process.env.LOD || 0), +(process.env.RES || 1)]);      // screenshots at full resolution unless RES says otherwise      // SHADOW=4096: the shadow map a real GPU gets
   const logs = []; page.on('pageerror', e => logs.push('PAGEERROR: ' + e.message)); page.on('console', m => { if (m.type() === 'error' && !/fonts|ERR_TUNNEL/.test(m.text())) logs.push(m.text()); });
   await page.goto(`http://127.0.0.1:${port}/local.html`, { waitUntil: 'load' }); await page.waitForTimeout(2500);
   try { await page.evaluate(fs.readFileSync('tools/testcam.js', 'utf8')); } catch (e) { logs.push('TESTCAM ' + e.message); }
@@ -20,7 +20,7 @@ server.listen(0, async () => {
   const clip = process.env.CLIP ? (([x, y, width, height]) => ({ x, y, width, height }))(process.env.CLIP.split(',').map(Number)) : undefined;
   for (const [label, js] of steps) {
     let r; try { r = await page.evaluate(js); } catch (e) { logs.push(`EVALERR ${label} ` + e.message); }
-    await page.waitForTimeout(+(process.env.PAUSE || 4000)); await page.screenshot({ path: `shots/${name}_${label}.png`, timeout: 240000, clip });
+    await page.waitForTimeout(+(process.env.PAUSE || 4000)); await page.screenshot({ path: `shots/${name}_${label}.png`, timeout: +(process.env.SHOT_TIMEOUT || 600000), clip });
     if (r !== undefined) console.log(label, JSON.stringify(r));
   }
   console.log(logs.slice(0, 6).join('\n'));

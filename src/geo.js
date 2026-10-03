@@ -34,5 +34,9 @@
     tx = ((tx % (2 * n)) + 2 * n) % (2 * n); ty = Math.max(0, Math.min(n - 1, ty)); return [tx, ty];
   }
   function wrapLon(l) { return ((l + 180) % 360 + 360) % 360 - 180; }
-  window.GEO = { R_KM, R_M, D2R, R2D, toVec, fromVec, enu, distKm, tileBounds, tileAt, wrapLon };
+  // Send a buffer's first n items to the GPU, not the whole of it. Instance buffers are allocated for the most a layer
+  // could ever draw (tens of thousands of trees per species) and usually hold a small part of that: sending megabytes
+  // of unused slots on every rebuild costs frames (and stalls a software renderer for seconds).
+  function touch(attr, n) { if (!attr) return; if (n > 0) { attr.updateRange.offset = 0; attr.updateRange.count = Math.min(attr.array.length, n * attr.itemSize); attr.needsUpdate = true; } }
+  window.GEO = { R_KM, R_M, D2R, R2D, toVec, fromVec, enu, distKm, tileBounds, tileAt, wrapLon, touch };
 })();

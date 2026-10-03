@@ -17,7 +17,7 @@
       this.arche = BKIT.makeKit();
       this.buildingGroup = new THREE.Group(); this.scene.add(this.buildingGroup);
       this.inst = {}; const MAXI = BKIT.MAXI;
-      this.bUniforms = { uSunV: { value: new THREE.Vector3(0, 1, 0) }, uUpV: { value: new THREE.Vector3(0, 1, 0) }, uDay: { value: 1 }, uCamAlt: { value: 1 }, uTime: { value: 0 }, uMetres: { value: R_M }, uTexMix: { value: 0 }, uGround: { value: new THREE.Vector3(0.42, 0.4, 0.26) } };      // uGround: the colour of the land around, for bounced light
+      this.bUniforms = { uSunV: { value: new THREE.Vector3(0, 1, 0) }, uUpV: { value: new THREE.Vector3(0, 1, 0) }, uDay: { value: 1 }, uCamAlt: { value: 1 }, uTime: { value: 0 }, uMetres: { value: R_M }, uTexMix: { value: 0 }, uGround: { value: new THREE.Vector3(0.42, 0.4, 0.26) }, uSnow: { value: 0 }, uSunCol: { value: new THREE.Vector3(1, 1, 1) }, uDusk: { value: 0 } };      // uGround: the colour of the land around, for bounced light; uSnow: how much snow lies here now
       this.bMat = new THREE.ShaderMaterial({ uniforms: this.bUniforms, vertexShader: BKIT.VERT, fragmentShader: BKIT.FRAG });
       this.textured = false;
       this.info = {};
@@ -36,7 +36,7 @@
       this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._s = new THREE.Vector3(); this._p = new THREE.Vector3(); this._c = new THREE.Color();
       this.buildingCount = 0;
       // real 3D models (models.js) share the kit's light uniforms and replace kit archetypes where a model exists
-      if (window.MODELS) MODELS.init(this.scene, { uSunV: this.bUniforms.uSunV, uUpV: this.bUniforms.uUpV, uDay: this.bUniforms.uDay, uCamAlt: this.bUniforms.uCamAlt, uTime: this.bUniforms.uTime, uGround: this.bUniforms.uGround }, { units: 6371.0 });
+      if (window.MODELS) MODELS.init(this.scene, { uSunV: this.bUniforms.uSunV, uUpV: this.bUniforms.uUpV, uDay: this.bUniforms.uDay, uCamAlt: this.bUniforms.uCamAlt, uTime: this.bUniforms.uTime, uGround: this.bUniforms.uGround, uSnow: this.bUniforms.uSnow, uSunCol: this.bUniforms.uSunCol, uDusk: this.bUniforms.uDusk }, { units: 6371.0 });
       this.modelsOn = true; this._pv = new THREE.Vector3();
       this.initSky();
     }
@@ -120,14 +120,23 @@
           L.hts = new Float32Array(n); L.meshV = T.meshVersion; L.dispOn = T.dispOn; const vc = new Map(); const hmap = hm.map;
           for (let k = 0; k < n; k++) { const it = items[k]; const key = ((it.x * 0.2) | 0) * 100003 + ((it.z * 0.2) | 0); let h = hmap.get(key); if (h === undefined) { h = T.meshHeightAt(cLon + it.x / (R_M * cl * GEO.D2R), cLat + it.z / (R_M * GEO.D2R), vc); if (hmap.size < 40000) hmap.set(key, h); } L.hts[k] = h; }
         }
-        if ((!L.mask || L.maskI !== T.stats.packsI) && this.decal && this.decal.rivers && this.decal.rivers.length) { L.mask = new Uint8Array(n); L.maskI = T.stats.packsI; for (let k = 0; k < n; k++) { const it = items[k]; const lo = cLon + it.x / (R_M * cl * GEO.D2R), la = cLat + it.z / (R_M * GEO.D2R); const afloat = it.kind === 'pier' || it.kind === 'boat' || it.kind === 'ship'; if (!afloat && T.isWater(lo, la)) { L.mask[k] = 1; continue; } const rv = this.decal.nearestRiver(lo, la); if (rv && rv.d < rv.hw + Math.max(it.w, it.d) * 0.5 + 4 && !afloat) L.mask[k] = 1; } }
+        if ((!L.mask || L.maskI !== T.stats.packsI) && this.decal && this.decal.rivers && this.decal.rivers.length) { L.mask = new Uint8Array(n); L.maskI = T.stats.packsI; for (let k = 0; k < n; k++) { const it = items[k]; if (it.kind === 'pier' || it.kind === 'boat' || it.kind === 'ship') continue;
+          // a long thing (a stretch of wall, a longhouse) is tried along its length, so one that only runs near the river stays
+          const long = Math.max(it.w, it.d), short = Math.min(it.w, it.d); const ns = long > short * 1.8 ? Math.min(7, Math.ceil(long / short)) : 1; const ax = it.w >= it.d ? Math.cos(it.yaw) : Math.sin(it.yaw), az = it.w >= it.d ? Math.sin(it.yaw) : -Math.cos(it.yaw);
+          let wet = 0, mid = false;
+          for (let q = 0; q < ns; q++) { const o = ns > 1 ? (q / (ns - 1) - 0.5) * (long - short) : 0; const lo = cLon + (it.x + ax * o) / (R_M * cl * GEO.D2R), la = cLat + (it.z + az * o) / (R_M * GEO.D2R);
+            let w = T.isWater(lo, la); if (!w) { const rv = this.decal.nearestRiver(lo, la); w = !!(rv && rv.d < rv.hw + short * 0.5 + 4); }
+            if (w) { wet++; if (ns === 1 || q === (ns - 1) / 2) mid = true; } }
+          // a wall that reaches the river is cut at the bank (2: its lengths are tried one by one when it is drawn); a gate whose own ground is dry stands
+          if (wet) L.mask[k] = (it.kind === 'palisade' || it.kind === 'wall' || (it.kind === 'gatehouse' && !mid)) && wet < ns ? 2 : 1; } }
         const mask = L.mask; const hts = L.hts;
         if (useModels && !coarse && L.fitEra !== c.era + ':' + Object.keys(MODELS.defs).length) { L.fit = this.fitHouses(L, i, c.era, L.culture || 0); L.fitEra = c.era + ':' + Object.keys(MODELS.defs).length; }
         const fits = useModels && !coarse ? L.fit : null;
         const era = c.era; const seed = (i % 997) / 997; const kRep = L.k || 1; const cul = L.culture || 0;
         const wantCasters = dKm < 40 && !coarse;
         for (let k = 0; k < n; k++) {
-          if (mask && mask[k]) continue;
+          if (mask && mask[k] === 1) continue;
+          const cut = !!(mask && mask[k] === 2);               // a wall that runs into the river: drawn up to the bank
           if (fits && fits[k]) continue;                       // its model would stand in a neighbour's
           if (items[k].off) continue;                          // a harbour with no shore to stand on
           const it = items[k]; const im = this.inst[it.kind]; if (!im) continue;
@@ -141,9 +150,12 @@
             // a model with its own building-site stage: the frame goes up first (rising from the ground), then the finished building replaces it
             let fitTo = null;
             if (def && prog < 1 && def.site && MODELS.defs[def.site]) { staged = true; if (prog < 0.72) { fitTo = def; def = MODELS.defs[def.site]; mprog = Math.min(1, prog / 0.3); } else mprog = 1; }
+            if (cut && !(def && (def.fit === 'run' || def.fit === 'gate'))) continue;
+            this._cut = cut;
             const nPut = def ? this.placeModel(def, it, lon, lat, hg, era, seed + k * 0.013, mprog, kRep, camPos, pxPerRad, cl, fitTo) : 0;
+            this._cut = false;
             if (nPut) {
-              total += nPut; const md = this._md; if (it.as === 'market') L.marketModel = this.buildPass;
+              total += nPut; const md = this._md; it.top = md[1]; it.fw = md[0]; it.fd = md[2]; it.fyaw = md[3]; if (it.as === 'market') L.marketModel = this.buildPass;      // (the model's drawn size, for whoever needs to know what really stands here: smoke leaves from its top, trees keep off its ground)
               if (prog < 1 && prog > 0.05 && prog < 0.97) {
                 if (!staged && def.fit !== 'run' && def.fit !== 'gate') { const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count) { this.setInst(sc, si, lon, lat, hg, md[0] * 1.1, md[1] * Math.min(1, prog + 0.3) * 1.03, md[2] * 1.1, md[3], era >= 6 ? 0x8f949a : 0x8a6a44, era, seed + k * 0.013, TOWN.packStyle(era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; } }
                 if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: md[0], d: md[2], k: kRep, prog, era });
@@ -154,6 +166,7 @@
             }
             if (def && MODELS.pending(def)) continue;      // its files are on their way: bare ground for a moment, not a stand-in
           }
+          if (cut) continue;
           if (prog < 1) {
             // a building site: the walls up to the current height in bare material, scaffolding around them, a crane in later ages
             const hf = Math.max(0.08, prog); const raw = (1 - prog) * 0.5;
@@ -187,7 +200,7 @@
           }
         }
       }
-      for (const k in this.inst) { const im = this.inst[k]; im.count = counts[k]; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; this.info[k].needsUpdate = true; }
+      for (const k in this.inst) { const im = this.inst[k]; im.count = counts[k]; GEO.touch(im.instanceMatrix, counts[k]); GEO.touch(im.instanceColor, counts[k]); GEO.touch(this.info[k], counts[k]); }
       if (useModels) MODELS.end();
       // what throws shadows changed only if something was placed differently: the sun's depth map and the ground shadows are redrawn then, not on every refresh
       const sig = (this._kitSig ^ Math.imul(total + 1, 2654435761) ^ (useModels ? MODELS.sig : 0)) | 0;
@@ -222,6 +235,15 @@
       for (let j = 0; j <= n; j++) { const o = (j / n - 0.5) * len; h[j] = Math.max(0, T.meshHeightAt(lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), vc)); }
       store[tag] = { v: T.meshVersion, d: T.dispOn, h }; return h;
     }
+    // which lengths of a run stand in water (kept on the plan item with the heights)
+    wetLengths(it, tag, lon, lat, cy, sy, len, n, oneM, cl) {
+      const T = this.terrain; const store = it._rw || (it._rw = {}); const e = store[tag]; const key = T.stats.packsI + ':' + n;
+      if (e && e.key === key) return e.w;
+      const w = new Uint8Array(n);
+      for (let j = 0; j < n; j++) { const o = (j - (n - 1) / 2) * (len / n); const lo = lon + o * cy / (R_M * cl * GEO.D2R), la = lat + o * sy / (R_M * GEO.D2R);
+        if (T.isWater(lo, la)) { w[j] = 1; continue; } const rv = this.decal ? this.decal.nearestRiver(lo, la) : null; if (rv && rv.d < rv.hw + oneM * 0.5 + 3) w[j] = 1; }
+      store[tag] = { key, w }; return w;
+    }
     // a run of one model end to end along a line (walls, fences): as many life-size copies as fit, stretched a
     // little so they meet exactly, each one following the ground from joint to joint. len in drawn metres.
     runModel(def, it, tag, lon, lat, planYaw, len, kRep, cl, era, seed, mflags, prog, camPos, pxPerRad) {
@@ -229,7 +251,9 @@
       const kUp = kRep * (it.th ? Math.max(0.8, Math.min(1.5, it.th / def.h)) : 1);       // a wall stands as high as it was planned: each level adds to it
       const cy = Math.cos(planYaw), sy = Math.sin(planYaw); const yaw = planYaw + (alongZ ? Math.PI / 2 : 0); let ok = false;
       const hs = this.runHeights(it, tag, lon, lat, planYaw, len, n, cl);
+      const wet = this._cut ? this.wetLengths(it, tag, lon, lat, cy, sy, len, n, one * kRep, cl) : null;
       for (let j = 0; j < n; j++) {
+        if (wet && wet[j]) continue;                       // this length would stand in the river
         const o = (j - (n - 1) / 2) * (len / n); const hA = hs[j], hB = hs[j + 1];
         ok = this.putModel(def, lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), (hA + hB) / 2, yaw, alongZ ? kRep : stretch, kUp, alongZ ? stretch : kRep, era, seed + j * 0.171, mflags,
           prog, camPos, pxPerRad, (hB - hA) * this.exag / one, alongZ) || ok;
@@ -250,7 +274,7 @@
       for (let k = 0; k < items.length; k++) { const it = items[k]; if (!it.hb) continue;
         if (it._x0 === undefined) { it._x0 = it.x; it._z0 = it.z; it._yaw0 = it.yaw; }
         if (!found) { it.off = true; continue; }
-        const rx = it._x0 - Hb.x, rz = it._z0 - Hb.z; it.x = nx + rx * c - rz * s; it.z = nz + rx * s + rz * c; it.yaw = it._yaw0 - found.da; it.off = false; if (it._rh) it._rh = null;
+        const rx = it._x0 - Hb.x, rz = it._z0 - Hb.z; it.x = nx + rx * c - rz * s; it.z = nz + rx * s + rz * c; it.yaw = it._yaw0 + found.da; it.off = false; if (it._rh) it._rh = null;
       }
       L.shore = found;
     }
@@ -259,7 +283,8 @@
     // the outsized version of its kind). u: drawn metres per model metre.
     modelFit(B, it, kRep, flags) {
       const landmark = flags & 1; const F = this._fit || (this._fit = { turn: false, u: 1 });
-      F.turn = (B.d > B.w * 1.2 && it.w > it.d * 1.2) || (B.w > B.d * 1.2 && it.d > it.w * 1.2);
+      // (a house may be turned to lie along its plot; a great building keeps its front where the plan put it: toward the square)
+      F.turn = !landmark && ((B.d > B.w * 1.2 && it.w > it.d * 1.2) || (B.w > B.d * 1.2 && it.d > it.w * 1.2));
       const pw = F.turn ? it.d : it.w, pd = F.turn ? it.w : it.d;
       if (B.fit === 'box') F.u = Math.min(pw / B.w, pd / B.d);
       else { const f = Math.min(pw / (B.w * kRep), pd / (B.d * kRep)); F.u = kRep * Math.max(landmark ? 0.75 : 0.8, Math.min((flags & 8) ? 2.2 : landmark ? 1.4 : 1.25, f)); }
@@ -420,7 +445,12 @@
       this.sunLight.position.copy(sun).multiplyScalar(10); this.sunLight.target.position.set(0, 0, 0);
       const camUp = cam.camera.position.clone().normalize(); const sunUp = camUp.dot(sun);
       const day = Math.min(1, Math.max(0, (sunUp + 0.15) / 0.4));
-      { const bu = this.bUniforms; const vm = cam.camera.matrixWorldInverse; bu.uSunV.value.copy(sun).transformDirection(vm); bu.uUpV.value.copy(camUp).transformDirection(vm); bu.uDay.value = Math.min(1, Math.max(0, (sunUp + 0.1) / 0.35)); bu.uCamAlt.value = cam.alt || 1; bu.uTime.value = time; }
+      { const bu = this.bUniforms; const vm = cam.camera.matrixWorldInverse; bu.uSunV.value.copy(sun).transformDirection(vm); bu.uUpV.value.copy(camUp).transformDirection(vm); bu.uCamAlt.value = cam.alt || 1; bu.uTime.value = time;
+        // the light of the hour, for everything that stands on the ground (the terrain works the same out per pixel):
+        // a low sun is warm and, the eye opening to it, strong; below the horizon it is gone. Dusk lends a rose glow.
+        const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+        const kW = sm(0.02, 0.42, sunUp), k = sm(-0.03, 0.05, sunUp) * (1 + 1.1 * (1 - sm(0.04, 0.5, sunUp)));
+        bu.uSunCol.value.set(k, k * (0.56 + 0.44 * kW), k * (0.30 + 0.70 * kW)); bu.uDusk.value = sm(-0.12, 0.02, sunUp) * (1 - sm(0.08, 0.4, sunUp)); bu.uDay.value = sm(-0.1, 0.16, sunUp); }
       this.sunLight.intensity = 1.5 * day; this.hemi.intensity = 0.25 + 0.8 * day;
       return day;
     }

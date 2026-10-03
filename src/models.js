@@ -24,7 +24,7 @@
   const FRAG = `
     precision highp float;
     uniform sampler2D uMap, uNormalMap, uOrmMap; uniform float uHasN, uHasOrm, uH, uUnits, uFoliage;
-    uniform vec3 uSunV, uUpV, uGround; uniform float uDay, uCamAlt, uTime;
+    uniform vec3 uSunV, uUpV, uGround, uSunCol; uniform float uDay, uCamAlt, uTime, uSnow, uDusk, uHome;
     varying vec3 vN, vView, vLocal; varying vec2 vUv; varying vec4 vInfo;
     ${window.SHADOWS ? SHADOWS.GLSL : 'const vec4 uShadowP = vec4(0.0); float sunHidden(vec3 p) { return 0.0; }'}
     float h21(vec2 p) { p = mod(p, 512.0); vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
@@ -41,7 +41,7 @@
       float era = floor(vInfo.x + 0.5), seed = vInfo.y, flags = floor(vInfo.z + 0.5), prog = vInfo.w;
       // a building going up: nothing above the build line, and the line is ragged, course by course
       if (prog < 0.999) { float rag = (vnoise(vec2(vLocal.x * 1.7 + vLocal.z * 1.3, seed * 40.0)) - 0.5) * 0.08 * uH; if (vLocal.y > prog * uH * 1.03 + rag) discard; }
-      vec3 col = texture2D(uMap, vUv).rgb;
+      vec3 col = texture2D(uMap, vUv).rgb; float lum0 = dot(col, vec3(0.3, 0.6, 0.1));
       vec3 n = normalize(vN); vec3 ng = n;
       if (uHasN > 0.5) n = bump(n, vView, vUv, texture2D(uNormalMap, vUv).xyz * 2.0 - 1.0);
       float rough = 0.88, metal = 0.0;
@@ -61,6 +61,8 @@
       if (prog < 0.999) { float raw = smoothstep(0.25 * uH, 0.0, prog * uH - vLocal.y); col = mix(col, vec3(dot(col, vec3(0.3, 0.6, 0.1))) * vec3(1.04, 1.0, 0.94) + 0.06, raw * 0.45); }
       float isRuin = mod(flags, 2.0);
       if (isRuin > 0.5) { float moss = smoothstep(0.4 * uH, 0.0, vLocal.y) * vnoise(vLocal.xz * 0.6 + seed) * 0.6; col = mix(col, vec3(0.42, 0.4, 0.34), 0.35); col = mix(col, vec3(0.3, 0.38, 0.2), moss); }
+      // winter where winters are white: snow lies on what faces the sky (roofs, wall tops, the lintels of a stone circle)
+      if (uSnow > 0.01 && uFoliage < 0.5) { float lie = uSnow * smoothstep(0.2, 0.58, dot(ng, uUpV) + (vnoise(vLocal.xz * 0.9 + seed * 9.0) - 0.5) * 0.3); col = mix(col, vec3(0.9, 0.92, 0.96), lie * 0.93); rough = mix(rough, 0.92, lie); }
       // lighting: the same sun and sky terms as the kit and the terrain, so everything sits in one light
       float diff = max(dot(n, uSunV), 0.0);
       if (uFoliage > 0.5) diff = diff * 0.6 + 0.4 * (0.5 + 0.5 * dot(n, uSunV));      // light gets into a crown: no hard dark side
@@ -71,19 +73,23 @@
       // the generated textures are photographs of lit buildings: full sun brings a surface to about its own brightness, no more
       // sky light from above, warm light thrown back by the ground from below: a wall in shade is neutral, not blue
       // (the higher the sun, the more the lit ground gives back: a wall in shade in a sunlit town is warm, not grey)
-      vec3 amb = mix(vec3(0.07, 0.08, 0.12) * (0.7 + 0.5 * sky), vec3(0.33, 0.34, 0.37) * (0.45 + 0.75 * sky) + uGround * (1.0 - sky) * (0.3 + 0.7 * max(dot(uUpV, uSunV), 0.0)) * 0.62, uDay);
+      vec3 amb = mix(vec3(0.20, 0.25, 0.40) * (0.7 + 0.5 * sky), vec3(0.33, 0.34, 0.37) * (0.45 + 0.75 * sky) + uGround * (1.0 - sky) * (0.3 + 0.7 * max(dot(uUpV, uSunV), 0.0)) * 0.62, uDay)
+        + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);        // moonlight is blue and enough to see by; at dusk the whole sky glows and lights what the sun no longer reaches
       float foot = 1.0 - 0.2 * smoothstep(0.05 * uH, 0.0, vLocal.y);
-      vec3 lit = col * (amb + diff * 0.82 * uDay) * foot;
+      vec3 lit = col * (amb + diff * 0.82 * uSunCol) * foot;
       vec3 v = normalize(-vView); vec3 hv = normalize(v + uSunV);
       float gloss = (1.0 - rough) * (1.0 - rough);
       lit += mix(vec3(0.35), col, metal) * pow(max(dot(n, hv), 0.0), mix(6.0, 90.0, 1.0 - rough)) * gloss * uDay * step(0.0, dot(n, uSunV)) * (1.0 - hid);
       // generated textures already carry their own highlights: roll the brightest values off instead of clipping them
       { vec3 x = max(lit - 0.78, 0.0) / 0.22; vec3 e = exp(-2.0 * x); lit = mix(lit, 0.78 + 0.22 * (1.0 - e) / (1.0 + e), step(0.78, lit)); }
-      // night: hearth and lamp light spills low around lived-in buildings
+      // night: in a lived-in house the fire shows in the doorway and through every dark opening in the walls, and a
+      // little of it lies on the wall beside (the texture's own darkest places low on a wall are its openings)
       float night = 1.0 - uDay;
-      float home = step(0.35, fract(seed * 91.7)) * (1.0 - isRuin) * step(0.999, prog) * (1.0 - uFoliage);
-      vec3 lamp = era >= 6.0 ? vec3(1.0, 0.86, 0.62) : vec3(1.0, 0.58, 0.26);
-      lit += col * lamp * night * home * 0.55 * smoothstep(0.45 * uH, 0.0, vLocal.y) * (0.85 + 0.15 * sin(uTime * 7.0 + seed * 50.0));
+      float home = step(0.3, fract(seed * 91.7)) * (1.0 - isRuin) * step(0.999, prog) * uHome;
+      vec3 lamp = era >= 6.0 ? vec3(1.0, 0.86, 0.62) : vec3(1.0, 0.56, 0.24);
+      float wallish = 1.0 - smoothstep(0.2, 0.5, dot(ng, uUpV)), lowW = smoothstep(0.62 * uH, 0.12 * uH, vLocal.y);
+      float opening = smoothstep(0.2, 0.06, lum0) * wallish * lowW;
+      lit += lamp * night * home * (opening * 1.1 + col * 0.55 * lowW * wallish) * (0.85 + 0.15 * sin(uTime * 7.0 + seed * 50.0));
       // aerial perspective shared with the terrain and the kit
       float distKm = length(vView) * uUnits; float low = smoothstep(0.035, 0.002, uCamAlt);
       float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;
@@ -148,6 +154,8 @@
     return ok[Math.min(n - 1, Math.floor((seed - Math.floor(seed)) * n))];
   };
 
+  // kinds nobody lives in: no firelight in them at night
+  const NOFIRE = new Set(['ziggurat', 'pyramid', 'steppyramid', 'stupa', 'mound', 'menhirs', 'well', 'pier', 'boat', 'granary', 'barn', 'palisade', 'watchtower', 'wall_mud', 'gate_mud', 'gate_palisade', 'tower_mud']);
   function makeLod(def, L, gltf) {
     let mesh = null; gltf.scene.updateMatrixWorld(true); gltf.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
     if (!mesh) { L.state = 'failed'; return; }
@@ -155,7 +163,8 @@
     const map = tex(src.map), nrm = tex(src.normalMap), orm = tex(src.roughnessMap || src.metalnessMap);
     const sh = M.shared;
     const uniforms = {
-      uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uTime: sh.uTime, uGround: sh.uGround || { value: new THREE.Vector3(0.42, 0.4, 0.26) },
+      uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uTime: sh.uTime, uGround: sh.uGround || { value: new THREE.Vector3(0.42, 0.4, 0.26) }, uSnow: sh.uSnow || { value: 0 }, uSunCol: sh.uSunCol || { value: new THREE.Vector3(1, 1, 1) }, uDusk: sh.uDusk || { value: 0 },
+      uHome: { value: def.tree || def.fit || def.open || (def.kinds || []).some((k) => NOFIRE.has(k)) ? 0 : 1 },      // does anybody keep a fire in it at night
       uMap: { value: map }, uNormalMap: { value: nrm }, uOrmMap: { value: orm }, uHasN: { value: nrm ? 1 : 0 }, uHasOrm: { value: orm ? 1 : 0 },
       uGeo: { value: mesh.matrixWorld.clone() }, uH: { value: def.h }, uSkirt: { value: def.tree ? 0.4 : Math.max(1.5, def.h * 0.18) }, uUnits: { value: M.units }, uFoliage: { value: def.tree ? 1 : 0 },
     };
@@ -204,7 +213,7 @@
     if (B.count >= B.cap) { const N = M.batch(B.L, B.cap * 2); N.mesh.instanceMatrix.array.set(B.mesh.instanceMatrix.array); N.info.array.set(B.info.array); N.count = B.count; M.group.remove(B.mesh); B.mesh.dispose && B.mesh.dispose(); B = N; }
     B.mesh.setMatrixAt(B.count, matrix); B.info.setXYZW(B.count, a, b, c, d); B.count++; return B;
   };
-  M.batchEnd = function (B) { B.mesh.count = B.count; if (B.count) { B.mesh.instanceMatrix.needsUpdate = true; B.info.needsUpdate = true; } };
+  M.batchEnd = function (B) { B.mesh.count = B.count; GEO.touch(B.mesh.instanceMatrix, B.count); GEO.touch(B.info, B.count); };
   M.batchDrop = function (B) { M.group.remove(B.mesh); B.mesh.dispose && B.mesh.dispose(); };
   // the LOD to draw for a model seen px pixels tall: the wanted one if it is loaded, else the nearest loaded one
   // (asking for the wanted one, and for the coarsest so there is always something to show). null = nothing yet.
@@ -229,7 +238,7 @@
   };
   M.end = function () {
     let inst = 0, tris = 0, draws = 0;
-    for (const id in M.defs) for (const L of M.defs[id].lods) { if (!L.mesh) continue; L.mesh.count = L.count; if (L.count) { L.mesh.instanceMatrix.needsUpdate = true; L.info.needsUpdate = true; inst += L.count; tris += L.count * L.tris; draws++; } }
+    for (const id in M.defs) for (const L of M.defs[id].lods) { if (!L.mesh) continue; L.mesh.count = L.count; if (L.count) { GEO.touch(L.mesh.instanceMatrix, L.count); GEO.touch(L.info, L.count); inst += L.count; tris += L.count * L.tris; draws++; } }
     M.stats.instances = inst; M.stats.tris = tris; M.stats.draws = draws; M.dirty = false;
   };
   window.MODELS = M;

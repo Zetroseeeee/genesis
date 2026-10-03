@@ -12,11 +12,17 @@
   const FRAG = `
     precision mediump float; varying vec3 vAux;
     void main() {
-      float cov = 1.0 - smoothstep(0.55, 1.0, abs(vAux.x));
-      if (vAux.z < 0.5) gl_FragColor = vec4(cov, vAux.y * cov, 0.0, 0.0);
+      float ax = abs(vAux.x); float cov = 1.0 - smoothstep(0.55, 1.0, ax);
+      // a river's ribbon carries its banks: 1 on the centre line, 0.5 at the water's edge, 0 where the bank ends (a
+      // distance to the water the ground shader can draw a clean edge, shallows and a green bank from); g: its size
+      if (vAux.z < 0.5) { float r = 1.0 - ax; gl_FragColor = vec4(r, vAux.y * smoothstep(0.0, 0.2, r), 0.0, 0.0); }
       else if (vAux.z < 1.5) gl_FragColor = vec4(0.0, 0.0, cov * vAux.y, 0.0);
-      else gl_FragColor = vec4(0.0, 0.0, 0.0, cov * vAux.y);
+      else gl_FragColor = vec4(0.0, 0.0, 0.0, (1.0 - smoothstep(0.25, 1.0, ax)) * vAux.y);
     }`;
+  // How wide a river is drawn. Towns stand many times life size and roads six times; at its true width the river
+  // beside a village would be a thread. Brooks and small rivers are drawn four times as wide as they are, the great
+  // rivers twice (they are wide already). Everything that asks where the water is gets this width.
+  function drawnWidth(w) { const t = Math.min(1, Math.max(0, (w - 100) / 500)); return w * (4 - 2 * t * t * (3 - 2 * t)); }
 
   class Decal {
     constructor({ renderer, globals }) {
@@ -59,7 +65,7 @@
       // fine segment index (0.1 deg cells) for CPU queries: is this point in a river, where is the bank
       const SC = 0.1; const seg = new Map();
       for (const line of lines) {
-        const p = line.pts; const hw = line.width * 0.5;
+        const p = line.pts; const hw = drawnWidth(line.width) * 0.5;
         for (let i = 0; i + 3 < p.length; i += 2) {
           const x0 = Math.min(p[i], p[i + 2]), x1 = Math.max(p[i], p[i + 2]), y0 = Math.min(p[i + 1], p[i + 3]), y1 = Math.max(p[i + 1], p[i + 3]);
           for (let gy = Math.floor((y0 + 90) / SC); gy <= Math.floor((y1 + 90) / SC); gy++) for (let gx = Math.floor((x0 + 180) / SC); gx <= Math.floor((x1 + 180) / SC); gx++) { const key = gy * 10000 + gx; let a = seg.get(key); if (!a) { a = []; seg.set(key, a); } a.push(p[i], p[i + 1], p[i + 2], p[i + 3], hw); }
@@ -129,9 +135,10 @@
           for (const line of a) {
             if (seen.has(line)) continue; seen.add(line);
             const b = line.bbox; if (b[2] < gLon0 || b[0] > gLon1 || b[3] < gLat0 || b[1] > gLat1) continue;
-            const hwM = Math.max(line.width * 0.5, mpp * 0.9);      // never thinner than ~1.8 px in the decal
+            const hwW = Math.max(drawnWidth(line.width) * 0.5, mpp * 0.9);      // the water: never thinner than ~1.8 px in the decal
             if (line.width < mpp * 0.35 && line.sr > 6) continue;    // too small to matter at this scale
-            const hwLat = hwM / R_M, hwLon = hwM / R_M;
+            const hwM = hwW * 2;                                      // the ribbon: the water and a bank as wide as half the river on either side
+            const hwLat = hwM / R_M, hwLon = hwM / R_M; const resolved = hwW > mpp * 1.3;
             const p = line.pts; nr++;
             // clip to the rect (with margin), then round the corners (two Chaikin passes) so channels meander instead of zig-zagging
             const mg = hwLat * 8 + 0.002; const q = [];
@@ -146,7 +153,8 @@
               const ax = pts[i], ay = pts[i + 1], bx = pts[i + 2], by = pts[i + 3];
               if ((ax < lon0 - mg && bx < lon0 - mg) || (ax > lon1 + mg && bx > lon1 + mg) || (ay < lat0 - mg && by < lat0 - mg) || (ay > lat1 + mg && by > lat1 + mg)) continue;
               quad(ax, ay, bx, by, hwLon, hwLat, line.cls, 0);
-              if (line.width > 400) quad(ax, ay, bx, by, hwLon * 6, hwLat * 6, Math.min(1, line.width / 1500) * 0.6, 2);
+              // the wet land along it: green well beyond the bank, wider along a great river
+              if (resolved) { const hh = (hwW * 5 + 150) / R_M; quad(ax, ay, bx, by, hh, hh, 0.3 + 0.5 * Math.min(1, line.width / 600), 2); }
             }
           }
         }
