@@ -4,10 +4,10 @@
 //   pop: thousands of people in the capital  walls: wall level (0 none)   special: works bitmask (1 port, 2 academy, 4 temple, 8 market, 16 wonder, 512 mine)
 //   grow: newest ring of houses still going up   settled: the age has been here long enough for every house to be rebuilt
 //   alt (m), tilt (rad), out (fraction of the wall radius the camera looks at; 0 = the square), turn (rad), gate (index)
-//   sun: [height, bearing] in radians (default a mid-afternoon sun from the south-west), null = let the day run
+//   sun: [height, bearing] in radians (default an afternoon sun from the west, so shadows show from most angles), null = let the day run
 (() => {
   const G = window.__G; if (!G) return 'no game';
-  const P = Object.assign({ lon: 11.25, lat: 43.77, tech: 0, pop: 1, walls: 1, special: 0, grow: true, settled: true, alt: 900, tilt: 1.2, out: 1, turn: 0, gate: 0, sun: [0.85, 3.9] }, window.__scene || {});
+  const P = Object.assign({ lon: 11.25, lat: 43.77, tech: 0, pop: 1, walls: 1, special: 0, grow: true, settled: true, alt: 900, tilt: 1.2, out: 1, turn: 0, gate: 0, sun: [0.75, 4.6] }, window.__scene || {});
   // the day runs round in nine minutes: hold the sun where the scene wants it (sun: [height, bearing] in radians, bearing
   // from north through east; null lets the clock run)
   window.__sceneSun = (el, az) => { const f = GEO.enu(P.lon, P.lat); window.__sunLock = true; G.globals.uSun.value.copy(f.up).multiplyScalar(Math.sin(el)).addScaledVector(f.east, Math.sin(az) * Math.cos(el)).addScaledVector(f.north, Math.cos(az) * Math.cos(el)).normalize(); return [el, az]; };

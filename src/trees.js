@@ -9,9 +9,9 @@
 
   // tiers: radius (m), spacing (m), scale multiplier, max instances
   const TIERS = [
-    { R: 3200, s: 48, k: 2.2, max: 16000 },
-    { R: 12000, s: 150, k: 3.6, max: 20000 },
-    { R: 36000, s: 520, k: 7.0, max: 16000 },
+    { R: 3200, s: 48, k: 2.2, max: 30000 },
+    { R: 12000, s: 150, k: 3.6, max: 38000 },
+    { R: 36000, s: 520, k: 7.0, max: 28000 },
   ];
 
   // Where each tree grows is said by the model library: flora = { zones: { temperate: 5, med: 2 }, region: [lon0, lon1,
@@ -301,6 +301,16 @@
               col.setRGB(v * (fr2 * br + fall * 1.75 + bare * 0.95), v * (fr2 * br + fall * 0.95 + bare * 0.78), v * (fr2 * br + fall * 0.35 + bare * 0.62));
               I.setColorAt(I.count, col); I.count++; countM++;
               if (casters && !(window.SHADOWS && SHADOWS.ready && SHADOWS.enabled)) casters.push(lon, lat, hgt * I.userData.aspect * 0.8, hgt);   // with the depth map on, the card throws its own true shadow
+              // slender trees stand closer than broad ones: a spruce or a birch brings a neighbour, so a wood of them closes its canopy too
+              if (I.userData.aspect < 0.78 && kEff <= kTier * 1.05 && hash2(gx, gy, 81) < density && I.count < I.instanceMatrix.count) {
+                const a2 = hash2(gx, gy, 82) * 6.2832, r2 = (0.34 + 0.16 * hash2(gx, gy, 83)) * t.s; const lon2 = lon + Math.cos(a2) * r2 / (R_M * D2R * cl), lat2 = lat + Math.sin(a2) * r2 / (R_M * D2R);
+                const h2 = ti === 0 ? T.meshHeightAt(lon2, lat2, vc) : h; if (h2 > 0.5 && !(ti === 0 && T.isWater(lon2, lat2))) {
+                  const f2 = GEO.enu(lon2, lat2); const g2 = hgt * (0.78 + 0.3 * hash2(gx, gy, 84)); p.copy(f2.up).multiplyScalar(1 + (h2 * exag - 0.15 * kEff) / R_M);
+                  basis.makeBasis(f2.east, f2.up, f2.north.clone().negate()); q.setFromRotationMatrix(basis);
+                  s.set(g2 * I.userData.aspect / R_M, g2 / R_M, (hash2(gx, gy, 85) < 0.5 ? 1 : 3) / R_M); m.compose(p, q, s); I.setMatrixAt(I.count, m);
+                  col.multiplyScalar(0.94 + 0.12 * hash2(gx, gy, 86)); I.setColorAt(I.count, col); I.count++; countM++;
+                }
+              }
             }                                              // nothing of this species has arrived yet: the ground stays bare for the moment it takes
             continue;
           }

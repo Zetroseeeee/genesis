@@ -277,6 +277,10 @@
       // cultivation patchwork near settlements (sim channel b)
       vec4 sim = texture2D(uSim, geo);
       float cult = sim.b;
+      // under the trees it is dim: where the forest stands the ground lies in the canopy's shade, dappled with light
+      // (from the height at which single trees are drawn; farmland has cleared its share)
+      { float canopy = wForest * smoothstep(0.0085, 0.005, uCamAlt) * (1.0 - cult * 0.6) * (1.0 - max(snow, ice));
+        land *= 1.0 - canopy * (0.30 + 0.26 * nFin.a) * mix(1.0, 0.45, bare); }
       if (cult > 0.03 && closeFade > 0.0) {
         // fields cluster around the settlement site (sim.a? no: site is unknown here) -> use noise clusters within the cell
         vec2 sc0 = geo * uSimRes; vec2 cellId0 = floor(sc0); vec2 inCell = sc0 - cellId0;
