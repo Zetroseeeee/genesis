@@ -78,7 +78,7 @@
   const M = {
     ready: false, failed: false, defs: {}, byKind: {}, base: 'data/models/', group: null, shared: null, loader: null,
     // pixel heights at which each LOD takes over (l0 above the first, l1 above the second, ...)
-    lodPx: [420, 150, 55, 0], lodBias: 1, maxLoads: 3, loading: 0, queue: [], dirty: false, anisotropy: 8,
+    lodPx: [520, 190, 60, 18, 0], lodBias: 1, maxLoads: 3, loading: 0, queue: [], dirty: false, anisotropy: 8,
     stats: { instances: 0, tris: 0, draws: 0, loaded: 0 }, VERT, FRAG,
   };
 

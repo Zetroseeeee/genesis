@@ -18,19 +18,22 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { cloneDocument, dedup, flatten, getBounds, join, meshopt, prune, simplify, textureCompress, transformMesh, weld } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
+import { bakeLowLod } from './lowlod.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
 const MANIFEST = path.join(ROOT, 'assets/models/models.json');
 const OUT = path.join(ROOT, 'data/models');
 const CACHE = path.join(HERE, 'cache');
-const PIPELINE_REV = 1;          // bump to rebuild every model
+const PIPELINE_REV = 2;          // bump to rebuild every model
 // the LOD ladder: triangle budget, texture edge, which maps survive, simplifier error budget (fraction of mesh radius)
+// The two near LODs keep the generated mesh and its maps; the far ones are rebuilt and baked (lowlod.mjs).
 const LODS = [
   { tris: 160000, tex: 2048, maps: 'all', error: 0.0006 },
   { tris: 32000, tex: 1024, maps: 'all', error: 0.003 },
-  { tris: 6000, tex: 512, maps: 'color', error: 0.012 },
-  { tris: 1200, tex: 256, maps: 'color', error: 0.05 },
+  { tris: 6000, tex: 512, bake: true },
+  { tris: 1200, tex: 256, bake: true },
+  { tris: 220, tex: 64, bake: true },
 ];
 
 const log = (...a) => console.log(...a);
@@ -107,15 +110,20 @@ async function processModel(m, srcPath, outDir) {
   const prims = base.getRoot().listMeshes().reduce((n, mesh) => n + mesh.listPrimitives().length, 0);
   const dims = await normalise(base, m);
   const mats = base.getRoot().listMaterials().length;
-  const lods = [];
+  const lods = []; let mean = null;
   for (let k = 0; k < LODS.length; k++) {
-    const file = `${m.id}.l${k}.glb`;
-    const r = await buildLod(base, LODS[k], path.join(outDir, file));
+    const file = `${m.id}.l${k}.glb`, out = path.join(outDir, file), lod = LODS[k]; let r;
+    if (lod.bake) {
+      const b = await bakeLowLod(base, lod.tris, lod.tex); if (!mean) mean = b.mean;
+      await b.doc.transform(textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 90, effort: 60 }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+      await io.write(out, b.doc);
+      r = { tris: b.tris, bytes: fs.statSync(out).size, tex: lod.tex, maps: 'baked' };
+    } else r = await buildLod(base, lod, out);
     lods.push(Object.assign({ file }, r));
     log(`   l${k}: ${r.tris} tris, ${(r.bytes / 1e6).toFixed(2)} MB`);
   }
   log(`   ${m.id}: ${dims.w} x ${dims.h} x ${dims.d} m, source ${srcTris} tris, ${prims} primitive(s), ${mats} material(s), ${((Date.now() - t0) / 1000).toFixed(1)} s`);
-  return { rev: revOf(m), set: m.set, w: dims.w, h: dims.h, d: dims.d, srcTris, lods };
+  return { rev: revOf(m), set: m.set, w: dims.w, h: dims.h, d: dims.d, srcTris, mean, lods };
 }
 
 // ---------- modes ----------
@@ -167,7 +175,7 @@ async function local(ids) {
     const m = man.models.find((x) => x.id === id); if (!m) { log('unknown model ' + id); continue; }
     const src = [path.join(CACHE, srcName(m)), path.join(CACHE, `${id}.src.glb`)].find((p) => fs.existsSync(p));
     if (!src) { log(`no source for ${id} in ${CACHE}`); continue; }
-    log(`+ ${id}`); index.models[id] = await processModel(m, src, OUT);
+    log(`+ ${id}`); index.models[id] = Object.assign(await processModel(m, src, OUT), { kinds: m.kinds, cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', group: m.group || '', title: m.title });
   }
   fs.writeFileSync(indexPath, JSON.stringify(index));
 }

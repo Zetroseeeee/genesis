@@ -27,7 +27,7 @@ MODELS.init(scene, shared, { units: 0.001 });
   const sun = new THREE.Vector3(0.55, 0.7, 0.45).normalize(), up = new THREE.Vector3(0, 1, 0);
   shared.uSunV.value.copy(sun).transformDirection(camera.matrixWorldInverse); shared.uUpV.value.copy(up).transformDirection(camera.matrixWorldInverse);
   // force the wanted LOD: thresholds that make lodFor() ask for exactly that step
-  MODELS.lodPx = [0, 0, 0, 0].map((_, k) => (k < lod ? 1e9 : 0)); const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), yAxis = new THREE.Vector3(0, 1, 0);
+  MODELS.lodPx = [0, 0, 0, 0, 0, 0].map((_, k) => (k < lod ? 1e9 : 0)); const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), yAxis = new THREE.Vector3(0, 1, 0);
   let frames = 0;
   function tick() {
     MODELS.begin(); let allReady = true, i = 0;
