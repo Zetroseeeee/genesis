@@ -344,7 +344,7 @@
       if (!old && era === 6 && lvl >= 2 && hash(i, k + 7) < 0.06) { kind = 'chimney'; w = d = 3; h = 28 + hash(i, k + 8) * 20; wm = WALL.brick; }
       if (planned) { w = Math.min(w, s * 0.82); d = Math.min(d, s * 0.82); }
       if (quake >= 0 && hash(i, k + 11) < 0.35 * (1 - quake / 3)) { push('rubble', x, z, w, Math.min(h * 0.75, 6), d, yaw, colorOfP(pl, k + 10), packStyle(wm, ROOF.flat, cul, FLAG.ruin)); count++; continue; }
-      push(kind, x, z, w, h, d, yaw, colorOfP(pl, k + 10), packStyle(wm, rm, cul, 0), 0, prog); count++; if (prog < 1) nSites++;
+      const hit = push(kind, x, z, w, h, d, yaw, colorOfP(pl, k + 10), packStyle(wm, rm, cul, 0), 0, prog); if (old) hit.era = Math.max(0, era - 1); count++; if (prog < 1) nSites++;
     }
 
     // --- landmark at the plaza edge, facing in; a wonder rises there over decades ---

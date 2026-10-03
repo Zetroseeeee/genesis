@@ -13,3 +13,7 @@
 {"id":"stone_wigwam_a","concept":"3f42f01a-a014-45e7-a454-3ddea4fdc6ab","cts":"20261003_130320","mesh":"3c005c86-4327-4166-84da-8ada619f38b8"}
 {"id":"stone_palmhut_a","concept":"d5673709-a686-444e-887a-edd0973101d6","cts":"20261003_130944"}
 {"id":"stone_circle_a","concept":"7270e88a-089a-4e73-a4b2-63abe1a83725","cts":"20261003_130321","mesh":"cb323abc-c95d-4aa6-b225-18f67f254dbd"}
+{"id":"stone_grasshut_a","mesh":"c4f1cf74-d4e5-498d-854b-63fe263a2d8e"}
+{"id":"stone_domehut_a","mesh":"f67c4762-041a-4172-af76-f4e64450c590"}
+{"id":"stone_stilthouse_a","mesh":"7214f57e-ec2c-47d0-a208-7aaea9c6d323"}
+{"id":"stone_palmhut_a","mesh":"861aeb29-c843-43d4-a992-548ac4315a91"}

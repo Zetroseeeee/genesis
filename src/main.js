@@ -98,6 +98,7 @@
       requestAnimationFrame(frame);
       setTimeout(() => { setLoad(100); $('loading').hidden = true; }, 900);
       // generated materials and art arrive after first light; the world recompiles its shaders when they are in
+      if (window.MODELS && settings.models !== false) MODELS.load(window.GENESIS_MODELS_URL).then((M) => { if (M.ready) { world.lastBuild.t = -1e9; console.log('models: ' + Object.keys(M.defs).length + ' in the library'); } });
       if (window.TEX) TEX.load(renderer, TEX_URL).then((T) => { applyArt(); applyTextures(); if (T.ready) toast('Materials loaded'); else if (T.unsupported) console.warn('textures need WebGL2'); });
       try { sampleFn = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { sampleFn = null; }
       if (!sampleFn) $('btn-chronicle').textContent = 'Show the record';

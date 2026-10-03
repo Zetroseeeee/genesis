@@ -35,6 +35,9 @@
       this.lastBuild = { lon: 999, lat: 999, dist: 0, t: -1e9, tick: -1 }; this.htMaps = new Map();
       this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._s = new THREE.Vector3(); this._p = new THREE.Vector3(); this._c = new THREE.Color();
       this.buildingCount = 0;
+      // real 3D models (models.js) share the kit's light uniforms and replace kit archetypes where a model exists
+      if (window.MODELS) MODELS.init(this.scene, { uSunV: this.bUniforms.uSunV, uUpV: this.bUniforms.uUpV, uDay: this.bUniforms.uDay, uCamAlt: this.bUniforms.uCamAlt, uTime: this.bUniforms.uTime }, { units: 6371.0 });
+      this.modelsOn = true; this._pv = new THREE.Vector3();
       this.initSky();
     }
     setSim(sim) { this.sim = sim; for (let i = 0; i < W * H; i++) this.simData[i * 4 + 3] = Math.min(255, Math.round(sim.fert[i] * 255)); this.refreshTextures(); }
@@ -78,10 +81,11 @@
       const sim = this.sim; if (!sim) { return; }
       const dist = cam.dist; const now = performance.now();
       const show = dist < 0.12;   // towns are drawn at strategy-map scale, so they read from ~750 km up
-      if (!show) { if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; } return; }
+      if (!show) { if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; if (window.MODELS && MODELS.ready) { MODELS.begin(); MODELS.end(); } } return; }
       const moved = GEO.distKm(cam.lon, cam.lat, this.lastBuild.lon, this.lastBuild.lat) > Math.max(0.15, dist * 6371 * 0.12);
       const stale = now - this.lastBuild.t > 1500 || this.lastBuild.tex !== this.texVersion;
-      if (!force && !moved && !stale && Math.abs(Math.log(dist / (this.lastBuild.dist || 1))) < 0.15) return;
+      const arrived = window.MODELS && MODELS.dirty;       // a model file finished loading: swap it in
+      if (!force && !moved && !stale && !arrived && Math.abs(Math.log(dist / (this.lastBuild.dist || 1))) < 0.15) return;
       this.lastBuild = { lon: cam.lon, lat: cam.lat, dist, t: now, tex: this.texVersion };
       const T = this.terrain; const counts = {}; for (const k in this.inst) counts[k] = 0;
       const casters = this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1;
@@ -90,6 +94,8 @@
       const exag = this.exag; const m = this._m; const el = m.elements;
       const packsE = T.stats ? T.stats.packsE : 0; void packsE;
       let total = 0; const TOTAL_MAX = 70000; let nCasters = 0; const sites = this.sites = []; const SITE_MAX = 60;
+      const useModels = !!(window.MODELS && MODELS.ready && this.modelsOn); if (useModels) MODELS.begin();
+      const camPos = cam.camera.position; const pxPerRad = (window.innerHeight || 800) / (2 * Math.tan((cam.camera.fov || 45) * Math.PI / 360));
       // settlements nearest the camera first, so the town you are looking at always gets its full budget
       const cells = [];
       for (let dy = -rad; dy <= rad; dy++) {
@@ -114,7 +120,7 @@
         }
         if ((!L.mask || L.maskI !== T.stats.packsI) && this.decal && this.decal.rivers && this.decal.rivers.length) { L.mask = new Uint8Array(n); L.maskI = T.stats.packsI; for (let k = 0; k < n; k++) { const it = items[k]; const lo = cLon + it.x / (R_M * cl * GEO.D2R), la = cLat + it.z / (R_M * GEO.D2R); const afloat = it.kind === 'pier' || it.kind === 'boat' || it.kind === 'ship'; if (!afloat && T.isWater(lo, la)) { L.mask[k] = 1; continue; } const rv = this.decal.nearestRiver(lo, la); if (rv && rv.d < rv.hw + Math.max(it.w, it.d) * 0.5 + 4 && !afloat) L.mask[k] = 1; } }
         const mask = L.mask; const hts = L.hts;
-        const era = c.era; const seed = (i % 997) / 997; const kRep = L.k || 1;
+        const era = c.era; const seed = (i % 997) / 997; const kRep = L.k || 1; const cul = L.culture || 0;
         const wantCasters = dKm < 40 && !coarse;
         for (let k = 0; k < n; k++) {
           if (mask && mask[k]) continue;
@@ -123,6 +129,20 @@
           const lon = cLon + it.x / (R_M * cl * GEO.D2R), lat = cLat + it.z / (R_M * GEO.D2R);
           const hg = hts[k]; if (hg < 0.5 && it.kind !== 'pier' && it.kind !== 'boat' && it.kind !== 'ship') continue;
           const prog = it.prog === undefined ? 1 : it.prog;
+          if (useModels) {
+            const def = MODELS.pick(it.kind, it.era !== undefined ? it.era : era, cul, hash(i, 4000 + k));
+            const u = def ? this.placeModel(def, it, lon, lat, hg, era, seed + k * 0.013, prog, kRep, camPos, pxPerRad) : 0;
+            if (u) {
+              total++;
+              const mw = def.w * u, mh = def.h * u, md = def.d * u;
+              if (prog < 1 && prog > 0.05 && prog < 0.97) {
+                const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count) { this.setInst(sc, si, lon, lat, hg, mw * 1.1, mh * Math.min(1, prog + 0.3) * 1.03, md * 1.1, this._myaw, era >= 6 ? 0x8f949a : 0x8a6a44, era, seed + k * 0.013, TOWN.packStyle(era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; }
+                if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: mw, d: md, k: kRep, prog, era });
+              }
+              if (wantCasters && nCasters < 5000 && prog > 0.3) { casters.push(lon, lat, mw, mh * prog, md, this._myaw); nCasters++; }
+              continue;
+            }
+          }
           if (prog < 1) {
             // a building site: the walls up to the current height in bare material, scaffolding around them, a crane in later ages
             const hf = Math.max(0.08, prog); const raw = (1 - prog) * 0.5;
@@ -157,7 +177,34 @@
         }
       }
       for (const k in this.inst) { const im = this.inst[k]; im.count = counts[k]; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; this.info[k].needsUpdate = true; }
+      if (useModels) MODELS.end();
       this.buildingCount = total;
+    }
+    // a real model on a plan item. Landmarks fill the plot they were planned for; houses stand at life size times the
+    // town's drawn scale (a little give either way to suit the plot). Returns the drawn scale (0 = nothing loaded yet).
+    placeModel(def, it, lon, lat, hg, era, seed, prog, kRep, camPos, pxPerRad) {
+      const flags = Math.floor(it.style / 1024); const landmark = flags & 1;
+      // turn the model so its long side lies along the plot's long side
+      const turn = (def.d > def.w * 1.2 && it.w > it.d * 1.2) || (def.w > def.d * 1.2 && it.d > it.w * 1.2);
+      const pw = turn ? it.d : it.w, pd = turn ? it.w : it.d;
+      let u;
+      if (landmark || def.fit === 'box') u = Math.min(pw / def.w, pd / def.d);
+      else { const f = Math.min(pw / (def.w * kRep), pd / (def.d * kRep)); u = kRep * Math.max(0.8, Math.min(1.25, f)); }
+      const yaw = it.yaw + (turn ? Math.PI / 2 : 0); this._myaw = yaw;
+      const m = this._m; const el = m.elements; const s = u / R_M;
+      const lo = lon * GEO.D2R, la = lat * GEO.D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
+      const Ex = -slo, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const rr = 1 + Math.max(hg, 0) * this.exag / R_M;
+      el[0] = (cy * Ex + sy * Nx) * s; el[1] = (sy * Ny) * s; el[2] = (cy * Ez + sy * Nz) * s; el[3] = 0;
+      el[4] = Ux * s; el[5] = Uy * s; el[6] = Uz * s; el[7] = 0;
+      el[8] = (sy * Ex - cy * Nx) * s; el[9] = (-cy * Ny) * s; el[10] = (sy * Ez - cy * Nz) * s; el[11] = 0;
+      el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
+      const dx = camPos.x - el[12], dy = camPos.y - el[13], dz = camPos.z - el[14];
+      const px = def.h * s / Math.max(1e-9, Math.sqrt(dx * dx + dy * dy + dz * dz)) * pxPerRad;
+      const L = MODELS.lodFor(def, px); if (!L) return 0;
+      MODELS.push(L, m, era, seed, (flags & 16) ? 1 : 0, prog);
+      return u;
     }
     // one instance matrix at lon/lat on ground height hg (metres): size w,h,d in drawn metres, krep = drawn/true scale for the shader's patterns
     setInst(im, idx, lon, lat, hg, wM, hM, dM, yaw, color, era, seed, style, krep, infoAttr) {

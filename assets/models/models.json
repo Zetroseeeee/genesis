@@ -51,7 +51,7 @@
    "set": "stone",
    "eras": [
     0,
-    0
+    2
    ],
    "cultures": [
     "med",
@@ -109,6 +109,175 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124220_368ff7b1-22cb-42ac-ac04-49248222f1c6.png",
    "mesh": "b866d1ab-c895-43d0-b46d-678c61902746",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124305_b866d1ab-c895-43d0-b46d-678c61902746.glb"
+  },
+  {
+   "id": "stone_roundhouse_b",
+   "title": "Small roundhouse with a porch",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": [
+    "med",
+    "north",
+    "east"
+   ],
+   "kinds": [
+    "hut"
+   ],
+   "h": 4.6,
+   "concept": "e18c60f7-5b65-4df2-8e46-9567d9e8d3a3",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130442_e18c60f7-5b65-4df2-8e46-9567d9e8d3a3.png",
+   "mesh": "4689cd12-d28e-4471-ac1d-3af6ee15be43",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_131152_4689cd12-d28e-4471-ac1d-3af6ee15be43.glb"
+  },
+  {
+   "id": "stone_longhouse_a",
+   "title": "Neolithic timber longhouse",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": [
+    "med",
+    "north",
+    "east",
+    "easia"
+   ],
+   "kinds": [
+    "longhouse"
+   ],
+   "h": 6.4,
+   "w": 24,
+   "concept": "203c9638-c591-4293-9a85-2bcccd6df704",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130442_203c9638-c591-4293-9a85-2bcccd6df704.png",
+   "mesh": "89b833bc-a328-4ca3-b9f0-ee7ca27b1026",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_131155_89b833bc-a328-4ca3-b9f0-ee7ca27b1026.glb",
+   "scaleBy": "w"
+  },
+  {
+   "id": "stone_pithouse_a",
+   "title": "Pit house",
+   "set": "stone",
+   "eras": [
+    0,
+    1
+   ],
+   "cultures": [
+    "east",
+    "easia",
+    "namerica"
+   ],
+   "kinds": [
+    "hut"
+   ],
+   "h": 3.5,
+   "concept": "2578724d-7797-49b9-96d2-7d4ffdd85f25",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130443_2578724d-7797-49b9-96d2-7d4ffdd85f25.png",
+   "mesh": "9e7ec712-20ae-476e-aa0b-a42bd9d915f2",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_131158_9e7ec712-20ae-476e-aa0b-a42bd9d915f2.glb"
+  },
+  {
+   "id": "stone_mudbrick_a",
+   "title": "Mud-brick house",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": [
+    "mena"
+   ],
+   "kinds": [
+    "adobe"
+   ],
+   "h": 3.4,
+   "concept": "6f77815e-2e63-496d-b266-1c1e0324d8eb",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130442_6f77815e-2e63-496d-b266-1c1e0324d8eb.png",
+   "mesh": "30ce418a-222e-42f1-b3b9-6581c3eb2d0f",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_131201_30ce418a-222e-42f1-b3b9-6581c3eb2d0f.glb"
+  },
+  {
+   "id": "stone_mudbrick_b",
+   "title": "Two-room mud-brick house",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": [
+    "mena"
+   ],
+   "kinds": [
+    "adobe"
+   ],
+   "h": 3.6,
+   "concept": "7ce138f8-1025-4cf3-925d-41e336dcd656",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_7ce138f8-1025-4cf3-925d-41e336dcd656.png",
+   "mesh": "671310f2-0ba5-4081-9e8b-86d1f9fb3219",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130458_671310f2-0ba5-4081-9e8b-86d1f9fb3219.glb"
+  },
+  {
+   "id": "stone_tipi_a",
+   "title": "Hide tipi",
+   "set": "stone",
+   "eras": [
+    0,
+    5
+   ],
+   "cultures": [
+    "namerica"
+   ],
+   "kinds": [
+    "tipi"
+   ],
+   "h": 6.0,
+   "concept": "46805723-21f0-44b1-a0bd-1087e7a5192d",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_46805723-21f0-44b1-a0bd-1087e7a5192d.png",
+   "mesh": "d0cfaefb-c986-44c7-aae9-230710234a17",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130502_d0cfaefb-c986-44c7-aae9-230710234a17.glb"
+  },
+  {
+   "id": "stone_wigwam_a",
+   "title": "Bark wigwam",
+   "set": "stone",
+   "eras": [
+    0,
+    4
+   ],
+   "cultures": [
+    "namerica"
+   ],
+   "kinds": [
+    "hut"
+   ],
+   "h": 3.1,
+   "concept": "3f42f01a-a014-45e7-a454-3ddea4fdc6ab",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130320_3f42f01a-a014-45e7-a454-3ddea4fdc6ab.png",
+   "mesh": "3c005c86-4327-4166-84da-8ada619f38b8",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130505_3c005c86-4327-4166-84da-8ada619f38b8.glb"
+  },
+  {
+   "id": "stone_circle_a",
+   "title": "Megalithic stone circle",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": null,
+   "kinds": [
+    "menhirs"
+   ],
+   "h": 4.2,
+   "w": 26,
+   "concept": "7270e88a-089a-4e73-a4b2-63abe1a83725",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_7270e88a-089a-4e73-a4b2-63abe1a83725.png",
+   "mesh": "cb323abc-c95d-4aa6-b225-18f67f254dbd",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130508_cb323abc-c95d-4aa6-b225-18f67f254dbd.glb",
+   "scaleBy": "w"
   }
  ]
 }

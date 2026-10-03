@@ -1,0 +1,48 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>model viewer</title>
+<style>body{margin:0;background:#6b7a58;overflow:hidden}#tag{position:fixed;left:8px;top:6px;font:12px system-ui;color:#fff;text-shadow:0 1px 2px #000;white-space:pre}</style></head>
+<body><div id="tag"></div>
+<script src="three.min.js"></script><script src="GLTFLoader.js"></script><script src="meshopt_decoder.js"></script><script src="models.js"></script>
+<script>
+// ?ids=a,b,c&lod=0&prog=1&day=1&az=35&el=22&zoom=1&cell=0&n=1  — each model at true metres on a grid, 3/4 view.
+// lod = which LOD to force (0 finest); n = copies of each (rows of the same model, to judge repeats); cell = grid step (0 = auto).
+const q = new URLSearchParams(location.search);
+const lod = +(q.get('lod') || 0), prog = +(q.get('prog') || 1), day = +(q.get('day') || 1), az = +(q.get('az') || 35) * Math.PI / 180, el = +(q.get('el') || 22) * Math.PI / 180, zoom = +(q.get('zoom') || 1), nCopies = +(q.get('n') || 1);
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(W, H); document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(day > 0.5 ? 0x8fa6c4 : 0x0a0e18);
+const shared = { uSunV: { value: new THREE.Vector3() }, uUpV: { value: new THREE.Vector3() }, uDay: { value: day }, uCamAlt: { value: 1 }, uTime: { value: 0 } };
+MODELS.init(scene, shared, { units: 0.001 });
+(async () => {
+  await MODELS.load('data/models/index.json');
+  const ids = (q.get('ids') || Object.keys(MODELS.defs).join(',')).split(',').filter((id) => MODELS.defs[id]);
+  const defs = ids.map((id) => MODELS.defs[id]);
+  const biggest = Math.max(1, ...defs.map((d) => Math.max(d.w, d.d)));
+  const cell = +(q.get('cell') || 0) || biggest * 1.35;
+  const total = defs.length * nCopies; const cols = Math.min(total, Math.max(1, Math.ceil(Math.sqrt(total * W / H)))), rows = Math.ceil(total / cols);
+  const spanX = cols * cell, spanZ = rows * cell, maxH = Math.max(1, ...defs.map((d) => d.h));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(spanX * 4, spanZ * 4), new THREE.MeshBasicMaterial({ color: day > 0.5 ? 0x6a7355 : 0x11150f })); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; scene.add(ground);
+  const R = Math.hypot(spanX, spanZ, maxH) * 0.5; const camera = new THREE.PerspectiveCamera(28, W / H, R * 0.02, R * 40);
+  const dist = R / Math.sin(14 * Math.PI / 180) / zoom; camera.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el) + maxH * 0.35, dist * Math.cos(el) * Math.cos(az)); camera.lookAt(0, maxH * 0.35, 0); camera.updateMatrixWorld();
+  const sun = new THREE.Vector3(0.55, 0.7, 0.45).normalize(), up = new THREE.Vector3(0, 1, 0);
+  shared.uSunV.value.copy(sun).transformDirection(camera.matrixWorldInverse); shared.uUpV.value.copy(up).transformDirection(camera.matrixWorldInverse);
+  // force the wanted LOD: thresholds that make lodFor() ask for exactly that step
+  MODELS.lodPx = [0, 0, 0, 0].map((_, k) => (k < lod ? 1e9 : 0)); const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), yAxis = new THREE.Vector3(0, 1, 0);
+  let frames = 0;
+  function tick() {
+    MODELS.begin(); let allReady = true, i = 0;
+    for (const d of defs) for (let c = 0; c < nCopies; c++, i++) {
+      const L = MODELS.lodFor(d, 1); const want = Math.min(lod, d.lods.length - 1);
+      if (!L || L.k !== want) allReady = false; if (!L) continue;
+      const x = (i % cols - cols / 2 + 0.5) * cell, z = (Math.floor(i / cols) - rows / 2 + 0.5) * cell;
+      qt.setFromAxisAngle(yAxis, c * 1.3); m4.compose(new THREE.Vector3(x, 0, z), qt, new THREE.Vector3(1, 1, 1));
+      MODELS.push(L, m4, 4, 0.13 + i * 0.37, 0, prog);
+    }
+    MODELS.end(); renderer.render(scene, camera);
+    document.getElementById('tag').textContent = defs.map((d) => `${d.id}  ${d.w}x${d.h}x${d.d} m  l${Math.min(lod, d.lods.length - 1)}: ${d.lods[Math.min(lod, d.lods.length - 1)].tris} tris`).join('\n');
+    if (allReady && ++frames > 3) { window.__ready = true; return; }
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+</script></body></html>

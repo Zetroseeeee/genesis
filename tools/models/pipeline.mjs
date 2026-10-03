@@ -36,7 +36,7 @@ const LODS = [
 const log = (...a) => console.log(...a);
 const sh = (cmd, args, opts) => execFileSync(cmd, args, Object.assign({ encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 28 }, opts || {}));
 const readManifest = () => JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.fit || 'h'])).digest('hex').slice(0, 12);
+const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h'])).digest('hex').slice(0, 12);
 const srcName = (m) => `${m.id}.${(m.mesh || 'x').slice(0, 8)}.src.glb`;
 
 let _io = null;
@@ -64,8 +64,8 @@ async function normalise(doc, m) {
   const root = doc.getRoot(); const scene = root.getDefaultScene() || root.listScenes()[0];
   const b = getBounds(scene);
   const size = [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
-  // "fit": which declared dimension fixes the scale. h = height (default), w = the longer side of the footprint
-  const s = m.fit === 'w' ? m.w / Math.max(size[0], size[2]) : m.h / size[1];
+  // scaleBy: which declared dimension fixes the scale. Height by default; "w" = the longer side of the footprint
+  const s = m.scaleBy === 'w' ? m.w / Math.max(size[0], size[2]) : m.h / size[1];
   const yaw = (m.yaw || 0) * Math.PI / 180; const c = Math.cos(yaw), sn = Math.sin(yaw);
   const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2, y0 = b.min[1];
   const M = [s * c, 0, -s * sn, 0, 0, s, 0, 0, s * sn, 0, s * c, 0, -s * (c * cx + sn * cz), -s * y0, -s * (-sn * cx + c * cz), 1];
@@ -187,7 +187,9 @@ function fetchAll() {
         if (fs.existsSync(p) && fs.statSync(p).size === l.bytes) { kept++; continue; }
         sh('curl', ['-fsSL', '--retry', '3', '-o', p, `${base}/models-${set}/${l.file}`]); got++;
       }
-      merged.models[id] = entry;
+      const m = man.models.find((x) => x.id === id);       // where and when the model belongs comes from the manifest
+      if (!m) continue;
+      merged.models[id] = Object.assign({}, entry, { kinds: m.kinds, cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', group: m.group || '', title: m.title });
     }
   }
   fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(merged));

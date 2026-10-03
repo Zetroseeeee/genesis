@@ -7,3 +7,5 @@ out/
 release/
 data/models/
 tools/models/cache/
+data/tex/shot_*.png
+data/tex/atlas_shot.json
