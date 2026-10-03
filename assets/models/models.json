@@ -191,8 +191,7 @@
     "mena"
    ],
    "kinds": [
-    "adobe",
-    "hut"
+    "adobe"
    ],
    "h": 3.4,
    "concept": "6f77815e-2e63-496d-b266-1c1e0324d8eb",
@@ -212,8 +211,7 @@
     "mena"
    ],
    "kinds": [
-    "adobe",
-    "hut"
+    "adobe"
    ],
    "h": 3.6,
    "concept": "7ce138f8-1025-4cf3-925d-41e336dcd656",
@@ -269,7 +267,13 @@
     0,
     2
    ],
-   "cultures": null,
+   "cultures": [
+    "med",
+    "north",
+    "east",
+    "africa",
+    "sasia"
+   ],
    "kinds": [
     "menhirs"
    ],
@@ -335,11 +339,13 @@
     "stilt",
     "hut"
    ],
-   "h": 7.0,
+   "h": 5.2,
    "concept": "5fe657b0-f700-492f-9479-981523eefcae",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130945_5fe657b0-f700-492f-9479-981523eefcae.png",
    "mesh": "7214f57e-ec2c-47d0-a208-7aaea9c6d323",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132538_7214f57e-ec2c-47d0-a208-7aaea9c6d323.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132538_7214f57e-ec2c-47d0-a208-7aaea9c6d323.glb",
+   "scaleBy": "w",
+   "w": 8.0
   },
   {
    "id": "stone_palmhut_a",
@@ -355,11 +361,97 @@
    "kinds": [
     "hut"
    ],
-   "h": 5.4,
+   "h": 4.2,
    "concept": "d5673709-a686-444e-887a-edd0973101d6",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130944_d5673709-a686-444e-887a-edd0973101d6.png",
    "mesh": "861aeb29-c843-43d4-a992-548ac4315a91",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132542_861aeb29-c843-43d4-a992-548ac4315a91.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132542_861aeb29-c843-43d4-a992-548ac4315a91.glb",
+   "scaleBy": "w",
+   "w": 7.2
+  },
+  {
+   "id": "stone_mudround_a",
+   "title": "Round house of the first farmers",
+   "set": "stone",
+   "eras": [
+    0,
+    1
+   ],
+   "cultures": [
+    "mena"
+   ],
+   "kinds": [
+    "hut"
+   ],
+   "h": 2.9,
+   "concept": "036b761b-e325-4ddd-baae-156a03783aee",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135223_036b761b-e325-4ddd-baae-156a03783aee.png",
+   "mesh": "ca60b1fd-001e-45d1-90ac-2fbdaf058a7f",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135822_ca60b1fd-001e-45d1-90ac-2fbdaf058a7f.glb"
+  },
+  {
+   "id": "stone_tpillars_a",
+   "title": "T-pillar enclosure",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": [
+    "mena"
+   ],
+   "kinds": [
+    "menhirs"
+   ],
+   "h": 5.2,
+   "concept": "036fdd2b-9144-44fb-be98-c8caacf31b83",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135222_036fdd2b-9144-44fb-be98-c8caacf31b83.png",
+   "mesh": "87edd9a2-f6d3-4e94-9d1e-69405d8840e0",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135825_87edd9a2-f6d3-4e94-9d1e-69405d8840e0.glb"
+  },
+  {
+   "id": "stone_timbercircle_a",
+   "title": "Timber circle",
+   "set": "stone",
+   "eras": [
+    0,
+    2
+   ],
+   "cultures": [
+    "easia",
+    "seasia",
+    "america",
+    "namerica"
+   ],
+   "kinds": [
+    "menhirs"
+   ],
+   "h": 5.6,
+   "concept": "1a6d9407-1fce-43a7-8929-97e1234a6bb8",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135223_1a6d9407-1fce-43a7-8929-97e1234a6bb8.png",
+   "mesh": "c054e85c-70e8-4abf-b69a-a8b0d06313fa",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135829_c054e85c-70e8-4abf-b69a-a8b0d06313fa.glb"
+  },
+  {
+   "id": "stone_palisade_a",
+   "title": "Log palisade",
+   "set": "stone",
+   "eras": [
+    0,
+    0
+   ],
+   "cultures": null,
+   "kinds": [
+    "palisade"
+   ],
+   "h": 3.6,
+   "w": 12,
+   "scaleBy": "w",
+   "fit": "run",
+   "concept": "4c68c5c8-2f73-425c-a11a-036f29be5d72",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135222_4c68c5c8-2f73-425c-a11a-036f29be5d72.png",
+   "mesh": "7755d2fb-3027-4734-aae7-473cbef2b60e",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135833_7755d2fb-3027-4734-aae7-473cbef2b60e.glb"
   }
  ]
 }

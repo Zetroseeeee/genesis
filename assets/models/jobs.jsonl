@@ -25,3 +25,7 @@
 {"id":"stone_watchtower_a","concept":"5fb233e1-802b-4772-8675-6442b0be496d"}
 {"id":"stone_granary_a","concept":"8fb2bf95-b2ca-4bea-a552-f66e4eb72dde"}
 {"id":"stone_roundhouse_site","concept":"c41aac94-3ae2-4fe2-a523-9a95defa0d81"}
+{"id":"stone_gate_a","mesh":"b1a19f67-da0e-4115-8881-b73033b6abed"}
+{"id":"stone_watchtower_a","mesh":"6da70c9c-27bf-4cfd-83f8-a704276cff67"}
+{"id":"stone_granary_a","mesh":"cff6e38c-0851-4763-b03b-c7b9cee44b6b"}
+{"id":"stone_roundhouse_site","mesh":"2ee86755-8a68-4c84-a6e7-d49d7bbf7bdc"}

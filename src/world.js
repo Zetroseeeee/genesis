@@ -130,16 +130,17 @@
           const hg = hts[k]; if (hg < 0.5 && it.kind !== 'pier' && it.kind !== 'boat' && it.kind !== 'ship') continue;
           const prog = it.prog === undefined ? 1 : it.prog;
           if (useModels) {
-            const def = MODELS.pick(it.kind, it.era !== undefined ? it.era : era, cul, hash(i, 4000 + k));
-            const u = def ? this.placeModel(def, it, lon, lat, hg, era, seed + k * 0.013, prog, kRep, camPos, pxPerRad) : 0;
-            if (u) {
-              total++;
-              const mw = def.w * u, mh = def.h * u, md = def.d * u;
+            let def = MODELS.pick(it.kind, it.era !== undefined ? it.era : era, cul, hash(i, 4000 + k)), mprog = prog, staged = false;
+            // a model with its own building-site stage: the frame goes up first (rising from the ground), then the finished building replaces it
+            if (def && prog < 1 && def.site && MODELS.defs[def.site]) { staged = true; if (prog < 0.72) { def = MODELS.defs[def.site]; mprog = Math.min(1, prog / 0.3); } else mprog = 1; }
+            const nPut = def ? this.placeModel(def, it, lon, lat, hg, era, seed + k * 0.013, mprog, kRep, camPos, pxPerRad, cl) : 0;
+            if (nPut) {
+              total += nPut; const md = this._md;
               if (prog < 1 && prog > 0.05 && prog < 0.97) {
-                const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count) { this.setInst(sc, si, lon, lat, hg, mw * 1.1, mh * Math.min(1, prog + 0.3) * 1.03, md * 1.1, this._myaw, era >= 6 ? 0x8f949a : 0x8a6a44, era, seed + k * 0.013, TOWN.packStyle(era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; }
-                if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: mw, d: md, k: kRep, prog, era });
+                if (!staged && def.fit !== 'run' && def.fit !== 'gate') { const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count) { this.setInst(sc, si, lon, lat, hg, md[0] * 1.1, md[1] * Math.min(1, prog + 0.3) * 1.03, md[2] * 1.1, md[3], era >= 6 ? 0x8f949a : 0x8a6a44, era, seed + k * 0.013, TOWN.packStyle(era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; } }
+                if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: md[0], d: md[2], k: kRep, prog, era });
               }
-              if (wantCasters && nCasters < 5000 && prog > 0.3) { casters.push(lon, lat, mw, mh * prog, md, this._myaw); nCasters++; }
+              if (wantCasters && nCasters < 5000 && prog > 0.3) { casters.push(lon, lat, md[0], md[1] * Math.min(1, prog + 0.2), md[2], md[3]); nCasters++; }
               continue;
             }
           }
@@ -180,31 +181,60 @@
       if (useModels) MODELS.end();
       this.buildingCount = total;
     }
-    // a real model on a plan item. Landmarks fill the plot they were planned for; houses stand at life size times the
-    // town's drawn scale (a little give either way to suit the plot). Returns the drawn scale (0 = nothing loaded yet).
-    placeModel(def, it, lon, lat, hg, era, seed, prog, kRep, camPos, pxPerRad) {
-      const flags = Math.floor(it.style / 1024); const landmark = flags & 1;
+    // one model instance at lon/lat: sx, sy, sz are drawn metres per model metre along the model's own axes.
+    // false = none of its files has loaded yet.
+    putModel(def, lon, lat, hg, yaw, sx, sy, sz, era, seed, mflags, prog, camPos, pxPerRad) {
+      const m = this._m; const el = m.elements; const kx = sx / R_M, ky = sy / R_M, kz = sz / R_M;
+      const lo = lon * GEO.D2R, la = lat * GEO.D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
+      const Ex = -slo, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
+      const cy = Math.cos(yaw), sy2 = Math.sin(yaw);
+      const rr = 1 + Math.max(hg, 0) * this.exag / R_M;
+      el[0] = (cy * Ex + sy2 * Nx) * kx; el[1] = (sy2 * Ny) * kx; el[2] = (cy * Ez + sy2 * Nz) * kx; el[3] = 0;
+      el[4] = Ux * ky; el[5] = Uy * ky; el[6] = Uz * ky; el[7] = 0;
+      el[8] = (sy2 * Ex - cy * Nx) * kz; el[9] = (-cy * Ny) * kz; el[10] = (sy2 * Ez - cy * Nz) * kz; el[11] = 0;
+      el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
+      const dx = camPos.x - el[12], dy = camPos.y - el[13], dz = camPos.z - el[14];
+      const px = def.h * ky / Math.max(1e-9, Math.sqrt(dx * dx + dy * dy + dz * dz)) * pxPerRad;
+      const L = MODELS.lodFor(def, px); if (!L) return false;
+      MODELS.push(L, m, era, seed, mflags, prog);
+      return true;
+    }
+    // a run of one model end to end along a line (walls, fences): as many life-size copies as fit, stretched a
+    // little so they meet exactly. cx/cz: the line's direction (east, north); len in drawn metres.
+    runModel(def, lon, lat, hg, planYaw, len, kRep, cl, era, seed, mflags, prog, camPos, pxPerRad) {
+      const alongZ = def.d > def.w; const unit = (alongZ ? def.d : def.w) * kRep; const n = Math.max(1, Math.round(len / unit)); const stretch = len / (n * (alongZ ? def.d : def.w));
+      const cy = Math.cos(planYaw), sy = Math.sin(planYaw); const yaw = planYaw + (alongZ ? Math.PI / 2 : 0); let ok = false;
+      for (let j = 0; j < n; j++) {
+        const o = (j - (n - 1) / 2) * (len / n);
+        ok = this.putModel(def, lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), hg, yaw, alongZ ? kRep : stretch, kRep, alongZ ? stretch : kRep, era, seed + j * 0.171, mflags, prog, camPos, pxPerRad) || ok;
+      }
+      return ok ? n : 0;
+    }
+    // a real model on a plan item. Houses stand at life size times the town's drawn scale (a little give either way to
+    // suit the plot); landmarks fill the plot they were planned for; walls run end to end; a gate stands life-size in
+    // the middle of its stretch of wall. Leaves the drawn size in this._md; returns instances placed (0 = not loaded).
+    placeModel(def, it, lon, lat, hg, era, seed, prog, kRep, camPos, pxPerRad, cl) {
+      const flags = Math.floor(it.style / 1024); const landmark = flags & 1; const mf = (flags & 16) ? 1 : 0; const md = this._md || (this._md = [0, 0, 0, 0]);
+      if (def.fit === 'run') {
+        const n = this.runModel(def, lon, lat, hg, it.yaw, it.w, kRep, cl, era, seed, mf, prog, camPos, pxPerRad);
+        md[0] = it.w; md[1] = def.h * kRep; md[2] = Math.min(def.w, def.d) * kRep; md[3] = it.yaw; return n;
+      }
+      if (def.fit === 'gate') {
+        const gw = Math.max(def.w, def.d) * kRep; const alongZ = def.d > def.w; const yaw = it.yaw + (alongZ ? Math.PI / 2 : 0);
+        if (!this.putModel(def, lon, lat, hg, yaw, kRep, kRep, kRep, era, seed, mf, prog, camPos, pxPerRad)) return 0;
+        let n = 1; const side = def.sides ? MODELS.defs[def.sides] : null; const rest = (it.w - gw) / 2;
+        if (side && rest > gw * 0.2) { const cy = Math.cos(it.yaw), sy = Math.sin(it.yaw); for (const sgn of [-1, 1]) { const o = sgn * (gw / 2 + rest / 2); n += this.runModel(side, lon + o * cy / (R_M * cl * GEO.D2R), lat + o * sy / (R_M * GEO.D2R), hg, it.yaw, rest, kRep, cl, era, seed + sgn * 0.31, mf, prog, camPos, pxPerRad); } }
+        md[0] = it.w; md[1] = def.h * kRep; md[2] = Math.min(def.w, def.d) * kRep; md[3] = it.yaw; return n;
+      }
       // turn the model so its long side lies along the plot's long side
       const turn = (def.d > def.w * 1.2 && it.w > it.d * 1.2) || (def.w > def.d * 1.2 && it.d > it.w * 1.2);
       const pw = turn ? it.d : it.w, pd = turn ? it.w : it.d;
       let u;
       if (landmark || def.fit === 'box') u = Math.min(pw / def.w, pd / def.d);
       else { const f = Math.min(pw / (def.w * kRep), pd / (def.d * kRep)); u = kRep * Math.max(0.8, Math.min(1.25, f)); }
-      const yaw = it.yaw + (turn ? Math.PI / 2 : 0); this._myaw = yaw;
-      const m = this._m; const el = m.elements; const s = u / R_M;
-      const lo = lon * GEO.D2R, la = lat * GEO.D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
-      const Ex = -slo, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
-      const cy = Math.cos(yaw), sy = Math.sin(yaw);
-      const rr = 1 + Math.max(hg, 0) * this.exag / R_M;
-      el[0] = (cy * Ex + sy * Nx) * s; el[1] = (sy * Ny) * s; el[2] = (cy * Ez + sy * Nz) * s; el[3] = 0;
-      el[4] = Ux * s; el[5] = Uy * s; el[6] = Uz * s; el[7] = 0;
-      el[8] = (sy * Ex - cy * Nx) * s; el[9] = (-cy * Ny) * s; el[10] = (sy * Ez - cy * Nz) * s; el[11] = 0;
-      el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
-      const dx = camPos.x - el[12], dy = camPos.y - el[13], dz = camPos.z - el[14];
-      const px = def.h * s / Math.max(1e-9, Math.sqrt(dx * dx + dy * dy + dz * dz)) * pxPerRad;
-      const L = MODELS.lodFor(def, px); if (!L) return 0;
-      MODELS.push(L, m, era, seed, (flags & 16) ? 1 : 0, prog);
-      return u;
+      const yaw = it.yaw + (turn ? Math.PI / 2 : 0);
+      if (!this.putModel(def, lon, lat, hg, yaw, u, u, u, era, seed, mf, prog, camPos, pxPerRad)) return 0;
+      md[0] = def.w * u; md[1] = def.h * u; md[2] = def.d * u; md[3] = yaw; return 1;
     }
     // one instance matrix at lon/lat on ground height hg (metres): size w,h,d in drawn metres, krep = drawn/true scale for the shader's patterns
     setInst(im, idx, lon, lat, hg, wM, hM, dM, yaw, color, era, seed, style, krep, infoAttr) {
