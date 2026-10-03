@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#000}</style></head><body>
+<script src="three.min.js"></script><script src="geo.js"></script><script src="town.js"></script><script src="buildings.js"></script><script src="world.js"></script>
+<script>
+// ?lat=66&lon=25&heading=0&el=25&sun=-20&comet=1&t=100  — the sky dome alone, from a point on the surface
+const q = new URLSearchParams(location.search); const lat = +(q.get('lat') || 66), lon = +(q.get('lon') || 25), heading = +(q.get('heading') || 0) * Math.PI / 180, el = +(q.get('el') || 25) * Math.PI / 180, sunEl = +(q.get('sun') || -20), comet = +(q.get('comet') || 0), t = +(q.get('t') || 100);
+const W = innerWidth, H = innerHeight; const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); renderer.setSize(W, H); document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(60, W / H, 1e-6, 20);
+const world = new WORLD.World({ scene, terrain: { exag: 2, heightAt: () => 0 } });
+const f = GEO.enu(lon, lat); const pos = f.up.clone().multiplyScalar(1 + 300 / 6371000); camera.position.copy(pos);
+const dir = f.north.clone().multiplyScalar(Math.cos(heading)).add(f.east.clone().multiplyScalar(Math.sin(heading))).multiplyScalar(Math.cos(el)).add(f.up.clone().multiplyScalar(Math.sin(el)));
+camera.up.copy(f.up); camera.lookAt(pos.clone().add(dir)); camera.updateMatrixWorld();
+// a sun below the horizon on the far side of the sky
+const sun = GEO.toVec(lon + (+(q.get('sunOff') || 200)), +(q.get('sunDec') || -10)).normalize();   // the sun on the far side of the planet
+const cam = { alt: 300 / 6371000, lat, lon, camera };
+world.cometOn = comet > 0; world.cloudsOn = false;
+world.updateSky(cam, sun, t);
+if (q.get('aim') === 'moon') { let tt = t; for (let k = 0; k < 200; k++) { world.updateSky(cam, sun, tt); if (world.skyUniforms.uMoon.value.dot(f.up) > 0.3) break; tt += 40; } const m = world.skyUniforms.uMoon.value; camera.lookAt(pos.clone().add(m)); camera.updateMatrixWorld(); const cd = new THREE.Vector3(); camera.getWorldDirection(cd); console.error('dbg moonEl', m.dot(f.up).toFixed(3), 'camDirUp', cd.dot(f.up).toFixed(3), 'tt', tt, 'sunUp', sun.dot(f.up).toFixed(3)); }
+// ground disc so the horizon reads
+const g = new THREE.Mesh(new THREE.CircleGeometry(0.02, 64), new THREE.MeshBasicMaterial({ color: 0x0a0f08 })); g.position.copy(f.up); g.lookAt(f.up.clone().multiplyScalar(2)); scene.add(g);
+renderer.render(scene, camera); window.__ready = true;
+</script></body></html>

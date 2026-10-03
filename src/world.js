@@ -1,0 +1,268 @@
+// GENESIS world layer: sim textures, 3D settlements, labels, clouds, atmosphere. Classic script; exposes window.WORLD.
+(function () {
+  const R_M = 6371000, KM = 1 / 6371;
+  const W = 720, H = 360;
+  function hash(i, k) { let h = (i * 374761393 + k * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+
+  class World {
+    constructor(opts) {
+      this.scene = opts.scene; this.terrain = opts.terrain; this.sim = null; this.exag = opts.terrain.exag;
+      // sim textures
+      this.ownerData = new Uint8Array(W * H * 4); this.simData = new Uint8Array(W * H * 4); this.palData = new Uint8Array(512 * 4);
+      this.ownerTex = new THREE.DataTexture(this.ownerData, W, H, THREE.RGBAFormat); this.ownerTex.magFilter = this.ownerTex.minFilter = THREE.NearestFilter; this.ownerTex.wrapS = THREE.RepeatWrapping;
+      this.simTex = new THREE.DataTexture(this.simData, W, H, THREE.RGBAFormat); this.simTex.magFilter = this.simTex.minFilter = THREE.LinearFilter; this.simTex.wrapS = THREE.RepeatWrapping;
+      this.palTex = new THREE.DataTexture(this.palData, 512, 1, THREE.RGBAFormat); this.palTex.magFilter = this.palTex.minFilter = THREE.NearestFilter;
+      this.centroids = new Map(); // civ id -> {x,y,z,n}
+      // buildings
+      this.arche = BKIT.makeKit();
+      this.buildingGroup = new THREE.Group(); this.scene.add(this.buildingGroup);
+      this.inst = {}; const MAXI = BKIT.MAXI;
+      this.bUniforms = { uSunV: { value: new THREE.Vector3(0, 1, 0) }, uUpV: { value: new THREE.Vector3(0, 1, 0) }, uDay: { value: 1 }, uCamAlt: { value: 1 }, uTime: { value: 0 }, uMetres: { value: R_M }, uTexMix: { value: 0 } };
+      this.bMat = new THREE.ShaderMaterial({ uniforms: this.bUniforms, vertexShader: BKIT.VERT, fragmentShader: BKIT.FRAG });
+      this.textured = false;
+      this.info = {};
+      for (const k of Object.keys(this.arche)) {
+        const geo = this.arche[k];
+        if (!MAXI[k]) MAXI[k] = 500;
+        const info = new THREE.InstancedBufferAttribute(new Float32Array(MAXI[k] * 4), 4); info.setUsage(THREE.DynamicDrawUsage); geo.setAttribute('aInfo', info); this.info[k] = info;
+        const m = new THREE.InstancedMesh(geo, this.bMat, MAXI[k]); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        // allocate instance colours up front so the shader compiles with per-instance colour from the first frame
+        m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXI[k] * 3).fill(1), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        m.userData.kind = k; this.inst[k] = m; this.buildingGroup.add(m);
+      }
+      this.sunLight = new THREE.DirectionalLight(0xfff2dc, 1.4); this.scene.add(this.sunLight); this.scene.add(this.sunLight.target);
+      this.hemi = new THREE.HemisphereLight(0xbcd3f2, 0x5a4a3a, 0.9); this.scene.add(this.hemi);
+      this.lastBuild = { lon: 999, lat: 999, dist: 0, t: -1e9, tick: -1 }; this.htMaps = new Map();
+      this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._s = new THREE.Vector3(); this._p = new THREE.Vector3(); this._c = new THREE.Color();
+      this.buildingCount = 0;
+      this.initSky();
+    }
+    setSim(sim) { this.sim = sim; for (let i = 0; i < W * H; i++) this.simData[i * 4 + 3] = Math.min(255, Math.round(sim.fert[i] * 255)); this.refreshTextures(); }
+    // generated materials (textures.js): the building shader recompiles with the wall and roof texture arrays
+    setTextures(T, on = true) {
+      const u = this.bUniforms;
+      if (T && T.ready && on) {
+        const v3 = (arr) => { const out = []; for (let i = 0; i < 16; i++) out.push(new THREE.Vector3(arr[i * 3] || 0.5, arr[i * 3 + 1] || 0.5, arr[i * 3 + 2] || 0.5)); return out; };
+        u.uWallTex = { value: T.arrays.wall }; u.uRoofTex = { value: T.arrays.roof };
+        u.uWallM = { value: Array.from(T.scale.wall) }; u.uRoofM = { value: Array.from(T.scale.roof) };
+        u.uWallMean = { value: v3(T.mean.wall) }; u.uRoofMean = { value: v3(T.mean.roof) };
+        u.uTexMix.value = 1; this.bMat.defines = { USE_TEXARR: 1 }; this.textured = true;
+      } else { u.uTexMix.value = 0; this.bMat.defines = {}; this.textured = false; }
+      this.bMat.needsUpdate = true;
+    }
+    refreshTextures() {
+      const sim = this.sim; if (!sim) return;
+      const civs = sim.civs, owner = sim.owner, pop = sim.pop, player = sim.player; const pc = sim.playerCiv();
+      const od = this.ownerData, sd = this.simData; const cents = this.centroids; cents.clear();
+      const cosLat = new Float32Array(H), sinLat = new Float32Array(H); for (let y = 0; y < H; y++) { const la = (90 - (y + 0.5) / H * 180) * GEO.D2R; cosLat[y] = Math.cos(la); sinLat[y] = Math.sin(la); }
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = y * W + x, j = i * 4; const o = owner[i]; const c = o >= 0 ? civs[o] : null;
+        if (c) {
+          od[j] = o & 255; od[j + 1] = o >> 8; od[j + 2] = o === player ? 153 : (pc && sim.isAtWar(pc, o) ? 77 : 255); od[j + 3] = 255;
+          let ct = cents.get(o); if (!ct) { ct = { x: 0, y: 0, z: 0, n: 0 }; cents.set(o, ct); }
+          const lo = ((x + 0.5) / W * 360 - 180) * GEO.D2R; ct.x += cosLat[y] * Math.cos(lo); ct.y += sinLat[y]; ct.z += -cosLat[y] * Math.sin(lo); ct.n++;
+        } else { od[j] = 0; od[j + 1] = 0; od[j + 2] = 0; od[j + 3] = 0; }
+        const p = pop[i]; let light = 0;
+        if (p > 0.2) { const t = c ? c.tech : 0; light = Math.min(1, Math.log10(p + 1) * (0.12 + t * 0.55)); if (t < 0.12) light *= 0.35; }
+        sd[j] = light * 255; sd[j + 1] = (c ? c.tech : 0) * 255; sd[j + 2] = c ? Math.round(sim.cultivation(i) * 255 * (sim.level[i] ? 1 : 0.6)) : 0;
+      }
+      for (const c of civs) if (c) { const rgb = c.rgb; this.palData[c.id * 4] = rgb[0] * 255; this.palData[c.id * 4 + 1] = rgb[1] * 255; this.palData[c.id * 4 + 2] = rgb[2] * 255; this.palData[c.id * 4 + 3] = 255; }
+      this.ownerTex.needsUpdate = true; this.simTex.needsUpdate = true; this.palTex.needsUpdate = true;
+      this.texVersion = (this.texVersion || 0) + 1;
+    }
+    // ---------- buildings ----------
+    // Settlements are laid out once at true scale by TOWN (metres from the centre) and cached; each rebuild only
+    // turns the cached plan into instance matrices for the towns near the camera. Far towns get the coarse plan
+    // (landmarks, walls and one instance per block); towns beyond ~70 km are only their label and ground decal.
+    updateBuildings(cam, force) {
+      const sim = this.sim; if (!sim) { return; }
+      const dist = cam.dist; const now = performance.now();
+      const show = dist < 0.12;   // towns are drawn at strategy-map scale, so they read from ~750 km up
+      if (!show) { if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; } return; }
+      const moved = GEO.distKm(cam.lon, cam.lat, this.lastBuild.lon, this.lastBuild.lat) > Math.max(0.15, dist * 6371 * 0.12);
+      const stale = now - this.lastBuild.t > 1500 || this.lastBuild.tex !== this.texVersion;
+      if (!force && !moved && !stale && Math.abs(Math.log(dist / (this.lastBuild.dist || 1))) < 0.15) return;
+      this.lastBuild = { lon: cam.lon, lat: cam.lat, dist, t: now, tex: this.texVersion };
+      const T = this.terrain; const counts = {}; for (const k in this.inst) counts[k] = 0;
+      const casters = this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1;
+      const rad = Math.max(3, Math.min(12, Math.ceil(dist * 6371 / 55) + 1)); // cells (0.5 deg ~ 55 km)
+      const cy0 = Math.floor((90 - cam.lat) / 180 * H), cx0 = Math.floor((cam.lon + 180) / 360 * W);
+      const exag = this.exag; const m = this._m; const el = m.elements;
+      const packsE = T.stats ? T.stats.packsE : 0; void packsE;
+      let total = 0; const TOTAL_MAX = 70000; let nCasters = 0; const sites = this.sites = []; const SITE_MAX = 60;
+      // settlements nearest the camera first, so the town you are looking at always gets its full budget
+      const cells = [];
+      for (let dy = -rad; dy <= rad; dy++) {
+        const y = cy0 + dy; if (y < 0 || y >= H) continue;
+        const cl = Math.max(0.15, Math.cos((90 - (y + 0.5) / H * 180) * GEO.D2R)); const rx = Math.ceil(rad / cl);
+        for (let dx = -rx; dx <= rx; dx++) { const x = ((cx0 + dx) % W + W) % W; const i = y * W + x; if (!sim.level[i] || sim.owner[i] < 0) continue; const c = sim.civs[sim.owner[i]]; if (!c) continue; const [cLon, cLat] = this.siteOf(i); cells.push([GEO.distKm(cam.lon, cam.lat, cLon, cLat), i, cLon, cLat, cl, c]); }
+      }
+      cells.sort((a, b) => a[0] - b[0]);
+      for (const [dKm, i, cLon, cLat, cl, c] of cells) {
+        if (total >= TOTAL_MAX) break;
+        const R = TOWN.radiusM(sim, i, c); const Rk = R / 1000;
+        if (dKm - Rk > 520) continue;
+        const coarse = dKm - Rk > 150;
+        const L = TOWN.layout(sim, i, c, { coarse });
+        const items = L.items; const n = items.length;
+        // per-plan caches: ground heights (refreshed when finer elevation arrives) and river masks (once)
+        if (!L.hts || L.meshV !== T.meshVersion || L.dispOn !== T.dispOn) {
+          // ground heights per item; a town re-planned while it grows keeps the heights of the plots it already had
+          let hm = this.htMaps.get(i); if (!hm || hm.meshV !== T.meshVersion || hm.dispOn !== T.dispOn) { hm = { meshV: T.meshVersion, dispOn: T.dispOn, map: new Map() }; this.htMaps.set(i, hm); if (this.htMaps.size > 300) this.htMaps.delete(this.htMaps.keys().next().value); }
+          L.hts = new Float32Array(n); L.meshV = T.meshVersion; L.dispOn = T.dispOn; const vc = new Map(); const hmap = hm.map;
+          for (let k = 0; k < n; k++) { const it = items[k]; const key = ((it.x * 0.2) | 0) * 100003 + ((it.z * 0.2) | 0); let h = hmap.get(key); if (h === undefined) { h = T.meshHeightAt(cLon + it.x / (R_M * cl * GEO.D2R), cLat + it.z / (R_M * GEO.D2R), vc); if (hmap.size < 40000) hmap.set(key, h); } L.hts[k] = h; }
+        }
+        if ((!L.mask || L.maskI !== T.stats.packsI) && this.decal && this.decal.rivers && this.decal.rivers.length) { L.mask = new Uint8Array(n); L.maskI = T.stats.packsI; for (let k = 0; k < n; k++) { const it = items[k]; const lo = cLon + it.x / (R_M * cl * GEO.D2R), la = cLat + it.z / (R_M * GEO.D2R); const afloat = it.kind === 'pier' || it.kind === 'boat' || it.kind === 'ship'; if (!afloat && T.isWater(lo, la)) { L.mask[k] = 1; continue; } const rv = this.decal.nearestRiver(lo, la); if (rv && rv.d < rv.hw + Math.max(it.w, it.d) * 0.5 + 4 && !afloat) L.mask[k] = 1; } }
+        const mask = L.mask; const hts = L.hts;
+        const era = c.era; const seed = (i % 997) / 997; const kRep = L.k || 1;
+        const wantCasters = dKm < 40 && !coarse;
+        for (let k = 0; k < n; k++) {
+          if (mask && mask[k]) continue;
+          const it = items[k]; const im = this.inst[it.kind]; if (!im) continue;
+          const idx = counts[it.kind]; if (idx >= im.instanceMatrix.count) continue;
+          const lon = cLon + it.x / (R_M * cl * GEO.D2R), lat = cLat + it.z / (R_M * GEO.D2R);
+          const hg = hts[k]; if (hg < 0.5 && it.kind !== 'pier' && it.kind !== 'boat' && it.kind !== 'ship') continue;
+          const prog = it.prog === undefined ? 1 : it.prog;
+          if (prog < 1) {
+            // a building site: the walls up to the current height in bare material, scaffolding around them, a crane in later ages
+            const hf = Math.max(0.08, prog); const raw = (1 - prog) * 0.5;
+            const col = ((Math.round(((it.color >> 16) & 255) * (1 - raw) + 0x9a * raw)) << 16) | ((Math.round(((it.color >> 8) & 255) * (1 - raw) + 0x8f * raw)) << 8) | Math.round((it.color & 255) * (1 - raw) + 0x80 * raw);
+            this.setInst(im, idx, lon, lat, hg, it.w, it.h * hf, it.d, it.yaw, col, era, seed + k * 0.013, it.style + (prog < 0.95 ? 32 * 1024 : 0), kRep); counts[it.kind] = idx + 1; total++;
+            if (prog > 0.05 && prog < 0.97) {
+              const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count) { this.setInst(sc, si, lon, lat, hg, it.w * 1.12, it.h * Math.min(1, prog + 0.3) * 1.03, it.d * 1.12, it.yaw, era >= 6 ? 0x8f949a : 0x8a6a44, era, seed + k * 0.013, TOWN.packStyle(era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; }
+              if (era >= 6 && it.h > 25 * kRep && prog < 0.9) { const cr = this.inst.crane; const ci = counts.crane; if (cr && ci < cr.instanceMatrix.count) { this.setInst(cr, ci, cLon + (it.x + it.w * 0.75) / (R_M * cl * GEO.D2R), lat, hg, 6 * kRep, it.h * 1.25 + 12 * kRep, 6 * kRep, it.yaw, 0xd9552f, era, seed, TOWN.packStyle(5, 3, 0, 0), kRep); counts.crane = ci + 1; total++; } }
+              if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: it.w, d: it.d, k: kRep, prog, era });
+            }
+            continue;
+          }
+          this.setInst(im, idx, lon, lat, hg, it.w, it.h, it.d, it.yaw, it.color, era, seed + k * 0.013, it.style, kRep);
+          counts[it.kind] = idx + 1; total++;
+          if (wantCasters && nCasters < 5000 && it.h > 3 * kRep && it.kind !== 'lamp' && it.kind !== 'pier') { casters.push(lon, lat, it.w, it.h, it.d, it.yaw); nCasters++; }
+        }
+      }
+      // ruins: the dead towns of the region, as long as something still stands
+      if (sim.ruins && sim.ruins.size) {
+        for (const [i, ru] of sim.ruins) {
+          if (total >= TOTAL_MAX) break;
+          const y = (i / W) | 0, x = i - y * W; if (Math.abs(y - cy0) > rad) continue; let dx = Math.abs(x - cx0); if (dx > W / 2) dx = W - dx; if (dx > rad * 2.2) continue;
+          const [cLon, cLat] = this.siteOf(i); const cl = Math.max(0.15, Math.cos(cLat * GEO.D2R)); const dKm = GEO.distKm(cam.lon, cam.lat, cLon, cLat); if (dKm > 60) continue;
+          const L = TOWN.ruinLayout(i, ru, sim); const items = L.items; const n = items.length;
+          if (!L.hts || L.meshV !== T.meshVersion) { L.hts = new Float32Array(n); L.meshV = T.meshVersion; const vc = new Map(); for (let k = 0; k < n; k++) { const it = items[k]; L.hts[k] = T.meshHeightAt(cLon + it.x / (R_M * cl * GEO.D2R), cLat + it.z / (R_M * GEO.D2R), vc); } }
+          const era = ru.era || 0; const seed = (i % 991) / 991;
+          for (let k = 0; k < n; k++) {
+            const it = items[k]; const im = this.inst[it.kind]; if (!im) continue; const idx = counts[it.kind]; if (idx >= im.instanceMatrix.count) continue;
+            const lon = cLon + it.x / (R_M * cl * GEO.D2R), lat = cLat + it.z / (R_M * GEO.D2R); const hg = L.hts[k]; if (hg < 0.5) continue;
+            this.setInst(im, idx, lon, lat, hg, it.w, it.h, it.d, it.yaw, it.color, era, seed + k * 0.013, it.style, L.k || 1); counts[it.kind] = idx + 1; total++;
+          }
+        }
+      }
+      for (const k in this.inst) { const im = this.inst[k]; im.count = counts[k]; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; this.info[k].needsUpdate = true; }
+      this.buildingCount = total;
+    }
+    // one instance matrix at lon/lat on ground height hg (metres): size w,h,d in drawn metres, krep = drawn/true scale for the shader's patterns
+    setInst(im, idx, lon, lat, hg, wM, hM, dM, yaw, color, era, seed, style, krep, infoAttr) {
+      const m = this._m; const el = m.elements; const exag = this.exag;
+      const sink = Math.min(hM * 0.3, 0.35 + 0.06 * Math.max(wM, dM));
+      const lo = lon * GEO.D2R, la = lat * GEO.D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
+      const Ex = -slo, Ey = 0, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw); const w = wM / R_M, h = hM / R_M, d = dM / R_M;
+      const Xx = (cy * Ex + sy * Nx) * w, Xy = (cy * Ey + sy * Ny) * w, Xz = (cy * Ez + sy * Nz) * w;
+      const Zx = (sy * Ex - cy * Nx) * d, Zy = (sy * Ey - cy * Ny) * d, Zz = (sy * Ez - cy * Nz) * d;
+      const rr = 1 + (Math.max(hg, 0) * exag - sink) / R_M;
+      el[0] = Xx; el[1] = Xy; el[2] = Xz; el[3] = 0; el[4] = Ux * h; el[5] = Uy * h; el[6] = Uz * h; el[7] = 0; el[8] = Zx; el[9] = Zy; el[10] = Zz; el[11] = 0; el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
+      im.setMatrixAt(idx, m);
+      const ca = im.instanceColor.array; ca[idx * 3] = ((color >> 16) & 255) / 255; ca[idx * 3 + 1] = ((color >> 8) & 255) / 255; ca[idx * 3 + 2] = (color & 255) / 255;
+      const ia = infoAttr || this.info[im.userData.kind]; if (ia) ia.setXYZW(idx, era, seed, style, krep || 1);
+    }
+    // the older entry point (events, movers): a plan item
+    placeInstance(im, idx, lon, lat, hg, it, era, seed, infoAttr) { this.setInst(im, idx, lon, lat, hg, it.w, it.h, it.d, it.yaw, it.color, era, seed, it.style, it.k || 1, infoAttr); }
+    siteOf(i) { const sim = this.sim; const c = sim.civs[sim.owner[i]]; return TOWN.siteOf(sim, i, c, this.terrain, this.decal); }
+    // ---------- sky / clouds / atmosphere ----------
+    initSky() {
+      const scene = this.scene;
+      { // stars
+        const n = 3000; const pos = new Float32Array(n * 3); const col = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) { const r = 60; const t = Math.random() * Math.PI * 2, p = Math.acos(Math.random() * 2 - 1); pos[i * 3] = r * Math.sin(p) * Math.cos(t); pos[i * 3 + 1] = r * Math.cos(p); pos[i * 3 + 2] = r * Math.sin(p) * Math.sin(t); const b = 0.45 + Math.random() * 0.55; const w = Math.random(); col[i * 3] = b * (0.8 + w * 0.2); col[i * 3 + 1] = b * (0.85 + w * 0.15); col[i * 3 + 2] = b; }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        this.stars = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.5, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.9, depthWrite: false })); scene.add(this.stars);
+      }
+      this.atmoUniforms = { uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamAlt: { value: 1 } };
+      this.atmo = new THREE.Mesh(new THREE.SphereGeometry(1.03, 96, 64), new THREE.ShaderMaterial({
+        uniforms: this.atmoUniforms, side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+        vertexShader: `varying vec3 vN; varying vec3 vP; void main(){ vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vP = mv.xyz; gl_Position = projectionMatrix*mv; }`,
+        fragmentShader: `uniform vec3 uSun; uniform float uCamAlt; varying vec3 vN; varying vec3 vP; void main(){ vec3 v = normalize(-vP); float rim = pow(max(dot(normalize(vN), v), 0.0), 2.4); vec3 s = normalize((viewMatrix*vec4(uSun,0.0)).xyz); float lit = 0.25 + 0.75*max(dot(-normalize(vN), s), 0.0); float k = smoothstep(0.0, 0.08, uCamAlt); gl_FragColor = vec4(vec3(0.32,0.56,1.0)*rim*lit*0.95*k, rim*0.9*k); }`,
+      })); scene.add(this.atmo);
+      // clouds
+      const cl = new THREE.TextureLoader().load('data/clouds.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; this.cloudTex = t; });
+      this.cloudTex = null; this.cloudShift = 0; this.cloudVis = 0;
+      this.cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaMap: cl, transparent: true, opacity: 0.55, depthWrite: false });
+      this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.004, 128, 80), this.cloudMat); this.clouds.rotation.y = Math.PI; scene.add(this.clouds);
+      this.cloudsOn = true;
+      // sky dome for low altitudes (camera-centred, drawn behind everything)
+      this.skyUniforms = { uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamPos: { value: new THREE.Vector3() }, uAlpha: { value: 0 }, uMoon: { value: new THREE.Vector3(0, 1, 0) }, uTime: { value: 0 }, uComet: { value: 0 }, uLat: { value: 0 } };
+      this.sky = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.ShaderMaterial({
+        uniforms: this.skyUniforms, side: THREE.BackSide, transparent: false, depthWrite: false, depthTest: false, blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation,
+        vertexShader: `varying vec3 vW; void main(){ vW = (modelMatrix*vec4(position,1.0)).xyz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+        fragmentShader: `uniform vec3 uSun, uCamPos, uMoon; uniform float uAlpha, uTime, uComet, uLat; varying vec3 vW;
+          float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+          float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
+          void main(){
+            vec3 dir = normalize(vW - uCamPos); vec3 up = normalize(uCamPos); vec3 sun = normalize(uSun);
+            float el = dot(dir, up); float t = clamp(el, 0.0, 1.0);
+            vec3 zenith = vec3(0.16, 0.36, 0.78), horizon = vec3(0.70, 0.80, 0.92);
+            vec3 sky = mix(horizon, zenith, pow(t, 0.55));
+            sky = mix(sky, horizon * 0.92, smoothstep(0.0, -0.12, el));
+            float sd = max(dot(dir, sun), 0.0);
+            sky += vec3(1.0, 0.86, 0.62) * (pow(sd, 400.0) * 2.2 + pow(sd, 10.0) * 0.14);
+            float sunEl = dot(sun, up);
+            float dusk = smoothstep(0.35, 0.0, sunEl) * smoothstep(-0.2, 0.02, sunEl);
+            sky = mix(sky, vec3(0.96, 0.56, 0.3), dusk * pow(sd, 3.0) * (1.0 - t) * 0.85);
+            float day = smoothstep(-0.12, 0.2, sunEl);
+            vec3 col = mix(vec3(0.01, 0.015, 0.035), sky, day);
+            float night = 1.0 - day; vec3 add = vec3(0.0);
+            // stars: a hashed field fixed to the world, fading out in daylight and near the horizon haze
+            { vec2 sc = vec2(atan(dir.z, dir.x) * 38.0, asin(clamp(dir.y, -1.0, 1.0)) * 38.0); vec2 cell = floor(sc); vec2 f = fract(sc) - 0.5; float hs = h21(cell); vec2 o = vec2(h21(cell + 3.1), h21(cell + 7.7)) - 0.5; float dd = length(f - o * 0.8); float mag = smoothstep(0.962, 1.0, hs); float st = smoothstep(0.16, 0.0, dd) * mag * mag * (0.7 + 0.3 * sin(uTime * 2.0 + hs * 60.0)); add += mix(vec3(1.0, 0.9, 0.8), vec3(0.8, 0.88, 1.0), h21(cell + 1.3)) * st * night * smoothstep(0.0, 0.12, el) * 3.0; }
+            // the moon: a lit disc with a soft halo, phase from its angle to the sun
+            vec3 moon = normalize(uMoon); float md = dot(dir, moon);
+            if (md > 0.9994) { vec3 e = normalize(cross(moon, up)); vec3 n2 = normalize(cross(e, moon)); vec3 off = dir - moon * md; vec2 uv = vec2(dot(off, e), dot(off, n2)) / 0.0346; float r2 = dot(uv, uv); if (r2 < 1.0) { vec3 nrm = vec3(uv, sqrt(1.0 - r2)); vec3 toSun = normalize(vec3(dot(sun, e), dot(sun, n2), dot(sun, moon))); float lit = max(dot(nrm, toSun), 0.0); float mare = 0.75 + 0.25 * vn(uv * 4.0 + 7.0); add += vec3(0.93, 0.93, 0.9) * mare * (0.22 + 1.1 * lit) * (1.0 - smoothstep(0.92, 1.0, r2)) * (0.5 + 0.5 * night); } }
+            add += vec3(0.8, 0.85, 0.95) * pow(max(md, 0.0), 600.0) * 0.25 * night;
+            // aurora: curtains to the pole on clear nights at high latitude
+            float auroraLat = smoothstep(52.0, 66.0, abs(uLat));
+            if (auroraLat > 0.0 && night > 0.3) {
+              vec3 northish = normalize(vec3(0.0, 1.0, 0.0) - up * up.y); if (uLat < 0.0) northish = -northish;
+              float toward = dot(dir, northish); float band = smoothstep(0.08, 0.3, el) * (1.0 - smoothstep(0.45, 0.8, el)) * smoothstep(-0.2, 0.5, toward);
+              vec3 e = normalize(cross(northish, up)); float az = atan(dot(dir, e), toward);
+              float curtain = vn(vec2(az * 6.0 + uTime * 0.05, el * 3.0 - uTime * 0.02)) * vn(vec2(az * 23.0 - uTime * 0.11, 1.7)) ;
+              curtain = pow(curtain, 1.4) * band * auroraLat * night;
+              add += mix(vec3(0.1, 0.9, 0.45), vec3(0.6, 0.25, 0.8), smoothstep(0.35, 0.6, el)) * curtain * 3.2;
+            }
+            // a comet, when the chronicle says one hangs in the sky
+            if (uComet > 0.0) { vec3 eastW = normalize(cross(vec3(0.0, 1.0, 0.0), up)); vec3 northW = cross(up, eastW); vec3 cdir = normalize(up * 0.55 + eastW * 0.6 - northW * 0.5); float cd = dot(dir, cdir); vec3 tail = normalize(-sun - cdir * dot(-sun, cdir)); vec3 perp = dir - cdir * cd; float along = dot(perp, tail); float side = length(perp - tail * along); float tl = smoothstep(0.0, 0.02, along) * (1.0 - smoothstep(0.05, 0.34, along)); float width = 0.006 + along * 0.12; float coma = pow(max(cd, 0.0), 4000.0) * 3.0 + pow(max(cd, 0.0), 300.0) * 0.5; float tailG = exp(-pow(side / width, 2.0)) * tl * (0.55 + 0.45 * vn(vec2(along * 40.0, side * 80.0 + uTime * 0.1))); add += vec3(0.85, 0.95, 1.0) * (coma + tailG) * uComet * (0.25 + 0.75 * night); }
+            col += add; float lumAdd = dot(add, vec3(0.33));
+            gl_FragColor = vec4(col, uAlpha * clamp(0.2 + 0.8 * day + lumAdd * 3.0, 0.0, 1.0)); }`,
+      }));
+      this.sky.renderOrder = -5; this.sky.frustumCulled = false; this.sky.visible = false; scene.add(this.sky);
+    }
+    updateSky(cam, sun, time) {
+      this.atmoUniforms.uSun.value.copy(sun); this.atmoUniforms.uCamAlt.value = cam.alt || 1;
+      this.clouds.rotation.y = Math.PI + time * 0.0012; this.cloudShift = time * 0.0012;
+      const fade = Math.min(1, Math.max(0, (cam.alt - 0.006) / 0.02));
+      this.cloudMat.opacity = 0.55 * fade; this.clouds.visible = this.cloudsOn && fade > 0.01; this.cloudVis = this.cloudsOn ? 1 : 0;
+      const skyA = Math.min(1, Math.max(0, (0.06 - cam.alt) / 0.04));
+      this.sky.visible = skyA > 0.01; this.skyUniforms.uAlpha.value = skyA; this.skyUniforms.uSun.value.copy(sun);
+      // the moon circles the sky once a game-month, offset from the sun so phases run their course
+      { const a = time * 0.0025; const ax = new THREE.Vector3(0.06, 1, 0.04).normalize(); this.skyUniforms.uMoon.value.copy(sun).applyAxisAngle(ax, 2.6 + a).normalize(); this.skyUniforms.uTime.value = time; this.skyUniforms.uLat.value = cam.lat; this.skyUniforms.uComet.value = this.cometOn ? 1 : 0; }
+      this.sky.position.copy(cam.camera.position); this.sky.scale.setScalar(Math.max(cam.camera.near * 50, cam.camera.far * 0.4)); this.skyUniforms.uCamPos.value.copy(cam.camera.position); this.sky.updateMatrixWorld();
+      const camUp0 = cam.camera.position.clone().normalize(); const dayHere = Math.min(1, Math.max(0, (camUp0.dot(sun) + 0.12) / 0.32));
+      this.stars.material.opacity = 0.9 * (1 - skyA * dayHere);
+      // lights follow the sun; hemisphere dims at night for the camera's local sun elevation
+      this.sunLight.position.copy(sun).multiplyScalar(10); this.sunLight.target.position.set(0, 0, 0);
+      const camUp = cam.camera.position.clone().normalize(); const sunUp = camUp.dot(sun);
+      const day = Math.min(1, Math.max(0, (sunUp + 0.15) / 0.4));
+      { const bu = this.bUniforms; const vm = cam.camera.matrixWorldInverse; bu.uSunV.value.copy(sun).transformDirection(vm); bu.uUpV.value.copy(camUp).transformDirection(vm); bu.uDay.value = Math.min(1, Math.max(0, (sunUp + 0.1) / 0.35)); bu.uCamAlt.value = cam.alt || 1; bu.uTime.value = time; }
+      this.sunLight.intensity = 1.5 * day; this.hemi.intensity = 0.25 + 0.8 * day;
+      return day;
+    }
+  }
+  window.WORLD = { World };
+})();

@@ -1,0 +1,17 @@
+{
+  "name": "genesis",
+  "productName": "GENESIS",
+  "version": "0.10.0",
+  "private": true,
+  "description": "GENESIS — a god-game on the real Earth, from 10,000 BC",
+  "main": "desktop/main.js",
+  "scripts": {
+    "build": "node tools/build.js",
+    "test": "node tools/build.js && ONLY=2,7 node tools/test_sim.js",
+    "test:e2e": "node tools/build.js && node tools/test_e2e.js",
+    "start": "node tools/build.js && electron ."
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0"
+  }
+}
