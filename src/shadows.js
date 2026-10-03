@@ -84,7 +84,9 @@
       S.drawn++; S.stats.draws = swapped.length / 2; S.stats.half = half; redrawn = true;
       P.w = texel; P.z = 1.1 / S.size;                                   // about three texels' worth of depth (the map's depth spans 5.85 x half)
     }
-    // view space -> the map's clip space, composed in double precision
+    // view space -> the map's clip space, composed in double precision. The camera has just been moved for this frame
+    // and the renderer has not seen it yet: bring its matrix up to date first, or the shadows trail a frame behind it.
+    camera.updateMatrixWorld();
     S.uniforms.uShadowMat.value.multiplyMatrices(S.cam.projectionMatrix, S._m.multiplyMatrices(S.cam.matrixWorldInverse, camera.matrixWorld));
     P.x = 1;
     return redrawn;

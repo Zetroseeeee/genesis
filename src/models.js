@@ -106,7 +106,7 @@
     ready: false, failed: false, defs: {}, byKind: {}, base: 'data/models/', group: null, shared: null, loader: null,
     // pixel heights at which each LOD takes over (l0 above the first, l1 above the second, ...)
     lodPx: [520, 190, 60, 18, 0], lodBias: 1, maxLoads: 6, loading: 0, queue: [], dirty: false, anisotropy: 8,
-    stats: { instances: 0, tris: 0, draws: 0, loaded: 0 }, VERT, FRAG,
+    stats: { instances: 0, tris: 0, draws: 0, loaded: 0 }, sig: 0, VERT, FRAG,
   };
 
   // shared: { uSunV, uUpV, uDay, uCamAlt, uTime } uniform objects (the world's own, so one update lights everything)
@@ -216,10 +216,15 @@
     for (let k = want - 1; k >= 0; k--) if (def.lods[k].state === 'ready') return def.lods[k];
     return null;
   };
-  M.begin = function () { for (const id in M.defs) for (const L of M.defs[id].lods) L.count = 0; };
+  // true while a model has nothing to show yet but its files are on their way: the plot stays bare for that moment
+  // rather than showing a stand-in from another age
+  M.pending = function (def) { let loading = false; for (const L of def.lods) { if (L.state === 'ready') return false; if (L.state === 'loading') loading = true; } return loading; };
+  M.begin = function () { for (const id in M.defs) for (const L of M.defs[id].lods) L.count = 0; M.sig = 0; };
   M.push = function (L, matrix, era, seed, flags, prog) {
     if (L.count >= L.cap) { const old = L.mesh, oi = L.info; grow(L, L.cap * 2); L.mesh.instanceMatrix.array.set(old.instanceMatrix.array); L.info.array.set(oi.array); }
     L.mesh.setMatrixAt(L.count, matrix); L.info.setXYZW(L.count, era, seed, flags || 0, prog === undefined ? 1 : prog); L.count++;
+    // a running signature of everything placed: what stands where, at which level of detail and how far built (the shadow map is redrawn only when it changes)
+    const e = matrix.elements; M.sig = Math.imul(M.sig ^ ((e[12] * 1e9) | 0), 16777619) ^ ((e[13] * 1e9) | 0); M.sig = Math.imul(M.sig ^ ((e[14] * 1e9) | 0), 16777619) ^ ((e[5] * 1e12) | 0) ^ (L.k << 20) ^ (((prog === undefined ? 1 : prog) * 1000) | 0);
   };
   M.end = function () {
     let inst = 0, tris = 0, draws = 0;

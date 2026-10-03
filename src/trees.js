@@ -73,11 +73,15 @@
     }`;
   const IMP_FRAG = `
     precision highp float;
-    uniform sampler2D uImp; uniform vec3 uSunV, uUpV; uniform float uDay, uCamAlt, uUnits;
+    uniform sampler2D uImp; uniform vec2 uImpSize; uniform vec3 uSunV, uUpV; uniform float uDay, uCamAlt, uUnits;
     varying vec2 vUv; varying vec3 vCol, vView, vNrm, vMid;
     ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
     void main() {
-      vec4 t = texture2D(uImp, vUv); if (t.a < 0.42) discard;
+      vec4 t = texture2D(uImp, vUv);
+      // a small picture of a tree averages its twigs and leaf edges thin: lower the bar as the picture shrinks, so a
+      // distant crown keeps its body and a winter tree its branches
+      vec2 px = vUv * uImpSize; float lod = max(0.0, 0.5 * log2(max(dot(dFdx(px), dFdx(px)), dot(dFdy(px), dFdy(px))) + 1e-8));
+      if (t.a * (1.0 + lod * 0.3) < 0.42) discard;
       vec3 col = t.rgb * vCol; vec3 n = normalize(vNrm);
       float sky = 0.5 + 0.5 * dot(n, uUpV);
       float diff = 0.45 + 0.55 * max(dot(n, uSunV), 0.0) + 0.25 * max(dot(uUpV, uSunV), 0.0);     // the photograph is already softly lit: the sun adds a bright side
@@ -199,9 +203,9 @@
       let I = this.imps[ti].get(def.id); if (I) return I;
       const card = MODELS.card(def); if (!card) return null;
       const sh = MODELS.shared; const g = new THREE.PlaneGeometry(1, 1); g.translate(0, 0.5, 0);
-      const uniforms = { uImp: { value: card.tex }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units } };
+      const uniforms = { uImp: { value: card.tex }, uImpSize: { value: new THREE.Vector2(card.tex.image ? card.tex.image.width : 1024, card.tex.image ? card.tex.image.height : 1024) }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units } };
       if (window.SHADOWS) Object.assign(uniforms, SHADOWS.uniforms);
-      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide });   // a mirrored card is wound the other way
+      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide, extensions: { derivatives: true } });   // a mirrored card is wound the other way
       I = new THREE.InstancedMesh(g, mat, TIERS[ti].max); I.count = 0; I.frustumCulled = false; I.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       I.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(TIERS[ti].max * 3).fill(1), 3); I.instanceColor.setUsage(THREE.DynamicDrawUsage);
       I.userData.aspect = card.aspect; this.scene.add(I); this.imps[ti].set(def.id, I);

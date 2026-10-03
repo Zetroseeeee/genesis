@@ -38,7 +38,10 @@
   // ---------- renderer ----------
   const stage = $('stage');
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
-  if (window.SHADOWS) SHADOWS.init(renderer, 4096);
+  if (window.SHADOWS) {      // the sun's depth map: 4096 texels across on a real GPU, a quarter of that when the browser is drawing in software
+    let soft = false; try { const gl = renderer.getContext(); const x = gl.getExtension('WEBGL_debug_renderer_info'); soft = /SwiftShader|llvmpipe|Software/i.test(String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))); } catch (e) {}
+    SHADOWS.init(renderer, window.GENESIS_SHADOW || (soft ? 1024 : 4096));
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.setClearColor(0x05070c, 1);

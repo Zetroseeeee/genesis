@@ -162,7 +162,7 @@
   const LANDMARK = {
     med: ['menhirs', 'ziggurat', 'temple', 'cathedral', 'basilica', 'station', 'stadium', 'spire'],
     north: ['menhirs', 'menhirs', 'temple', 'cathedral', 'palace', 'station', 'stadium', 'spire'],
-    east: ['menhirs', 'hall', 'hall', 'onion', 'onion', 'station', 'stadium', 'spire'],
+    east: ['menhirs', 'menhirs', 'hall', 'onion', 'onion', 'station', 'stadium', 'spire'],
     mena: ['menhirs', 'ziggurat', 'ziggurat', 'mosque', 'mosque', 'station', 'stadium', 'spire'],
     africa: ['menhirs', 'menhirs', 'stepped', 'mudmosque', 'mudmosque', 'station', 'stadium', 'spire'],
     sasia: ['menhirs', 'stupa', 'stupa', 'shikhara', 'mosque', 'station', 'stadium', 'spire'],
@@ -176,7 +176,7 @@
     north: ['menhirs', 'menhirs', 'menhirs', 'colosseum', 'cathedral', 'palace', 'crystal', 'stadium', 'spire'],
     east: ['menhirs', 'menhirs', 'hall', 'hall', 'onion', 'palace', 'irontower', 'stadium', 'spire'],
     mena: ['menhirs', 'pyramid', 'ziggurat', 'lighthouse', 'mosque', 'mosque', 'crystal', 'stadium', 'spire'],
-    africa: ['menhirs', 'pyramid', 'stepped', 'stepped', 'mudmosque', 'mudmosque', 'crystal', 'stadium', 'spire'],
+    africa: ['menhirs', 'pyramid', 'pyramid', 'stepped', 'mudmosque', 'mudmosque', 'crystal', 'stadium', 'spire'],
     sasia: ['menhirs', 'stupa', 'stupa', 'stupa', 'shikhara', 'tajmosque', 'crystal', 'stadium', 'spire'],
     easia: ['menhirs', 'hall', 'hall', 'pagoda', 'pagoda', 'hall', 'irontower', 'stadium', 'spire'],
     seasia: ['menhirs', 'hall', 'stepped', 'stepped', 'stepped', 'stupa', 'crystal', 'stadium', 'spire'],
@@ -399,11 +399,13 @@
       const yaw = -(d.a + Math.PI / 2);
       const head = push(main, d.x, d.z, mainSize[0], mainSize[1], mainSize[2], yaw, mainCol, packStyle(wm, rm, cul, FLAG.landmark), 0, d.prog);
       if (coarse || d.prog < 0.75) return head;
-      for (let k = 0; k < nSup; k++) { const a = d.a + (k / nSup) * Math.PI * 2 + 0.5; const rr = d.rad * 1.15 + s * 0.4; const e = pickW(houses, rnd(700 + k)); push(support || e[0], d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, s * 0.6, heightOf(e[0], 0.3) * 0.9, s * 0.6, yaw + (rnd(720 + k) - 0.5), colorOf(730 + k), packStyle(e[2], e[3], cul, 0), 0, d.prog < 1 ? clamp((d.prog - 0.75) / 0.25, 0.05, 1) : 1); }
+      for (let k = 0; k < nSup; k++) { const a = d.a + (k / nSup) * Math.PI * 2 + 0.5; const rr = d.rad * 1.15 + s * 0.4; const e = pickW(houses, rnd(700 + k)); const sx = d.x + Math.cos(a) * rr, sz = d.z + Math.sin(a) * rr;
+        if (Math.hypot(sx, sz) < plaza * 0.85 || (lmPlot && Math.hypot(sx - lmPlot.x, sz - lmPlot.z) < lmPlot.r + s * 0.45)) continue;      // the square stays open, and nothing is built on the landmark's plot
+        push(support || e[0], sx, sz, s * 0.6, heightOf(e[0], 0.3) * 0.9, s * 0.6, yaw + (rnd(720 + k) - 0.5), colorOf(730 + k), packStyle(e[2], e[3], cul, 0), 0, d.prog < 1 ? clamp((d.prog - 0.75) / 0.25, 0.05, 1) : 1); }
       return head;
     };
-    if (dist.temple) { const tk = era <= 2 ? (cul === 3 || cul === 5 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'stepped') : era === 3 ? 'temple' : LANDMARK[cname][band] === 'menhirs' ? 'temple' : (['cathedral', 'basilica', 'onion', 'station', 'stadium', 'spire', 'palace'].includes(LANDMARK[cname][band]) ? (cul === 3 || cul === 5 && era >= 5 ? 'mosque' : 'church') : LANDMARK[cname][band]); const sz = landmarkSize(tk, false); quarter(dist.temple, tk, [sz[0] * 0.7, sz[1] * 0.8, sz[2] * 0.7], tk === 'church' ? 0xd6cfc0 : tk === 'temple' ? 0xf1ebdd : 0xe6dcc4, tk === 'mosque' ? WALL.plaster : WALL.stone, tk === 'church' ? ROOF.slate : tk === 'mosque' ? ROOF.copper : ROOF.tile, null, 8).tag = 'temple'; }
-    if (dist.academy) quarter(dist.academy, era >= 6 ? 'palazzo' : era >= 3 ? 'temple' : 'courtyard', era >= 6 ? [36, 16, 22] : [26, 11, 34], 0xe7e0d2, era >= 6 ? WALL.brick : WALL.stone, era >= 6 ? ROOF.slate : ROOF.tile, null, 8);
+    if (dist.temple) { const tk = era <= 2 ? (cul === 3 || cul === 5 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'stepped') : era === 3 ? 'temple' : LANDMARK[cname][band] === 'menhirs' ? 'temple' : (['cathedral', 'basilica', 'onion', 'station', 'stadium', 'spire', 'palace'].includes(LANDMARK[cname][band]) ? (cul === 3 || cul === 5 && era >= 5 ? 'mosque' : 'church') : LANDMARK[cname][band]); const sz = landmarkSize(tk, false); const th = quarter(dist.temple, tk, [sz[0] * 0.7, sz[1] * 0.8, sz[2] * 0.7], tk === 'church' ? 0xd6cfc0 : tk === 'temple' ? 0xf1ebdd : 0xe6dcc4, tk === 'mosque' ? WALL.plaster : WALL.stone, tk === 'church' ? ROOF.slate : tk === 'mosque' ? ROOF.copper : ROOF.tile, null, 8); th.tag = 'temple'; if (era <= 2) th.as = 'shrine'; }
+    if (dist.academy) quarter(dist.academy, era >= 6 ? 'palazzo' : era >= 3 ? 'temple' : 'courtyard', era >= 6 ? [36, 16, 22] : [26, 11, 34], 0xe7e0d2, era >= 6 ? WALL.brick : WALL.stone, era >= 6 ? ROOF.slate : ROOF.tile, null, 8).as = 'academy';
     if (dist.palace) (quarter(dist.palace, era <= 2 ? (cul === 6 ? 'hall' : cul === 3 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'palace') : era <= 4 ? (cul === 6 ? 'hall' : 'keep') : era <= 5 ? (cul === 6 ? 'hall' : 'palace') : 'palace', era <= 2 ? [30, 10, 24] : era <= 4 ? [24, 26, 24] : [60, 18, 26], era >= 5 ? 0xf1e6cf : 0xd9cba8, WALL.stone, cul === 6 ? ROOF.glazed : ROOF.tile, null, coarse ? 0 : 4)).as = 'palace';
     if (dist.keep) { push('keep', dist.keep.x, dist.keep.z, 22, 28, 22, -axis, 0x8c8478, packStyle(WALL.stone, ROOF.flat, cul, FLAG.landmark)); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; push('roundtower', dist.keep.x + Math.cos(a) * 19, dist.keep.z + Math.sin(a) * 19, 7, 20, 7, 0, 0x85807a, packStyle(WALL.stone, ROOF.slate, cul, 0)); } }
     if (dist.market && !coarse) { const d = dist.market; push('hall', d.x, d.z, Math.max(14, d.rad * 0.9), 6 + (era >= 3 ? 4 : 0), Math.max(10, d.rad * 0.6), -(d.a + Math.PI / 2), 0xd9b98c, packStyle(era >= 3 ? WALL.stone : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, FLAG.landmark), 0, d.prog).as = 'market'; if (d.prog >= 0.6) for (let k = 0; k < 8; k++) { const a = d.a + k * 0.7; const rr = d.rad * (0.5 + rnd(800 + k) * 0.5); push('stall', d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, 3.2, 2.8, 2.4, rnd(810 + k) * 3, [0xc84a3a, 0xd9a94a, 0x5a8a5a, 0xe6dcc4][k % 4], packStyle(WALL.wood, ROOF.thatch, cul, 0)); } }

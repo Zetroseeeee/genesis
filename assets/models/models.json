@@ -181,7 +181,35 @@
    "mesh": "89b833bc-a328-4ca3-b9f0-ee7ca27b1026",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_131155_89b833bc-a328-4ca3-b9f0-ee7ca27b1026.glb",
    "scaleBy": "w",
-   "site": "bronze_timber_site"
+   "site": "bronze_timber_site",
+   "also": [
+    {
+     "kinds": [
+      "academy"
+     ],
+     "eras": [
+      0,
+      2
+     ],
+     "cultures": [
+      "north",
+      "east"
+     ]
+    },
+    {
+     "kinds": [
+      "academy"
+     ],
+     "eras": [
+      0,
+      0
+     ],
+     "cultures": [
+      "med",
+      "easia"
+     ]
+    }
+   ]
   },
   {
    "id": "stone_pithouse_a",
@@ -229,7 +257,23 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130442_6f77815e-2e63-496d-b266-1c1e0324d8eb.png",
    "mesh": "30ce418a-222e-42f1-b3b9-6581c3eb2d0f",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_131201_30ce418a-222e-42f1-b3b9-6581c3eb2d0f.glb",
-   "site": "bronze_mudbrick_site"
+   "site": "bronze_mudbrick_site",
+   "also": [
+    {
+     "kinds": [
+      "academy"
+     ],
+     "eras": [
+      0,
+      0
+     ],
+     "cultures": [
+      "mena",
+      "africa",
+      "sasia"
+     ]
+    }
+   ]
   },
   {
    "id": "stone_mudbrick_b",
@@ -320,7 +364,37 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_7270e88a-089a-4e73-a4b2-63abe1a83725.png",
    "mesh": "cb323abc-c95d-4aa6-b225-18f67f254dbd",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130508_cb323abc-c95d-4aa6-b225-18f67f254dbd.glb",
-   "open": true
+   "open": true,
+   "also": [
+    {
+     "kinds": [
+      "shrine"
+     ],
+     "eras": [
+      0,
+      0
+     ],
+     "cultures": [
+      "mena",
+      "easia",
+      "seasia",
+      "america",
+      "namerica"
+     ]
+    },
+    {
+     "kinds": [
+      "shrine"
+     ],
+     "eras": [
+      1,
+      2
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "stone_grasshut_a",
@@ -387,7 +461,18 @@
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132538_7214f57e-ec2c-47d0-a208-7aaea9c6d323.glb",
    "scaleBy": "w",
    "w": 8,
-   "site": "bronze_timber_site"
+   "site": "bronze_timber_site",
+   "also": [
+    {
+     "kinds": [
+      "academy"
+     ],
+     "eras": [
+      0,
+      2
+     ]
+    }
+   ]
   },
   {
    "id": "stone_palmhut_a",
@@ -410,7 +495,18 @@
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132542_861aeb29-c843-43d4-a992-548ac4315a91.glb",
    "scaleBy": "w",
    "w": 7.2,
-   "site": "bronze_timber_site"
+   "site": "bronze_timber_site",
+   "also": [
+    {
+     "kinds": [
+      "academy"
+     ],
+     "eras": [
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "id": "stone_mudround_a",
@@ -476,7 +572,41 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135223_1a6d9407-1fce-43a7-8929-97e1234a6bb8.png",
    "mesh": "c054e85c-70e8-4abf-b69a-a8b0d06313fa",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135829_c054e85c-70e8-4abf-b69a-a8b0d06313fa.glb",
-   "open": true
+   "open": true,
+   "also": [
+    {
+     "kinds": [
+      "shrine"
+     ],
+     "eras": [
+      0,
+      0
+     ],
+     "cultures": [
+      "med",
+      "north",
+      "east",
+      "africa",
+      "sasia"
+     ]
+    },
+    {
+     "kinds": [
+      "shrine"
+     ],
+     "eras": [
+      1,
+      2
+     ],
+     "cultures": [
+      "north",
+      "east",
+      "easia",
+      "seasia",
+      "africa"
+     ]
+    }
+   ]
   },
   {
    "id": "stone_palisade_a",
@@ -718,7 +848,14 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153202_5e30cc40-300b-4d73-85d4-f50b86c2c618.png",
    "mesh": "26eb11b2-0352-45b3-8e6b-300e6145f7e8",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153514_26eb11b2-0352-45b3-8e6b-300e6145f7e8.glb",
-   "site": "bronze_timber_site"
+   "site": "bronze_timber_site",
+   "also": [
+    {
+     "kinds": [
+      "academy"
+     ]
+    }
+   ]
   },
   {
    "id": "bronze_america_house_a",
@@ -741,7 +878,23 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153202_52c7956e-bfcf-463d-b8c0-4fb6345027e3.png",
    "mesh": "0da77d6c-ad54-4e15-bfb9-e8951c17c481",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153518_0da77d6c-ad54-4e15-bfb9-e8951c17c481.glb",
-   "site": "bronze_timber_site"
+   "site": "bronze_timber_site",
+   "also": [
+    {
+     "kinds": [
+      "academy"
+     ],
+     "eras": [
+      1,
+      2
+     ]
+    },
+    {
+     "kinds": [
+      "palace"
+     ]
+    }
+   ]
   },
   {
    "id": "stone_barklonghouse_a",
@@ -766,7 +919,14 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153201_d2857705-9bf1-4c36-8d52-2fd9327ea483.png",
    "mesh": "84599e0a-4c27-470c-a6a0-426109522db5",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153522_84599e0a-4c27-470c-a6a0-426109522db5.glb",
-   "site": "bronze_timber_site"
+   "site": "bronze_timber_site",
+   "also": [
+    {
+     "kinds": [
+      "academy"
+     ]
+    }
+   ]
   },
   {
    "id": "bronze_mudgate_a",
@@ -985,17 +1145,7 @@
    "mesh": "5d6d3927-5672-4f6d-875d-a3592f1a72ed",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153338_5d6d3927-5672-4f6d-875d-a3592f1a72ed.glb",
    "variantOf": "bronze_court_a",
-   "site": "bronze_mudbrick_site",
-   "also": [
-    {
-     "kinds": [
-      "stepped"
-     ],
-     "cultures": [
-      "africa"
-     ]
-    }
-   ]
+   "site": "bronze_mudbrick_site"
   },
   {
    "id": "bronze_pyramid_a",
@@ -1196,7 +1346,7 @@
    "title": "Barn and byre",
    "set": "bronze",
    "eras": [
-    1,
+    0,
     3
    ],
    "cultures": null,
@@ -1255,7 +1405,18 @@
    "concept": "39d1d141-fbf0-4bcf-962d-b57ff097d6ab",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161418_39d1d141-fbf0-4bcf-962d-b57ff097d6ab.png",
    "mesh": "ff6f9684-fe15-4cb2-9632-1851bc9865ce",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161638_ff6f9684-fe15-4cb2-9632-1851bc9865ce.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161638_ff6f9684-fe15-4cb2-9632-1851bc9865ce.glb",
+   "also": [
+    {
+     "kinds": [
+      "mine"
+     ],
+     "eras": [
+      0,
+      3
+     ]
+    }
+   ]
   },
   {
    "id": "bronze_boat_a",

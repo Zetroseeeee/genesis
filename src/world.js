@@ -81,14 +81,14 @@
       const sim = this.sim; if (!sim) { return; }
       const dist = cam.dist; const now = performance.now();
       const show = dist < 0.12;   // towns are drawn at strategy-map scale, so they read from ~750 km up
-      if (!show) { if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; if (window.MODELS && MODELS.ready) { MODELS.begin(); MODELS.end(); } } return; }
+      if (!show) { if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; this._casterSig = null; if (window.MODELS && MODELS.ready) { MODELS.begin(); MODELS.end(); } } return; }
       const moved = GEO.distKm(cam.lon, cam.lat, this.lastBuild.lon, this.lastBuild.lat) > Math.max(0.15, dist * 6371 * 0.12);
       const stale = now - this.lastBuild.t > 1500 || this.lastBuild.tex !== this.texVersion;
       const arrived = window.MODELS && MODELS.dirty;       // a model file finished loading: swap it in
       if (!force && !moved && !stale && !arrived && Math.abs(Math.log(dist / (this.lastBuild.dist || 1))) < 0.15) return;
       this.lastBuild = { lon: cam.lon, lat: cam.lat, dist, t: now, tex: this.texVersion };
       const T = this.terrain; const counts = {}; for (const k in this.inst) counts[k] = 0;
-      const casters = this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1;
+      const casters = this.casters = []; this._kitSig = 0;
       const rad = Math.max(3, Math.min(12, Math.ceil(dist * 6371 / 55) + 1)); // cells (0.5 deg ~ 55 km)
       const cy0 = Math.floor((90 - cam.lat) / 180 * H), cx0 = Math.floor((cam.lon + 180) / 360 * W);
       const exag = this.exag; const m = this._m; const el = m.elements;
@@ -146,6 +146,7 @@
               if (wantCasters && nCasters < 5000 && prog > 0.3 && !def.open) { casters.push(lon, lat, md[0] * 0.86, md[1] * 0.6 * Math.min(1, prog + 0.2), md[2] * 0.86, md[3]); nCasters++; }
               continue;
             }
+            if (def && MODELS.pending(def)) continue;      // its files are on their way: bare ground for a moment, not a stand-in
           }
           if (prog < 1) {
             // a building site: the walls up to the current height in bare material, scaffolding around them, a crane in later ages
@@ -182,6 +183,9 @@
       }
       for (const k in this.inst) { const im = this.inst[k]; im.count = counts[k]; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; this.info[k].needsUpdate = true; }
       if (useModels) MODELS.end();
+      // what throws shadows changed only if something was placed differently: the sun's depth map and the ground shadows are redrawn then, not on every refresh
+      const sig = (this._kitSig ^ Math.imul(total + 1, 2654435761) ^ (useModels ? MODELS.sig : 0)) | 0;
+      if (sig !== this._casterSig) { this._casterSig = sig; this.castersVersion = (this.castersVersion || 0) + 1; }
       this.buildingCount = total;
     }
     // one model instance at lon/lat: sx, sy, sz are drawn metres per model metre along the model's own axes.
@@ -275,7 +279,7 @@
       const Zx = (sy * Ex - cy * Nx) * d, Zy = (sy * Ey - cy * Ny) * d, Zz = (sy * Ez - cy * Nz) * d;
       const rr = 1 + (Math.max(hg, 0) * exag - sink) / R_M;
       el[0] = Xx; el[1] = Xy; el[2] = Xz; el[3] = 0; el[4] = Ux * h; el[5] = Uy * h; el[6] = Uz * h; el[7] = 0; el[8] = Zx; el[9] = Zy; el[10] = Zz; el[11] = 0; el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
-      im.setMatrixAt(idx, m);
+      im.setMatrixAt(idx, m); this._kitSig = Math.imul((this._kitSig | 0) ^ ((el[12] * 1e9) | 0), 16777619) ^ ((el[13] * 1e9) | 0) ^ ((el[5] * 1e12) | 0);
       const ca = im.instanceColor.array; ca[idx * 3] = ((color >> 16) & 255) / 255; ca[idx * 3 + 1] = ((color >> 8) & 255) / 255; ca[idx * 3 + 2] = (color & 255) / 255;
       const ia = infoAttr || this.info[im.userData.kind]; if (ia) ia.setXYZW(idx, era, seed, style, krep || 1);
     }

@@ -13,9 +13,15 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
   (`TEX=data/tex/atlas.offline.json` for the real materials). Scenes to start from: `tools/scenes/town.js`
-  (options in `window.__scene`: place, age, size, walls, works, camera). Software GL is slow: models take a
-  minute or two to arrive, so wait ~150 s before the first shot, and run it in the background (`nohup ... &`).
+  (options in `window.__scene`: place, age, size, walls, works, camera; then `__sceneLook('palace', 4)` etc.) and
+  `tools/scenes/forest.js` (`__forest(lon, lat, alt, tilt, heading, season)`). Software GL is slow: models take
+  minutes to arrive and until then plots stand empty, so wait ~170 s before the first shot, run it in the
+  background (`nohup ... &`), and judge nothing from a frame taken while files are still coming in.
+  `SHADOW=4096` gives the shadow map its real size (software GL gets 1024), `DIST=<dir>` serves a snapshot build.
 - `tools/peek.sh <name> <url> ...` — contact sheet of generated images via the Peek workflow (`shots/peek/<name>.jpg`).
+- `node tools/coverage.js [eras] [--all] [--wonder]` — which planned buildings are real models and which still fall
+  back to the kit, for a capital of every culture with every work built. Run it after touching the manifest or the
+  planner: eras 0–2 must show nothing but `stall` (the market model brings its own) and `rubble`.
 - `node tools/dbg3.js "<script>" "<probe>" <wait>` — run a script in the page and print a probe object.
 - `npm start` — desktop window (Electron).
 
@@ -48,18 +54,26 @@ Conventions that matter:
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.
 - **Models are chosen by role**: `MODELS.pick(it.as || it.kind, era, culture)`. A plan item can carry `as`
-  (`market`, `palace`, `mine`, `watchtower`) where the kit kind is shared by different buildings.
+  (`market`, `palace`, `academy`, `shrine`, `mine`, `watchtower`, `wall_mud`, `gate_palisade` ...) where the kit kind
+  is shared by different buildings. In the manifest one mesh can serve further roles, eras or cultures:
+  `also: [{ kinds, eras, cultures }]`. Walls follow `wallStyleOf(era, culture)` in `town.js` (timber peoples keep
+  the palisade into the Iron Age). While a model's files are still loading its plot stays bare (no kit stand-in).
   Placement: houses at life size × the town's scale; landmarks likewise with more give; `fit: 'run'` walls end to
   end following the ground; `fit: 'gate'` a gate with wall on both sides; `site` = the building-site model shown
   while a building goes up, laid out on the finished building's footprint.
-- Trees are models too (`tree_broad`, `tree_conifer`, `tree_savanna`, `tree_palm`), meshes near the camera and
-  picture cards of the same model beyond; near a town they are drawn at the town's scale.
+- Trees are cut-out photographs on camera-facing cards (`card: true` in the manifest, most without a mesh). Each
+  says where it grows (`tree: { zones, region, deciduous, bare }`); `zoneOf()` in `trees.js` gives the flora zone
+  of a point (boreal, temperate, med, easia, dry, savanna, rain). Near a town they are drawn at the town's scale.
+- **Shadows.** The sun's depth map holds what stands still (models, kit, near trees) and is redrawn only when the
+  camera, the sun or the placements change (`castersVersion` follows a signature of everything placed). Things
+  that move get their own cheap shadow (walkers: a streak on the ground in `movers.js`).
 
 ## Assets
 
 - Generated with Higgsfield on Emile's account. Textures: `assets/textures/` (prompts, job ids, atlas builder).
   3D models: `assets/models/` (concept prompts, job ids, source GLB URLs, processing settings).
-- One building ≈ 16 credits (1 concept image + 15 for the mesh). Consistency: every concept uses the same prompt
+- One building ≈ 16 credits (1 concept image + 15 for the mesh); a tree is 1 credit (card only, photographed on
+  a blue screen: `style.tree`). Consistency: every concept uses the same prompt
   frame (`style` in the manifest) and a reference image — the set's anchor, or, for an upgrade or a matching piece
   (a wall's gate, the next age's house), the concept of the building it follows. Look at every concept
   (`tools/peek.sh`) before paying for its mesh. True sizes in metres go in the manifest (`h`, or `w` with

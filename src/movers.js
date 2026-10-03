@@ -63,6 +63,33 @@
       gl_FragColor = vec4(mix(lit, mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), uDay), fog), 1.0);
     }`;
 
+  // A walker's shadow: a soft streak on the ground from its feet, away from the sun, as long as the sun is low. (The
+  // sun's depth map is kept for what stands still; it is not redrawn for every step somebody takes.)
+  const PS_VERT = `
+    uniform vec3 uSunV; varying vec2 vQ; varying vec3 vView;
+    void main() {
+      mat4 mvi = modelViewMatrix * instanceMatrix;
+      vec3 c = (mvi * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+      vec3 upV = (mvi * vec4(0.0, 1.0, 0.0, 0.0)).xyz; float k = length(upV); upV /= k;       // k: the drawn size of one unit of the figure
+      float se = max(dot(uSunV, upV), 0.12);                                                  // sine of the sun's height
+      vec3 dH = -(uSunV - upV * dot(uSunV, upV)); float dl = length(dH); dH = dl > 1e-4 ? dH / dl : vec3(1.0, 0.0, 0.0);
+      float len = min(1.7 * sqrt(max(1.0 - se * se, 0.0)) / se, 5.0) + 0.3;                   // a figure 1.7 units tall
+      vec3 side = cross(upV, dH);
+      vec2 q = vec2(position.x, position.y + 0.5);                                            // across -0.5..0.5, along 0..1
+      vec3 p = c + (dH * (q.y * len - 0.15) + side * q.x * 0.62 + upV * 0.06) * k;
+      vQ = vec2(position.x * 2.0, q.y); vView = p;
+      gl_Position = projectionMatrix * vec4(p, 1.0);
+    }`;
+  const PS_FRAG = `
+    precision highp float; uniform float uDay; varying vec2 vQ; varying vec3 vView;
+    ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
+    void main() {
+      float a = (1.0 - smoothstep(0.35, 1.0, abs(vQ.x))) * smoothstep(0.0, 0.08, vQ.y) * (1.0 - smoothstep(0.7, 1.0, vQ.y));
+      a *= 0.42 * uDay * (1.0 - sunHidden(vView));                                            // no shadow inside a shadow
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(0.03, 0.035, 0.05, a);
+    }`;
+
   const C_VERT = `
     attribute float aAge, aSize; uniform float uFovK; varying float vAge;
     void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vAge = aAge; float sz = aSize / ${R_M.toFixed(1)} * uFovK / max(-mv.z, 1e-7); gl_PointSize = clamp(sz, 1.5, 40.0); gl_Position = projectionMatrix * mv; }`;
@@ -86,7 +113,10 @@
         const bu = world.bUniforms; this.puni = { uSunV: bu.uSunV, uUpV: bu.uUpV, uDay: bu.uDay, uCamAlt: bu.uCamAlt, uTime: { value: 0 } };
         const pm = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ uniforms: this.puni, vertexShader: P_VERT, fragmentShader: P_FRAG }), MAXPEOPLE); pm.count = 0; pm.frustumCulled = false; pm.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         pm.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXPEOPLE * 3).fill(1), 3); pm.instanceColor.setUsage(THREE.DynamicDrawUsage);
-        this.people = pm; scene.add(pm); if (window.SHADOWS) SHADOWS.caster(pm); this._pm = new THREE.Matrix4(); }
+        this.people = pm; scene.add(pm); this._pm = new THREE.Matrix4();
+        const su = { uSunV: bu.uSunV, uDay: bu.uDay }; if (window.SHADOWS) Object.assign(su, SHADOWS.uniforms);
+        const ps = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ uniforms: su, vertexShader: PS_VERT, fragmentShader: PS_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), MAXPEOPLE);
+        ps.count = 0; ps.frustumCulled = false; ps.instanceMatrix = pm.instanceMatrix; scene.add(ps); this.pshadow = ps; }
       // contrails: a ring buffer of puffs per plane
       const cg = new THREE.BufferGeometry(); const NC = CAPS.plane * TRAIL_N;
       this.cpos = new Float32Array(NC * 3); this.cage = new Float32Array(NC); this.csize = new Float32Array(NC);
@@ -237,7 +267,7 @@
       this.cuni.uDay.value = day; this.cuni.uFovK.value = viewportH / (2 * Math.tan(fovDeg * 0.5 * D2R));
       this.animate(dt, sim);
     }
-    clear() { if (this.stats.agents || this.stats.walkers || this.stats.ships || this.stats.planes) { for (const k in this.inst) this.inst[k].mesh.count = 0; this.people.count = 0; this.contrails.geometry.setDrawRange(0, 0); this.agents = []; this.walkers = []; this.ships = []; this.planes = []; this.stats = { agents: 0, walkers: 0, ships: 0, planes: 0 }; } }
+    clear() { if (this.stats.agents || this.stats.walkers || this.stats.ships || this.stats.planes) { for (const k in this.inst) this.inst[k].mesh.count = 0; this.people.count = 0; this.pshadow.count = 0; this.contrails.geometry.setDrawRange(0, 0); this.agents = []; this.walkers = []; this.ships = []; this.planes = []; this.stats = { agents: 0, walkers: 0, ships: 0, planes: 0 }; } }
     // place one instance: lon/lat/height in metres, yaw from east toward north
     placeAt(kind, lon, lat, hg, yaw, w, h, d, color, era, krep) {
       const I = this.inst[kind]; if (!I) return; const idx = this.counts[kind] || 0; if (idx >= CAPS[kind]) return;
@@ -324,7 +354,7 @@
         pm.setMatrixAt(n, pmat);
         pc[n * 3] = ((a.color >> 16) & 255) / 255; pc[n * 3 + 1] = ((a.color >> 8) & 255) / 255; pc[n * 3 + 2] = (a.color & 255) / 255; ph[n] = a.phase; n++;
       }
-      pm.count = n; pm.instanceMatrix.needsUpdate = true; pm.instanceColor.needsUpdate = true; this.pphase.needsUpdate = true;
+      pm.count = n; pm.instanceMatrix.needsUpdate = true; pm.instanceColor.needsUpdate = true; this.pphase.needsUpdate = true; this.pshadow.count = n;
       this.stats = { agents: this.agents.length, walkers: n, ships: this.ships.length, planes: this.planes.length };
     }
   }
