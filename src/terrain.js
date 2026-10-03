@@ -295,7 +295,7 @@
       #ifdef USE_TEXARR
       if (gOn > 0.002 && dec.b > 0.04) {   // trodden earth around early towns, paving slabs once they are built up
         float paved = smoothstep(0.3, 0.42, dec.b);
-        urbanCol = mix(urbanCol, mix(gtex(uLanduse, 14.0, 4.0), gtex(uLanduse, 12.0, 2.0), paved), gOn);
+        urbanCol = mix(urbanCol, mix(gtex(uGround, 14.0, 4.0) * 1.06, gtex(uLanduse, 12.0, 2.0), paved), gOn);
       }
       #endif
       land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * mix(0.7, 0.9, smoothstep(0.3, 0.45, dec.b)) * (1.0 - ice));
@@ -305,7 +305,7 @@
       vec3 roadCol = mix(mix(vec3(0.44, 0.36, 0.26), vec3(0.56, 0.53, 0.48), smoothstep(0.55, 0.75, dec.b)), vec3(0.30, 0.30, 0.31), smoothstep(0.8, 0.95, dec.b));
       #ifdef USE_TEXARR
       if (gOn > 0.002 && dec.b > 0.4) {   // dirt tracks, then cobbles, then asphalt; railway lines run on ballast
-        vec3 rt = dec.b > 0.95 ? gtex(uGround, 11.0, 4.0) * 0.8 : dec.b > 0.8 ? gtex(uLanduse, 10.0, 4.0) : dec.b > 0.62 ? gtex(uLanduse, 8.0, 2.0) : gtex(uLanduse, 14.0, 4.0) * 0.92;
+        vec3 rt = dec.b > 0.95 ? gtex(uGround, 11.0, 4.0) * 0.8 : dec.b > 0.8 ? gtex(uLanduse, 10.0, 4.0) : dec.b > 0.62 ? gtex(uLanduse, 8.0, 2.0) : gtex(uGround, 14.0, 4.0) * 0.9;
         roadCol = mix(roadCol, rt, gOn);
       }
       #endif

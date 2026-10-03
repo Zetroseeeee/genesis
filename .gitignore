@@ -9,3 +9,6 @@ data/models/
 tools/models/cache/
 data/tex/shot_*.png
 data/tex/atlas_shot.json
+data/tex/atlas_*.webp
+data/tex/ui_*.webp
+data/tex/atlas.offline.json

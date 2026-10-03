@@ -12,6 +12,8 @@
     "start": "node tools/build.js && electron ."
   },
   "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
     "pngjs": "^7.0.0"
   }
 }

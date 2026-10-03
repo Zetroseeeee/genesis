@@ -3,7 +3,7 @@
 //
 //   node tools/models/pipeline.mjs ci                 GitHub Actions: mirror sources, process what changed, publish
 //   node tools/models/pipeline.mjs local <id> [...]   dev box: tools/models/cache/<id>.src.glb -> data/models/
-//   node tools/models/pipeline.mjs fetch              download the published LOD files into data/models/
+//   node tools/models/fetch.mjs                       download the published LOD files into data/models/
 //
 // Every model goes through the same steps so the library stays consistent: one mesh, entrance turned to +Z, base
 // centred on the origin at y = 0, true metres (height from the manifest), then the same LOD ladder and texture
@@ -172,32 +172,7 @@ async function local(ids) {
   fs.writeFileSync(indexPath, JSON.stringify(index));
 }
 
-// published files -> data/models/ (plain HTTPS, no credentials: the repository is public)
-function fetchAll() {
-  const man = readManifest(); fs.mkdirSync(OUT, { recursive: true });
-  const base = `https://github.com/${repo()}/releases/download`;
-  const merged = { models: {} }; let got = 0, kept = 0;
-  for (const set of [...new Set(man.models.filter((m) => m.src).map((m) => m.set))]) {
-    const tmp = path.join(OUT, `.index-${set}.json`);
-    try { sh('curl', ['-fsSL', '--retry', '3', '-o', tmp, `${base}/models-${set}/index.json`]); } catch (e) { log(`no published models for set ${set} yet`); continue; }
-    const idx = JSON.parse(fs.readFileSync(tmp, 'utf8')); fs.rmSync(tmp, { force: true });
-    for (const [id, entry] of Object.entries(idx.models)) {
-      for (const l of entry.lods) {
-        const p = path.join(OUT, l.file);
-        if (fs.existsSync(p) && fs.statSync(p).size === l.bytes) { kept++; continue; }
-        sh('curl', ['-fsSL', '--retry', '3', '-o', p, `${base}/models-${set}/${l.file}`]); got++;
-      }
-      const m = man.models.find((x) => x.id === id);       // where and when the model belongs comes from the manifest
-      if (!m) continue;
-      merged.models[id] = Object.assign({}, entry, { kinds: m.kinds, cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', group: m.group || '', title: m.title });
-    }
-  }
-  fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(merged));
-  log(`models: ${Object.keys(merged.models).length} in index, ${got} file(s) downloaded, ${kept} already here`);
-}
-
 const mode = process.argv[2];
 if (mode === 'ci') await ci();
 else if (mode === 'local') await local(process.argv.slice(3));
-else if (mode === 'fetch') fetchAll();
-else { console.log('usage: pipeline.mjs ci | local <id...> | fetch'); process.exit(2); }
+else { console.log('usage: pipeline.mjs ci | local <id...>   (fetch published files with tools/models/fetch.mjs)'); process.exit(2); }

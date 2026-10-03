@@ -1,0 +1,21 @@
+# Mirrors the generated texture atlases and UI art into the "textures" release.
+name: Textures
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/tex/atlas.json'
+      - 'tools/textures/**'
+      - '.github/workflows/textures.yml'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mirror textures
+        run: node tools/textures/mirror.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

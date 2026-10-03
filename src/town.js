@@ -441,7 +441,7 @@
         streets.push([u * ca - (-half) * sa, u * sa + (-half) * ca, u * ca - half * sa, u * sa + half * ca, hw]);      // along v
         streets.push([(-half) * ca - u * sa, (-half) * sa + u * ca, half * ca - u * sa, half * sa + u * ca, hw]); }     // along u
     } else {
-      const hw = Math.max(1.2, s * 0.26);
+      const hw = Math.max(1.0, Math.min(s * 0.26, [1.3, 1.6, 2, 3, 2.6, 3.5, 5, 7, 8][era]));   // footpaths between huts, lanes in a town, streets in a city
       for (const a of lanes) { const r1 = R * 1.12; streets.push([Math.cos(a) * plaza * 0.85, Math.sin(a) * plaza * 0.85, Math.cos(a) * r1, Math.sin(a) * r1, hw]); }
       if (era >= 1) for (let rr = plaza + ringStep; rr < R * 0.98; rr += ringStep) { const n = Math.max(16, Math.round(rr / 12)); for (let k = 0; k < n; k++) { const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2; streets.push([Math.cos(a0) * rr, Math.sin(a0) * rr, Math.cos(a1) * rr, Math.sin(a1) * rr, hw * 0.9]); } }
     }

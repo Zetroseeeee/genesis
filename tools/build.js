@@ -7,7 +7,9 @@ fs.mkdirSync(DIST, { recursive: true });
 const page = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
 fs.writeFileSync(path.join(DIST, 'index.html'), page);
 const skeleton = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui;background:#faf9f5}img{max-width:100%}[hidden]{display:none!important}</style></head><body>${page}</body></html>`;
-fs.writeFileSync(path.join(DIST, 'local.html'), skeleton.replace('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'three.min.js').replace('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js', 'GLTFLoader.js').replace('https://cdn.jsdelivr.net/npm/meshoptimizer@0.22.0/meshopt_decoder.js', 'meshopt_decoder.js'));
+// when the art has been fetched to disk (tools/textures/fetch.mjs) the local page uses it instead of the CDN copies
+const offline = fs.existsSync('data/tex/atlas.offline.json') ? `<script>window.GENESIS_TEX_URL = window.GENESIS_TEX_URL || 'data/tex/atlas.offline.json';</script>` : '';
+fs.writeFileSync(path.join(DIST, 'local.html'), skeleton.replace('<body>', '<body>' + offline).replace('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'three.min.js').replace('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js', 'GLTFLoader.js').replace('https://cdn.jsdelivr.net/npm/meshoptimizer@0.22.0/meshopt_decoder.js', 'meshopt_decoder.js'));
 for (const f of ['geo.js', 'sim.js', 'terrain.js', 'camera.js', 'town.js', 'portrait.js', 'buildings.js', 'textures.js', 'models.js', 'world.js', 'decal.js', 'trees.js', 'life.js', 'movers.js', 'events.js', 'main.js']) {
   const src = fs.readFileSync(path.join(SRC, f), 'utf8');
   try { new Function(src); } catch (e) { console.error('SYNTAX ERROR in', f, e.message); process.exit(1); }
