@@ -5,3 +5,5 @@ shots/
 .DS_Store
 out/
 release/
+data/models/
+tools/models/cache/

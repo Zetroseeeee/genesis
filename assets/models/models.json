@@ -1,0 +1,114 @@
+{
+ "repo": "Zetroseeeee/genesis",
+ "about": "The GENESIS building library. One entry per 3D model: what it is, where and when it belongs, how big it really is, and the generation jobs it came from. tools/models/pipeline.mjs turns every entry with a src into game-ready LOD files.",
+ "generator": {
+  "image": {
+   "model": "gpt_image_2_5",
+   "variant": "flare",
+   "quality": "medium",
+   "resolution": "2k",
+   "aspect_ratio": "1:1"
+  },
+  "mesh": {
+   "model": "hunyuan3d_v3_image_to_3d",
+   "generate_type": "Normal",
+   "enable_pbr": true,
+   "face_count": 500000
+  }
+ },
+ "style": {
+  "reference": "Every concept image is generated with the set's anchor image attached as a style reference, so lighting, camera, background and material character match across the whole library.",
+  "prefix": "Use the attached image only as the style reference: same photographic look, same soft lighting, same camera height and angle, same plain light-grey background. Show a different building: ",
+  "suffix": " Three-quarter view from the front-left, camera slightly above at about 30 degrees elevation, the entire structure visible and centred with clear margin around it. Photorealistic archaeological reconstruction, historically accurate construction details, natural weathering. Soft even overcast lighting, no harsh shadows, no cast shadow on the ground. Plain flat light-grey studio background, no ground plane, no people, no animals, no plants, no other objects, no text."
+ },
+ "sets": {
+  "stone": {
+   "eras": [
+    0
+   ],
+   "anchor": "36afee3f-1178-4673-ac5d-8a7c59e4fe59",
+   "note": "10,000 BC to the first metal: wattle, daub, mud brick, hide, bark, reed and grass thatch, rough megaliths. No dressed stone, no fired brick, no tiles, no glass."
+  },
+  "classical": {
+   "eras": [
+    3
+   ],
+   "anchor": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "note": "Pilot only so far."
+  },
+  "medieval": {
+   "eras": [
+    4
+   ],
+   "anchor": "368ff7b1-22cb-42ac-ac04-49248222f1c6",
+   "note": "Pilot only so far."
+  }
+ },
+ "models": [
+  {
+   "id": "stone_roundhouse_a",
+   "title": "Neolithic roundhouse",
+   "set": "stone",
+   "eras": [
+    0,
+    0
+   ],
+   "cultures": [
+    "med",
+    "north",
+    "east"
+   ],
+   "kinds": [
+    "hut"
+   ],
+   "h": 5.6,
+   "concept": "36afee3f-1178-4673-ac5d-8a7c59e4fe59",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124221_36afee3f-1178-4673-ac5d-8a7c59e4fe59.png",
+   "mesh": "66b41197-a01f-4938-b1c3-7ac0bab63e96",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_125128_66b41197-a01f-4938-b1c3-7ac0bab63e96.glb"
+  },
+  {
+   "id": "classical_med_doric_temple",
+   "title": "Doric temple",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med",
+    "north"
+   ],
+   "kinds": [
+    "temple"
+   ],
+   "h": 14.5,
+   "concept": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124221_190f769d-bbe0-4baa-9ae4-870d8bf10cea.png",
+   "mesh": "b06e4dd1-d1e4-4336-9484-eac03513881e",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_125442_b06e4dd1-d1e4-4336-9484-eac03513881e.glb"
+  },
+  {
+   "id": "medieval_north_timberhouse_a",
+   "title": "Timber-framed town house",
+   "set": "medieval",
+   "eras": [
+    4,
+    4
+   ],
+   "cultures": [
+    "north",
+    "east"
+   ],
+   "kinds": [
+    "halftimber",
+    "townhouse"
+   ],
+   "h": 11.0,
+   "concept": "368ff7b1-22cb-42ac-ac04-49248222f1c6",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124220_368ff7b1-22cb-42ac-ac04-49248222f1c6.png",
+   "mesh": "b866d1ab-c895-43d0-b46d-678c61902746",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124305_b866d1ab-c895-43d0-b46d-678c61902746.glb"
+  }
+ ]
+}

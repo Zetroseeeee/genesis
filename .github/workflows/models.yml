@@ -1,0 +1,30 @@
+# Builds the 3D model library: mirrors generated source meshes into Releases and publishes game-ready LOD files.
+name: Models
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/models/**'
+      - 'tools/models/**'
+      - '.github/workflows/models.yml'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: models
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pipeline dependencies
+        run: npm ci --prefix tools/models
+      - name: Mirror sources, build LODs, publish
+        run: node tools/models/pipeline.mjs ci
+        env:
+          GH_TOKEN: ${{ github.token }}
