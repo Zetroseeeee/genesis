@@ -191,7 +191,8 @@
     "mena"
    ],
    "kinds": [
-    "adobe"
+    "adobe",
+    "hut"
    ],
    "h": 3.4,
    "concept": "6f77815e-2e63-496d-b266-1c1e0324d8eb",
@@ -211,7 +212,8 @@
     "mena"
    ],
    "kinds": [
-    "adobe"
+    "adobe",
+    "hut"
    ],
    "h": 3.6,
    "concept": "7ce138f8-1025-4cf3-925d-41e336dcd656",
@@ -276,6 +278,88 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_7270e88a-089a-4e73-a4b2-63abe1a83725.png",
    "mesh": "cb323abc-c95d-4aa6-b225-18f67f254dbd",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130508_cb323abc-c95d-4aa6-b225-18f67f254dbd.glb"
+  },
+  {
+   "id": "stone_grasshut_a",
+   "title": "Grass-thatched roundhouse",
+   "set": "stone",
+   "eras": [
+    0,
+    5
+   ],
+   "cultures": [
+    "africa",
+    "sasia"
+   ],
+   "kinds": [
+    "hut"
+   ],
+   "h": 5.0,
+   "concept": "35387ef5-5c03-4111-925d-91c7df115614",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130944_35387ef5-5c03-4111-925d-91c7df115614.png",
+   "mesh": "c4f1cf74-d4e5-498d-854b-63fe263a2d8e",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132531_c4f1cf74-d4e5-498d-854b-63fe263a2d8e.glb"
+  },
+  {
+   "id": "stone_domehut_a",
+   "title": "Dome grass hut",
+   "set": "stone",
+   "eras": [
+    0,
+    1
+   ],
+   "cultures": [
+    "africa"
+   ],
+   "kinds": [
+    "hut"
+   ],
+   "h": 2.6,
+   "concept": "d5ba6fae-4578-4fc6-9688-b0530916f063",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130945_d5ba6fae-4578-4fc6-9688-b0530916f063.png",
+   "mesh": "f67c4762-041a-4172-af76-f4e64450c590",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132535_f67c4762-041a-4172-af76-f4e64450c590.glb"
+  },
+  {
+   "id": "stone_stilthouse_a",
+   "title": "Stilt house",
+   "set": "stone",
+   "eras": [
+    0,
+    6
+   ],
+   "cultures": [
+    "seasia"
+   ],
+   "kinds": [
+    "stilt",
+    "hut"
+   ],
+   "h": 7.0,
+   "concept": "5fe657b0-f700-492f-9479-981523eefcae",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130945_5fe657b0-f700-492f-9479-981523eefcae.png",
+   "mesh": "7214f57e-ec2c-47d0-a208-7aaea9c6d323",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132538_7214f57e-ec2c-47d0-a208-7aaea9c6d323.glb"
+  },
+  {
+   "id": "stone_palmhut_a",
+   "title": "Palm-thatched oval house",
+   "set": "stone",
+   "eras": [
+    0,
+    3
+   ],
+   "cultures": [
+    "america"
+   ],
+   "kinds": [
+    "hut"
+   ],
+   "h": 5.4,
+   "concept": "d5673709-a686-444e-887a-edd0973101d6",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130944_d5673709-a686-444e-887a-edd0973101d6.png",
+   "mesh": "861aeb29-c843-43d4-a992-548ac4315a91",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132542_861aeb29-c843-43d4-a992-548ac4315a91.glb"
   }
  ]
 }
