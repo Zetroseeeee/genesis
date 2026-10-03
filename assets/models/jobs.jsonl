@@ -65,3 +65,11 @@
 {"id":"bronze_market_a","concept":"403d997d-984e-4a37-aa5a-1ada72a9dd1e","ref":"b29afb73-544d-47dd-8728-7560af5f4613"}
 {"id":"tree_spruce_a","concept":"92d82252-86b4-404a-937b-24c575110753","ref":"86bf0d6d-5279-464c-a498-d82de2f181b4"}
 {"id":"tree_acacia_a","concept":"0ce0f2c2-f5fe-4f54-8c73-f8dd0e9eecfb","ref":"86bf0d6d-5279-464c-a498-d82de2f181b4"}
+{"id":"bronze_pyramid_a","mesh":"d9d69b04-8fdc-4d2e-becc-66cfa938f930"}
+{"id":"bronze_market_a","mesh":"f0487e6c-706f-4c64-90a2-885f72be89f8"}
+{"id":"tree_spruce_a","mesh":"eb55b342-a473-40f0-9da6-018a60e8b975"}
+{"id":"tree_acacia_a","mesh":"edf79d01-7ec8-4496-8fe6-13d1fe291f46"}
+{"id":"tree_palm_a","concept":"51219261-fb76-44fc-b277-ed24dc75ce75","ref":"86bf0d6d-5279-464c-a498-d82de2f181b4"}
+{"id":"bronze_mudbrick_site","concept":"07ece328-66d8-45c3-b03b-39653d8d9c08","ref":"e8c06ff0-c45c-45e4-9f96-5fb0899054f9"}
+{"id":"bronze_timber_site","concept":"3bc34a7a-8287-45cf-aaf9-691fb8e9ffce","ref":"b29afb73-544d-47dd-8728-7560af5f4613"}
+{"id":"bronze_mound_a","concept":"fdd5b71a-ad16-42ac-8b26-77dde3ca9f88","ref":"d2857705-9bf1-4c36-8d52-2fd9327ea483"}

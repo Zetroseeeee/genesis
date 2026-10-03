@@ -748,7 +748,7 @@
    "kinds": [
     "gatehouse"
    ],
-   "w": 14.0,
+   "w": 17.5,
    "scaleBy": "w",
    "fit": "gate",
    "sides": "bronze_mudwall_a",
@@ -870,7 +870,7 @@
     "stepped",
     "palace"
    ],
-   "w": 31.0,
+   "w": 28.0,
    "scaleBy": "w",
    "h": 10.0,
    "ref": "5e30cc40-300b-4d73-85d4-f50b86c2c618",
