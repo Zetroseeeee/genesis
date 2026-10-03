@@ -201,8 +201,9 @@
   const hScale = (k) => Math.pow(k, 0.85);
   const peopleOf = (sim, i) => Math.max(30, sim.pop[i] * 1000);
   // How closely a people builds, by culture (med, north, east, mena, africa, sasia, easia, seasia, america, namerica): the
-  // mud-brick towns of the river valleys and the Mediterranean stand wall to wall; northern and woodland villages spread out.
-  const COMPACT = [0.45, 1, 1, 0.35, 0.7, 0.4, 0.5, 0.85, 0.7, 1];
+  // mud-brick towns of the river valleys and the Mediterranean stand wall to wall; northern and woodland villages spread
+  // out more, though never so far that a town of small houses reads as a scatter of dots.
+  const COMPACT = [0.45, 0.6, 0.6, 0.35, 0.34, 0.4, 0.45, 0.42, 0.5, 0.6];
   const trueR = (people, era, cul) => clamp(Math.sqrt(people * APC[era] * (cul === undefined ? 1 : era === 0 ? Math.sqrt(COMPACT[cul]) : COMPACT[cul]) / Math.PI), 60, 9000);
   function radiusTrue(sim, i, c) { return trueR(peopleOf(sim, i), c ? c.era : 0, c ? civCulture(sim, c) : undefined); }
   function radiusM(sim, i, c) { const Rt = radiusTrue(sim, i, c); return Rt * scaleOf(Rt); }   // the radius as drawn, metres
@@ -412,14 +413,18 @@
     if (dist.market && !coarse) { const d = dist.market; push('hall', d.x, d.z, Math.max(14, d.rad * 0.9), 6 + (era >= 3 ? 4 : 0), Math.max(10, d.rad * 0.6), -(d.a + Math.PI / 2), 0xd9b98c, packStyle(era >= 3 ? WALL.stone : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, FLAG.landmark), 0, d.prog).as = 'market'; if (d.prog >= 0.6) for (let k = 0; k < 8; k++) { const a = d.a + k * 0.7; const rr = d.rad * (0.5 + rnd(800 + k) * 0.5); push('stall', d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, 3.2, 2.8, 2.4, rnd(810 + k) * 3, [0xc84a3a, 0xd9a94a, 0x5a8a5a, 0xe6dcc4][k % 4], packStyle(WALL.wood, ROOF.thatch, cul, 0)); } }
     if (dist.mine && !coarse) { const d = dist.mine; const yaw = -(d.a + Math.PI / 2); push(era >= 6 ? 'chimney' : 'keep', d.x, d.z, era >= 6 ? 4 : 8, era >= 6 ? 30 : 14, era >= 6 ? 4 : 8, yaw, era >= 6 ? 0x4a4440 : 0x6e5537, packStyle(era >= 6 ? WALL.brick : WALL.timber, ROOF.flat, cul, FLAG.landmark), 0, d.prog).as = 'mine'; for (let k = 0; k < 2; k++) push('barn', d.x + Math.cos(d.a + 1.2 + k * 2) * d.rad * 0.5, d.z + Math.sin(d.a + 1.2 + k * 2) * d.rad * 0.5, 12, 5, 8, yaw + k, 0x7a6247, packStyle(WALL.wood, ROOF.shingle, cul, 0), 0, d.prog); for (let k = 0; k < 4; k++) push('rubble', d.x + Math.cos(d.a + k * 1.5) * d.rad * 0.8, d.z + Math.sin(d.a + k * 1.5) * d.rad * 0.8, 9, 3.5, 9, rnd(830 + k) * 3, 0x6f685e, packStyle(WALL.stone, ROOF.flat, cul, FLAG.ruin)); }
     if (dist.industry) { const d = dist.industry; const nF = coarse ? 2 : 3 + Math.min(4, lvl); for (let k = 0; k < nF; k++) { const a = d.a + (k - nF / 2) * 0.5; const rr = R * 0.12 * (k % 2 ? 1 : 0.4); push('factory', d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, 42, 11, 26, -axis + (k % 2 ? 0 : Math.PI / 2), era >= 7 ? 0x9ea3a8 : 0x7a4a3c, packStyle(era >= 7 ? WALL.concrete : WALL.brick, ROOF.metal, cul, 0)); if (era === 6 || rnd(850 + k) < 0.4) push('chimney', d.x + Math.cos(a) * rr + 14, d.z + Math.sin(a) * rr + 9, 3.5, 36, 3.5, 0, 0x5a4a44, packStyle(WALL.brick, ROOF.flat, cul, 0)); } }
+    let harbour = null;
     if (dist.harbour) {
-      const d = dist.harbour; const dirx = Math.cos(d.a), dirz = Math.sin(d.a); const pr = d.prog;
+      const d = dist.harbour; const dirx = Math.cos(d.a), dirz = Math.sin(d.a); const pr = d.prog; const hb0 = items.length;
       const nP = coarse ? 1 : 2 + Math.min(3, lvl);
       for (let k = 0; k < nP; k++) { const off = (k - (nP - 1) / 2) * 22; const px = d.x + dirx * 40 - dirz * off, pz = d.z + dirz * 40 + dirx * off; const pp = clamp((pr - k * 0.12) / 0.5, 0, 1); if (pp <= 0) continue; push('pier', px, pz, 70 * Math.max(0.3, pp), 1.6, 4, -d.a, 0x6a563e, packStyle(WALL.wood, ROOF.flat, cul, 0), 0); if (!coarse && pr >= 0.8) push(era >= 6 ? 'ship' : 'boat', px + dirx * 30, pz + dirz * 30 + 5, era >= 6 ? 34 : 9, era >= 6 ? 8 : 2.5, era >= 6 ? 8 : 3, -d.a, era >= 6 ? 0x5b6068 : 0x7c5a38, packStyle(WALL.wood, ROOF.flat, cul, 0)); }
       const shedKind = houses.reduce((b, e) => e[1] > b[1] ? e : b, houses[0])[0];      // early harbours: sheds built the way the houses are
       const nW = coarse ? 1 : 3 + lvl; for (let k = 0; k < nW; k++) { const off = (k - nW / 2) * (era <= 2 && shedKind === 'longhouse' ? 30 : 18); const pp = clamp((pr - 0.2 - k * 0.1) / 0.5, 0, 1); if (pp <= 0) continue; push(era >= 6 ? 'warehouse' : era <= 2 ? shedKind : 'gable', d.x - dirx * 22 - dirz * off, d.z - dirz * 22 + dirx * off, 16, era >= 6 ? 9 : 6, 10, -d.a + Math.PI / 2, era >= 6 ? 0x8a6a4e : colorOf(900 + k), packStyle(era >= 6 ? WALL.brick : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, 0), 0, pp); }
       if (era >= 3 && lvl >= 3 && pr >= 1) push('lighthouse', d.x + dirx * 120 - dirz * 60, d.z + dirz * 120 + dirx * 60, 8, 26, 8, 0, 0xf2efe8, packStyle(WALL.stone, ROOF.copper, cul, FLAG.landmark));
       if (era >= 7 && !coarse && pr >= 1) for (let k = 0; k < 3; k++) push('crane', d.x + dirx * 60 - dirz * (k - 1) * 40, d.z + dirz * 60 + dirx * (k - 1) * 40, 6, 40, 6, -d.a, 0xd9552f, packStyle(WALL.concrete, ROOF.flat, cul, 0));
+      // the planner only knows which way the sea lies; the world layer finds the shore and moves these there (hb: harbour item)
+      for (let k = hb0; k < items.length; k++) items[k].hb = 1;
+      harbour = { a: d.a, x: d.x * kS, z: d.z * kS };
     }
     // --- walls: a ring with towers and gates; bastions in the Renaissance; going up segment by segment when under construction ---
     const walls = [];
@@ -490,7 +495,7 @@
     for (const it of items) { it.x *= kS; it.z *= kS; it.w *= kS; it.d *= kS; it.h *= kH; }
     for (const st of streets) { st[0] *= kS; st[1] *= kS; st[2] *= kS; st[3] *= kS; st[4] *= kS; }
     for (const wv of walls) { wv.x *= kS; wv.z *= kS; }
-    const out = { key, R: R * kS, Rt: R, k: kS, kh: kH, plaza: plaza * kS, axis, gates, items, walls, wallR: wallStyle !== 'none' ? wallR * kS : 0, culture: cul, era, coast, streets, streetCls: cls, plots, sites: nSites, growing: !!growing };
+    const out = { key, R: R * kS, Rt: R, k: kS, kh: kH, plaza: plaza * kS, axis, gates, items, walls, wallR: wallStyle !== 'none' ? wallR * kS : 0, culture: cul, era, coast, harbour, streets, streetCls: cls, plots, sites: nSites, growing: !!growing };
     cache.set(ck, out);
     if (cache.size > 400) { const first = cache.keys().next().value; cache.delete(first); }
     return out;

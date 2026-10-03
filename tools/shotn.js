@@ -1,7 +1,7 @@
 // Several screenshots in one browser session: node tools/shotn.js <name> <setup script> <wait ms> <label=script> [<label=script> ...]
 // After the setup script and the wait, each step's script runs, 'pause' ms pass (env PAUSE, default 4000), and shots/<name>_<label>.png is saved.
 // TEX=<manifest> picks the texture set (default: the labelled synthetic one); W/H set the viewport; CLIP=x,y,w,h crops;
-// The software renderer gets a lighter load by default; for the real thing: SHADOW=4096 (shadow map size), TREES=1
+// The software renderer gets a lighter load by default; for the real thing: SHADOW=4096 (the shadow map, off otherwise), TREES=1
 // (forest density), LOD=1 (finest models). DIST=<dir> serves another build.
 const { chromium } = require('playwright'); const http = require('http'); const fs = require('fs'); const path = require('path');
 const name = process.argv[2], script = process.argv[3] || '', t1 = +(process.argv[4] || 8000); const steps = process.argv.slice(5).map((s) => { const k = s.indexOf('='); return [s.slice(0, k), s.slice(k + 1)]; });

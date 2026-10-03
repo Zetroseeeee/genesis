@@ -273,7 +273,8 @@
       "sasia"
      ]
     }
-   ]
+   ],
+   "straighten": true
   },
   {
    "id": "stone_mudbrick_b",
@@ -1273,7 +1274,7 @@
    "card": true,
    "tree": {
     "zones": {
-     "dry": 2,
+     "dry": 4,
      "rain": 1,
      "savanna": 0.4
     }

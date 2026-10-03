@@ -17,7 +17,7 @@
       this.arche = BKIT.makeKit();
       this.buildingGroup = new THREE.Group(); this.scene.add(this.buildingGroup);
       this.inst = {}; const MAXI = BKIT.MAXI;
-      this.bUniforms = { uSunV: { value: new THREE.Vector3(0, 1, 0) }, uUpV: { value: new THREE.Vector3(0, 1, 0) }, uDay: { value: 1 }, uCamAlt: { value: 1 }, uTime: { value: 0 }, uMetres: { value: R_M }, uTexMix: { value: 0 } };
+      this.bUniforms = { uSunV: { value: new THREE.Vector3(0, 1, 0) }, uUpV: { value: new THREE.Vector3(0, 1, 0) }, uDay: { value: 1 }, uCamAlt: { value: 1 }, uTime: { value: 0 }, uMetres: { value: R_M }, uTexMix: { value: 0 }, uGround: { value: new THREE.Vector3(0.42, 0.4, 0.26) } };      // uGround: the colour of the land around, for bounced light
       this.bMat = new THREE.ShaderMaterial({ uniforms: this.bUniforms, vertexShader: BKIT.VERT, fragmentShader: BKIT.FRAG });
       this.textured = false;
       this.info = {};
@@ -36,7 +36,7 @@
       this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._s = new THREE.Vector3(); this._p = new THREE.Vector3(); this._c = new THREE.Color();
       this.buildingCount = 0;
       // real 3D models (models.js) share the kit's light uniforms and replace kit archetypes where a model exists
-      if (window.MODELS) MODELS.init(this.scene, { uSunV: this.bUniforms.uSunV, uUpV: this.bUniforms.uUpV, uDay: this.bUniforms.uDay, uCamAlt: this.bUniforms.uCamAlt, uTime: this.bUniforms.uTime }, { units: 6371.0 });
+      if (window.MODELS) MODELS.init(this.scene, { uSunV: this.bUniforms.uSunV, uUpV: this.bUniforms.uUpV, uDay: this.bUniforms.uDay, uCamAlt: this.bUniforms.uCamAlt, uTime: this.bUniforms.uTime, uGround: this.bUniforms.uGround }, { units: 6371.0 });
       this.modelsOn = true; this._pv = new THREE.Vector3();
       this.initSky();
     }
@@ -111,6 +111,8 @@
         const coarse = dKm - Rk > 150;
         const L = TOWN.layout(sim, i, c, { coarse });
         const items = L.items; const n = items.length;
+        // a harbour belongs on the shore: found once the coast is on screen, and again when finer terrain arrives
+        if (L.harbour && !coarse && L.shoreKey !== T.meshVersion + ':' + T.stats.packsI) { L.shoreKey = T.meshVersion + ':' + T.stats.packsI; this.placeHarbour(L, cLon, cLat, cl); L.hts = null; L.mask = null; L.fitEra = null; }
         // per-plan caches: ground heights (refreshed when finer elevation arrives) and river masks (once)
         if (!L.hts || L.meshV !== T.meshVersion || L.dispOn !== T.dispOn) {
           // ground heights per item; a town re-planned while it grows keeps the heights of the plots it already had
@@ -127,6 +129,7 @@
         for (let k = 0; k < n; k++) {
           if (mask && mask[k]) continue;
           if (fits && fits[k]) continue;                       // its model would stand in a neighbour's
+          if (items[k].off) continue;                          // a harbour with no shore to stand on
           const it = items[k]; const im = this.inst[it.kind]; if (!im) continue;
           const idx = counts[it.kind]; if (idx >= im.instanceMatrix.count) continue;
           const lon = cLon + it.x / (R_M * cl * GEO.D2R), lat = cLat + it.z / (R_M * GEO.D2R);
@@ -232,6 +235,24 @@
           prog, camPos, pxPerRad, (hB - hA) * this.exag / one, alongZ) || ok;
       }
       return ok ? n : 0;
+    }
+    // The planner puts a harbour at the town's edge toward the nearest sea; where the water really begins it cannot
+    // know. Walk out from the town that way (and, failing that, a little to either side) until land gives way to water,
+    // and move piers, boats and sheds there as one group, turned to face the water. No shore within reach: no harbour.
+    placeHarbour(L, cLon, cLat, cl) {
+      const Hb = L.harbour, T = this.terrain; const items = L.items; const step = Math.max(40, L.R / 70); let found = null;
+      for (const da of [0, 0.3, -0.3, 0.6, -0.6, 0.95, -0.95, 1.3, -1.3]) {
+        const a = Hb.a + da, ca = Math.cos(a), sa = Math.sin(a); let land = 0;
+        for (let r = L.R * 0.2; r <= L.R * 3.2; r += step) { const w = T.isWater(cLon + ca * r / (R_M * cl * GEO.D2R), cLat + sa * r / (R_M * GEO.D2R)); if (!w) land++; else if (land >= 3) { found = { a, r, da }; break; } else land = 0; }
+        if (found) break;
+      }
+      const c = found ? Math.cos(found.da) : 1, s = found ? Math.sin(found.da) : 0; const nx = found ? Math.cos(found.a) * found.r : 0, nz = found ? Math.sin(found.a) * found.r : 0;
+      for (let k = 0; k < items.length; k++) { const it = items[k]; if (!it.hb) continue;
+        if (it._x0 === undefined) { it._x0 = it.x; it._z0 = it.z; it._yaw0 = it.yaw; }
+        if (!found) { it.off = true; continue; }
+        const rx = it._x0 - Hb.x, rz = it._z0 - Hb.z; it.x = nx + rx * c - rz * s; it.z = nz + rx * s + rz * c; it.yaw = it._yaw0 - found.da; it.off = false; if (it._rh) it._rh = null;
+      }
+      L.shore = found;
     }
     // How a model sits on its plot: turned so its long side lies along the plot's long side, at life size on the town's
     // drawn scale with a little give to suit the plot (more for the building a town gathers around; a wonder may be

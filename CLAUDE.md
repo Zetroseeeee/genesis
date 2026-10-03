@@ -17,7 +17,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   `tools/scenes/forest.js` (`__forest(lon, lat, alt, tilt, heading, season)`). Software GL is slow: models take
   minutes to arrive and until then plots stand empty, so wait ~170 s before the first shot, run it in the
   background (`nohup ... &`), and judge nothing from a frame taken while files are still coming in.
-  `SHADOW=4096` gives the shadow map its real size (software GL gets 1024), `DIST=<dir>` serves a snapshot build.
+  `SHADOW=4096` turns the shadow map on at its real size (software GL goes without), `TREES=1` and `LOD=1` give full forests and the finest models, `DIST=<dir>` serves a snapshot build.
 - `tools/peek.sh <name> <url> ...` — contact sheet of generated images via the Peek workflow (`shots/peek/<name>.jpg`).
 - `node tools/coverage.js [eras] [--all] [--wonder]` — which planned buildings are real models and which still fall
   back to the kit, for a capital of every culture with every work built. Run it after touching the manifest or the

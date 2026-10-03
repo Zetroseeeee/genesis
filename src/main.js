@@ -38,9 +38,9 @@
   // ---------- renderer ----------
   const stage = $('stage');
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
-  // a browser drawing in software (the test harness) gets a lighter load: a quarter-size shadow map, thinner forests
+  // a browser drawing in software (the test harness) gets a lighter load: no shadow map, thinner forests, coarser models
   let softGL = false; try { const gl = renderer.getContext(); const x = gl.getExtension('WEBGL_debug_renderer_info'); softGL = /SwiftShader|llvmpipe|Software/i.test(String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))); } catch (e) {}
-  if (window.SHADOWS) SHADOWS.init(renderer, window.GENESIS_SHADOW || (softGL ? 1024 : 4096));      // the sun's depth map: 4096 texels across on a real GPU
+  if (window.SHADOWS && (window.GENESIS_SHADOW || !softGL)) SHADOWS.init(renderer, window.GENESIS_SHADOW || 4096);      // the sun's depth map, 4096 texels across (a software renderer goes without unless asked)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.setClearColor(0x05070c, 1);
@@ -105,7 +105,7 @@
       terrain = new TERRAIN.Terrain({ scene, index, base: 'data/', globals, exag: 2.0, anisotropy: Math.min(8, renderer.capabilities.getMaxAnisotropy()) });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
-      trees = new TREES.Trees({ scene, terrain, renderer }); if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.4; trees.load('data/veg.jpg', 'data/noise.png').catch((e) => console.warn('veg', e));
+      trees = new TREES.Trees({ scene, terrain, renderer }); if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; trees.load('data/veg.jpg', 'data/noise.png').catch((e) => console.warn('veg', e));
       life = new LIFE.Life({ scene, terrain }); movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
@@ -841,7 +841,7 @@
   setInterval(() => saveLocal(false), 60000);
 
   // ---------- loop ----------
-  let last = performance.now(), acc = 0, texAge = 0, uiAge = 0, tpsCount = 0, tpsT = 0, sunAngle = 0.6, mmT = 0, olT = 0, seasonPhase = 0.45;
+  let frameNo = 0; let last = performance.now(), acc = 0, texAge = 0, uiAge = 0, tpsCount = 0, tpsT = 0, sunAngle = 0.6, mmT = 0, olT = 0, seasonPhase = 0.45;
   let frameEMA = 16, playSince = 0, autoQualityDone = false;
   function frame(now) {
     requestAnimationFrame(frame);
@@ -851,8 +851,9 @@
     if (mode === 'play' && !autoQualityDone) { if (!playSince) playSince = now; else if (now - playSince > 5000) { autoQualityDone = true; if (frameEMA > 34 && settings.quality === 'high' && !settings.qualityPinned) { settings.quality = 'balanced'; $('opt-quality').value = 'balanced'; applySettings(); toast('Graphics set to Balanced for smoother flying (Menu › Graphics to change)'); } } }
     const modalOpen = $('chron').open || $('menu').open;
     mapcam.update(dt);
+    camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();      // everything this frame (sun in view space, shadow lookup) works from the camera where it now is
     // seasons: one year every four minutes of real time; the sun's declination swings with it and the ground follows
-    seasonPhase = (seasonPhase + dt / 240) % 1; const decl = -0.4 * Math.cos(seasonPhase * Math.PI * 2);
+    if (!window.__seasonLock) seasonPhase = (seasonPhase + dt / 240) % 1; const decl = -0.4 * Math.cos(seasonPhase * Math.PI * 2);
     { const wN = 0.5 + 0.5 * Math.cos(seasonPhase * Math.PI * 2); const gauss = (x, c) => Math.exp(-Math.pow(((x - c + 1.5) % 1) - 0.5, 2) / 0.006); globals.uSeason.value.set(wN, gauss(seasonPhase, 0.82), 1 - wN, gauss(seasonPhase, 0.32)); if (trees) trees.season = globals.uSeason.value; }
     if (!window.__sunLock) { sunAngle += dt * 0.012; const cd = Math.sqrt(1 - decl * decl); globals.uSun.value.set(Math.cos(sunAngle) * cd, decl, Math.sin(sunAngle) * cd).normalize(); }
     globals.uTime.value = now / 1000; globals.uCamAlt.value = mapcam.alt;
@@ -877,6 +878,12 @@
     if (world.cloudTex && globals.uClouds.value !== world.cloudTex) globals.uClouds.value = world.cloudTex;
     globals.uCloudShift.value = world.cloudShift; globals.uCloudVis.value = world.cloudVis;
     world.updateBuildings(mapcam, false);
+    // the colour of the ground hereabouts, for the light it throws back onto walls in shade (looked up now and then)
+    if (trees && trees.ready && ((frameNo = (frameNo + 1) % 20) === 0) && mapcam.alt < 0.03) {
+      const fw = trees.forestAt(mapcam.lon, mapcam.lat, Math.max(1, terrain.heightAt(mapcam.lon, mapcam.lat))); const g = world.bUniforms.uGround.value;
+      if (fw && fw.warm !== undefined) { const o = Math.max(0, 1 - fw.f - fw.g), w = fw.warm;
+        g.set(fw.f * 0.16 + fw.g * (0.36 + 0.19 * w) + o * (0.5 + 0.36 * w), fw.f * 0.22 + fw.g * (0.40 + 0.06 * w) + o * (0.48 + 0.16 * w), fw.f * 0.10 + fw.g * (0.20 + 0.06 * w) + o * (0.44 - 0.06 * w)); }
+    }
     // sun shadows: a depth map of what stands around the point the camera looks at, pushed a little way down the view
     if (window.SHADOWS && SHADOWS.ready) {
       if (mapcam.alt < 0.03 && settings.quality === 'high') {

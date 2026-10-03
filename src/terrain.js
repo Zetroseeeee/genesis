@@ -206,8 +206,13 @@
       // biome weights
       float aboveTree = smoothstep(treeLine - 300.0, treeLine + 200.0, vH);
       float steep = smoothstep(0.12, 0.42, slope);
-      float wForest = green * (1.0 - smoothstep(0.32, 0.6, lum)) * (1.0 - aboveTree) * (1.0 - steep * 0.7);
-      float wGrass  = green * smoothstep(0.28, 0.55, lum) * (1.0 - steep * 0.6) + green * aboveTree * 0.6 * (1.0 - steep);
+      // the wildwood: land that is green and not dry was forest until somebody cleared it; today's pictures show the
+      // fields that came later. So where nobody farms, the lighter greens count as forest too.
+      vec4 sim = texture2D(uSim, geo);
+      float cult = sim.b;
+      float wild = (1.0 - smoothstep(0.22, 0.48, warm)) * (1.0 - clamp(cult * 1.4, 0.0, 1.0));
+      float wForest = green * (1.0 - smoothstep(0.32 + 0.2 * wild, 0.6 + 0.3 * wild, lum)) * (1.0 - aboveTree) * (1.0 - steep * 0.7);
+      float wGrass  = green * smoothstep(0.28 + 0.2 * wild, 0.55 + 0.3 * wild, lum) * (1.0 - steep * 0.6) + green * aboveTree * 0.6 * (1.0 - steep);
       float wDesert = warm * (1.0 - green) * (1.0 - steep) * (1.0 - smoothstep(1800.0, 3000.0, vH));
       float wRock   = max(steep, smoothstep(treeLine + 400.0, treeLine + 1400.0, vH) * (1.0 - green * 0.5)) + (1.0 - green) * (1.0 - warm) * 0.5;
       // dithered transitions: land cover breaks up instead of fading
@@ -231,6 +236,9 @@
       vec3 dF = DET(uDetA), dG = DET(uDetD), dS = DET(uDetB), dR = DET(uDetC) * 0.78;
       #endif
       #undef DET
+      // between the tropics dry open country is savanna, not sand sea (the great deserts lie further out, or are drier still)
+      float dryGrass = (1.0 - smoothstep(0.17, 0.23, latN0 + (nMid.b - 0.5) * 0.04)) * (1.0 - smoothstep(0.66, 0.84, warm));
+      dS = mix(dS, dG * vec3(1.18, 1.02, 0.72), dryGrass);
       vec3 det = dF * wForest + dG * wGrass + dS * wDesert + dR * wRock;
       float dl = dot(det, vec3(0.299, 0.587, 0.114));
       det = mix(vec3(dl) * 0.5 + det * 0.5, det, smoothstep(0.0012, 0.0002, uCamAlt));   // photo grain only reads from low altitude
@@ -258,7 +266,7 @@
         float dith = (nMic.r - 0.5) * 0.35 + (nFin.g - 0.5) * 0.15;
         float gL = (latN0 + dith < 0.3 && warm > 0.3) ? 9.0 : (lum + dith > 0.5 && green < 0.7) ? 1.0 : 0.0;    // savanna, steppe, meadow
         float fL = (vH > treeLine - 600.0 || latN0 + dith > 0.62) ? 8.0 : 7.0;                                  // tundra above the trees and in the far north, else forest floor
-        float dL = (lum > 0.62 && green < 0.25 && warm < 0.4) ? 15.0 : (nMid.b + dith > 0.62 ? 4.0 : 3.0);       // salt flat, stony desert, sand
+        float dL = dryGrass + dith > 0.5 ? 9.0 : (lum > 0.62 && green < 0.25 && warm < 0.4) ? 15.0 : (nMid.b + dith > 0.62 ? 4.0 : 3.0);       // dry savanna, salt flat, stony desert, sand
         float rL = (nMid.a + dith > 0.58) ? 11.0 : 5.0;                                                           // scree, bare rock
         float wD = wDesert > 0.02 ? wDesert : 0.0, wR = wRock > 0.02 ? wRock : 0.0;
         vec3 tex = gtex(uGround, gL, 4.0) * wGrass + gtex(uGround, fL, 4.0) * wForest;
@@ -275,8 +283,6 @@
       }
       #endif
       // cultivation patchwork near settlements (sim channel b)
-      vec4 sim = texture2D(uSim, geo);
-      float cult = sim.b;
       // under the trees it is dim: where the forest stands the ground lies in the canopy's shade, dappled with light
       // (from the height at which single trees are drawn; farmland has cleared its share)
       { float canopy = wForest * smoothstep(0.0085, 0.005, uCamAlt) * (1.0 - cult * 0.6) * (1.0 - max(snow, ice));

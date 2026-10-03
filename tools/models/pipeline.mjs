@@ -20,6 +20,7 @@ import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer
 import sharp from 'sharp';
 import { bakeLowLod } from './lowlod.mjs';
 import { keyCard } from './card.mjs';
+import { wallLines } from './taper.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
@@ -40,7 +41,7 @@ const LODS = [
 const log = (...a) => console.log(...a);
 const sh = (cmd, args, opts) => execFileSync(cmd, args, Object.assign({ encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 28 }, opts || {}));
 const readManifest = () => JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h', ...(m.plan ? [m.plan] : []), ...(m.sink ? [m.sink] : []), ...(m.card ? ['card', 2] : [])])).digest('hex').slice(0, 12);
+const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h', ...(m.plan ? [m.plan] : []), ...(m.sink ? [m.sink] : []), ...(m.card ? ['card', 2] : []), ...(m.straighten ? ['straighten', 1] : [])])).digest('hex').slice(0, 12);
 const srcName = (m) => `${m.id}.${(m.mesh || 'x').slice(0, 8)}.src.glb`;
 
 let _io = null;
@@ -82,8 +83,36 @@ async function normalise(doc, m) {
     transformMesh(mesh, mul(M, node.getWorldMatrix()));
     node.setMatrix(IDENT);
   }
+  if (m.straighten) straightenWalls(doc, getBounds(scene).max[1]);
   const nb = getBounds(scene);
   return { w: +(nb.max[0] - nb.min[0]).toFixed(3), h: +(nb.max[1] - nb.min[1]).toFixed(3), d: +(nb.max[2] - nb.min[2]).toFixed(3) };
+}
+
+// straighten: true. A generator that reads a three-quarter photograph leans the far walls of a box-shaped building in
+// (the house comes out a wedge). Each of the four sides is measured in a low and a high band of the walls; a side that
+// leans more than a few degrees is stood up again, everything between the sides moving with them, the roof included.
+// Normals turn with the walls.
+function straightenWalls(doc, h) {
+  const prims = []; let total = 0;
+  for (const mesh of doc.getRoot().listMeshes()) for (const p of mesh.listPrimitives()) { const a = p.getAttribute('POSITION'); if (a) { prims.push(p); total += a.getCount(); } }
+  const pts = new Float32Array(total * 3); { let o = 0; const v = [0, 0, 0]; for (const p of prims) { const a = p.getAttribute('POSITION'); for (let i = 0; i < a.getCount(); i++) { a.getElement(i, v); pts[o++] = v[0]; pts[o++] = v[1]; pts[o++] = v[2]; } } }
+  const L = wallLines(pts, h); const dy = L.yH - L.yL;
+  const sl = [0, 1, 2, 3].map((k) => Math.abs(L.lean[k]) > 3 ? (L.hi[k] - L.lo[k]) / dy : 0);        // metres the wall line moves per metre of height; 0 = leave this side alone
+  if (!sl.some((x) => x)) { log('   straighten: walls already upright'); return; }
+  log(`   straighten: walls leaned ${L.lean.map((d) => d.toFixed(1)).join(', ')} degrees (-x, +x, -z, +z)`);
+  const W0 = L.lo[1] - L.lo[0], D0 = L.lo[3] - L.lo[2]; const v = [0, 0, 0], nrm = [0, 0, 0];
+  for (const p of prims) {
+    const a = p.getAttribute('POSITION'), na = p.getAttribute('NORMAL');
+    for (let i = 0; i < a.getCount(); i++) {
+      a.getElement(i, v); const t = v[1] - L.yL;
+      const xlo = L.lo[0] + sl[0] * t, xhi = L.lo[1] + sl[1] * t, zlo = L.lo[2] + sl[2] * t, zhi = L.lo[3] + sl[3] * t;
+      const wx = Math.max(xhi - xlo, W0 * 0.3), wz = Math.max(zhi - zlo, D0 * 0.3); const Sx = W0 / wx, Sz = D0 / wz;
+      const ux = (v[0] - xlo) / wx, uz = (v[2] - zlo) / wz;
+      if (na) { na.getElement(i, nrm); const cx = -Sx * (sl[0] + (sl[1] - sl[0]) * ux), cz = -Sz * (sl[2] + (sl[3] - sl[2]) * uz);
+        const nx = nrm[0] / Sx, nz = nrm[2] / Sz, ny = nrm[1] - cx * nrm[0] / Sx - cz * nrm[2] / Sz; const l = Math.hypot(nx, ny, nz) || 1; na.setElement(i, [nx / l, ny / l, nz / l]); }
+      a.setElement(i, [L.lo[0] + ux * W0, v[1], L.lo[2] + uz * D0]);
+    }
+  }
 }
 
 async function buildLod(base, lod, outPath) {

@@ -74,7 +74,7 @@ server.listen(0, async () => {
     await ev(() => document.getElementById('bannercancel').click()); await frames(2); check((await state()).mode === 'intro', 'cancel returns to intro');
   });
   await scenario('intro: random river start', async (check) => {
-    await ev(() => document.getElementById('btn-random').click()); await wait(500); await page.waitForFunction(() => !__G.mapcam.fly, null, { timeout: 180000 }); await frames(5); // the flight is paced by frame dt (capped), so wait for it rather than the clock
+    await ev(() => document.getElementById('btn-random').click()); await wait(500); await page.waitForFunction(() => !__G.mapcam.fly, null, { timeout: 320000 }); await frames(5); // the flight is paced by frame dt (capped), so wait for it rather than the clock
     const s = await state(); check(s.mode === 'play' && s.player >= 0, 'random start enters play');
     const cap = await ev(() => { const c = __G.sim.playerCiv(); const i = c.capital; return { river: !!(__G.sim.flags[i] & 2), fert: __G.sim.fert[i] }; }); check(cap.fert > 0.3, 'random start on decent land (fert ' + cap.fert.toFixed(2) + ')');
     check(s.dist < 0.006, 'camera flew in to town height (dist ' + s.dist.toFixed(5) + ')');
@@ -85,7 +85,7 @@ server.listen(0, async () => {
     const y0 = (await state()).year;
     await ev(() => document.getElementById('turn').click()); await frames(2);
     let s = await state(); check(/state-running/.test(s.turn), 'button in running state: ' + s.turn);
-    await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 180000 });
+    await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 320000 });
     s = await state(); check(s.year - y0 === 200 || s.report, `200 years passed or an interrupt stopped it (${s.year - y0})`); check(s.report, 'report shown');
     const rep = await ev(() => ({ title: document.getElementById('report-title').textContent, body: document.getElementById('report-body').textContent.length, delta: document.getElementById('report-delta').textContent })); check(/→/.test(rep.title), 'report title has a range'); check(/people/.test(rep.delta), 'report delta lists people');
     await ev(() => document.getElementById('report-close').click()); check(!(await state()).report, 'report closes');

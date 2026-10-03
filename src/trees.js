@@ -20,7 +20,7 @@
     tree_broad: { zones: { temperate: 5, med: 2, easia: 3 }, deciduous: true },
     tree_conifer: { zones: { boreal: 6, temperate: 0.6 } },
     tree_savanna: { zones: { savanna: 6, dry: 5 } },
-    tree_palm: { zones: { dry: 2, rain: 1, savanna: 0.4 } },
+    tree_palm: { zones: { dry: 4, rain: 1, savanna: 0.4 } },
   };
   // the lands with a Mediterranean climate: the western basin with the Maghreb coast, the eastern basin north of the
   // Levant's deserts, California, central Chile, the Cape, the south-west and south of Australia
@@ -176,8 +176,11 @@
       const gx = lon * D2R * Math.cos(lat * D2R), gy = lat * D2R;
       const nMid = [this.noiseAt(gx, gy, 1200, 0), this.noiseAt(gx, gy, 1200, 1), this.noiseAt(gx, gy, 1200, 3)];
       const nMic = [this.noiseAt(gx, gy, 9000, 0), this.noiseAt(gx, gy, 9000, 1), this.noiseAt(gx, gy, 9000, 3)];
-      let wF = green * (1 - smooth(0.32, 0.6, lum)) * (1 - aboveTree);
-      let wG = green * smooth(0.28, 0.55, lum) + green * aboveTree * 0.6;
+      // the wildwood (as in the terrain shader): green land that is not dry is forest wherever nobody farms it
+      let cult = 0; if (this.sim) { const ci = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W); cult = this.sim.owner[ci] >= 0 ? this.sim.cultivation(ci) * (this.sim.level[ci] ? 1 : 0.6) : 0; }
+      const wild = (1 - smooth(0.22, 0.48, warm)) * (1 - Math.min(1, cult * 1.4));
+      let wF = green * (1 - smooth(0.32 + 0.2 * wild, 0.6 + 0.3 * wild, lum)) * (1 - aboveTree);
+      let wG = green * smooth(0.28 + 0.2 * wild, 0.55 + 0.3 * wild, lum) + green * aboveTree * 0.6;
       let wD = warm * (1 - green) * (1 - smooth(1800, 3000, h));
       let wR = smooth(2600, 4300, h) * (1 - green * 0.5) + (1 - green) * (1 - warm) * 0.5;
       wF = Math.pow(Math.max(wF + (nMid[0] - 0.5) * 0.5 + (nMic[1] - 0.5) * 0.25, 0), 3);

@@ -24,7 +24,7 @@
   const FRAG = `
     precision highp float;
     uniform sampler2D uMap, uNormalMap, uOrmMap; uniform float uHasN, uHasOrm, uH, uUnits, uFoliage;
-    uniform vec3 uSunV, uUpV; uniform float uDay, uCamAlt, uTime;
+    uniform vec3 uSunV, uUpV, uGround; uniform float uDay, uCamAlt, uTime;
     varying vec3 vN, vView, vLocal; varying vec2 vUv; varying vec4 vInfo;
     ${window.SHADOWS ? SHADOWS.GLSL : 'const vec4 uShadowP = vec4(0.0); float sunHidden(vec3 p) { return 0.0; }'}
     float h21(vec2 p) { p = mod(p, 512.0); vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
@@ -71,7 +71,7 @@
       // the generated textures are photographs of lit buildings: full sun brings a surface to about its own brightness, no more
       // sky light from above, warm light thrown back by the ground from below: a wall in shade is neutral, not blue
       // (the higher the sun, the more the lit ground gives back: a wall in shade in a sunlit town is warm, not grey)
-      vec3 amb = mix(vec3(0.07, 0.08, 0.12) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.42, 0.34, 0.24) * (1.0 - sky) * (0.45 + 0.55 * max(dot(uUpV, uSunV), 0.0)), uDay);
+      vec3 amb = mix(vec3(0.07, 0.08, 0.12) * (0.7 + 0.5 * sky), vec3(0.33, 0.34, 0.37) * (0.45 + 0.75 * sky) + uGround * (1.0 - sky) * (0.3 + 0.7 * max(dot(uUpV, uSunV), 0.0)) * 0.62, uDay);
       float foot = 1.0 - 0.2 * smoothstep(0.05 * uH, 0.0, vLocal.y);
       vec3 lit = col * (amb + diff * 0.82 * uDay) * foot;
       vec3 v = normalize(-vView); vec3 hv = normalize(v + uSunV);
@@ -155,7 +155,7 @@
     const map = tex(src.map), nrm = tex(src.normalMap), orm = tex(src.roughnessMap || src.metalnessMap);
     const sh = M.shared;
     const uniforms = {
-      uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uTime: sh.uTime,
+      uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uTime: sh.uTime, uGround: sh.uGround || { value: new THREE.Vector3(0.42, 0.4, 0.26) },
       uMap: { value: map }, uNormalMap: { value: nrm }, uOrmMap: { value: orm }, uHasN: { value: nrm ? 1 : 0 }, uHasOrm: { value: orm ? 1 : 0 },
       uGeo: { value: mesh.matrixWorld.clone() }, uH: { value: def.h }, uSkirt: { value: def.tree ? 0.4 : Math.max(1.5, def.h * 0.18) }, uUnits: { value: M.units }, uFoliage: { value: def.tree ? 1 : 0 },
     };

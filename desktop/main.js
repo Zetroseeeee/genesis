@@ -67,6 +67,7 @@ function createWindow() {
     width: size[0], height: size[1], minWidth: 1024, minHeight: 640, backgroundColor: '#05070b', title: 'GENESIS', show: false, enableLargerThanScreen: SMOKE,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
   });
+  if (SMOKE) win.setContentSize(size[0], size[1]);      // (the constructor clamps to the screen; this does not)
   win.once('ready-to-show', () => win.show());
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   if (SMOKE) smoke(win);
