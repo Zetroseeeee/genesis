@@ -82,7 +82,15 @@
     uniform sampler2D uImg; uniform vec4 uImgRect;
     uniform float uDLon, uDLat, uLevel;
     uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason;   // winter N, autumn N, winter S, autumn S (0..1)
-    uniform sampler2D uOwner, uPal, uSim, uInfo, uNoise, uDetA, uDetB, uDetC, uDetD;
+    uniform sampler2D uOwner, uPal, uSim, uInfo, uNoise;
+    // the four photographic detail textures (forest, dunes, rock, grass) travel as one array where the GPU has arrays:
+    // Apple's GPUs allow a fragment shader 16 textures, and this one needs every unit it can spare
+    #ifdef USE_DETARR
+    precision highp sampler2DArray;
+    uniform sampler2DArray uDet;
+    #else
+    uniform sampler2D uDetA, uDetB, uDetC, uDetD;
+    #endif
     uniform vec2 uSimRes, uSel, uHover; uniform float uFertView, uPolitical, uLabelsOn;
     uniform sampler2D uClouds; uniform float uCloudShift, uCloudVis; uniform vec2 uPhaseB, uPhaseRot;
     uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality;
@@ -92,7 +100,10 @@
     // generated ground and land-use tiles (textures.js), sampled in a metric Mercator frame: a phase computed in double precision
     // at the tile centre (uPhN whole cells mod 16, uPhF the fraction) plus the precise local offset vGLf, in base cells of 1.5 m
     precision highp sampler2DArray;
-    uniform sampler2DArray uGround, uLanduse; uniform float uTexMix; uniform sampler2D uShallows;
+    uniform sampler2DArray uGround, uLanduse; uniform float uTexMix;
+    #ifndef DET_SHALLOWS
+    uniform sampler2D uShallows;
+    #endif
     uniform vec2 uPhF, uPhN, uPhR; uniform float uK0, uKR;
     vec2 gcf(float n) { return (uPhN + uPhF + vGLf * uK0) / n; }
     vec2 gcr() { return uPhR + (mat2(0.8, 0.6, -0.6, 0.8) * vGLf) * uKR; }
@@ -211,8 +222,13 @@
       vec2 dp3 = fract(uPhaseRot) + (mat2(0.83, 0.56, -0.56, 0.83) * vGL) * 9000.0;
       float near3 = smoothstep(0.0004, 0.0001, uCamAlt) * step(0.5, uQuality);
       detailFade *= smoothstep(0.08, 0.02, uCamAlt);
+      #ifdef USE_DETARR
+      #define DET(L) mix(texture(uDet, vec3(dp2, L)).rgb * (0.7 + 0.6 * texture(uDet, vec3(dp1, L)).g), texture(uDet, vec3(dp3, L)).rgb * (0.7 + 0.6 * texture(uDet, vec3(dp2, L)).g), near3)
+      vec3 dF = DET(0.0), dG = DET(3.0), dS = DET(1.0), dR = DET(2.0) * 0.78;
+      #else
       #define DET(t) mix(texture2D(t, dp2).rgb * (0.7 + 0.6 * texture2D(t, dp1).g), texture2D(t, dp3).rgb * (0.7 + 0.6 * texture2D(t, dp2).g), near3)
       vec3 dF = DET(uDetA), dG = DET(uDetD), dS = DET(uDetB), dR = DET(uDetC) * 0.78;
+      #endif
       #undef DET
       vec3 det = dF * wForest + dG * wGrass + dS * wDesert + dR * wRock;
       float dl = dot(det, vec3(0.299, 0.587, 0.114));
@@ -328,7 +344,11 @@
       water = mix(water, coast, smoothstep(0.86, 1.0, shelf) * 0.6);
       #ifdef USE_TEXARR
       { float shal = smoothstep(0.9, 1.0, shelf) * seaW * gOn;   // sunlit sand and caustics in the shallows, drifting slowly
+        #ifdef DET_SHALLOWS
+        if (shal > 0.01) water = mix(water, texture(uDet, vec3(gcf(8.0) + vec2(uTime * 0.012, -uTime * 0.008), 4.0)).rgb * 0.85, shal * 0.5); }
+        #else
         if (shal > 0.01) water = mix(water, texture2D(uShallows, gcf(8.0) + vec2(uTime * 0.012, -uTime * 0.008)).rgb * 0.85, shal * 0.5); }
+        #endif
       #endif
       // waves: animated normal perturbation
       vec2 wp = gc(180.0);
@@ -613,7 +633,7 @@
         uExag: { value: this.exag }, uSkirt: { value: Math.max(b.w, b.h) * GEO.D2R * 0.06 + 0.00002 },
       };
       Object.assign(uniforms, this.globals);
-      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, extensions: { derivatives: true }, defines: Object.assign({}, this.texDefines || {}) });
+      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, extensions: { derivatives: true }, defines: this.defines() });
       const mesh = new THREE.Mesh(this.geoms[L >= 9 ? 128 : L >= 7 ? 64 : 32], mat);
       mesh.position.copy(center); mesh.quaternion.copy(q); mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
       // world-space extent
@@ -629,8 +649,10 @@
       if (ok) { g.uGround.value = T.arrays.ground; g.uLanduse.value = T.arrays.landuse; g.uShallows.value = (T.misc && T.misc.shallows) || this.flatTex; g.uTexMix.value = 1; }
       else if (g.uTexMix) g.uTexMix.value = 0;
       this.texDefines = ok ? { USE_TEXARR: 1 } : {}; this.textured = ok;
-      for (const t of this.tiles.values()) { const m = t.mesh.material; m.defines = Object.assign({}, this.texDefines); m.needsUpdate = true; }
+      for (const t of this.tiles.values()) { const m = t.mesh.material; m.defines = this.defines(); m.needsUpdate = true; }
     }
+    // shader switches for every tile material: the detail array when the globals carry one, the generated ground when it has loaded
+    defines() { const d = this.globals.uDet && this.globals.uDet.value; return Object.assign(d ? (d.image.depth >= 5 ? { USE_DETARR: 1, DET_SHALLOWS: 1 } : { USE_DETARR: 1 }) : {}, this.texDefines || {}); }
     // ----- per frame -----
     update(camera, viewportH) {
       this.frame++; this.queue = [];

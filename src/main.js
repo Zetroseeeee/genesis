@@ -50,7 +50,7 @@
   const globals = {
     uSun: { value: new THREE.Vector3(1, 0.3, 0.2).normalize() }, uTime: { value: 0 }, uCamAlt: { value: 1 }, uDayMix: { value: 1 },
     uOwner: { value: null }, uPal: { value: null }, uSim: { value: null }, uInfo: { value: null }, uNoise: { value: null },
-    uDetA: { value: null }, uDetB: { value: null }, uDetC: { value: null }, uDetD: { value: null },
+    uDetA: { value: null }, uDetB: { value: null }, uDetC: { value: null }, uDetD: { value: null }, uDet: { value: null },
     uSimRes: { value: new THREE.Vector2(W, H) }, uSel: { value: new THREE.Vector2(-9, -9) }, uHover: { value: new THREE.Vector2(-9, -9) },
     uFertView: { value: 0 }, uPolitical: { value: 1 }, uLabelsOn: { value: 1 },
     uClouds: { value: null }, uCloudShift: { value: 0 }, uCloudVis: { value: 0 },
@@ -64,6 +64,19 @@
   function loadTex(url, opts = {}) {
     return new Promise((res) => { new THREE.TextureLoader().load(url, (t) => { t.wrapS = t.wrapT = opts.mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.anisotropy = 4; if (opts.flipY === false) t.flipY = false; res(t); }, undefined, () => { console.warn('texture missing', url); res(null); }); });
   }
+  // The terrain's photographic detail (forest, dunes, rock, grass), and the shallows once the generated art has loaded,
+  // as layers of one array texture: one texture unit instead of five.
+  let detImages = null;
+  function buildDetArray(extra) {
+    if (!renderer.capabilities.isWebGL2 || !THREE.DataTexture2DArray || !detImages) return;
+    try {
+      const S = 1024, srcs = extra ? detImages.concat([extra]) : detImages; const cv = document.createElement('canvas'); cv.width = cv.height = S; const ctx = cv.getContext('2d', { willReadFrequently: true });
+      const data = new Uint8Array(S * S * 4 * srcs.length); srcs.forEach((im, k) => { ctx.clearRect(0, 0, S, S); ctx.drawImage(im, 0, 0, S, S); data.set(ctx.getImageData(0, 0, S, S).data, k * S * S * 4); });
+      const arr = new THREE.DataTexture2DArray(data, S, S, srcs.length); arr.format = THREE.RGBAFormat; arr.type = THREE.UnsignedByteType; arr.wrapS = arr.wrapT = THREE.MirroredRepeatWrapping;
+      arr.minFilter = THREE.LinearMipmapLinearFilter; arr.magFilter = THREE.LinearFilter; arr.generateMipmaps = true; arr.anisotropy = 4; arr.needsUpdate = true;
+      const old = globals.uDet.value; globals.uDet.value = arr; if (old) old.dispose();
+    } catch (e) { console.warn('detail array unavailable', e); }
+  }
   function loadImageData(url) {
     return new Promise((res, rej) => { const im = new Image(); im.onload = () => { const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(im, 0, 0); res(ctx.getImageData(0, 0, im.width, im.height)); }; im.onerror = () => rej(new Error('failed ' + url)); im.src = url; });
   }
@@ -76,6 +89,8 @@
       const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([loadTex('data/info.png', { flipY: false }), loadTex('data/noise.png'), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
       info.wrapS = THREE.RepeatWrapping; info.wrapT = THREE.ClampToEdgeWrapping; info.minFilter = THREE.LinearFilter; info.generateMipmaps = false;
       globals.uInfo.value = info; globals.uNoise.value = noise; globals.uClouds.value = noise; globals.uWaterN.value = waterN || noise; globals.uDetA.value = detA || noise; globals.uDetB.value = detB || noise; globals.uDetC.value = detC || noise; globals.uDetD.value = detD || noise;
+      // one array texture for the four detail photographs (WebGL2): the terrain shader then fits the 16 textures an Apple GPU allows
+      detImages = [detA, detB, detC, detD].map((t) => (t || noise).image); buildDetArray(null);
       setLoad(34, 'the world');
       const wd = await loadImageData('data/world.png');
       loadImageData('data/noise.png').then((nd) => { if (terrain) terrain.noiseData = nd; }).catch(() => {});
@@ -485,6 +500,7 @@
   }
   function applyTextures() {
     if (!window.TEX) return; const on = settings.textures !== false && TEX.ready;
+    if (on && TEX.misc && TEX.misc.shallows && TEX.misc.shallows.image && globals.uDet.value && globals.uDet.value.image.depth < 5) buildDetArray(TEX.misc.shallows.image);
     if (world) world.setTextures(TEX, on); if (terrain) terrain.setTextures(TEX, on);
   }
   function banner(msg, cancel) { const b = $('banner'); if (msg) { $('bannertext').textContent = msg; b.hidden = false; $('bannercancel').hidden = !cancel; } else b.hidden = true; }

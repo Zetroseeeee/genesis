@@ -32,12 +32,14 @@ function smoke(win) {
   win.webContents.on('console-message', (...a) => { const d = a[0] && a[0].message !== undefined ? a[0] : { level: a[1], message: a[2] }; if (d.level === 'error' || d.level === 3) errors.push(String(d.message).slice(0, 300)); });
   win.webContents.on('render-process-gone', (e, d) => { console.log('GENESIS-SMOKE ' + JSON.stringify({ ok: false, gone: d.reason })); app.exit(1); });
   const probe = `(() => { const c = document.querySelector('canvas'); let gpu = ''; try { const gl = c.getContext('webgl2'); const x = gl.getExtension('WEBGL_debug_renderer_info'); gpu = x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (e) {}
-    return { sim: !!(window.__G && __G.sim), models: window.MODELS && MODELS.ready ? Object.keys(MODELS.defs).length : 0, tex: !!(window.TEX && TEX.manifest), buildings: window.__G && __G.world ? __G.world.buildingCount : 0, modelStats: window.MODELS ? MODELS.stats : null, gpu, w: innerWidth, h: innerHeight, dpr: devicePixelRatio }; })()`;
+    let samplers = 0, glMax = 0; try { const gl = window.__G.renderer.getContext(); glMax = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS); for (const p of window.__G.renderer.info.programs) { const n = gl.getProgramParameter(p.program, gl.ACTIVE_UNIFORMS); let k = 0; for (let i = 0; i < n; i++) { const u = gl.getActiveUniform(p.program, i); if (u && (u.type === gl.SAMPLER_2D || u.type === gl.SAMPLER_CUBE || u.type === 0x8DC1 || u.type === 0x8B5F || u.type === 0x8B62 || u.type === 0x8DC4)) k += u.size; } if (k > samplers) samplers = k; } } catch (e) {}
+    return { samplers, glMax, sim: !!(window.__G && __G.sim), models: window.MODELS && MODELS.ready ? Object.keys(MODELS.defs).length : 0, tex: !!(window.TEX && TEX.manifest), buildings: window.__G && __G.world ? __G.world.buildingCount : 0, modelStats: window.MODELS ? MODELS.stats : null, gpu, w: innerWidth, h: innerHeight, dpr: devicePixelRatio }; })()`;
   const finish = async (ok, info) => {
     let fps = 0;
     try { fps = await win.webContents.executeJavaScript(`new Promise((res) => { let n = 0; const t = performance.now(); const f = () => { n++; if (performance.now() - t > 3000) res(Math.round(n / 3)); else requestAnimationFrame(f); }; requestAnimationFrame(f); })`); } catch (e) {}
     try { if (process.env.GENESIS_SMOKE_SHOT) { const img = await win.webContents.capturePage(); fs.writeFileSync(process.env.GENESIS_SMOKE_SHOT, img.toPNG()); } } catch (e) { errors.push('capture: ' + e.message); }
     try { info = Object.assign(info || {}, await win.webContents.executeJavaScript(probe)); } catch (e) {}
+    if (errors.some((e) => /shader error|not compiled|INVALID_OPERATION/i.test(e))) ok = false;      // a shader the GPU refused is a failed launch, whatever else loaded
     console.log('GENESIS-SMOKE ' + JSON.stringify(Object.assign({ ok, seconds: Math.round((Date.now() - t0) / 1000), fps }, info, { errors: errors.slice(0, 6) })));
     app.exit(ok ? 0 : 1);
   };
