@@ -25,6 +25,18 @@
     return { era: c.era, culture: L.culture, R: Math.round(L.R), k: +L.k.toFixed(2), items: L.items.length };
   };
   window.__sceneCam = cam;
+  // look at the whole town ('town') or at one building of it (by role or kind: 'palace', 'market', 'temple', 'landmark',
+  // 'gatehouse' ...): k = camera distance in town radii (town) or in building sizes (a building)
+  window.__sceneLook = (what, k, tilt, turn) => {
+    const [lon, lat] = G.world.siteOf(cap); const L = TOWN.layout(S, cap, c, {});
+    const cl = Math.cos(lat * Math.PI / 180); const mLon = 1 / (6371000 * cl * Math.PI / 180), mLat = 1 / (6371000 * Math.PI / 180);
+    let x = 0, z = 0, it = null, d = L.R * (k || 2.6);
+    if (what !== 'town') { it = L.items.find((q) => q.tag === what || q.as === what || q.kind === what); if (!it) return { missing: what }; x = it.x; z = it.z; d = Math.max(it.w, it.d, it.h * 1.5) * (k || 5); }
+    const M = G.mapcam; M.fly = null; M.autoTilt = false; M.lon = M.tLon = lon + x * mLon; M.lat = M.tLat = lat + z * mLat;
+    M.tilt = M.tTilt = tilt === undefined ? 1.0 : tilt; M.dist = M.tDist = d / 6371000; M.heading = M.tHeading = turn || 0;
+    return it ? { what, kind: it.kind, as: it.as, w: Math.round(it.w), h: Math.round(it.h), d: Math.round(it.d) } : { what, R: Math.round(L.R), k: +L.k.toFixed(1), items: L.items.length };
+  };
+  const left = document.getElementById('left'); if (left && P.clean !== false) left.style.display = 'none';      // the city panel hides a third of the picture
   setTimeout(cam, 2500); setTimeout(cam, 6000);     // the opening flight to the capital would otherwise take the camera back
   return cam();
 })();

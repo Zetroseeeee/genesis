@@ -20,7 +20,13 @@
   "reference": "Every concept image is generated with the set's anchor image attached as a style reference, so lighting, camera, background and material character match across the whole library.",
   "prefix": "Use the attached image only as the style reference: same photographic look, same soft lighting, same camera height and angle, same plain light-grey background. Show a different building: ",
   "suffix": " Three-quarter view from the front-left, camera slightly above at about 30 degrees elevation, the entire structure visible and centred with clear margin around it. Photorealistic archaeological reconstruction, historically accurate construction details, natural weathering. Soft even overcast lighting, no harsh shadows, no cast shadow on the ground. Plain flat light-grey studio background, no ground plane, no people, no animals, no plants, no other objects, no text.",
-  "chain": "A building that is the later form of an earlier one (a house of the next age, a higher wall, the gate of a wall) is generated with the earlier one's concept image attached as its reference, so upgrades keep the same materials and workmanship."
+  "chain": "A building that is the later form of an earlier one (a house of the next age, a higher wall, the gate of a wall) is generated with the earlier one's concept image attached as its reference, so upgrades keep the same materials and workmanship.",
+  "tree": {
+   "note": "Trees are photographed on a blue screen and cut out by tools/models/card.mjs (the first four, on the grey studio backdrop, are keyed by distance from it). The oak is the style reference for all of them.",
+   "prefix": "Use the attached image only as the style reference for the photographic look, the soft lighting and the camera height and angle. Show a different tree: ",
+   "suffix": " The whole tree from the foot of the trunk to the top of the crown, seen from the side at eye level, upright and centred, with clear margin all around it. Photorealistic, botanically accurate. Soft even overcast lighting, no harsh shadows, no cast shadow. The background is one flat uniform pure chroma-key blue (#1433ff) filling the whole frame from edge to edge like a blue screen: no ground, no grass, no horizon, no gradient, no vignette, no people, no animals, no other plants, no other objects, no text.",
+   "winter": "The attached image shows an oak tree in summer. Show this same tree in mid-winter: "
+  }
  },
  "sets": {
   "stone": {
@@ -58,7 +64,7 @@
     8
    ],
    "anchor": "86bf0d6d-5279-464c-a498-d82de2f181b4",
-   "note": "Trees. Generated meshes get trunks right and crowns wrong, so a tree is drawn as its concept photograph, cut out, on a card that faces the camera (card: true); the mesh is kept for later."
+   "note": "Trees. Generated meshes get trunks right and crowns wrong, so a tree is drawn as its concept photograph, cut out, on a card that faces the camera (card: true). Most have no mesh at all. tree: where it grows (weights by flora zone: boreal, temperate, med, easia, dry, savanna, rain; region: [lon0, lon1, lat0, lat1]), whether it sheds its leaves, and which card shows it leafless."
   }
  },
  "models": [
@@ -122,7 +128,7 @@
     "halftimber",
     "townhouse"
    ],
-   "h": 11.0,
+   "h": 11,
    "concept": "368ff7b1-22cb-42ac-ac04-49248222f1c6",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124220_368ff7b1-22cb-42ac-ac04-49248222f1c6.png",
    "mesh": "b866d1ab-c895-43d0-b46d-678c61902746",
@@ -309,7 +315,7 @@
    "kinds": [
     "menhirs"
    ],
-   "h": 5.0,
+   "h": 5,
    "concept": "7270e88a-089a-4e73-a4b2-63abe1a83725",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130321_7270e88a-089a-4e73-a4b2-63abe1a83725.png",
    "mesh": "cb323abc-c95d-4aa6-b225-18f67f254dbd",
@@ -331,7 +337,7 @@
    "kinds": [
     "hut"
    ],
-   "h": 5.0,
+   "h": 5,
    "concept": "35387ef5-5c03-4111-925d-91c7df115614",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_130944_35387ef5-5c03-4111-925d-91c7df115614.png",
    "mesh": "c4f1cf74-d4e5-498d-854b-63fe263a2d8e",
@@ -380,7 +386,7 @@
    "mesh": "7214f57e-ec2c-47d0-a208-7aaea9c6d323",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_132538_7214f57e-ec2c-47d0-a208-7aaea9c6d323.glb",
    "scaleBy": "w",
-   "w": 8.0,
+   "w": 8,
    "site": "bronze_timber_site"
   },
   {
@@ -478,7 +484,7 @@
    "set": "stone",
    "eras": [
     0,
-    0
+    4
    ],
    "cultures": null,
    "kinds": [
@@ -497,14 +503,14 @@
    "set": "stone",
    "eras": [
     0,
-    0
+    4
    ],
    "cultures": null,
    "kinds": [
-    "gatehouse"
+    "gate_palisade"
    ],
-   "h": 5.0,
-   "w": 8.0,
+   "h": 5,
+   "w": 8,
    "scaleBy": "w",
    "fit": "gate",
    "sides": "stone_palisade_a",
@@ -519,13 +525,13 @@
    "set": "stone",
    "eras": [
     0,
-    0
+    4
    ],
    "cultures": null,
    "kinds": [
     "watchtower"
    ],
-   "h": 7.0,
+   "h": 7,
    "concept": "5fb233e1-802b-4772-8675-6442b0be496d",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135857_5fb233e1-802b-4772-8675-6442b0be496d.png",
    "mesh": "6da70c9c-27bf-4cfd-83f8-a704276cff67",
@@ -575,7 +581,7 @@
    ],
    "cultures": null,
    "kinds": [
-    "wall"
+    "wall_mud"
    ],
    "h": 6.4,
    "fit": "run",
@@ -648,14 +654,23 @@
    "kinds": [
     "tree_broad"
    ],
-   "h": 18.0,
+   "h": 18,
    "ref": "36afee3f-1178-4673-ac5d-8a7c59e4fe59",
    "prompt": "a mature European oak about 18 m tall, broad dense rounded crown of deep green summer foliage in full leaf masses, thick gnarled trunk dividing into a few heavy limbs, roots flaring at the base",
    "concept": "86bf0d6d-5279-464c-a498-d82de2f181b4",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_152049_86bf0d6d-5279-464c-a498-d82de2f181b4.png",
    "mesh": "91131398-9a32-42a1-99cf-4e7fd6c1696e",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153344_91131398-9a32-42a1-99cf-4e7fd6c1696e.glb",
-   "card": true
+   "card": true,
+   "tree": {
+    "zones": {
+     "temperate": 5,
+     "med": 2,
+     "easia": 3
+    },
+    "deciduous": true,
+    "bare": "tree_oak_bare"
+   }
   },
   {
    "id": "bronze_med_house_a",
@@ -719,7 +734,7 @@
    "kinds": [
     "adobe"
    ],
-   "h": 6.0,
+   "h": 6,
    "ref": "d5673709-a686-444e-887a-edd0973101d6",
    "prompt": "a village house of Formative Mesoamerica of about 800 BC, about 7 by 4.5 m on a low platform faced with river cobbles and clay, wattle-and-daub walls partly whitewashed, tall steep hipped palm-thatch roof, one open doorway with a wooden lintel",
    "concept": "52c7956e-bfcf-463d-b8c0-4fb6345027e3",
@@ -742,8 +757,8 @@
    "kinds": [
     "longhouse"
    ],
-   "h": 6.0,
-   "w": 20.0,
+   "h": 6,
+   "w": 20,
    "scaleBy": "w",
    "ref": "3f42f01a-a014-45e7-a454-3ddea4fdc6ab",
    "prompt": "a longhouse of the Eastern Woodlands, about 20 m long, 6 m wide and 6 m high, an arched frame of bent saplings covered with overlapping sheets of elm bark held by an outer lattice of poles, barrel roof with smoke holes, a hide-hung doorway at each end",
@@ -763,7 +778,7 @@
    ],
    "cultures": null,
    "kinds": [
-    "gatehouse"
+    "gate_mud"
    ],
    "w": 17.5,
    "scaleBy": "w",
@@ -786,9 +801,9 @@
    ],
    "cultures": null,
    "kinds": [
-    "roundtower"
+    "tower_mud"
    ],
-   "h": 10.0,
+   "h": 10,
    "ref": "be7d25bc-89c3-4149-8cec-29494202a6a0",
    "prompt": "a free-standing rectangular tower of the mud-brick town wall, about 6 m square and 10 m high, slightly sloping walls on a field-stone footing, weathered plaster, narrow slits, a crenellated fighting platform, projecting roof beams",
    "concept": "5f2c9931-bcbe-41d6-8460-598885d803ee",
@@ -811,7 +826,7 @@
    "kinds": [
     "ziggurat"
    ],
-   "h": 20.0,
+   "h": 20,
    "ref": "e8c06ff0-c45c-45e4-9f96-5fb0899054f9",
    "prompt": "a Sumerian ziggurat of about 2100 BC in the manner of Ur: three receding terraces, about 45 by 30 m and 20 m high, mud-brick core faced with fired brick, buttressed sloping walls, three monumental stairs meeting at a gate tower, a small plastered shrine on top",
    "concept": "a9e1d27d-bc80-4043-b512-6f1e9729dbdc",
@@ -832,8 +847,7 @@
    ],
    "kinds": [
     "ziggurat",
-    "stepped",
-    "palace"
+    "stepped"
    ],
    "h": 7.4,
    "ref": "25558def-753a-482c-8aab-589254347642",
@@ -860,7 +874,7 @@
     "stepped",
     "palace"
    ],
-   "w": 28.0,
+   "w": 28,
    "scaleBy": "w",
    "h": 9.5,
    "ref": "b29afb73-544d-47dd-8728-7560af5f4613",
@@ -888,9 +902,9 @@
     "stepped",
     "palace"
    ],
-   "w": 28.0,
+   "w": 28,
    "scaleBy": "w",
-   "h": 10.0,
+   "h": 10,
    "ref": "5e30cc40-300b-4d73-85d4-f50b86c2c618",
    "prompt": "a Shang dynasty palace hall of about 1300 BC: about 28 by 11 m on a stepped platform of pounded yellow earth, a veranda of thick timber columns on stone bases, plastered rammed-earth walls with three plank doors, a double-eaved hipped grass-thatch roof, a broad flight of earthen steps",
    "concept": "9ff08044-dd50-43fc-b497-3f4148ce65c8",
@@ -913,9 +927,9 @@
    "kinds": [
     "stupa"
    ],
-   "w": 27.0,
+   "w": 27,
    "scaleBy": "w",
-   "h": 13.0,
+   "h": 13,
    "ref": "e8c06ff0-c45c-45e4-9f96-5fb0899054f9",
    "prompt": "an early stupa of about 250 BC in the manner of the first stupa at Sanchi: a solid brick dome about 18 m across coated in weathered lime plaster on a low circular terrace with a stair, a square railing and parasol mast on top, a plain circular wooden railing with one post-and-lintel gateway around it",
    "concept": "3b56f876-595e-4d33-a80b-f23a729f3533",
@@ -937,7 +951,7 @@
    "kinds": [
     "steppyramid"
    ],
-   "h": 21.0,
+   "h": 21,
    "ref": "52c7956e-bfcf-463d-b8c0-4fb6345027e3",
    "prompt": "an early Mesoamerican temple platform of about 600 BC: four receding terraces about 30 m square and 15 m high, packed clay and rubble faced with river cobbles under weathered dull-red lime plaster, one broad stair, a small wattle-and-daub temple with a tall palm-thatch roof on top",
    "concept": "d5b91d9b-69f1-48a5-aa3d-3d4f3b21456f",
@@ -956,7 +970,8 @@
    "cultures": [
     "mena",
     "sasia",
-    "africa"
+    "africa",
+    "med"
    ],
    "kinds": [
     "palace",
@@ -970,7 +985,17 @@
    "mesh": "5d6d3927-5672-4f6d-875d-a3592f1a72ed",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153338_5d6d3927-5672-4f6d-875d-a3592f1a72ed.glb",
    "variantOf": "bronze_court_a",
-   "site": "bronze_mudbrick_site"
+   "site": "bronze_mudbrick_site",
+   "also": [
+    {
+     "kinds": [
+      "stepped"
+     ],
+     "cultures": [
+      "africa"
+     ]
+    }
+   ]
   },
   {
    "id": "bronze_pyramid_a",
@@ -988,7 +1013,7 @@
    "kinds": [
     "pyramid"
    ],
-   "h": 138.0,
+   "h": 138,
    "ref": "47f25e33-7766-4bc7-bbe2-554de3ad55ea",
    "prompt": "an Egyptian pyramid of the Old Kingdom as newly finished: a true smooth-sided pyramid on a square base, sides at about 52 degrees, cased in fine white limestone with hair-thin joints, faintly weather-stained near the base, a small gilded capstone, a low limestone plinth",
    "concept": "892c11f5-091e-4d13-8490-f137cc1fc6c3",
@@ -996,8 +1021,8 @@
    "mesh": "d9d69b04-8fdc-4d2e-becc-66cfa938f930",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155828_d9d69b04-8fdc-4d2e-becc-66cfa938f930.glb",
    "plan": [
-    217.0,
-    217.0
+    217,
+    217
    ]
   },
   {
@@ -1012,9 +1037,9 @@
    "kinds": [
     "market"
    ],
-   "w": 16.0,
+   "w": 16,
    "scaleBy": "w",
-   "h": 6.0,
+   "h": 6,
    "ref": "b29afb73-544d-47dd-8728-7560af5f4613",
    "prompt": "a Bronze Age market: an open-sided shelter about 14 by 7 m with a reed-thatch roof on rough timber posts, under and beside it trestle tables laden with baskets of grain and fruit, pottery, bundles of wool and cloth, dried fish, copper ingots, two striped cloth awnings on poles",
    "concept": "403d997d-984e-4a37-aa5a-1ada72a9dd1e",
@@ -1034,14 +1059,20 @@
    "kinds": [
     "tree_conifer"
    ],
-   "h": 24.0,
+   "h": 24,
    "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
    "prompt": "a mature Norway spruce about 24 m tall, dense narrow conical crown of dark green needles in layered drooping branches reaching almost to the ground, straight trunk with reddish-brown scaly bark visible only at the base",
    "concept": "92d82252-86b4-404a-937b-24c575110753",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154842_92d82252-86b4-404a-937b-24c575110753.png",
    "mesh": "eb55b342-a473-40f0-9da6-018a60e8b975",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155835_eb55b342-a473-40f0-9da6-018a60e8b975.glb",
-   "card": true
+   "card": true,
+   "tree": {
+    "zones": {
+     "boreal": 6,
+     "temperate": 0.6
+    }
+   }
   },
   {
    "id": "tree_acacia_a",
@@ -1055,14 +1086,20 @@
    "kinds": [
     "tree_savanna"
    ],
-   "h": 9.0,
+   "h": 9,
    "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
    "prompt": "a mature umbrella thorn acacia about 9 m tall and 12 m across, wide flat-topped crown of fine dense grey-green foliage on a few strong spreading branches, short thick trunk with dark fissured bark forking low",
    "concept": "0ce0f2c2-f5fe-4f54-8c73-f8dd0e9eecfb",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154843_0ce0f2c2-f5fe-4f54-8c73-f8dd0e9eecfb.png",
    "mesh": "edf79d01-7ec8-4496-8fe6-13d1fe291f46",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155839_edf79d01-7ec8-4496-8fe6-13d1fe291f46.glb",
-   "card": true
+   "card": true,
+   "tree": {
+    "zones": {
+     "savanna": 6,
+     "dry": 5
+    }
+   }
   },
   {
    "id": "tree_palm_a",
@@ -1076,14 +1113,21 @@
    "kinds": [
     "tree_palm"
    ],
-   "h": 15.0,
+   "h": 15,
    "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
    "prompt": "a mature date palm about 15 m tall, a straight sturdy trunk patterned with the stubs of old leaf bases, a dense full rounded head of long arching grey-green fronds, hanging clusters of amber dates",
    "concept": "51219261-fb76-44fc-b277-ed24dc75ce75",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155919_51219261-fb76-44fc-b277-ed24dc75ce75.png",
    "mesh": "53c861a7-d2eb-49f0-9415-771bff9ab6e0",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161347_53c861a7-d2eb-49f0-9415-771bff9ab6e0.glb",
-   "card": true
+   "card": true,
+   "tree": {
+    "zones": {
+     "dry": 2,
+     "rain": 1,
+     "savanna": 0.4
+    }
+   }
   },
   {
    "id": "bronze_mudbrick_site",
@@ -1133,11 +1177,13 @@
     "namerica"
    ],
    "kinds": [
-    "mound"
+    "mound",
+    "palace",
+    "stepped"
    ],
-   "w": 38.0,
+   "w": 38,
    "scaleBy": "w",
-   "h": 15.0,
+   "h": 15,
    "ref": "d2857705-9bf1-4c36-8d52-2fd9327ea483",
    "prompt": "an earthen platform mound of the Eastern Woodlands: rectangular, flat-topped, about 40 by 30 m and 8 m high, steep turfed sides worn to clay in places, a ramp of log steps, on the summit a wattle-and-daub building with a steep thatched roof behind a low screen of posts",
    "concept": "fdd5b71a-ad16-42ac-8b26-77dde3ca9f88",
@@ -1159,7 +1205,7 @@
    ],
    "w": 12.5,
    "scaleBy": "w",
-   "h": 6.0,
+   "h": 6,
    "ref": "b29afb73-544d-47dd-8728-7560af5f4613",
    "prompt": "a Bronze Age barn and cattle byre about 12 by 6 m: woven wattle hurdles between rough posts, open under the eaves, a steep thatched roof, a hurdle gate half open in the long side, hay and sheaves inside, a wooden feeding trough",
    "concept": "ce345b5e-0da1-4f9b-bf37-f5b88b20488a",
@@ -1180,7 +1226,7 @@
    "kinds": [
     "pier"
    ],
-   "w": 16.0,
+   "w": 16,
    "scaleBy": "w",
    "h": 4.2,
    "fit": "run",
@@ -1223,7 +1269,7 @@
    "kinds": [
     "boat"
    ],
-   "w": 12.0,
+   "w": 12,
    "scaleBy": "w",
    "h": 5.5,
    "ref": "b29afb73-544d-47dd-8728-7560af5f4613",
@@ -1233,6 +1279,289 @@
    "mesh": "17657e73-476e-4058-9860-2ec37632c1d2",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161649_17657e73-476e-4058-9860-2ec37632c1d2.glb",
    "sink": 0.6
+  },
+  {
+   "id": "tree_pine_a",
+   "title": "Scots pine",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_conifer"
+   ],
+   "h": 22,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a mature Scots pine about 22 m tall, a tall bare trunk whose bark turns orange-red in the upper part, a flat-topped irregular crown of blue-green needles on a few twisted spreading branches",
+   "concept": "9565fdf5-3e9b-4e58-b583-73ef22648e3e",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174244_9565fdf5-3e9b-4e58-b583-73ef22648e3e.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "boreal": 3,
+     "temperate": 1,
+     "easia": 2
+    }
+   }
+  },
+  {
+   "id": "tree_stonepine_a",
+   "title": "Stone pine",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_med"
+   ],
+   "h": 16,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a mature Mediterranean stone pine about 16 m tall, a tall bare reddish-brown plated trunk dividing high up into upswept branches that carry one broad flat umbrella-shaped crown of dense dark green needles",
+   "concept": "30e7d837-1e76-434e-8dea-f82d176b85a6",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174245_30e7d837-1e76-434e-8dea-f82d176b85a6.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "med": 3
+    }
+   }
+  },
+  {
+   "id": "tree_cypress_a",
+   "title": "Mediterranean cypress",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_med"
+   ],
+   "h": 20,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a mature Mediterranean cypress about 20 m tall, a tall narrow dense dark green column tapering to a point, foliage down to near the ground, a short grey-brown trunk just visible at the foot",
+   "concept": "cf6b195c-8533-475e-8b49-275bebf4dfc3",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174245_cf6b195c-8533-475e-8b49-275bebf4dfc3.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "med": 2
+    }
+   }
+  },
+  {
+   "id": "tree_rain_a",
+   "title": "Rainforest tree",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_rain"
+   ],
+   "h": 28,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a tall tropical rainforest tree about 28 m tall, a straight brown trunk with low buttress roots, a broad dense rounded crown of large glossy dark green leaves beginning halfway up, a few lianas and epiphytes on the limbs",
+   "concept": "0b138f88-2360-44f8-90d7-c7e9d3e7a6ba",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174246_0b138f88-2360-44f8-90d7-c7e9d3e7a6ba.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "rain": 5
+    }
+   }
+  },
+  {
+   "id": "tree_birch_a",
+   "title": "Silver birch",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_birch"
+   ],
+   "h": 17,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a mature silver birch about 17 m tall, a slender straight white trunk marked with black fissures, darkening and rugged at the foot, a light airy narrow crown of fine drooping twigs and small bright green leaves",
+   "concept": "512151de-6d52-4bc0-8ab5-4c103fa5ec08",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174359_512151de-6d52-4bc0-8ab5-4c103fa5ec08.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "boreal": 2.5,
+     "temperate": 1.5
+    },
+    "deciduous": true,
+    "bare": "tree_oak_bare"
+   }
+  },
+  {
+   "id": "tree_beech_a",
+   "title": "European beech",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_broad"
+   ],
+   "h": 24,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a mature European beech about 24 m tall grown in the open, a smooth silver-grey trunk, a tall dense domed crown of fresh green leaves in layered sprays reaching down to within a few metres of the ground",
+   "concept": "bcaf1b94-1dda-4f51-b4a0-dd8a9d8a7da9",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174400_bcaf1b94-1dda-4f51-b4a0-dd8a9d8a7da9.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "temperate": 4,
+     "easia": 1
+    },
+    "deciduous": true,
+    "bare": "tree_oak_bare"
+   }
+  },
+  {
+   "id": "tree_olive_a",
+   "title": "Olive",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_med"
+   ],
+   "h": 7,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "an old olive tree about 7 m tall and 8 m across, a thick gnarled twisted hollowed grey trunk, a rounded open crown of small narrow silvery grey-green leaves",
+   "concept": "6e18ddd0-0e4a-47e6-9caa-77cc4746ae17",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174359_6e18ddd0-0e4a-47e6-9caa-77cc4746ae17.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "med": 3
+    }
+   }
+  },
+  {
+   "id": "tree_kapok_a",
+   "title": "Kapok",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_rain"
+   ],
+   "h": 42,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a giant rainforest kapok tree about 42 m tall, a straight pale grey columnar trunk with tall plank buttress roots at the foot, bare of branches for two thirds of its height, then a wide spreading umbrella crown of horizontal limbs with dense green foliage and a few hanging lianas",
+   "concept": "c72aa0c0-987a-475f-b960-c7e89ffe132e",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174400_c72aa0c0-987a-475f-b960-c7e89ffe132e.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "rain": 2.5
+    }
+   }
+  },
+  {
+   "id": "tree_baobab_a",
+   "title": "Baobab",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_savanna"
+   ],
+   "h": 18,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a mature African baobab about 18 m tall, an enormous swollen smooth grey-brown bottle-shaped trunk about 7 m thick, short stout tapering branches spreading from its top like roots, sparse small green leaves",
+   "concept": "cca0bbf4-c98c-4b27-aa00-3525f6a260bc",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174438_cca0bbf4-c98c-4b27-aa00-3525f6a260bc.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "savanna": 0.8
+    },
+    "region": [
+     -20,
+     52,
+     -30,
+     18
+    ]
+   }
+  },
+  {
+   "id": "tree_bamboo_a",
+   "title": "Giant bamboo",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_bamboo"
+   ],
+   "h": 14,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "a clump of giant timber bamboo about 14 m tall, some thirty straight jointed green culms rising close together from one base and arching outward at the top, feathery light green leaves along the upper half",
+   "concept": "0a94db10-fe90-4c4e-9fad-e70cdc64b85a",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174438_0a94db10-fe90-4c4e-9fad-e70cdc64b85a.png",
+   "card": true,
+   "tree": {
+    "zones": {
+     "easia": 1.5,
+     "rain": 0.8
+    },
+    "region": [
+     68,
+     150,
+     -12,
+     46
+    ]
+   }
+  },
+  {
+   "id": "tree_oak_bare",
+   "title": "Oak in winter",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_bare"
+   ],
+   "h": 18,
+   "ref": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "prompt": "the same thick gnarled trunk, the same heavy limbs, the same size and place in the frame, but completely leafless, its broad rounded crown now an intricate tracery of bare grey-brown branches and fine twigs, not a single leaf",
+   "concept": "3ad817cd-8474-42f9-9553-df0c6d90a8de",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_174437_3ad817cd-8474-42f9-9553-df0c6d90a8de.png",
+   "card": true,
+   "tree": {
+    "bareOf": "tree_oak_a"
+   }
   }
  ]
 }

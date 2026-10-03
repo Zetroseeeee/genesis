@@ -143,7 +143,7 @@ function ensureRelease(tag, title, notes) {
 
 async function ci() {
   const man = readManifest(); const work = fs.mkdtempSync('/tmp/models-'); let failed = 0;
-  const bySet = {}; for (const m of man.models) if (m.src) (bySet[m.set] = bySet[m.set] || []).push(m);
+  const bySet = {}; for (const m of man.models) if (m.src || m.card) (bySet[m.set] = bySet[m.set] || []).push(m);      // a model drawn only as a card has no mesh
   for (const set of Object.keys(bySet)) {
     const srcTag = `src-${set}`, outTag = `models-${set}`;
     const haveSrc = ensureRelease(srcTag, `Source models: ${set}`, 'Generated source meshes and concept images, as they came from the generator. Archive only; the game uses the processed files.');
@@ -157,22 +157,23 @@ async function ci() {
       log(`+ ${m.id}`);
       try {
         const sn = srcName(m), src = path.join(work, sn);
-        if (haveSrc.has(sn)) sh('gh', ['release', 'download', srcTag, '-p', sn, '-D', work, '--clobber']);
+        if (!m.src) { /* card only */ }
+        else if (haveSrc.has(sn)) sh('gh', ['release', 'download', srcTag, '-p', sn, '-D', work, '--clobber']);
         else { sh('curl', ['-fsSL', '--retry', '3', '-o', src, m.src]); sh('gh', ['release', 'upload', srcTag, src, '--clobber']); }
         if (m.conceptUrl && !haveSrc.has(`${m.id}.concept.png`)) { const cp = path.join(work, `${m.id}.concept.png`); try { sh('curl', ['-fsSL', '--retry', '3', '-o', cp, m.conceptUrl]); sh('gh', ['release', 'upload', srcTag, cp, '--clobber']); fs.rmSync(cp, { force: true }); } catch (e) { log('   concept image not mirrored: ' + e.message); } }
-        const entry = await processModel(m, src, work);
+        const entry = m.src ? await processModel(m, src, work) : { rev: revOf(m), set: m.set, w: 0, h: m.h, d: 0, lods: [] };
         if (m.card) {      // the cut-out photograph, for models drawn as a picture on a card (trees)
           const cp = path.join(work, `${m.id}.concept.png`);
           if (haveSrc.has(`${m.id}.concept.png`) || fs.existsSync(cp)) { if (!fs.existsSync(cp)) sh('gh', ['release', 'download', srcTag, '-p', `${m.id}.concept.png`, '-D', work, '--clobber']); } else sh('curl', ['-fsSL', '--retry', '3', '-o', cp, m.conceptUrl]);
           const card = await keyCard(fs.readFileSync(cp), { height: 1024 }); const cf = `${m.id}.card.png`; fs.writeFileSync(path.join(work, cf), card.png);
           sh('gh', ['release', 'upload', outTag, path.join(work, cf), '--clobber']);
-          entry.card = { file: cf, bytes: card.png.length, aspect: card.aspect, pivot: card.pivot, mean: card.mean }; log(`   card: ${card.width} x ${card.height}, ${(card.png.length / 1e6).toFixed(2)} MB`);
+          entry.card = { file: cf, bytes: card.png.length, aspect: card.aspect, pivot: card.pivot, mean: card.mean }; if (!m.src) { entry.w = +(m.h * card.aspect).toFixed(3); entry.d = entry.w; } log(`   card: ${card.width} x ${card.height}, ${(card.png.length / 1e6).toFixed(2)} MB`);
           fs.rmSync(path.join(work, cf), { force: true }); fs.rmSync(cp, { force: true });
         }
-        sh('gh', ['release', 'upload', outTag, ...entry.lods.map((l) => path.join(work, l.file)), '--clobber']);
+        if (entry.lods.length) sh('gh', ['release', 'upload', outTag, ...entry.lods.map((l) => path.join(work, l.file)), '--clobber']);
         index.models[m.id] = entry; publishIndex();
         for (const l of entry.lods) fs.rmSync(path.join(work, l.file), { force: true });
-        fs.rmSync(src, { force: true });
+        if (m.src) fs.rmSync(src, { force: true });
       } catch (e) { failed++; log(`!! ${m.id} failed: ${e && e.stack || e}`); }
     }
     const ids = new Set(bySet[set].map((m) => m.id)); let dropped = false;
@@ -189,7 +190,7 @@ async function local(ids) {
     const m = man.models.find((x) => x.id === id); if (!m) { log('unknown model ' + id); continue; }
     const src = [path.join(CACHE, srcName(m)), path.join(CACHE, `${id}.src.glb`)].find((p) => fs.existsSync(p));
     if (!src) { log(`no source for ${id} in ${CACHE}`); continue; }
-    log(`+ ${id}`); index.models[id] = Object.assign(await processModel(m, src, OUT), { kinds: m.kinds || [], cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', site: m.site || '', sides: m.sides || '', open: !!m.open, title: m.title });
+    log(`+ ${id}`); index.models[id] = Object.assign(await processModel(m, src, OUT), { kinds: m.kinds || [], cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', site: m.site || '', sides: m.sides || '', open: !!m.open, title: m.title, ...(m.also ? { also: m.also } : {}) });
   }
   fs.writeFileSync(indexPath, JSON.stringify(index));
 }

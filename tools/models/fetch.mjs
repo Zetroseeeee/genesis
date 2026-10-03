@@ -13,7 +13,7 @@ const base = `https://github.com/${repo}/releases/download`;
 const curl = (url, out) => execFileSync('curl', ['-fsSL', '--retry', '3', '-o', out, url], { stdio: ['ignore', 'ignore', 'ignore'] });
 fs.mkdirSync(OUT, { recursive: true });
 const merged = { models: {} }; let got = 0, kept = 0;
-for (const set of [...new Set(man.models.filter((m) => m.src).map((m) => m.set))]) {
+for (const set of [...new Set(man.models.filter((m) => m.src || m.card).map((m) => m.set))]) {
   const tmp = path.join(OUT, `.index-${set}.json`);
   try { curl(`${base}/models-${set}/index.json`, tmp); } catch (e) { console.log(`no published models for set ${set} yet`); continue; }
   const idx = JSON.parse(fs.readFileSync(tmp, 'utf8')); fs.rmSync(tmp, { force: true });
@@ -24,7 +24,7 @@ for (const set of [...new Set(man.models.filter((m) => m.src).map((m) => m.set))
       if (fs.existsSync(p) && fs.statSync(p).size === l.bytes) { kept++; continue; }
       curl(`${base}/models-${set}/${l.file}`, p); got++;
     }
-    merged.models[id] = Object.assign({}, entry, { kinds: m.kinds || [], cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', site: m.site || '', sides: m.sides || '', open: !!m.open, title: m.title });
+    merged.models[id] = Object.assign({}, entry, { kinds: m.kinds || [], cultures: m.cultures || null, eras: m.eras || [0, 8], fit: m.fit || '', site: m.site || '', sides: m.sides || '', open: !!m.open, title: m.title, ...(m.also ? { also: m.also } : {}), ...(m.tree ? { tree: m.tree } : {}) });
   }
 }
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(merged));

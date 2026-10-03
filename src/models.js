@@ -122,15 +122,18 @@
       const r = await fetch(url || (M.base + 'index.json')); if (!r.ok) { M.failed = true; return M; }
       const idx = await r.json();
       for (const id of Object.keys(idx.models || {})) {
-        const e = idx.models[id]; if (!e.lods || !e.lods.length) continue;
-        const def = { id, w: e.w, h: e.h, d: e.d, kinds: e.kinds || [], cultures: e.cultures || null, eras: e.eras || [0, 8], fit: e.fit || '', site: e.site || '', sides: e.sides || '', open: !!e.open, tree: (e.kinds || []).some((k) => k.indexOf('tree_') === 0), card: e.card || null, mean: e.mean || null, lods: e.lods.map((l, k) => ({ k, file: l.file, tris: l.tris, state: '', mesh: null, mat: null, count: 0, cap: 0 })) };
-        M.defs[id] = def; for (const kind of def.kinds) (M.byKind[kind] = M.byKind[kind] || []).push(def);
+        const e = idx.models[id]; if ((!e.lods || !e.lods.length) && !e.card) continue;      // a mesh, or at least a card (trees)
+        const def = { id, w: e.w, h: e.h, d: e.d, kinds: e.kinds || [], cultures: e.cultures || null, eras: e.eras || [0, 8], fit: e.fit || '', site: e.site || '', sides: e.sides || '', open: !!e.open, tree: (e.kinds || []).some((k) => k.indexOf('tree_') === 0), flora: e.tree || null, card: e.card || null, mean: e.mean || null, lods: (e.lods || []).map((l, k) => ({ k, file: l.file, tris: l.tris, state: '', mesh: null, mat: null, count: 0, cap: 0 })) };
+        M.defs[id] = def;
+        // where a model is used: its own kinds, eras and cultures, plus any further uses of the same mesh (also: [{ kinds, eras, cultures }])
+        const use = (kinds, eras, cultures) => { for (const kind of kinds) (M.byKind[kind] = M.byKind[kind] || []).push({ def, eras, cultures }); };
+        use(def.kinds, def.eras, def.cultures); for (const u of e.also || []) use(u.kinds || [], u.eras || def.eras, u.cultures === undefined ? def.cultures : u.cultures);
       }
       M.ready = Object.keys(M.defs).length > 0;
       // the two coarsest steps of every model are a few kilobytes each: fetch them all now (coarsest first), so no town
       // ever opens on kit boxes and what stands in while the finer files arrive already has the model's shape
-      for (const id in M.defs) { const d = M.defs[id]; request(d, d.lods[d.lods.length - 1], false); }
-      for (const id in M.defs) { const d = M.defs[id]; if (d.lods.length > 1) request(d, d.lods[d.lods.length - 2], false); }
+      for (const id in M.defs) { const d = M.defs[id]; if (d.lods.length && !d.tree) request(d, d.lods[d.lods.length - 1], false); }      // (trees are drawn as cards: their meshes stay on disk)
+      for (const id in M.defs) { const d = M.defs[id]; if (d.lods.length > 1 && !d.tree) request(d, d.lods[d.lods.length - 2], false); }
     } catch (e) { console.warn('models unavailable', e); M.failed = true; }
     return M;
   };
@@ -139,7 +142,7 @@
   M.pick = function (kind, era, culture, seed) {
     const list = M.byKind[kind]; if (!list) return null;
     const cn = CULT[culture]; let n = 0; const ok = M._ok || (M._ok = []);
-    for (let i = 0; i < list.length; i++) { const d = list[i]; if (era < d.eras[0] || era > d.eras[1]) continue; if (d.cultures && d.cultures.indexOf(cn) < 0) continue; ok[n++] = d; }
+    for (let i = 0; i < list.length; i++) { const u = list[i]; if (era < u.eras[0] || era > u.eras[1]) continue; if (u.cultures && u.cultures.indexOf(cn) < 0) continue; ok[n++] = u.def; }
     if (!n) return null;
     return ok[Math.min(n - 1, Math.floor((seed - Math.floor(seed)) * n))];
   };

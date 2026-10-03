@@ -14,8 +14,33 @@
     { R: 36000, s: 520, k: 7.0, max: 16000 },
   ];
 
-  // the kinds of tree the model library is asked for, by climate: broadleaf, conifer, savanna thorn tree, palm
-  const SPECIES = ['tree_broad', 'tree_conifer', 'tree_savanna', 'tree_palm'];
+  // Where each tree grows is said by the model library: flora = { zones: { temperate: 5, med: 2 }, region: [lon0, lon1,
+  // lat0, lat1], deciduous, bare: <id of its leafless winter card> }. A tree without that note gets these by its kind.
+  const FLORA = {
+    tree_broad: { zones: { temperate: 5, med: 2, easia: 3 }, deciduous: true },
+    tree_conifer: { zones: { boreal: 6, temperate: 0.6 } },
+    tree_savanna: { zones: { savanna: 6, dry: 5 } },
+    tree_palm: { zones: { dry: 2, rain: 1, savanna: 0.4 } },
+  };
+  // the lands with a Mediterranean climate: the western basin with the Maghreb coast, the eastern basin north of the
+  // Levant's deserts, California, central Chile, the Cape, the south-west and south of Australia
+  const MED = [[-10, 12, 30, 44.5], [12, 42, 33.5, 44.5], [-125, -114, 31, 41], [-75, -69, -38, -30], [16, 28, -35, -31], [113, 140, -38, -30]];
+  const inBox = (b, lon, lat) => lon >= b[0] && lon <= b[1] && lat >= b[2] && lat <= b[3];
+  // The flora zone of a point: boreal, temperate, med, easia, dry, savanna or rain. r5, r6: the tree's own dice, so
+  // zones shade into each other instead of meeting at a line.
+  function zoneOf(lon, lat, h, fw, r5, r6) {
+    const aLat = Math.abs(lat);
+    const conifer = smooth(46, 62, aLat) + smooth(1200, 2400, h) * 0.8 * smooth(12, 28, aLat);
+    if (conifer >= 0.5 + (r5 - 0.5) * 0.5) return 'boreal';
+    const open = fw.warm > 0.42 && fw.f < 0.6 && r5 < 0.25 + fw.warm * 0.7;
+    for (const b of MED) if (inBox(b, lon, lat)) return open && aLat < 38 && r6 < 0.5 ? 'dry' : 'med';
+    if (lon > -18 && lon < 75 && lat > 15 && lat < 38) return 'dry';                      // North Africa to Iran and the Indus: thorn trees and date palms
+    const tropic = lon > 60 && lon < 100 ? 31 : 23.5;                                       // the monsoon forests of India reach further north
+    if (aLat < tropic + (r6 - 0.5) * 5) return h > 1600 + r6 * 400 ? 'temperate' : open ? 'savanna' : 'rain';   // tropical highlands: oak and pine
+    if (aLat < 38 && open) return 'dry';
+    if (lon > 95 && lon < 150 && lat > 20 && lat < 46) return 'easia';
+    return 'temperate';
+  }
   // A tree is the photograph of one, cut out, on a card that turns about its own trunk to face the camera. Seen from
   // above, the card leans back until it lies under the eye as the crown does. Into the sun's depth map the same card
   // is drawn facing the sun, so the shadow on the ground is the tree's own outline.
@@ -35,7 +60,7 @@
       float hEff = max(hgt * l, wid * 0.85);                                  // from overhead a tree is as tall on screen as its crown is wide
       float x = (position.x + 0.5 - uPivot) * flip;                           // the card turns about the trunk, not about its middle
       vec3 p = c.xyz + rightV * x * wid + upB * (position.y - 0.5 * (1.0 - l)) * hEff + toCam * wid * 0.2;
-      vUv = vec2(flip > 0.0 ? uv.x : 1.0 - uv.x, uv.y); vView = p;
+      vUv = uv; vView = p;                                                    // a mirrored card keeps its picture and turns its geometry over: the trunk stays on the pivot
       #ifdef USE_INSTANCING_COLOR
       vCol = instanceColor;
       #else
@@ -96,7 +121,7 @@
     constructor({ scene, terrain, renderer }) {
       this.scene = scene; this.terrain = terrain; this.exag = terrain.exag; this.sim = null; this.renderer = renderer || null;
       this.veg = null; this.noise = null; this.ready = false; this.enabled = true;
-      this.imps = TIERS.map(() => new Map()); this.modelCount = TIERS.map(() => 0); this._sp = {};   // real trees: picture cards per tier and species
+      this.imps = TIERS.map(() => new Map()); this.modelCount = TIERS.map(() => 0);   // real trees: picture cards per tier and species
       const mk = (detail, max) => {
         const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x10190a, emissiveIntensity: 0.6 });
         const m = new THREE.InstancedMesh(treeGeometry(detail), mat, max); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -161,15 +186,22 @@
       for (let ti = 0; ti < TIERS.length; ti++) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; }
     }
     // ----- real trees: the photograph of each species on a card -----
-    // The models of a species that have a card, or null while the library has none (the kit tree stands in).
-    species(sp) { if (!window.MODELS || !MODELS.ready) return null; let list = this._sp[sp]; if (list === undefined) { list = (MODELS.byKind[SPECIES[sp]] || []).filter((d) => d.card); this._sp[sp] = list.length ? list : null; list = this._sp[sp]; } return list; }
+    // The trees of each flora zone that have a card: { zone: [{ def, w, region }] }, or null while the library has none
+    // (the kit tree stands in).
+    flora() {
+      if (!window.MODELS || !MODELS.ready) return null; if (this._flora !== undefined) return this._flora;
+      const zones = {}; let n = 0;
+      for (const id in MODELS.defs) { const d = MODELS.defs[id]; if (!d.tree || !d.card) continue; const f = d.flora || FLORA[d.kinds[0]]; if (!f || !f.zones) continue; d.flora = f; n++;
+        for (const z in f.zones) (zones[z] = zones[z] || []).push({ def: d, w: f.zones[z], region: f.region || null }); }
+      return (this._flora = n ? zones : null);
+    }
     impMesh(ti, def) {
       let I = this.imps[ti].get(def.id); if (I) return I;
       const card = MODELS.card(def); if (!card) return null;
       const sh = MODELS.shared; const g = new THREE.PlaneGeometry(1, 1); g.translate(0, 0.5, 0);
       const uniforms = { uImp: { value: card.tex }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units } };
       if (window.SHADOWS) Object.assign(uniforms, SHADOWS.uniforms);
-      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG });
+      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide });   // a mirrored card is wound the other way
       I = new THREE.InstancedMesh(g, mat, TIERS[ti].max); I.count = 0; I.frustumCulled = false; I.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       I.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(TIERS[ti].max * 3).fill(1), 3); I.instanceColor.setUsage(THREE.DynamicDrawUsage);
       I.userData.aspect = card.aspect; this.scene.add(I); this.imps[ti].set(def.id, I);
@@ -189,7 +221,7 @@
       let count = 0, countB = 0, countM = 0; const maxN = t.max; const exag = this.exag; const broad = this.broad;
       const casters = ti === 0 ? (this.casters = []) : null; if (ti === 0) this.castersVersion = (this.castersVersion || 0) + 1; const vc = new Map();
       const inner = ti > 0 ? TIERS[ti - 1].R : 0;   // leave the inner disc to the finer tier
-      const imps = this.imps[ti]; for (const I of imps.values()) I.count = 0;
+      const imps = this.imps[ti]; for (const I of imps.values()) I.count = 0; const flora = this.flora();
       const camPos = cam.camera ? cam.camera.position : null; const pxPerRad = (window.innerHeight || 800) / (2 * Math.tan(((cam.camera && cam.camera.fov) || 45) * Math.PI / 360));
       const kTier = t.k * exag * 0.5;                // how many times life size this tier draws a tree, away from any town
       const budget = this.budget === undefined ? 1 : this.budget;
@@ -220,22 +252,22 @@
           }
           density *= Math.min(1, Math.pow(kTier / kEff, 1.7));       // bigger trees, fewer of them: the canopy covers as much ground as before
           if (h1 > density) continue;
-          // species, size and colour by climate
-          const conifer = smooth(0.35, 0.7, fw.latN) + smooth(1200, 2400, h) * 0.8;
-          const dry = fw.warm * (1 - fw.f) * 0.8; const r5 = hash2(gx, gy, 51);
-          let sp = 0;
-          if (conifer >= 0.5 + (r5 - 0.5) * 0.3) sp = 1;
-          else if (fw.latN < 0.42 && fw.warm > 0.42 && fw.f < 0.6 && r5 < 0.25 + fw.warm * 0.7) sp = 2;      // warm open country: flat-topped thorn trees
-          else if (fw.latN < 0.27 && r5 > 0.72) sp = 3;                                                       // the tropics: palms among the broadleaf
+          // which tree: the flora zone of the place, then one of the zone's trees by its weight there
+          const r5 = hash2(gx, gy, 51); const zone = zoneOf(lon, lat, h, fw, r5, hash2(gx, gy, 52));
+          const conifer = zone === 'boreal' ? 1 : 0; const dry = fw.warm * (1 - fw.f) * 0.8;
+          let def = null; const Z = flora ? flora[zone] || flora.temperate : null;
+          if (Z) { let tot = 0; for (const e of Z) if (!e.region || inBox(e.region, lon, lat)) tot += e.w;
+            let r = hash2(gx, gy, 61) * tot; for (const e of Z) { if (e.region && !inBox(e.region, lon, lat)) continue; def = e.def; r -= e.w; if (r <= 0) break; } }
           const v = 0.85 + hash2(gx, gy, 41) * 0.3;
-          // seasons for the broadleaf belt: autumn colour, then bare grey-brown crowns in winter
+          // seasons, for the trees that shed: autumn colour, then bare crowns in winter (each tree in its own week)
           let fall = 0, bare = 0;
-          if (this.season && sp === 0) { const north = lat > 0; const winter = (north ? this.season.x : this.season.z) * smooth(0.18, 0.4, fw.latN), autumn = north ? this.season.y : this.season.w; const decid = (1 - Math.min(1, conifer)) * smooth(0.26, 0.4, fw.latN) * (1 - smooth(0.56, 0.74, fw.latN)); fall = autumn * decid; bare = winter * decid; }
+          if (this.season && (def ? def.flora.deciduous : zone === 'temperate' || zone === 'easia')) { const north = lat > 0; const winter = (north ? this.season.x : this.season.z) * smooth(0.18, 0.4, fw.latN), autumn = north ? this.season.y : this.season.w; const decid = smooth(0.26, 0.4, fw.latN); fall = autumn * decid; bare = winter * decid; }
+          const lifeH = def ? def.h : 0;
+          if (def && bare > 0.12 + 0.7 * hash2(gx, gy, 71) && def.flora.bare) { const B = MODELS.defs[def.flora.bare]; if (B && B.card) { def = B; fall = 0; bare = 0; } }      // its leafless picture
           const f = GEO.enu(lon, lat);
-          const list = this.species(sp); const def = list ? list[Math.floor(hash2(gx, gy, 61) * list.length) % list.length] : null;
           if (def) {
             // a real tree: life height by species, times the scale of the place it stands in
-            const life = def.h * (0.72 + hash2(gx, gy, 21) * 0.5); const hgt = life * kEff;
+            const life = lifeH * (0.72 + hash2(gx, gy, 21) * 0.5); const hgt = life * kEff;
             const I = this.impMesh(ti, def);
             if (I && I.count < I.instanceMatrix.count) {
               p.copy(f.up).multiplyScalar(1 + (h * exag - 0.15 * kEff) / R_M);
@@ -257,7 +289,7 @@
           col.setRGB((0.24 + dry * 0.28 - conifer * 0.06) * v * 0.66, (0.46 - dry * 0.1 - conifer * 0.12) * v * 0.66, (0.16 + conifer * 0.06) * v * 0.7);
           if (fall > 0.01) { const k = 0.4 + 0.6 * hash2(gx, gy, 31); col.setRGB(col.r * (1 - fall) + (0.62 * k + 0.3) * fall, col.g * (1 - fall) + (0.3 * k + 0.1) * fall, col.b * (1 - fall) + 0.05 * fall); }
           if (bare > 0.01) { col.setRGB(col.r * (1 - bare) + 0.3 * bare, col.g * (1 - bare) + 0.26 * bare, col.b * (1 - bare) + 0.22 * bare); }
-          const isBroad = ti === 0 && sp !== 1;
+          const isBroad = ti === 0 && zone !== 'boreal';
           if (isBroad) { s.set(wid * 1.4 / R_M, hgt * 0.85 / R_M, wid * 1.4 / R_M); m.compose(p, q, s); broad.setMatrixAt(countB, m); broad.setColorAt(countB, col); countB++; }
           else { m.compose(p, q, s); mesh.setMatrixAt(count, m); mesh.setColorAt(count, col); count++; }
           if (casters) casters.push(lon, lat, wid, hgt);

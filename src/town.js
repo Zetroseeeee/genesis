@@ -164,7 +164,7 @@
     north: ['menhirs', 'menhirs', 'temple', 'cathedral', 'palace', 'station', 'stadium', 'spire'],
     east: ['menhirs', 'hall', 'hall', 'onion', 'onion', 'station', 'stadium', 'spire'],
     mena: ['menhirs', 'ziggurat', 'ziggurat', 'mosque', 'mosque', 'station', 'stadium', 'spire'],
-    africa: ['menhirs', 'granary', 'stepped', 'mudmosque', 'mudmosque', 'station', 'stadium', 'spire'],
+    africa: ['menhirs', 'menhirs', 'stepped', 'mudmosque', 'mudmosque', 'station', 'stadium', 'spire'],
     sasia: ['menhirs', 'stupa', 'stupa', 'shikhara', 'mosque', 'station', 'stadium', 'spire'],
     easia: ['menhirs', 'hall', 'pagoda', 'pagoda', 'hall', 'station', 'stadium', 'spire'],
     seasia: ['menhirs', 'hall', 'stepped', 'stepped', 'stupa', 'station', 'stadium', 'spire'],
@@ -183,8 +183,11 @@
     america: ['menhirs', 'steppyramid', 'steppyramid', 'steppyramid', 'steppyramid', 'basilica', 'irontower', 'stadium', 'spire'],
     namerica: ['menhirs', 'mound', 'mound', 'mound', 'pueblo', 'church', 'irontower', 'stadium', 'spire'],
   };
-  // walls by era: what a fortified town surrounds itself with
+  // walls by era: what a fortified town surrounds itself with. The timber countries kept the palisade long after the
+  // mud-brick lands had walls of brick: the north and east of Europe, the forests of south-east Asia, the Americas.
   const WALLSTYLE = ['palisade', 'mud', 'mud', 'stone', 'stone', 'bastion', 'none', 'none', 'none'];
+  const TIMBER_UNTIL = [0, 2, 2, 0, 0, 0, 0, 2, 2, 4];               // by culture: the last era whose wall is still a palisade
+  const wallStyleOf = (era, cul) => era <= TIMBER_UNTIL[cul] ? 'palisade' : WALLSTYLE[era];
 
   // ---------- size ----------
   // Towns are planned at true scale (metres), then drawn at a representational scale, the way a strategy map does it:
@@ -276,7 +279,7 @@
     const blockN = planned ? 3 : 0;                                   // slots per block side before a street
     const street = planned ? s * (era >= 6 ? 0.9 : 0.6) : 0;
     const wallWork = workProg('walls'); const wallLvl = wallsL || (wallWork >= 0 ? 1 : 0);
-    const wallStyle = wallLvl ? WALLSTYLE[era] : 'none';
+    const wallStyle = wallLvl ? wallStyleOf(era, cul) : 'none';
     const wallR = R * 1.06 + 6;
     const gates = gateAngles(i, lvl, planned);                        // angles of the gates (roads leave here)
     // organic street net: radial lanes (through the gates, plus more as the town grows) and ring lanes
@@ -385,7 +388,7 @@
       const lmWall = ['menhirs', 'mound'].includes(lmKind) ? WALL.stone : lmKind === 'mudmosque' || lmKind === 'stepped' && cul === 4 ? WALL.adobe : lmKind === 'irontower' ? WALL.brick : lmKind === 'crystal' || lmKind === 'spire' ? WALL.glass : lmKind === 'station' ? WALL.brick : ['hall', 'pagoda', 'onion'].includes(lmKind) ? WALL.wood : lmKind === 'stadium' ? WALL.concrete : ['mosque', 'tajmosque', 'basilica', 'palace', 'stupa'].includes(lmKind) ? WALL.plaster : WALL.stone;
       const lmRoof = ['hall', 'pagoda'].includes(lmKind) ? ROOF.glazed : ['onion', 'basilica', 'mosque', 'tajmosque', 'stupa'].includes(lmKind) ? ROOF.copper : lmKind === 'cathedral' || lmKind === 'church' || lmKind === 'station' ? ROOF.slate : lmKind === 'temple' || lmKind === 'palace' ? ROOF.tile : ROOF.flat;
       const lmCol = { menhirs: 0x8b857a, pyramid: 0xe7d9b0, ziggurat: 0xcdb082, steppyramid: 0xb9b0a0, temple: 0xf1ebdd, colosseum: 0xe6dcc4, cathedral: 0xc9c2b3, church: 0xd6cfc0, basilica: 0xebe3d0, mosque: 0xf3efe6, tajmosque: 0xf7f4ee, mudmosque: 0xb8845a, onion: 0xf1ede2, hall: 0xb3462f, pagoda: 0xa64534, stupa: 0xf3efe6, shikhara: 0xd8c39a, stepped: 0xa39a88, mound: 0x6f7f4a, pueblo: 0xc48f5f, palace: 0xf1e6cf, keep: 0x8c8478, station: 0x9a5a48, crystal: 0xd9e6ee, irontower: 0x6b5a4a, stadium: 0xd8dbdf, spire: 0xcbd7e0, lighthouse: 0xf2efe8 }[lmKind] || 0xd9d2c2;
-      push(lmKind, lx, lz, lw, lh, ld, -(lmAngle + Math.PI / 2), lmCol, packStyle(lmWall, lmRoof, cul, wonderProg >= 0 ? FLAG.wonder | FLAG.landmark : FLAG.landmark), 0, wonderProg >= 0 ? wonderProg : 1);
+      push(lmKind, lx, lz, lw, lh, ld, -(lmAngle + Math.PI / 2), lmCol, packStyle(lmWall, lmRoof, cul, wonderProg >= 0 ? FLAG.wonder | FLAG.landmark : FLAG.landmark), 0, wonderProg >= 0 ? wonderProg : 1).tag = 'landmark';
       // plaza furniture
       const propKind = era === 0 ? null : era <= 2 ? 'well' : era <= 5 ? 'fountain' : 'statue';
       if (propKind && !coarse) push(propKind, Math.cos(lmAngle + Math.PI) * plaza * 0.25, Math.sin(lmAngle + Math.PI) * plaza * 0.25, propKind === 'well' ? 3 : propKind === 'statue' ? 4 : 8, propKind === 'well' ? 2.5 : propKind === 'statue' ? 9 : 4, propKind === 'well' ? 3 : propKind === 'statue' ? 4 : 8, 0, 0xbfb6a6, packStyle(WALL.stone, ROOF.flat, cul, 0));
@@ -399,7 +402,7 @@
       for (let k = 0; k < nSup; k++) { const a = d.a + (k / nSup) * Math.PI * 2 + 0.5; const rr = d.rad * 1.15 + s * 0.4; const e = pickW(houses, rnd(700 + k)); push(support || e[0], d.x + Math.cos(a) * rr, d.z + Math.sin(a) * rr, s * 0.6, heightOf(e[0], 0.3) * 0.9, s * 0.6, yaw + (rnd(720 + k) - 0.5), colorOf(730 + k), packStyle(e[2], e[3], cul, 0), 0, d.prog < 1 ? clamp((d.prog - 0.75) / 0.25, 0.05, 1) : 1); }
       return head;
     };
-    if (dist.temple) { const tk = era <= 2 ? (cul === 3 || cul === 5 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'stepped') : era === 3 ? 'temple' : LANDMARK[cname][band] === 'menhirs' ? 'temple' : (['cathedral', 'basilica', 'onion', 'station', 'stadium', 'spire', 'palace'].includes(LANDMARK[cname][band]) ? (cul === 3 || cul === 5 && era >= 5 ? 'mosque' : 'church') : LANDMARK[cname][band]); const sz = landmarkSize(tk, false); quarter(dist.temple, tk, [sz[0] * 0.7, sz[1] * 0.8, sz[2] * 0.7], tk === 'church' ? 0xd6cfc0 : tk === 'temple' ? 0xf1ebdd : 0xe6dcc4, tk === 'mosque' ? WALL.plaster : WALL.stone, tk === 'church' ? ROOF.slate : tk === 'mosque' ? ROOF.copper : ROOF.tile, null, 8); }
+    if (dist.temple) { const tk = era <= 2 ? (cul === 3 || cul === 5 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'stepped') : era === 3 ? 'temple' : LANDMARK[cname][band] === 'menhirs' ? 'temple' : (['cathedral', 'basilica', 'onion', 'station', 'stadium', 'spire', 'palace'].includes(LANDMARK[cname][band]) ? (cul === 3 || cul === 5 && era >= 5 ? 'mosque' : 'church') : LANDMARK[cname][band]); const sz = landmarkSize(tk, false); quarter(dist.temple, tk, [sz[0] * 0.7, sz[1] * 0.8, sz[2] * 0.7], tk === 'church' ? 0xd6cfc0 : tk === 'temple' ? 0xf1ebdd : 0xe6dcc4, tk === 'mosque' ? WALL.plaster : WALL.stone, tk === 'church' ? ROOF.slate : tk === 'mosque' ? ROOF.copper : ROOF.tile, null, 8).tag = 'temple'; }
     if (dist.academy) quarter(dist.academy, era >= 6 ? 'palazzo' : era >= 3 ? 'temple' : 'courtyard', era >= 6 ? [36, 16, 22] : [26, 11, 34], 0xe7e0d2, era >= 6 ? WALL.brick : WALL.stone, era >= 6 ? ROOF.slate : ROOF.tile, null, 8);
     if (dist.palace) (quarter(dist.palace, era <= 2 ? (cul === 6 ? 'hall' : cul === 3 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'palace') : era <= 4 ? (cul === 6 ? 'hall' : 'keep') : era <= 5 ? (cul === 6 ? 'hall' : 'palace') : 'palace', era <= 2 ? [30, 10, 24] : era <= 4 ? [24, 26, 24] : [60, 18, 26], era >= 5 ? 0xf1e6cf : 0xd9cba8, WALL.stone, cul === 6 ? ROOF.glazed : ROOF.tile, null, coarse ? 0 : 4)).as = 'palace';
     if (dist.keep) { push('keep', dist.keep.x, dist.keep.z, 22, 28, 22, -axis, 0x8c8478, packStyle(WALL.stone, ROOF.flat, cul, FLAG.landmark)); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; push('roundtower', dist.keep.x + Math.cos(a) * 19, dist.keep.z + Math.sin(a) * 19, 7, 20, 7, 0, 0x85807a, packStyle(WALL.stone, ROOF.slate, cul, 0)); } }
@@ -410,7 +413,8 @@
       const d = dist.harbour; const dirx = Math.cos(d.a), dirz = Math.sin(d.a); const pr = d.prog;
       const nP = coarse ? 1 : 2 + Math.min(3, lvl);
       for (let k = 0; k < nP; k++) { const off = (k - (nP - 1) / 2) * 22; const px = d.x + dirx * 40 - dirz * off, pz = d.z + dirz * 40 + dirx * off; const pp = clamp((pr - k * 0.12) / 0.5, 0, 1); if (pp <= 0) continue; push('pier', px, pz, 70 * Math.max(0.3, pp), 1.6, 4, -d.a, 0x6a563e, packStyle(WALL.wood, ROOF.flat, cul, 0), 0); if (!coarse && pr >= 0.8) push(era >= 6 ? 'ship' : 'boat', px + dirx * 30, pz + dirz * 30 + 5, era >= 6 ? 34 : 9, era >= 6 ? 8 : 2.5, era >= 6 ? 8 : 3, -d.a, era >= 6 ? 0x5b6068 : 0x7c5a38, packStyle(WALL.wood, ROOF.flat, cul, 0)); }
-      const nW = coarse ? 1 : 3 + lvl; for (let k = 0; k < nW; k++) { const off = (k - nW / 2) * 18; const pp = clamp((pr - 0.2 - k * 0.1) / 0.5, 0, 1); if (pp <= 0) continue; push(era >= 6 ? 'warehouse' : 'gable', d.x - dirx * 22 - dirz * off, d.z - dirz * 22 + dirx * off, 16, era >= 6 ? 9 : 6, 10, -d.a + Math.PI / 2, era >= 6 ? 0x8a6a4e : colorOf(900 + k), packStyle(era >= 6 ? WALL.brick : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, 0), 0, pp); }
+      const shedKind = houses.reduce((b, e) => e[1] > b[1] ? e : b, houses[0])[0];      // early harbours: sheds built the way the houses are
+      const nW = coarse ? 1 : 3 + lvl; for (let k = 0; k < nW; k++) { const off = (k - nW / 2) * (era <= 2 && shedKind === 'longhouse' ? 30 : 18); const pp = clamp((pr - 0.2 - k * 0.1) / 0.5, 0, 1); if (pp <= 0) continue; push(era >= 6 ? 'warehouse' : era <= 2 ? shedKind : 'gable', d.x - dirx * 22 - dirz * off, d.z - dirz * 22 + dirx * off, 16, era >= 6 ? 9 : 6, 10, -d.a + Math.PI / 2, era >= 6 ? 0x8a6a4e : colorOf(900 + k), packStyle(era >= 6 ? WALL.brick : WALL.wood, era >= 6 ? ROOF.metal : ROOF.tile, cul, 0), 0, pp); }
       if (era >= 3 && lvl >= 3 && pr >= 1) push('lighthouse', d.x + dirx * 120 - dirz * 60, d.z + dirz * 120 + dirx * 60, 8, 26, 8, 0, 0xf2efe8, packStyle(WALL.stone, ROOF.copper, cul, FLAG.landmark));
       if (era >= 7 && !coarse && pr >= 1) for (let k = 0; k < 3; k++) push('crane', d.x + dirx * 60 - dirz * (k - 1) * 40, d.z + dirz * 60 + dirx * (k - 1) * 40, 6, 40, 6, -d.a, 0xd9552f, packStyle(WALL.concrete, ROOF.flat, cul, 0));
     }
@@ -419,7 +423,7 @@
     if (wallStyle !== 'none') {
       const segs = Math.max(14, Math.round(wallR * 2 * Math.PI / (wallStyle === 'bastion' ? 40 : 24)));
       const lvlDrawn = wallsL || 1;
-      const hW = wallStyle === 'palisade' ? 3.5 : wallStyle === 'mud' ? 5 + lvlDrawn * 1.2 : wallStyle === 'bastion' ? 7 : 7 + lvlDrawn * 2;
+      const hW = wallStyle === 'palisade' ? 3.5 + (lvlDrawn - 1) * 0.7 : wallStyle === 'mud' ? 5 + lvlDrawn * 1.2 : wallStyle === 'bastion' ? 7 : 7 + lvlDrawn * 2;
       const thick = wallStyle === 'palisade' ? 0.6 : wallStyle === 'mud' ? 2.2 : wallStyle === 'bastion' ? 9 : 2.6;
       const wCol = wallStyle === 'palisade' ? 0x6e5537 : wallStyle === 'mud' ? 0xc0a070 : wallStyle === 'bastion' ? 0x8f8778 : 0x9c9486;
       const wKind = wallStyle === 'palisade' ? 'palisade' : 'wall';
@@ -444,10 +448,10 @@
         const isGate = bounds[k][2];
         const x1 = Math.cos(a) * wallR, z1 = Math.sin(a) * wallR, x2 = Math.cos(a2) * wallR, z2 = Math.sin(a2) * wallR;
         const len = Math.hypot(x2 - x1, z2 - z1) * 1.04; const yaw = Math.atan2(z2 - z1, x2 - x1);
-        if (isGate) { push('gatehouse', (x1 + x2) / 2, (z1 + z2) / 2, len, hW * 1.7, thick + 5, yaw, wCol, packStyle(wm, ROOF.slate, cul, 0), 0, segProg).th = hW; walls.push({ x: (x1 + x2) / 2, z: (z1 + z2) / 2, gate: true }); continue; }
-        push(wKind, (x1 + x2) / 2, (z1 + z2) / 2, len, hW, thick, yaw, wCol, packStyle(wm, ROOF.flat, cul, 0), 0, segProg).th = hW;
+        if (isGate) { const gt = push('gatehouse', (x1 + x2) / 2, (z1 + z2) / 2, len, hW * 1.7, thick + 5, yaw, wCol, packStyle(wm, ROOF.slate, cul, 0), 0, segProg); gt.th = hW; gt.as = 'gate_' + wallStyle; walls.push({ x: (x1 + x2) / 2, z: (z1 + z2) / 2, gate: true }); continue; }
+        { const ws = push(wKind, (x1 + x2) / 2, (z1 + z2) / 2, len, hW, thick, yaw, wCol, packStyle(wm, ROOF.flat, cul, 0), 0, segProg); ws.th = hW; if (wallStyle !== 'palisade') ws.as = 'wall_' + wallStyle; }
         if (wallStyle === 'bastion') { if (k % 4 === 0) push('bastion', x1, z1, 26, hW * 1.1, 26, Math.atan2(z1, x1), wCol, packStyle(WALL.stone, ROOF.flat, cul, 0), 0, segProg); }
-        else if (k % (wallStyle === 'palisade' ? 5 : 3) === 0) { const tw = push(wallStyle === 'palisade' ? 'keep' : 'roundtower', x1, z1, wallStyle === 'palisade' ? 4 : 6 + lvlDrawn, hW * (wallStyle === 'palisade' ? 1.5 : 1.6), wallStyle === 'palisade' ? 4 : 6 + lvlDrawn, wallStyle === 'palisade' ? 0 : Math.atan2(z1, x1) + Math.PI / 2, wCol, packStyle(wm, wallStyle === 'stone' ? ROOF.slate : ROOF.flat, cul, 0), 0, segProg); tw.th = hW; if (wallStyle === 'palisade') tw.as = 'watchtower'; }
+        else if (k % (wallStyle === 'palisade' ? 5 : 3) === 0) { const tw = push(wallStyle === 'palisade' ? 'keep' : 'roundtower', x1, z1, wallStyle === 'palisade' ? 4 : 6 + lvlDrawn, hW * (wallStyle === 'palisade' ? 1.5 : 1.6), wallStyle === 'palisade' ? 4 : 6 + lvlDrawn, wallStyle === 'palisade' ? 0 : Math.atan2(z1, x1) + Math.PI / 2, wCol, packStyle(wm, wallStyle === 'stone' ? ROOF.slate : ROOF.flat, cul, 0), 0, segProg); tw.th = hW; tw.as = wallStyle === 'palisade' ? 'watchtower' : 'tower_' + wallStyle; }
       }
     }
     // --- farmsteads in the fields (more with every level of farming), the odd windmill; the newest are still being raised ---
