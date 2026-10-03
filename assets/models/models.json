@@ -58,7 +58,7 @@
     8
    ],
    "anchor": "86bf0d6d-5279-464c-a498-d82de2f181b4",
-   "note": "Trees and other living things, in the same photographic frame as the buildings."
+   "note": "Trees. Generated meshes get trunks right and crowns wrong, so a tree is drawn as its concept photograph, cut out, on a card that faces the camera (card: true); the mesh is kept for later."
   }
  },
  "models": [
@@ -654,7 +654,8 @@
    "concept": "86bf0d6d-5279-464c-a498-d82de2f181b4",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_152049_86bf0d6d-5279-464c-a498-d82de2f181b4.png",
    "mesh": "91131398-9a32-42a1-99cf-4e7fd6c1696e",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153344_91131398-9a32-42a1-99cf-4e7fd6c1696e.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153344_91131398-9a32-42a1-99cf-4e7fd6c1696e.glb",
+   "card": true
   },
   {
    "id": "bronze_med_house_a",
@@ -1039,7 +1040,8 @@
    "concept": "92d82252-86b4-404a-937b-24c575110753",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154842_92d82252-86b4-404a-937b-24c575110753.png",
    "mesh": "eb55b342-a473-40f0-9da6-018a60e8b975",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155835_eb55b342-a473-40f0-9da6-018a60e8b975.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155835_eb55b342-a473-40f0-9da6-018a60e8b975.glb",
+   "card": true
   },
   {
    "id": "tree_acacia_a",
@@ -1059,7 +1061,8 @@
    "concept": "0ce0f2c2-f5fe-4f54-8c73-f8dd0e9eecfb",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154843_0ce0f2c2-f5fe-4f54-8c73-f8dd0e9eecfb.png",
    "mesh": "edf79d01-7ec8-4496-8fe6-13d1fe291f46",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155839_edf79d01-7ec8-4496-8fe6-13d1fe291f46.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155839_edf79d01-7ec8-4496-8fe6-13d1fe291f46.glb",
+   "card": true
   },
   {
    "id": "tree_palm_a",
@@ -1079,7 +1082,8 @@
    "concept": "51219261-fb76-44fc-b277-ed24dc75ce75",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155919_51219261-fb76-44fc-b277-ed24dc75ce75.png",
    "mesh": "53c861a7-d2eb-49f0-9415-771bff9ab6e0",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161347_53c861a7-d2eb-49f0-9415-771bff9ab6e0.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_161347_53c861a7-d2eb-49f0-9415-771bff9ab6e0.glb",
+   "card": true
   },
   {
    "id": "bronze_mudbrick_site",

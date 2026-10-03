@@ -19,6 +19,7 @@ import { cloneDocument, dedup, flatten, getBounds, join, meshopt, prune, simplif
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { bakeLowLod } from './lowlod.mjs';
+import { keyCard } from './card.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
@@ -39,7 +40,7 @@ const LODS = [
 const log = (...a) => console.log(...a);
 const sh = (cmd, args, opts) => execFileSync(cmd, args, Object.assign({ encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 28 }, opts || {}));
 const readManifest = () => JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h', ...(m.plan ? [m.plan] : []), ...(m.sink ? [m.sink] : [])])).digest('hex').slice(0, 12);
+const revOf = (m) => crypto.createHash('sha1').update(JSON.stringify([PIPELINE_REV, LODS, m.src, m.h, m.yaw || 0, m.scaleBy === 'w' ? m.w : 'h', ...(m.plan ? [m.plan] : []), ...(m.sink ? [m.sink] : []), ...(m.card ? ['card', 2] : [])])).digest('hex').slice(0, 12);
 const srcName = (m) => `${m.id}.${(m.mesh || 'x').slice(0, 8)}.src.glb`;
 
 let _io = null;
@@ -152,7 +153,7 @@ async function ci() {
     const publishIndex = () => { fs.writeFileSync(path.join(work, 'index.json'), JSON.stringify(index)); sh('gh', ['release', 'upload', outTag, path.join(work, 'index.json'), '--clobber']); };
     for (const m of bySet[set]) {
       const cur = index.models[m.id];
-      if (cur && cur.rev === revOf(m) && cur.lods.every((l) => have.has(l.file))) { log(`= ${m.id} up to date`); continue; }
+      if (cur && cur.rev === revOf(m) && cur.lods.every((l) => have.has(l.file)) && (!m.card || (cur.card && have.has(cur.card.file)))) { log(`= ${m.id} up to date`); continue; }
       log(`+ ${m.id}`);
       try {
         const sn = srcName(m), src = path.join(work, sn);
@@ -160,6 +161,14 @@ async function ci() {
         else { sh('curl', ['-fsSL', '--retry', '3', '-o', src, m.src]); sh('gh', ['release', 'upload', srcTag, src, '--clobber']); }
         if (m.conceptUrl && !haveSrc.has(`${m.id}.concept.png`)) { const cp = path.join(work, `${m.id}.concept.png`); try { sh('curl', ['-fsSL', '--retry', '3', '-o', cp, m.conceptUrl]); sh('gh', ['release', 'upload', srcTag, cp, '--clobber']); fs.rmSync(cp, { force: true }); } catch (e) { log('   concept image not mirrored: ' + e.message); } }
         const entry = await processModel(m, src, work);
+        if (m.card) {      // the cut-out photograph, for models drawn as a picture on a card (trees)
+          const cp = path.join(work, `${m.id}.concept.png`);
+          if (haveSrc.has(`${m.id}.concept.png`) || fs.existsSync(cp)) { if (!fs.existsSync(cp)) sh('gh', ['release', 'download', srcTag, '-p', `${m.id}.concept.png`, '-D', work, '--clobber']); } else sh('curl', ['-fsSL', '--retry', '3', '-o', cp, m.conceptUrl]);
+          const card = await keyCard(fs.readFileSync(cp), { height: 1024 }); const cf = `${m.id}.card.png`; fs.writeFileSync(path.join(work, cf), card.png);
+          sh('gh', ['release', 'upload', outTag, path.join(work, cf), '--clobber']);
+          entry.card = { file: cf, bytes: card.png.length, aspect: card.aspect, pivot: card.pivot, mean: card.mean }; log(`   card: ${card.width} x ${card.height}, ${(card.png.length / 1e6).toFixed(2)} MB`);
+          fs.rmSync(path.join(work, cf), { force: true }); fs.rmSync(cp, { force: true });
+        }
         sh('gh', ['release', 'upload', outTag, ...entry.lods.map((l) => path.join(work, l.file)), '--clobber']);
         index.models[m.id] = entry; publishIndex();
         for (const l of entry.lods) fs.rmSync(path.join(work, l.file), { force: true });

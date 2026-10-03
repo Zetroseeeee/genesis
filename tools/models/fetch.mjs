@@ -19,7 +19,7 @@ for (const set of [...new Set(man.models.filter((m) => m.src).map((m) => m.set))
   const idx = JSON.parse(fs.readFileSync(tmp, 'utf8')); fs.rmSync(tmp, { force: true });
   for (const [id, entry] of Object.entries(idx.models)) {
     const m = man.models.find((x) => x.id === id); if (!m) continue;      // where and when the model belongs comes from the manifest
-    for (const l of entry.lods) {
+    for (const l of entry.card ? entry.lods.concat([entry.card]) : entry.lods) {
       const p = path.join(OUT, l.file);
       if (fs.existsSync(p) && fs.statSync(p).size === l.bytes) { kept++; continue; }
       curl(`${base}/models-${set}/${l.file}`, p); got++;
