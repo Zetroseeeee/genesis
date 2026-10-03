@@ -41,6 +41,7 @@
     M.tilt = M.tTilt = tilt === undefined ? 1.0 : tilt; M.dist = M.tDist = d / 6371000; M.heading = M.tHeading = turn || 0;
     return it ? { what, kind: it.kind, as: it.as, w: Math.round(it.w), h: Math.round(it.h), d: Math.round(it.d) } : { what, R: Math.round(L.R), k: +L.k.toFixed(1), items: L.items.length };
   };
+  const intro = document.getElementById('intro'); if (intro) intro.hidden = true;
   const left = document.getElementById('left'); if (left && P.clean !== false) left.style.display = 'none';      // the city panel hides a third of the picture
   setTimeout(cam, 2500); setTimeout(cam, 6000);     // the opening flight to the capital would otherwise take the camera back
   return cam();
