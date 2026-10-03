@@ -19,7 +19,8 @@
  "style": {
   "reference": "Every concept image is generated with the set's anchor image attached as a style reference, so lighting, camera, background and material character match across the whole library.",
   "prefix": "Use the attached image only as the style reference: same photographic look, same soft lighting, same camera height and angle, same plain light-grey background. Show a different building: ",
-  "suffix": " Three-quarter view from the front-left, camera slightly above at about 30 degrees elevation, the entire structure visible and centred with clear margin around it. Photorealistic archaeological reconstruction, historically accurate construction details, natural weathering. Soft even overcast lighting, no harsh shadows, no cast shadow on the ground. Plain flat light-grey studio background, no ground plane, no people, no animals, no plants, no other objects, no text."
+  "suffix": " Three-quarter view from the front-left, camera slightly above at about 30 degrees elevation, the entire structure visible and centred with clear margin around it. Photorealistic archaeological reconstruction, historically accurate construction details, natural weathering. Soft even overcast lighting, no harsh shadows, no cast shadow on the ground. Plain flat light-grey studio background, no ground plane, no people, no animals, no plants, no other objects, no text.",
+  "chain": "A building that is the later form of an earlier one (a house of the next age, a higher wall, the gate of a wall) is generated with the earlier one's concept image attached as its reference, so upgrades keep the same materials and workmanship."
  },
  "sets": {
   "stone": {
@@ -42,6 +43,22 @@
    ],
    "anchor": "368ff7b1-22cb-42ac-ac04-49248222f1c6",
    "note": "Pilot only so far."
+  },
+  "bronze": {
+   "eras": [
+    1,
+    2
+   ],
+   "anchor": "e8c06ff0-c45c-45e4-9f96-5fb0899054f9",
+   "note": "First cities to early iron: sun-dried mud brick, mud plaster, rammed earth, rubble stone, timber, reed and thatch. Fired brick only as facing on great works, dressed stone only on monuments. No true arches, no roof tiles, no glass."
+  },
+  "nature": {
+   "eras": [
+    0,
+    8
+   ],
+   "anchor": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "note": "Trees and other living things, in the same photographic frame as the buildings."
   }
  },
  "models": [
@@ -190,10 +207,14 @@
     2
    ],
    "cultures": [
-    "mena"
+    "mena",
+    "africa",
+    "sasia",
+    "namerica"
    ],
    "kinds": [
-    "adobe"
+    "adobe",
+    "pueblo"
    ],
    "h": 3.4,
    "concept": "6f77815e-2e63-496d-b266-1c1e0324d8eb",
@@ -210,10 +231,14 @@
     2
    ],
    "cultures": [
-    "mena"
+    "mena",
+    "africa",
+    "sasia",
+    "namerica"
    ],
    "kinds": [
-    "adobe"
+    "adobe",
+    "pueblo"
    ],
    "h": 3.6,
    "concept": "7ce138f8-1025-4cf3-925d-41e336dcd656",
@@ -529,6 +554,187 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_135857_c41aac94-3ae2-4fe2-a523-9a95defa0d81.png",
    "mesh": "2ee86755-8a68-4c84-a6e7-d49d7bbf7bdc",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_140127_2ee86755-8a68-4c84-a6e7-d49d7bbf7bdc.glb"
+  },
+  {
+   "id": "bronze_mudwall_a",
+   "title": "Mud-brick town wall",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": null,
+   "kinds": [
+    "wall"
+   ],
+   "h": 6.4,
+   "fit": "run",
+   "ref": "6f77815e-2e63-496d-b266-1c1e0324d8eb",
+   "prompt": "a straight free-standing section of a Bronze Age town wall, about 12 m long, 6 m high and 2.5 m thick, sun-dried mud brick on a rough field-stone footing, weathered mud plaster, a wall-walk behind a parapet with square crenellations, both ends cut flat so sections join end to end",
+   "concept": "be7d25bc-89c3-4149-8cec-29494202a6a0",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_152049_be7d25bc-89c3-4149-8cec-29494202a6a0.png",
+   "mesh": "b1413d3d-eb0f-42d4-9479-b91dbe9df569",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153335_b1413d3d-eb0f-42d4-9479-b91dbe9df569.glb"
+  },
+  {
+   "id": "bronze_court_a",
+   "title": "Mud-brick courtyard house",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "mena",
+    "med",
+    "sasia",
+    "africa"
+   ],
+   "kinds": [
+    "courtyard"
+   ],
+   "h": 4.6,
+   "ref": "6f77815e-2e63-496d-b266-1c1e0324d8eb",
+   "prompt": "a Mesopotamian courtyard house of about 2000 BC, single storey, about 12 m square around a small open court, thick mud-plastered mud-brick walls, flat roof of palm beams, reed matting and packed mud with a low parapet, one wooden door, ventilation slits, roof-drain spouts, a ladder in the court, storage jars on the roof",
+   "concept": "e8c06ff0-c45c-45e4-9f96-5fb0899054f9",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_152049_e8c06ff0-c45c-45e4-9f96-5fb0899054f9.png",
+   "mesh": "5d6d3927-5672-4f6d-875d-a3592f1a72ed",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153338_5d6d3927-5672-4f6d-875d-a3592f1a72ed.glb"
+  },
+  {
+   "id": "bronze_loghouse_a",
+   "title": "Log house with reed thatch",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "north",
+    "east"
+   ],
+   "kinds": [
+    "gable"
+   ],
+   "h": 5.8,
+   "ref": "203c9638-c591-4293-9a85-2bcccd6df704",
+   "prompt": "an early Iron Age house in the manner of Biskupin, about 9 by 7 m, horizontal split logs slotted into grooved corner posts on a field-stone sill, steep gabled roof of reed thatch held by crossed ridge poles, plank gables with a smoke opening, one low plank door",
+   "concept": "b29afb73-544d-47dd-8728-7560af5f4613",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_152048_b29afb73-544d-47dd-8728-7560af5f4613.png",
+   "mesh": "69592a9e-a7ef-4d6a-8ce8-9f646eeacf1f",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153342_69592a9e-a7ef-4d6a-8ce8-9f646eeacf1f.glb"
+  },
+  {
+   "id": "tree_oak_a",
+   "title": "Oak",
+   "set": "nature",
+   "eras": [
+    0,
+    8
+   ],
+   "cultures": null,
+   "kinds": [
+    "tree_broad"
+   ],
+   "h": 18.0,
+   "ref": "36afee3f-1178-4673-ac5d-8a7c59e4fe59",
+   "prompt": "a mature European oak about 18 m tall, broad dense rounded crown of deep green summer foliage in full leaf masses, thick gnarled trunk dividing into a few heavy limbs, roots flaring at the base",
+   "concept": "86bf0d6d-5279-464c-a498-d82de2f181b4",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_152049_86bf0d6d-5279-464c-a498-d82de2f181b4.png",
+   "mesh": "91131398-9a32-42a1-99cf-4e7fd6c1696e",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153344_91131398-9a32-42a1-99cf-4e7fd6c1696e.glb"
+  },
+  {
+   "id": "bronze_med_house_a",
+   "title": "Aegean town house",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "adobe",
+    "gable"
+   ],
+   "h": 6.6,
+   "ref": "7ce138f8-1025-4cf3-925d-41e336dcd656",
+   "prompt": "an Aegean town house of about 1600 BC in the manner of Akrotiri, two storeys, about 8 by 7 m and 6.5 m high, rubble stone bound with clay and laced with timber beams, flaking pale ochre plaster, dressed stone corners, flat roof of beams, reeds and earth, timber-framed door and windows",
+   "concept": "25558def-753a-482c-8aab-589254347642",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153202_25558def-753a-482c-8aab-589254347642.png",
+   "mesh": "65f2a6df-44d2-4f07-ac61-f2760235e79a",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153511_65f2a6df-44d2-4f07-ac61-f2760235e79a.glb"
+  },
+  {
+   "id": "bronze_easia_house_a",
+   "title": "Shang house on a rammed-earth platform",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "easia"
+   ],
+   "kinds": [
+    "curved",
+    "gable"
+   ],
+   "h": 5.4,
+   "ref": "2578724d-7797-49b9-96d2-7d4ffdd85f25",
+   "prompt": "a house of northern China of about 1200 BC, about 8 by 5 m on a low platform of pounded yellow earth, rammed-earth and wattle-and-daub walls between timber posts, steep hipped grass-thatch roof with wide eaves on slender posts, plank door in the long side, no windows",
+   "concept": "5e30cc40-300b-4d73-85d4-f50b86c2c618",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153202_5e30cc40-300b-4d73-85d4-f50b86c2c618.png",
+   "mesh": "26eb11b2-0352-45b3-8e6b-300e6145f7e8",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153514_26eb11b2-0352-45b3-8e6b-300e6145f7e8.glb"
+  },
+  {
+   "id": "bronze_america_house_a",
+   "title": "Formative Mesoamerican house",
+   "set": "bronze",
+   "eras": [
+    1,
+    3
+   ],
+   "cultures": [
+    "america"
+   ],
+   "kinds": [
+    "adobe"
+   ],
+   "h": 6.0,
+   "ref": "d5673709-a686-444e-887a-edd0973101d6",
+   "prompt": "a village house of Formative Mesoamerica of about 800 BC, about 7 by 4.5 m on a low platform faced with river cobbles and clay, wattle-and-daub walls partly whitewashed, tall steep hipped palm-thatch roof, one open doorway with a wooden lintel",
+   "concept": "52c7956e-bfcf-463d-b8c0-4fb6345027e3",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153202_52c7956e-bfcf-463d-b8c0-4fb6345027e3.png",
+   "mesh": "0da77d6c-ad54-4e15-bfb9-e8951c17c481",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153518_0da77d6c-ad54-4e15-bfb9-e8951c17c481.glb"
+  },
+  {
+   "id": "stone_barklonghouse_a",
+   "title": "Bark longhouse",
+   "set": "stone",
+   "eras": [
+    0,
+    4
+   ],
+   "cultures": [
+    "namerica"
+   ],
+   "kinds": [
+    "longhouse"
+   ],
+   "h": 6.0,
+   "w": 20.0,
+   "scaleBy": "w",
+   "ref": "3f42f01a-a014-45e7-a454-3ddea4fdc6ab",
+   "prompt": "a longhouse of the Eastern Woodlands, about 20 m long, 6 m wide and 6 m high, an arched frame of bent saplings covered with overlapping sheets of elm bark held by an outer lattice of poles, barrel roof with smoke holes, a hide-hung doorway at each end",
+   "concept": "d2857705-9bf1-4c36-8d52-2fd9327ea483",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153201_d2857705-9bf1-4c36-8d52-2fd9327ea483.png",
+   "mesh": "84599e0a-4c27-470c-a6a0-426109522db5",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153522_84599e0a-4c27-470c-a6a0-426109522db5.glb"
   }
  ]
 }
