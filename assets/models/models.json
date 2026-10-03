@@ -513,7 +513,7 @@
    ],
    "cultures": null,
    "kinds": [
-    "keep"
+    "watchtower"
    ],
    "h": 7.0,
    "concept": "5fb233e1-802b-4772-8675-6442b0be496d",
@@ -735,6 +735,222 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153201_d2857705-9bf1-4c36-8d52-2fd9327ea483.png",
    "mesh": "84599e0a-4c27-470c-a6a0-426109522db5",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153522_84599e0a-4c27-470c-a6a0-426109522db5.glb"
+  },
+  {
+   "id": "bronze_mudgate_a",
+   "title": "Mud-brick town gate",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": null,
+   "kinds": [
+    "gatehouse"
+   ],
+   "w": 14.0,
+   "scaleBy": "w",
+   "fit": "gate",
+   "sides": "bronze_mudwall_a",
+   "ref": "be7d25bc-89c3-4149-8cec-29494202a6a0",
+   "prompt": "the gate of the mud-brick town wall: a 3.5 m passage between two projecting rectangular gate towers about 9 m high with crenellated tops, a timber fighting platform over the passage, a two-leaf plank gate bound in bronze standing open, side ends cut flat at the wall's height and thickness",
+   "concept": "e777f264-327f-4454-ade6-4eea6beff9b2",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153421_e777f264-327f-4454-ade6-4eea6beff9b2.png",
+   "mesh": "e56dea0f-b2b4-4f8c-96c3-96377322f709",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154550_e56dea0f-b2b4-4f8c-96c3-96377322f709.glb"
+  },
+  {
+   "id": "bronze_mudtower_a",
+   "title": "Mud-brick wall tower",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": null,
+   "kinds": [
+    "roundtower"
+   ],
+   "h": 10.0,
+   "ref": "be7d25bc-89c3-4149-8cec-29494202a6a0",
+   "prompt": "a free-standing rectangular tower of the mud-brick town wall, about 6 m square and 10 m high, slightly sloping walls on a field-stone footing, weathered plaster, narrow slits, a crenellated fighting platform, projecting roof beams",
+   "concept": "5f2c9931-bcbe-41d6-8460-598885d803ee",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153420_5f2c9931-bcbe-41d6-8460-598885d803ee.png",
+   "mesh": "f5fb9773-aa92-4223-961b-fa6fb60603b3",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154554_f5fb9773-aa92-4223-961b-fa6fb60603b3.glb"
+  },
+  {
+   "id": "bronze_ziggurat_a",
+   "title": "Ziggurat",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "mena",
+    "sasia"
+   ],
+   "kinds": [
+    "ziggurat"
+   ],
+   "h": 20.0,
+   "ref": "e8c06ff0-c45c-45e4-9f96-5fb0899054f9",
+   "prompt": "a Sumerian ziggurat of about 2100 BC in the manner of Ur: three receding terraces, about 45 by 30 m and 20 m high, mud-brick core faced with fired brick, buttressed sloping walls, three monumental stairs meeting at a gate tower, a small plastered shrine on top",
+   "concept": "a9e1d27d-bc80-4043-b512-6f1e9729dbdc",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153421_a9e1d27d-bc80-4043-b512-6f1e9729dbdc.png",
+   "mesh": "d8603256-08b4-440b-aade-46a5556d9bca",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154557_d8603256-08b4-440b-aade-46a5556d9bca.glb"
+  },
+  {
+   "id": "bronze_megaron_a",
+   "title": "Mycenaean megaron",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "ziggurat",
+    "stepped",
+    "palace"
+   ],
+   "h": 7.4,
+   "ref": "25558def-753a-482c-8aab-589254347642",
+   "prompt": "a Mycenaean megaron of about 1300 BC: a hall about 12 by 23 m and 7 m high, plastered rubble and timber walls on large limestone blocks, a deep porch with two tapering dark-red wooden columns on stone bases, flat clay roof with a parapet, a painted blue and red frieze, a clay smoke vent",
+   "concept": "47f25e33-7766-4bc7-bbe2-554de3ad55ea",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153420_47f25e33-7766-4bc7-bbe2-554de3ad55ea.png",
+   "mesh": "3242e088-f499-4710-8382-f8223856e0a9",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154600_3242e088-f499-4710-8382-f8223856e0a9.glb"
+  },
+  {
+   "id": "bronze_hall_a",
+   "title": "Chieftain's great hall",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "north",
+    "east"
+   ],
+   "kinds": [
+    "hall",
+    "stepped",
+    "palace"
+   ],
+   "w": 28.0,
+   "scaleBy": "w",
+   "h": 9.5,
+   "ref": "b29afb73-544d-47dd-8728-7560af5f4613",
+   "prompt": "the great hall of a Bronze Age chieftain of northern Europe: a three-aisled timber hall about 28 by 9 m, low wattle-and-daub and plank walls between oak posts, a very tall steep reed-thatched roof with crossed ridge poles, a wide double door under a small thatched porch on carved posts",
+   "concept": "6c8fb2dc-6ff6-4363-921a-091b0f4b2e62",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154509_6c8fb2dc-6ff6-4363-921a-091b0f4b2e62.png",
+   "mesh": "0204768d-aaa9-447b-a163-274d7daf21a3",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154741_0204768d-aaa9-447b-a163-274d7daf21a3.glb"
+  },
+  {
+   "id": "bronze_easia_hall_a",
+   "title": "Shang palace hall",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "easia",
+    "seasia"
+   ],
+   "kinds": [
+    "hall",
+    "stepped",
+    "palace"
+   ],
+   "w": 31.0,
+   "scaleBy": "w",
+   "h": 10.0,
+   "ref": "5e30cc40-300b-4d73-85d4-f50b86c2c618",
+   "prompt": "a Shang dynasty palace hall of about 1300 BC: about 28 by 11 m on a stepped platform of pounded yellow earth, a veranda of thick timber columns on stone bases, plastered rammed-earth walls with three plank doors, a double-eaved hipped grass-thatch roof, a broad flight of earthen steps",
+   "concept": "9ff08044-dd50-43fc-b497-3f4148ce65c8",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154508_9ff08044-dd50-43fc-b497-3f4148ce65c8.png",
+   "mesh": "ded3caec-c907-44ba-b207-9a8c1acdef58",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154745_ded3caec-c907-44ba-b207-9a8c1acdef58.glb"
+  },
+  {
+   "id": "bronze_stupa_a",
+   "title": "Early stupa",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "sasia"
+   ],
+   "kinds": [
+    "stupa"
+   ],
+   "w": 27.0,
+   "scaleBy": "w",
+   "h": 13.0,
+   "ref": "e8c06ff0-c45c-45e4-9f96-5fb0899054f9",
+   "prompt": "an early stupa of about 250 BC in the manner of the first stupa at Sanchi: a solid brick dome about 18 m across coated in weathered lime plaster on a low circular terrace with a stair, a square railing and parasol mast on top, a plain circular wooden railing with one post-and-lintel gateway around it",
+   "concept": "3b56f876-595e-4d33-a80b-f23a729f3533",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154509_3b56f876-595e-4d33-a80b-f23a729f3533.png",
+   "mesh": "458468a5-949e-42ff-a262-b2fc29af8ee9",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154748_458468a5-949e-42ff-a262-b2fc29af8ee9.glb"
+  },
+  {
+   "id": "bronze_steppyramid_a",
+   "title": "Formative temple platform",
+   "set": "bronze",
+   "eras": [
+    1,
+    3
+   ],
+   "cultures": [
+    "america"
+   ],
+   "kinds": [
+    "steppyramid"
+   ],
+   "h": 21.0,
+   "ref": "52c7956e-bfcf-463d-b8c0-4fb6345027e3",
+   "prompt": "an early Mesoamerican temple platform of about 600 BC: four receding terraces about 30 m square and 15 m high, packed clay and rubble faced with river cobbles under weathered dull-red lime plaster, one broad stair, a small wattle-and-daub temple with a tall palm-thatch roof on top",
+   "concept": "d5b91d9b-69f1-48a5-aa3d-3d4f3b21456f",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154509_d5b91d9b-69f1-48a5-aa3d-3d4f3b21456f.png",
+   "mesh": "8db09787-2b5e-4638-ab9e-532341d9d2a3",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154753_8db09787-2b5e-4638-ab9e-532341d9d2a3.glb"
+  },
+  {
+   "id": "bronze_court_palace",
+   "title": "Courtyard palace",
+   "set": "bronze",
+   "eras": [
+    1,
+    2
+   ],
+   "cultures": [
+    "mena",
+    "sasia",
+    "africa"
+   ],
+   "kinds": [
+    "palace",
+    "courtyard_great"
+   ],
+   "h": 8.2,
+   "ref": "6f77815e-2e63-496d-b266-1c1e0324d8eb",
+   "prompt": "a Mesopotamian courtyard house of about 2000 BC, single storey, about 12 m square around a small open court, thick mud-plastered mud-brick walls, flat roof of palm beams, reed matting and packed mud with a low parapet, one wooden door, ventilation slits, roof-drain spouts, a ladder in the court, storage jars on the roof",
+   "concept": "e8c06ff0-c45c-45e4-9f96-5fb0899054f9",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_152049_e8c06ff0-c45c-45e4-9f96-5fb0899054f9.png",
+   "mesh": "5d6d3927-5672-4f6d-875d-a3592f1a72ed",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153338_5d6d3927-5672-4f6d-875d-a3592f1a72ed.glb",
+   "variantOf": "bronze_court_a"
   }
  ]
 }
