@@ -1,18 +1,22 @@
 // Fills the holes in the elevation packs (data/e).
 //
 // The packs were built from a source that had nothing for a few rectangles of the Earth: there the ground was left at
-// sea level, a pit with walls kilometres high where it met the mountains round it (Bohemia, the eastern Carpathians,
-// the Yukon, the Qaidam, a quarter of Antarctica). This reads every pack, finds the ground that is at zero inside
-// those rectangles though it should not be, and puts real heights there.
+// sea level - a pit with walls kilometres high where it met mountains (Bohemia and southern Poland, the Yukon, the
+// Qaidam, a quarter of Antarctica, the far tip of Chukotka). This reads every pack, finds the ground that lies at zero
+// inside those rectangles though it should not, and puts real heights there.
 //
-//   node tools/terrain/voids.mjs scan                 list the holes (quarter-degree cells at zero, well inland, beside high ground)
-//   node tools/terrain/voids.mjs fix [--source terrarium|world] [--cache <dir>] [--out <dir>] [--levels 3,4,5]
+//   node tools/terrain/voids.mjs scan [--dir <packs>]     list the holes: ground at zero where the simulation's own grid has land well above the sea
+//   node tools/terrain/voids.mjs fix [--cache <dir>] [--out <dir>] [--levels 3,4,5] [--no-tiles]
 //
-// Heights come from the Terrain Tiles on AWS Open Data ("terrarium" PNGs: metres = R*256 + G + B/256 - 32768,
-// https://registry.opendata.aws/terrain-tiles/ - Mapzen/Tilezen's mosaic of SRTM, GMTED2010, ETOPO1 and others, see
-// https://github.com/tilezen/joerd/blob/master/docs/attribution.md). That host cannot be reached from the cloud
-// workspace, so the Terrain workflow runs this and publishes the changed packs for review. `--source world` uses the
-// simulation's own half-degree grid instead (data/world.png): coarse, for trying the machinery where there is no network.
+// Two sources of heights:
+//  - "tiles": the Terrain Tiles on AWS Open Data ("terrarium" PNGs: metres = R*256 + G + B/256 - 32768,
+//    https://registry.opendata.aws/terrain-tiles/ - Mapzen/Tilezen's mosaic of SRTM, GMTED2010, ETOPO1 and others,
+//    attribution: https://github.com/tilezen/joerd/blob/master/docs/attribution.md). That host cannot be reached from
+//    the cloud workspace, so the Terrain workflow runs this and publishes the changed packs for review.
+//  - "grid": the simulation's own half-degree grid (data/world.png, red = 23 + metres / 30), smoothly interpolated.
+//    Used for Antarctica, where the tiles give the rock under the ice, not the ice one would stand on; an ice sheet
+//    is smooth enough for half a degree to do. With --no-tiles it is used everywhere (coarse: for trying the
+//    machinery where there is no network).
 // Where new ground meets old, the old is eased toward the new over a few pixels, so no seam is left.
 // Needs sharp: tools/models/node_modules (npm ci --prefix tools/models).
 import fs from 'node:fs';
@@ -25,12 +29,12 @@ const sharp = require('sharp');
 
 // lon0, lon1, lat0, lat1 (a little larger than the holes: only ground at zero inside them is touched)
 const VOIDS = [
-  { name: 'the Qaidam and the Altun', box: [89.5, 96.5, 35.5, 40.5] },
-  { name: 'the Yukon, south-east Alaska, northern British Columbia', box: [-144.5, -125.5, 51.5, 68.5] },
-  { name: 'Bohemia, Saxony, Silesia, Lower Austria', box: [11.5, 18.0, 47.8, 52.5] },
-  { name: 'the eastern Carpathians', box: [20.5, 24.0, 47.8, 50.7] },
-  { name: 'East Antarctica', box: [89.5, 180.0, -85.06, -66.0] },          // (south of 85.05 S the packs have ground from another source, and it is whole)
-  { name: 'Antarctica by the date line', box: [-180.0, -177.0, -85.06, -82.5] },
+  { name: 'the Qaidam and the Altun', box: [89.5, 96.5, 35.5, 40.5], src: 'tiles' },
+  { name: 'the Yukon, south-east Alaska, northern British Columbia', box: [-144.5, -125.5, 51.5, 68.5], src: 'tiles' },
+  { name: 'Bohemia, Silesia, Lower Austria, Slovakia, southern Poland', box: [11.5, 24.5, 47.7, 52.5], src: 'tiles' },
+  { name: 'the tip of Chukotka, Wrangel Island', box: [-180.0, -177.0, 64.5, 72.0], src: 'tiles' },
+  { name: 'East Antarctica', box: [89.5, 180.0, -85.06, -64.5], src: 'grid' },          // (south of 85.05 S the packs have ground from another source, and it is whole)
+  { name: 'Antarctica by the date line', box: [-180.0, -177.0, -85.06, -77.5], src: 'grid' },
 ];
 const CAP = -85.0511;       // where the Mercator tiles end
 const FEATHER = 10;         // pixels over which old ground is eased toward new beside a hole
@@ -39,7 +43,7 @@ const index = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/index.json'), 'ut
 const packFile = (L, px, py) => path.join(ROOT, 'data/e', `${L}_${px}_${py}.png`);
 // a pack's pixel -> the centre of that pixel on the Earth (tiles of level L are 360/2^(L+1) degrees across)
 const geo = (L, px, py, W) => { const td = 360 / (2 << L); const n = index.elev.packTiles; return { lon: (x) => -180 + (px * n + (x + 0.5) / TILE) * td, lat: (y) => 90 - (py * n + (y + 0.5) / TILE) * td, td }; };
-const inVoid = (lon, lat) => { for (const v of VOIDS) if (lon >= v.box[0] && lon <= v.box[1] && lat >= v.box[2] && lat <= v.box[3]) return true; return false; };
+const voidAt = (lon, lat) => { for (const v of VOIDS) if (lon >= v.box[0] && lon <= v.box[1] && lat >= v.box[2] && lat <= v.box[3]) return v; return null; };
 
 // ---- where heights come from ----
 function terrarium(cacheDir) {
@@ -73,35 +77,35 @@ function terrarium(cacheDir) {
   };
 }
 const merc = (lon, lat, S) => { const s = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180); return [(lon + 180) / 360 * S - 0.5, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * S - 0.5]; };
-// the simulation's own grid: one byte per half degree, turned into metres by what the packs themselves say where they are whole
+// the simulation's own grid: one byte per half degree (23 at the sea's level, one step per 30 m), read smoothly (a cubic
+// B-spline over sixteen cells: no creases where cells meet)
 async function worldGrid() {
   const { data, info } = await sharp(path.join(ROOT, 'data/world.png')).raw().toBuffer({ resolveWithObject: true }); const W = info.width, H = info.height, C = info.channels;
-  const byte = (lon, lat) => { const gx = (lon + 180) / 360 * W - 0.5, gy = (90 - lat) / 180 * H - 0.5; const x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0; let v = 0; for (const dx of [0, 1]) for (const dy of [0, 1]) v += data[(Math.min(H - 1, Math.max(0, y0 + dy)) * W + (((x0 + dx) % W) + W) % W) * C] * (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy); return v; };
-  // calibrate against level 3 (the whole Earth in eight packs), away from the holes
-  const sum = new Float64Array(256), cnt = new Float64Array(256);
-  for (let py = 0; py < 2; py++) for (let px = 0; px < 4; px++) { const key = `3/${px}/${py}`; if (!PACKS[key]) continue; const { data: d, info: i } = await sharp(packFile(3, px, py)).raw().toBuffer({ resolveWithObject: true }); const g = geo(3, px, py, i.width); const [mn, sc] = PACKS[key];
-    for (let y = 4; y < i.height; y += 16) for (let x = 4; x < i.width; x += 16) { const lon = g.lon(x), lat = g.lat(y); if (inVoid(lon, lat) || lat < -84) continue; const h = mn + d[(y * i.width + x) * i.channels] * sc; if (h <= 0) continue; const b = Math.round(byte(lon, lat)); sum[b] += h; cnt[b]++; } }
-  const lut = new Float64Array(256); let last = 0; for (let b = 0; b < 256; b++) { if (cnt[b] > 3) last = Math.max(last, sum[b] / cnt[b]); lut[b] = last; }
-  return { name: 'world', stats: () => 'the half-degree grid', clear() {}, async prepare() { return 0; }, at(z, lon, lat) { const v = byte(lon, Math.max(lat, CAP)); const b0 = Math.floor(v); return lut[b0] + (lut[Math.min(255, b0 + 1)] - lut[b0]) * (v - b0); } };
+  const B = (t) => [(1 - t) ** 3 / 6, (3 * t ** 3 - 6 * t * t + 4) / 6, (-3 * t ** 3 + 3 * t * t + 3 * t + 1) / 6, t ** 3 / 6];
+  const byte = (lon, lat) => { const gx = (lon + 180) / 360 * W - 0.5, gy = (90 - lat) / 180 * H - 0.5; const x0 = Math.floor(gx), y0 = Math.floor(gy); const wx = B(gx - x0), wy = B(gy - y0); let v = 0; for (let j = 0; j < 4; j++) { const y = Math.min(H - 1, Math.max(0, y0 - 1 + j)); for (let i = 0; i < 4; i++) v += data[(y * W + (((x0 - 1 + i) % W) + W) % W) * C] * wx[i] * wy[j]; } return v; };
+  return { name: 'grid', land: (lon, lat) => data[(Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W) + W) % W) * C + 2] & 1, raw: (lon, lat) => data[(Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W) + W) % W) * C], at(z, lon, lat) { return Math.max(0, (byte(lon, lat) - 23) * 30); } };
 }
 
 // ---- scan ----
 async function scan() {
-  const G = 0.25, cells = new Map(); const land = await (async () => { const { data, info } = await sharp(path.join(ROOT, 'data/world.png')).raw().toBuffer({ resolveWithObject: true }); return (lon, lat) => data[(Math.min(info.height - 1, Math.max(0, Math.floor((90 - lat) * 2))) * info.width + ((Math.floor((lon + 180) * 2) % 720) + 720) % 720) * info.channels + 2] & 1; })();
-  for (const key of Object.keys(PACKS)) { const [L, px, py] = key.split('/').map(Number); if (L !== 5 || !fs.existsSync(packFile(L, px, py))) continue; const { data, info } = await sharp(packFile(L, px, py)).raw().toBuffer({ resolveWithObject: true }); const g = geo(L, px, py, info.width); const [mn, sc] = PACKS[key];
-    for (let y = 2; y < info.height; y += 4) for (let x = 2; x < info.width; x += 4) { const lon = g.lon(x), lat = g.lat(y); const k = Math.floor((lon + 180) / G) + ',' + Math.floor((90 - lat) / G); let c = cells.get(k); if (!c) { c = { n: 0, z: 0, s: 0, lon, lat }; cells.set(k, c); } const h = mn + data[(y * info.width + x) * info.channels] * sc; c.n++; if (h <= 0) c.z++; c.s += h; } }
+  const grid = await worldGrid(); const dir = arg('dir', path.join(ROOT, 'data/e')); const G = 0.5, cells = new Map();
+  for (const key of Object.keys(PACKS)) { const [L, px, py] = key.split('/').map(Number); if (L !== 5) continue; let f = path.join(dir, `${L}_${px}_${py}.png`); if (!fs.existsSync(f)) f = packFile(L, px, py); if (!fs.existsSync(f)) continue;
+    const { data, info } = await sharp(f).raw().toBuffer({ resolveWithObject: true }); const g = geo(L, px, py, info.width);
+    for (let y = 2; y < info.height; y += 4) for (let x = 2; x < info.width; x += 4) { const lon = g.lon(x), lat = g.lat(y); const gx = Math.floor((lon + 180) / G), gy = Math.floor((90 - lat) / G); const k = gx + ',' + gy; let c = cells.get(k); if (!c) { c = { n: 0, z: 0, lon: gx * G - 180 + G / 2, lat: 90 - gy * G - G / 2 }; cells.set(k, c); } c.n++; if (data[(y * info.width + x) * info.channels] === 0) c.z++; } }
+  // a cell of the packs wholly at zero, inland, where the grid stands 90 m or more above the sea
   const out = [];
-  for (const [k, c] of cells) { if (c.z < c.n * 0.98) continue; let inl = true; for (let dy = -1; dy <= 1 && inl; dy++) for (let dx = -1; dx <= 1; dx++) if (!land(c.lon + dx * 0.5, c.lat + dy * 0.5)) { inl = false; break; } if (!inl) continue; const [gx, gy] = k.split(',').map(Number); let hi = 0; for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) { const o = cells.get((gx + dx) + ',' + (gy + dy)); if (o && o.s / o.n > hi) hi = o.s / o.n; } if (hi > 500) out.push([c.lon, c.lat, Math.round(hi)]); }
+  for (const c of cells.values()) { if (c.z < c.n * 0.97 || grid.raw(c.lon, c.lat) < 26) continue; let inl = true; for (const dx of [-0.5, 0, 0.5]) for (const dy of [-0.5, 0, 0.5]) if (!grid.land(c.lon + dx, c.lat + dy)) inl = false; if (inl) out.push([c.lon, c.lat, (grid.raw(c.lon, c.lat) - 23) * 30]); }
   const boxes = []; out.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  for (const [lon, lat, hi] of out) { let b = boxes.find((b) => lon >= b.a - 0.6 && lon <= b.b + 0.6 && lat >= b.c - 0.6 && lat <= b.d + 0.6); if (!b) { b = { a: lon, b: lon, c: lat, d: lat, n: 0, hi: 0 }; boxes.push(b); } b.a = Math.min(b.a, lon); b.b = Math.max(b.b, lon); b.c = Math.min(b.c, lat); b.d = Math.max(b.d, lat); b.n++; b.hi = Math.max(b.hi, hi); }
-  for (const b of boxes.sort((x, y) => y.n - x.n)) console.log(`${String(b.n).padStart(5)} cells at zero  lon ${b.a.toFixed(1)}..${b.b.toFixed(1)}  lat ${b.c.toFixed(1)}..${b.d.toFixed(1)}  ground nearby up to ${b.hi} m${b.n < 12 ? '   (a real hollow, most likely: below the sea)' : ''}`);
-  console.log(`${out.length} quarter-degree cells at zero, inland, beside ground above 500 m`);
+  for (const [lon, lat, h] of out) { let b = boxes.find((b) => lon >= b.a - 1.1 && lon <= b.b + 1.1 && lat >= b.c - 1.1 && lat <= b.d + 1.1); if (!b) { b = { a: lon, b: lon, c: lat, d: lat, n: 0, h: 0 }; boxes.push(b); } b.a = Math.min(b.a, lon); b.b = Math.max(b.b, lon); b.c = Math.min(b.c, lat); b.d = Math.max(b.d, lat); b.n++; b.h = Math.max(b.h, h); }
+  for (const b of boxes.sort((x, y) => y.n - x.n)) console.log(`${String(b.n).padStart(5)} half-degree cells at zero  lon ${(b.a - 0.25).toFixed(2)}..${(b.b + 0.25).toFixed(2)}  lat ${(b.c - 0.25).toFixed(2)}..${(b.d + 0.25).toFixed(2)}  where the ground should stand up to ${b.h} m`);
+  console.log(`${out.length} half-degree cells at zero where there should be ground, in ${boxes.length} places`);
   return out.length;
 }
 
 // ---- fix ----
 async function fix() {
-  const src = arg('source', 'terrarium') === 'world' ? await worldGrid() : terrarium(arg('cache', path.join(ROOT, 'tools/terrain/cache')));
+  const grid = await worldGrid(); const tiles = process.argv.includes('--no-tiles') ? null : terrarium(arg('cache', path.join(ROOT, 'tools/terrain/cache')));
+  const srcOf = (v) => (v.src === 'tiles' && tiles ? tiles : grid);
   const outDir = arg('out', path.join(ROOT, 'data/e')); fs.mkdirSync(outDir, { recursive: true }); const only = arg('levels') ? arg('levels').split(',').map(Number) : null;
   const report = []; let changedIndex = false;
   for (const key of Object.keys(PACKS).sort((a, b) => a.split('/')[0] - b.split('/')[0])) {
@@ -112,22 +116,23 @@ async function fix() {
     const lonA = g.lon(0), lonB = g.lon(W - 1), latA = g.lat(0), latB = g.lat(H - 1);
     const touches = VOIDS.some((v) => lonB >= v.box[0] && lonA <= v.box[1] && latA >= v.box[2] && latB <= v.box[3]); if (!touches) continue;
     const isVoid = new Uint8Array(W * H); let nVoid = 0; const pts = [];
-    for (let y = 0; y < H; y++) { const lat = g.lat(y); for (let x = 0; x < W; x++) { if (data[(y * W + x) * C] !== 0) continue; const lon = g.lon(x); if (inVoid(lon, lat)) { isVoid[y * W + x] = 1; nVoid++; } } }
+    for (let y = 0; y < H; y++) { const lat = g.lat(y); for (let x = 0; x < W; x++) { if (data[(y * W + x) * C] !== 0) continue; const lon = g.lon(x); if (voidAt(lon, lat)) { isVoid[y * W + x] = 1; nVoid++; } } }
     if (!nVoid) continue;
+    // which hole a pixel belongs to (its own, or for ground beside a hole the nearest one's: looked up a little way out)
+    const holeOf = (lon, lat) => voidAt(lon, lat) || voidAt(lon + g.td / TILE * FEATHER, lat) || voidAt(lon - g.td / TILE * FEATHER, lat) || voidAt(lon, lat + g.td / TILE * FEATHER) || voidAt(lon, lat - g.td / TILE * FEATHER);
     // distance (in pixels, up to FEATHER) from every pixel to the nearest zero-in-a-rectangle: those nearer than FEATHER are looked up too
     const dist = new Float32Array(W * H).fill(1e9); for (let i = 0; i < W * H; i++) if (isVoid[i]) dist[i] = 0;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; let d = dist[i]; if (x > 0) d = Math.min(d, dist[i - 1] + 1); if (y > 0) { d = Math.min(d, dist[i - W] + 1); if (x > 0) d = Math.min(d, dist[i - W - 1] + 1.414); if (x < W - 1) d = Math.min(d, dist[i - W + 1] + 1.414); } dist[i] = d; }
     for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const i = y * W + x; let d = dist[i]; if (x < W - 1) d = Math.min(d, dist[i + 1] + 1); if (y < H - 1) { d = Math.min(d, dist[i + W] + 1); if (x < W - 1) d = Math.min(d, dist[i + W + 1] + 1.414); if (x > 0) d = Math.min(d, dist[i + W - 1] + 1.414); } dist[i] = d; }
     // (the zoom whose pixels match this level's; one coarser toward the poles, where Mercator tiles are finer than needed)
     const z = Math.max(1, Math.min(11, L + 2 - (Math.max(Math.abs(latA), Math.abs(latB)) > 72 ? 1 : 0)));
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (dist[y * W + x] < FEATHER) pts.push([g.lon(x), g.lat(y)]);
-    await src.prepare(z, pts);
+    if (tiles) { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (dist[y * W + x] < FEATHER) { const lon = g.lon(x), lat = g.lat(y); const v = holeOf(lon, lat); if (v && v.src === 'tiles') pts.push([lon, lat]); } if (pts.length) await tiles.prepare(z, pts); }
     // new heights: a hole takes the source's ground; ground beside it is eased toward the source so the two meet
     const h = new Float32Array(W * H); let filled = 0, eased = 0, hMax = 0;
     for (let y = 0; y < H; y++) { const lat = g.lat(y); for (let x = 0; x < W; x++) { const i = y * W + x; const old = mn + data[i * C] * sc; let v = old; const d = dist[i];
-      if (d < FEATHER) { const s = Math.max(0, src.at(z, g.lon(x), lat)); if (isVoid[i]) { if (s > 0.5) { v = s; filled++; } } else if (old > 0 && s > 0.5) { const w = 1 - d / FEATHER; v = old + (s - old) * w * w * (3 - 2 * w); eased++; } }
+      if (d < FEATHER) { const lon = g.lon(x); const v0 = holeOf(lon, lat); if (!v0) { h[i] = v; if (v > hMax) hMax = v; continue; } const s = Math.max(0, srcOf(v0).at(z, lon, lat)); if (isVoid[i]) { if (s > 0.5) { v = s; filled++; } } else if (old > 0 && s > 0.5) { const w = 1 - d / FEATHER; v = old + (s - old) * w * w * (3 - 2 * w); eased++; } }
       h[i] = v; if (v > hMax) hMax = v; } }
-    src.clear();
+    if (tiles) tiles.clear();
     if (!filled) continue;
     // the pack's scale must still reach its highest ground
     let rescaled = false; if (hMax > mn + 255 * sc) { sc = Math.ceil((hMax - mn) / 255 * 1000) / 1000; rescaled = true; PACKS[key] = [mn, sc]; changedIndex = true; }
@@ -136,7 +141,7 @@ async function fix() {
     const line = `${key}: ${filled} pixels given ground, ${eased} eased beside them, highest ${Math.round(hMax)} m${rescaled ? `, scale now ${sc}` : ''} (zoom ${z})`; report.push(line); console.log(line);
   }
   if (changedIndex) fs.writeFileSync(arg('out') ? path.join(outDir, 'index.json') : path.join(ROOT, 'data/index.json'), JSON.stringify(index));
-  console.log(`${report.length} packs changed from ${src.name} (${src.stats()})${changedIndex ? '; index.json has new scales' : ''}`);
+  console.log(`${report.length} packs changed (${tiles ? tiles.stats() : 'no tiles: the half-degree grid everywhere'})${changedIndex ? '; index.json has new scales' : ''}`);
   fs.writeFileSync(path.join(outDir, 'voids-report.txt'), report.join('\n') + '\n');
 }
 

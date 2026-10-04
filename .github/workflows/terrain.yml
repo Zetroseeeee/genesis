@@ -23,6 +23,8 @@ jobs:
         run: |
           set -o pipefail
           node tools/terrain/voids.mjs fix --out out/e 2>&1 | tee terrain-fix.log
+          echo "the holes, after:" | tee -a terrain-fix.log
+          node tools/terrain/voids.mjs scan --dir out/e | tee -a terrain-fix.log
           ls -la out/e | head -60
           tar czf terrain-fix.tar.gz -C out e
           ls -la terrain-fix.tar.gz
