@@ -11,7 +11,7 @@
       this.fly = null; this.vel = { lon: 0, lat: 0 };
       this.exag = terrain.exag;
       this.locked = false; // disables user input (intro)
-      this.idleSpin = true;
+      this.idleSpin = true; this.spin = 1.2;      // degrees a second, eastward, while nobody steers
       this._bind();
     }
     _bind() {
@@ -96,7 +96,7 @@
         this.tTilt = this.tilt = f.tilt0 + (f.tilt1 - f.tilt0) * e; this.tHeading = this.heading = f.h0 + (f.h1 - f.h0) * e;
         if (f.t >= f.dur) { this.fly = null; if (f.onDone) f.onDone(); }
       } else {
-        if (this.idleSpin) this.tLon = GEO.wrapLon(this.tLon + dt * 1.2);
+        if (this.idleSpin) this.tLon = GEO.wrapLon(this.tLon + dt * this.spin);
         this.tDist = clamp(this.tDist, this.minDist, this.maxDist); this.tLat = clamp(this.tLat, -89.5, 89.5); // whatever set the target, keep it inside the world
         const k = 1 - Math.exp(-dt * 9);
         let dl = GEO.wrapLon(this.tLon - this.lon); this.lon = GEO.wrapLon(this.lon + dl * k);

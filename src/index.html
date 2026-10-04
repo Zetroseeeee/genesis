@@ -1,4 +1,4 @@
-<title>GENESIS</title>
+<title>Holocene</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Serif:ital,wght@1,400&display=swap">
 <style>
@@ -372,18 +372,89 @@
   #menu .modal { width: 420px; }
   #menu .row, .row { display: flex; gap: 8px; flex-wrap: wrap; }
 
-  /* intro */
-  #intro { position: fixed; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: flex-start; padding: 16px 16px 16px 7vw; background: linear-gradient(90deg, rgb(5 7 12 / 0.7) 0%, rgb(5 7 12 / 0.35) 45%, rgb(5 7 12 / 0) 70%); }
-  @media (max-width: 900px) { #intro { justify-content: center; padding: 16px; background: rgb(5 7 12 / 0.55); } }
-  #intro .card { max-width: 560px; width: 100%; overflow: hidden; display: flex; flex-direction: column; }
-  #intro .art { aspect-ratio: 16 / 7; background: linear-gradient(160deg, #1a2438, #060810 60%), #060810; background-size: cover; background-position: center; position: relative; }
-  #intro .art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgb(15 20 28 / 0) 50%, rgb(15 20 28 / 0.98)); }
-  #intro .art h1 { position: absolute; left: 26px; bottom: 16px; font-family: var(--display); font-weight: 700; font-size: var(--fs-era); letter-spacing: 0.28em; line-height: 1; text-shadow: 0 2px 20px rgb(0 0 0 / 0.6); z-index: 1; }
-  #intro .art h1 span { color: var(--gold); }
-  #intro .content { padding: 18px 26px 24px; display: flex; flex-direction: column; gap: 14px; }
-  #intro p { margin: 0; line-height: 1.55; color: var(--text-2); max-width: 62ch; }
-  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 10; background: var(--bg); font-family: var(--display); letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-2); font-size: calc(15px * var(--ui-scale)); }
-  #loading .bar { width: 240px; } #loading .bar i { background: var(--gold); }
+  /* ---------- the home screen: the Earth itself, the title set as the largest name on the map, a short list ---------- */
+  #intro { position: fixed; inset: 0; z-index: 9; display: grid; grid-template-rows: auto 1fr auto; box-sizing: border-box; pointer-events: none;
+    padding: clamp(30px, 8vh, 96px) clamp(24px, 6.2vw, 120px) clamp(18px, 4vh, 44px);
+    background: linear-gradient(90deg, rgb(5 7 12 / 0.88) 0%, rgb(5 7 12 / 0.66) 26%, rgb(5 7 12 / 0.18) 50%, rgb(5 7 12 / 0) 62%); }
+  #intro > * { pointer-events: auto; }
+  #wordmark { font-family: var(--display); font-weight: 500; font-size: clamp(38px, 5.4vw, 96px); letter-spacing: 0.3em; line-height: 1; text-transform: uppercase; color: var(--text); text-shadow: 0 0 2px rgb(8 12 20 / 0.9), 0 2px 34px rgb(0 0 0 / 0.6); white-space: nowrap; }
+  .home-tag { font-family: var(--serif); font-style: italic; font-size: clamp(16px, 1.4vw, 22px); line-height: 1.5; color: var(--text-2); margin: clamp(12px, 2vh, 22px) 0 0 0.1em; text-shadow: 0 1px 12px rgb(0 0 0 / 0.7); }
+  .home-menu { align-self: center; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 0 0 0 -14px; padding: 12px 0; }
+  .hm { appearance: none; background: none; border: 0; margin: 0; cursor: pointer; text-align: left; display: grid; grid-template-columns: 30px auto; align-items: center; padding: 8px 20px 8px 14px; border-radius: var(--radius); color: var(--text); position: relative; }
+  /* each entry is marked the way the map marks a town; the one to press is the capital */
+  .hm::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: rgb(243 228 183 / 0.5); box-shadow: 0 0 0 1.5px rgb(0 0 0 / 0.55); justify-self: start; margin-left: 2px; transition: background .15s, box-shadow .15s; }
+  .hm.first::before { width: 10px; height: 10px; margin-left: 0.5px; background: #fff; box-shadow: 0 0 0 2px var(--gold), 0 0 10px rgb(214 178 94 / 0.9); }
+  .hm:hover::before, .hm:focus-visible::before { background: #F3E4B7; box-shadow: 0 0 0 1.5px rgb(0 0 0 / 0.55), 0 0 9px rgb(243 228 183 / 0.95); }
+  .hm.first:hover::before, .hm.first:focus-visible::before { background: #fff; box-shadow: 0 0 0 2px var(--gold-2), 0 0 16px rgb(235 201 124 / 1); }
+  .hm-t { font-family: var(--body); font-weight: 500; font-size: clamp(18px, 1.5vw, 24px); line-height: 1.25; letter-spacing: 0.01em; text-shadow: 0 1px 10px rgb(0 0 0 / 0.75); transition: color .15s; }
+  .hm.first .hm-t { font-weight: 600; }
+  .hm-s { grid-column: 2; font-family: var(--serif); font-style: italic; font-size: clamp(13.5px, 1vw, 16px); line-height: 1.35; color: var(--text-2); text-shadow: 0 1px 8px rgb(0 0 0 / 0.8); }
+  .hm:hover .hm-t, .hm:focus-visible .hm-t { color: #fff; }
+  .hm:focus-visible { outline: 2px solid var(--select); outline-offset: 0; }
+  .hm.quiet { padding-top: 5px; padding-bottom: 5px; }
+  .hm.quiet .hm-t { font-size: clamp(15px, 1.12vw, 18px); font-weight: 400; color: var(--text-2); }
+  .hm.quiet:hover .hm-t, .hm.quiet:focus-visible .hm-t { color: var(--text); }
+  .home-menu .gap { height: clamp(10px, 2.2vh, 22px); }
+  /* the nine ages, and how far the saved world has come */
+  .eras { display: flex; gap: 3px; margin: 2px 0 10px 44px; align-items: flex-start; }
+  .eras i { display: block; width: clamp(16px, 1.5vw, 24px); height: 3px; border-radius: 1px; background: rgb(236 233 226 / 0.2); }
+  .eras i.past { background: rgb(214 178 94 / 0.6); }
+  .eras i.now { background: var(--gold-2); box-shadow: 0 0 8px rgb(235 201 124 / 0.7); }
+  .eras span { font-size: 12.5px; line-height: 1; color: var(--text-2); margin: -5px 0 0 9px; white-space: nowrap; text-shadow: 0 1px 6px rgb(0 0 0 / 0.8); }
+  .hm.fresh .hm-t::after { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #FFB25A; box-shadow: 0 0 8px rgb(255 140 50 / 0.8); margin-left: 10px; vertical-align: 2px; }
+  .home-foot { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--text-3); text-shadow: 0 1px 6px rgb(0 0 0 / 0.8); min-height: 28px; }
+  .home-foot img { width: 22px; height: 22px; border-radius: 5px; display: block; }
+  .home-foot button { appearance: none; background: none; border: 0; padding: 4px 6px; margin: 0 -6px; font: inherit; color: var(--text-2); cursor: pointer; border-radius: var(--radius); display: inline-flex; align-items: center; gap: 7px; }
+  .home-foot button:hover { color: var(--text); background: rgb(255 255 255 / 0.06); }
+  .home-foot button:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  .home-foot button:disabled { cursor: default; color: var(--text-3); background: none; }
+  /* a spark: there is something new (the first fire of the app's icon) */
+  .ember { width: 8px; height: 8px; border-radius: 50%; background: #FFB25A; box-shadow: 0 0 0 1.5px rgb(120 50 0 / 0.5), 0 0 10px 2px rgb(255 140 50 / 0.75); flex: none; display: inline-block; }
+  /* one entrance, when the Earth is first shown: the title settles like a name coming into focus, the list follows */
+  #intro.enter #wordmark { animation: title-in 1.5s cubic-bezier(.16,.7,.2,1) both; }
+  #intro.enter .home-tag { animation: fade-in .9s ease-out .55s both; }
+  #intro.enter .home-menu > * { animation: row-in .5s ease-out both; animation-delay: calc(.8s + var(--i, 0) * 55ms); }
+  #intro.enter .home-foot { animation: fade-in .8s ease-out 1.35s both; }
+  @keyframes title-in { from { opacity: 0; letter-spacing: 0.46em; } to { opacity: 1; letter-spacing: 0.3em; } }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes row-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 900px) { #intro { padding: 28px 22px 18px; background: linear-gradient(180deg, rgb(5 7 12 / 0.86) 0%, rgb(5 7 12 / 0.55) 60%, rgb(5 7 12 / 0.3) 100%); } #wordmark { font-size: clamp(30px, 8.4vw, 60px); letter-spacing: 0.22em; } @keyframes title-in { from { opacity: 0; letter-spacing: 0.34em; } to { opacity: 1; letter-spacing: 0.22em; } } }
+  @media (max-height: 620px) { #intro { padding-top: 22px; } .hm { padding-top: 5px; padding-bottom: 5px; } .hm-s { display: none; } }
+
+  /* ---------- updates: a note at the top right, a spark in the top bar while playing ---------- */
+  #update { position: fixed; z-index: 12; top: max(18px, env(safe-area-inset-top, 0px)); right: max(18px, env(safe-area-inset-right, 0px)); width: 348px; max-width: calc(100vw - 36px); background: var(--popup); border-top: 2px solid #F0913A; animation: drop .28s ease-out; }
+  body[data-mode="play"] #update, body[data-mode="choose"] #update { top: calc(max(10px, env(safe-area-inset-top, 0px)) + 50px * var(--ui-scale)); right: max(12px, env(safe-area-inset-right, 0px)); }
+  #update .up-head { display: flex; align-items: center; gap: 10px; padding: 11px 8px 4px 14px; }
+  #update h2 { font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: 0.05em; flex: 1; }
+  #update .up-body { padding: 2px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  #update p { margin: 0; font-size: var(--fs-body); line-height: 1.5; color: var(--text-2); }
+  #update p b { color: var(--text); font-weight: 600; }
+  #update p.bad { color: #F3A09A; }
+  #update ul { margin: 0; padding: 0 0 0 16px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.4; color: var(--text); }
+  #update ul li::marker { color: var(--text-3); }
+  #update ul li.more { list-style: none; margin-left: -16px; }
+  #update .linkish, #news .linkish { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--gold-2); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  #update .bar { height: 6px; } #update .bar i { background: #F0913A; transition: transform .2s linear; }
+  #update .row { margin-top: 2px; }
+  #upd-chip { display: flex; align-items: center; gap: 7px; align-self: center; margin: 0 2px 0 10px; min-height: 28px; padding: 3px 9px; text-transform: none; letter-spacing: 0.02em; font-size: var(--fs-cap); }
+  /* what's new */
+  #news .modal { width: min(640px, calc(100vw - 32px)); }
+  #news .pbody { gap: 18px; }
+  #news .note h3 { font-family: var(--body); font-size: 15.5px; font-weight: 600; line-height: 1.35; color: var(--text); }
+  #news .note time { display: block; font-size: 12px; color: var(--text-3); margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+  #news .note p { margin: 5px 0 0; font-size: var(--fs-body); line-height: 1.55; color: var(--text-2); max-width: 66ch; }
+  #news .note.new h3::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #FFB25A; box-shadow: 0 0 8px rgb(255 140 50 / 0.8); margin-right: 8px; vertical-align: 2px; }
+  body[data-mode="intro"] #menu .ingame { display: none; }
+  /* on the home screen a message sits low in the middle, clear of the title, and above the screen's own layer */
+  body[data-mode="intro"] #overlay { z-index: 10; }
+  body[data-mode="intro"] #tc { top: auto; bottom: max(30px, env(safe-area-inset-bottom, 0px)); }
+
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; z-index: 11; background: var(--bg); color: var(--text-2); transition: opacity .7s ease-out; }
+  #loading.gone { opacity: 0; pointer-events: none; }
+  #loading .lw { font-family: var(--display); font-weight: 500; letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; font-size: clamp(26px, 3.2vw, 46px); color: var(--text); }
+  #loading .bar { width: 240px; height: 2px; } #loading .bar i { background: var(--gold); }
+  #loading #loadstep { font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--text-3); }
+  @media (prefers-reduced-motion: reduce) { #intro.enter #wordmark, #intro.enter .home-tag, #intro.enter .home-menu > *, #intro.enter .home-foot, #update { animation: none; } #loading { transition: none; } }
   #debug { position: fixed; left: 12px; bottom: 60px; z-index: 3; font-size: 10.5px; color: var(--text-3); pointer-events: none; display: none; font-variant-numeric: tabular-nums; }
   .hidehud #overlay, .hidehud #labels { display: none; }
   body[data-mode="intro"] #tl, body[data-mode="intro"] #tr, body[data-mode="intro"] #left, body[data-mode="intro"] #bl, body[data-mode="intro"] #bc, body[data-mode="intro"] #br, body[data-mode="intro"] #labels { display: none; }
@@ -410,7 +481,7 @@
 <div id="labels"></div>
 <div id="plots"></div>
 <div id="debug"></div>
-<div id="loading"><div>Assembling the Earth</div><div class="bar"><i id="loadbar" style="transform:scaleX(.04)"></i></div><div id="loadstep" style="font-size:11px;letter-spacing:.2em">terrain index</div></div>
+<div id="loading"><div class="lw">Holocene</div><div class="bar"><i id="loadbar" style="transform:scaleX(.04)"></i></div><div id="loadstep">terrain index</div></div>
 
 <div id="overlay">
   <div id="tl">
@@ -427,6 +498,7 @@
         <div id="speedval">20×<small id="yps">0 yr/s</small></div>
         <button class="btn icon" id="btn-faster" title="Faster (+)">+</button>
       </div>
+      <button class="btn" id="upd-chip" hidden title="A newer version of the game"><i class="ember"></i><span id="upd-chip-t">Update</span></button>
       <button class="btn icon ghost" id="btn-menu" title="Menu (Esc)"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
   </div>
@@ -532,9 +604,9 @@
 </div></dialog>
 
 <dialog id="menu"><div class="modal panel">
-  <div class="phead"><h2 class="display">Menu</h2><button class="btn icon ghost" id="m-close">✕</button></div>
+  <div class="phead"><h2 class="display" id="m-title">Menu</h2><button class="btn icon ghost" id="m-close">✕</button></div>
   <div class="pbody">
-    <div class="row"><button class="btn" id="m-resume">Resume</button><button class="btn" id="m-save">Save now</button><button class="btn" id="m-load">Load save</button><button class="btn danger" id="m-new">New world</button></div>
+    <div class="row ingame"><button class="btn" id="m-resume">Resume</button><button class="btn" id="m-save">Save now</button><button class="btn" id="m-load">Load save</button><button class="btn" id="m-new">Save and go to the main menu</button></div>
     <div class="slider"><span class="micro">UI scale</span><input type="range" id="ui-scale" min="0.75" max="2" step="0.05" value="1"><span class="num" id="ui-scale-v">1.00</span></div>
     <div class="slider"><span class="micro">Tooltips</span><input type="range" id="tip-delay" min="0" max="600" step="150" value="300"><span class="num" id="tip-delay-v">300</span></div>
     <label class="hint" style="display:flex;gap:8px;align-items:center">Graphics <select id="opt-quality" class="btn" style="min-height:30px"><option value="high">Cinematic (terrain shadows, micro-relief, trees)</option><option value="balanced">Balanced (laptops)</option></select></label>
@@ -548,20 +620,38 @@
 </div></dialog>
 
 <div id="intro">
-  <div class="card panel">
-    <div class="art" id="intro-art"><h1>GEN<span>E</span>SIS</h1></div>
-    <div class="content">
-      <p>The real Earth, 10,000 BC. Real mountains, rivers and coasts, down to the valley. Four million people scattered across it, foraging. Nobody has founded anything.</p>
-      <p>You are one people among them, and their god. Everyone else runs on their own. Fly anywhere on the planet, pick a hillside or a river bend, and put your first village there.</p>
-      <div class="row">
-        <button class="btn primary" id="btn-choose">Choose my homeland</button>
-        <button class="btn" id="btn-random">Random river start</button>
-        <button class="btn" id="btn-load" hidden>Continue saved world</button>
-      </div>
-      <p class="hint">Drag to move, scroll to zoom, right-drag to tilt and turn. Time moves when you press Advance.</p>
-    </div>
-  </div>
+  <header>
+    <h1 id="wordmark">Holocene</h1>
+    <p class="home-tag">The real Earth, from 10,000 BC.</p>
+  </header>
+  <nav class="home-menu" aria-label="Main menu">
+    <button class="hm first" id="btn-load" hidden><span class="hm-t">Continue</span><span class="hm-s" id="home-save"></span></button>
+    <div class="eras" id="home-eras" hidden aria-hidden="true"></div>
+    <button class="hm" id="btn-choose"><span class="hm-t">New world</span><span class="hm-s" id="home-new-s">Choose where your people begin</span></button>
+    <button class="hm" id="btn-random"><span class="hm-t">Random start</span><span class="hm-s">A new world, in one of the great river valleys</span></button>
+    <div class="gap"></div>
+    <button class="hm quiet" id="btn-settings"><span class="hm-t">Settings</span></button>
+    <button class="hm quiet" id="btn-news"><span class="hm-t">What’s new</span></button>
+    <button class="hm quiet" id="btn-quit" hidden><span class="hm-t">Quit</span></button>
+  </nav>
+  <footer class="home-foot"><img src="mark.png" alt="" id="home-mark"><span id="home-version">Holocene</span><button id="home-status" hidden></button></footer>
 </div>
+
+<aside id="update" class="panel" hidden aria-live="polite">
+  <div class="up-head"><i class="ember"></i><h2 id="up-title">Update ready</h2><button class="btn icon ghost" id="up-close" title="Later">✕</button></div>
+  <div class="up-body">
+    <p id="up-line"></p>
+    <ul id="up-notes" hidden></ul>
+    <div class="bar" id="up-bar" hidden><i id="up-fill"></i></div>
+    <p id="up-err" class="bad" hidden></p>
+    <div class="row"><button class="btn primary" id="up-go">Update now</button><button class="btn" id="up-alt">Later</button></div>
+  </div>
+</aside>
+
+<dialog id="news"><div class="modal panel">
+  <div class="phead"><h2 class="display">What’s new</h2><span class="micro" id="news-sub"></span><button class="btn icon ghost" id="news-close">✕</button></div>
+  <div class="pbody" id="news-body"></div>
+</div></dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>

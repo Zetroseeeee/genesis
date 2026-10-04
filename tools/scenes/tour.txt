@@ -1,5 +1,8 @@
 # The tour: one line per picture.  name | scene script | window.__scene | script run after the scene | seconds to settle
 # (tools/scenes/town.js: __sceneLook(what, distance, tilt, turn); tools/scenes/forest.js: __forest(lon, lat, alt, tilt, heading, season))
+home         | tools/scenes/home.js | null | | 14
+home_saved   | tools/scenes/home.js | {years:400,tech:0.5,pop:120} | | 18
+home_lights  | tools/scenes/home.js | {years:400,tech:0.85,pop:900,turn:-34} | | 18
 stone        | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0,pop:1,walls:1,special:4,alt:620,tilt:1.25,out:1.0} | | 30
 stone_centre | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0,pop:1,walls:1,special:4} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 north        | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14,alt:620,tilt:1.25,out:1.0} | | 30

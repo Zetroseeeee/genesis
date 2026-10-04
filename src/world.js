@@ -368,18 +368,39 @@
     // ---------- sky / clouds / atmosphere ----------
     initSky() {
       const scene = this.scene;
-      { // stars
-        const n = 3000; const pos = new Float32Array(n * 3); const col = new Float32Array(n * 3);
-        for (let i = 0; i < n; i++) { const r = 60; const t = Math.random() * Math.PI * 2, p = Math.acos(Math.random() * 2 - 1); pos[i * 3] = r * Math.sin(p) * Math.cos(t); pos[i * 3 + 1] = r * Math.cos(p); pos[i * 3 + 2] = r * Math.sin(p) * Math.sin(t); const b = 0.45 + Math.random() * 0.55; const w = Math.random(); col[i * 3] = b * (0.8 + w * 0.2); col[i * 3 + 1] = b * (0.85 + w * 0.15); col[i * 3 + 2] = b; }
-        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-        this.stars = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.5, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.9, depthWrite: false })); scene.add(this.stars);
+      { // stars: a sphere of points round the camera, drawn at the far plane (so anything at all hides them), fixed to the
+        // heavens while the camera moves. Most are faint; a share of them crowd one great circle, the Milky Way.
+        const n = 5200; const pos = new Float32Array(n * 3); const mag = new Float32Array(n * 2); let sd = 20261004; const rnd = () => { sd = (Math.imul(sd, 1664525) + 1013904223) >>> 0; return sd / 4294967296; };
+        const pole = new THREE.Vector3(0.48, 0.47, -0.74).normalize(), ax = new THREE.Vector3(0, 1, 0).cross(pole).normalize(), ay = pole.clone().cross(ax), v = new THREE.Vector3();
+        for (let i = 0; i < n; i++) {
+          if (i < n * 0.42) { const a = rnd() * Math.PI * 2, off = (rnd() + rnd() + rnd() - 1.5) * 0.3; v.copy(ax).multiplyScalar(Math.cos(a)).addScaledVector(ay, Math.sin(a)).addScaledVector(pole, off).normalize(); }
+          else { const t = rnd() * Math.PI * 2, y = rnd() * 2 - 1, r = Math.sqrt(1 - y * y); v.set(r * Math.cos(t), y, r * Math.sin(t)); }
+          pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
+          const m = Math.pow(rnd(), 5.0); mag[i * 2] = 0.16 + 0.84 * m; mag[i * 2 + 1] = rnd();      // brightness (few are bright), colour (blue-white to amber)
+        }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aMag', new THREE.BufferAttribute(mag, 2));
+        this.starUniforms = { uAlpha: { value: 1 }, uPx: { value: 1 } };
+        this.stars = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: this.starUniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+          vertexShader: `attribute vec2 aMag; uniform float uPx; varying vec3 vCol; void main(){ vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); p.z = p.w * 0.9999995; gl_Position = p; float b = aMag.x; gl_PointSize = (1.5 + 2.4 * b * b) * uPx; vCol = mix(vec3(0.74, 0.83, 1.0), vec3(1.0, 0.86, 0.68), smoothstep(0.55, 1.0, aMag.y)) * (0.42 + 0.9 * b); }`,
+          fragmentShader: `uniform float uAlpha; varying vec3 vCol; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.08, d); gl_FragColor = vec4(vCol * a * uAlpha, 1.0); }`,
+        })); this.stars.frustumCulled = false; this.stars.renderOrder = -4; scene.add(this.stars);
       }
+      // the air, seen from outside: a shell a little larger than the planet that glows where it is looked through
+      // edge-on - a blue veil over the rim of the day side and a thin halo beyond it, reddening along the edge of night
       this.atmoUniforms = { uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamAlt: { value: 1 } };
-      this.atmo = new THREE.Mesh(new THREE.SphereGeometry(1.03, 96, 64), new THREE.ShaderMaterial({
-        uniforms: this.atmoUniforms, side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-        vertexShader: `varying vec3 vN; varying vec3 vP; void main(){ vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vP = mv.xyz; gl_Position = projectionMatrix*mv; }`,
-        fragmentShader: `uniform vec3 uSun; uniform float uCamAlt; varying vec3 vN; varying vec3 vP; void main(){ vec3 v = normalize(-vP); float rim = pow(max(dot(normalize(vN), v), 0.0), 2.4); vec3 s = normalize((viewMatrix*vec4(uSun,0.0)).xyz); float lit = 0.25 + 0.75*max(dot(-normalize(vN), s), 0.0); float k = smoothstep(0.0, 0.08, uCamAlt); gl_FragColor = vec4(vec3(0.32,0.56,1.0)*rim*lit*0.95*k, rim*0.9*k); }`,
-      })); scene.add(this.atmo);
+      this.atmo = new THREE.Mesh(new THREE.SphereGeometry(1.028, 128, 80), new THREE.ShaderMaterial({
+        uniforms: this.atmoUniforms, side: THREE.FrontSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+        vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = normalize(w.xyz); vec4 mv = viewMatrix * w; vN = normalize(normalMatrix * normal); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
+        fragmentShader: `uniform vec3 uSun; uniform float uCamAlt; varying vec3 vN; varying vec3 vV; varying vec3 vW;
+          void main(){
+            float mu = clamp(dot(normalize(vN), normalize(vV)), 0.0, 1.0);
+            float rim = pow(1.0 - mu, 4.2) * smoothstep(0.0, 0.2, mu);       // most where the path through the air is longest; nothing at the shell's own edge
+            float sunUp = dot(normalize(vW), normalize(uSun));
+            float day = smoothstep(-0.2, 0.3, sunUp);
+            vec3 col = mix(vec3(1.0, 0.42, 0.16), vec3(0.28, 0.54, 1.0), smoothstep(-0.12, 0.22, sunUp));
+            float k = smoothstep(0.03, 0.14, uCamAlt);                       // (from inside the air the sky dome takes over)
+            gl_FragColor = vec4(col * rim * (0.03 + 0.97 * day) * 2.2 * k, 1.0); }`,
+      })); this.atmo.renderOrder = 3; scene.add(this.atmo);
       // clouds
       const cl = new THREE.TextureLoader().load('data/clouds.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; this.cloudTex = t; });
       this.cloudTex = null; this.cloudShift = 0; this.cloudVis = 0;
@@ -442,7 +463,8 @@
       { const a = time * 0.0025; const ax = new THREE.Vector3(0.06, 1, 0.04).normalize(); this.skyUniforms.uMoon.value.copy(sun).applyAxisAngle(ax, 2.6 + a).normalize(); this.skyUniforms.uTime.value = time; this.skyUniforms.uLat.value = cam.lat; this.skyUniforms.uComet.value = this.cometOn ? 1 : 0; }
       this.sky.position.copy(cam.camera.position); this.sky.scale.setScalar(Math.max(cam.camera.near * 50, cam.camera.far * 0.4)); this.skyUniforms.uCamPos.value.copy(cam.camera.position); this.sky.updateMatrixWorld();
       const camUp0 = cam.camera.position.clone().normalize(); const dayHere = Math.min(1, Math.max(0, (camUp0.dot(sun) + 0.12) / 0.32));
-      this.stars.material.opacity = 0.9 * (1 - skyA * dayHere);
+      // (near the ground the sky dome has its own stars; from high up the field is dimmed on the day side, where the lit ground fills the eye)
+      this.stars.position.copy(cam.camera.position); this.stars.updateMatrixWorld(); this.starUniforms.uAlpha.value = (1 - skyA) * (1 - 0.55 * dayHere); this.stars.visible = skyA < 0.99;
       // lights follow the sun; hemisphere dims at night for the camera's local sun elevation
       this.sunLight.position.copy(sun).multiplyScalar(10); this.sunLight.target.position.set(0, 0, 0);
       const camUp = cam.camera.position.clone().normalize(); const sunUp = camUp.dot(sun);

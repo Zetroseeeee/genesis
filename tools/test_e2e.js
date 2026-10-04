@@ -1,8 +1,8 @@
-// GENESIS browser end-to-end suite. One Chromium (SwiftShader) session; every scenario runs in the same page unless it
+// Holocene browser end-to-end suite. One Chromium (SwiftShader) session; every scenario runs in the same page unless it
 // needs a fresh load. Collects page errors, console errors, WebGL shader errors, and assertion failures.
 //   node test_e2e.js [filter]        screenshots on failure go to shots/e2e_*.png, report to shots/test_e2e.log
 const { chromium } = require('playwright'); const http = require('http'); const fs = require('fs'); const path = require('path');
-const root = path.resolve('dist'); const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.json': 'application/json' };
+const root = path.resolve('dist'); const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.json': 'application/json' };
 const server = http.createServer((req, res) => { const p = path.join(root, decodeURIComponent(req.url.split('?')[0])); fs.readFile(p, (err, data) => { if (err) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream' }); res.end(data); }); });
 const filter = process.argv[2] || '';
 const results = []; let page, browser, port; const errors = []; const t0 = Date.now();
@@ -237,12 +237,40 @@ server.listen(0, async () => {
     check(before.saved, 'save written to localStorage'); check(/saved/i.test(before.toast || ''), 'save toast: ' + before.toast);
     await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.__G && window.__G.sim && document.getElementById('loading').hidden, null, { timeout: 60000 }); await page.evaluate(TC); await installToastLog();
     check(!(await ev(() => document.getElementById('btn-load').hidden)), 'Continue button shown on the intro after a save');
-    await ev(() => document.getElementById('btn-load').click()); await wait(800); await frames(4);
+    await ev(() => document.getElementById('btn-load').click()); await wait(800); await page.waitForFunction(() => !__G.mapcam.fly, null, { timeout: 320000 }); await frames(4);      // (from the home screen the camera flies down to where the world was left)
     const after = await ev(() => { const S = __G.sim; const c = S.playerCiv(); return { mode: document.body.dataset.mode, year: S.year, name: c && c.name, cells: c && S.cellsOf[c.id], civs: S.st.civCount, lon: __G.mapcam.lon, lat: __G.mapcam.lat, ruin: S.ruins.get(S.LI[123])?.name, turn: document.getElementById('turn1').textContent, left: document.getElementById('left').classList.contains('open') }; });
     check(after.mode === 'play', 'play mode after load'); check(after.year === before.year, `year ${after.year} == ${before.year}`); check(after.name === before.name, 'player name'); check(Math.abs(after.cells - before.cells) <= 1, `cells ${after.cells} ~ ${before.cells}`); check(after.civs === before.civs, `civs ${after.civs} == ${before.civs}`);
     check(Math.abs(after.lon - before.lon) < 1e-6 && Math.abs(after.lat - before.lat) < 1e-6, 'camera restored'); check(after.ruin === 'Testruin', 'ruins restored'); check(after.turn === 'Advance', 'turn button ready');
     // and a turn still runs after loading
     await ev(() => document.getElementById('turn').click()); await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 300000 }); check((await state()).year > before.year, 'time runs after load');
+  });
+  await scenario('home: back to the main menu, the saved world shown there, keys, what\'s new, settings, continue', async (check) => {
+    const before = await ev(() => { const S = __G.sim; const c = S.playerCiv(); return { year: S.year, name: S.fullName(c), era: c.era }; });
+    await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-new').click(); }); await frames(3);
+    const h = await ev(() => ({ mode: document.body.dataset.mode, intro: !document.getElementById('intro').hidden, cont: !document.getElementById('btn-load').hidden, line: document.getElementById('home-save').textContent, ticks: document.querySelectorAll('#home-eras i').length, now: [...document.querySelectorAll('#home-eras i')].findIndex((i) => i.classList.contains('now')), first: (document.querySelector('.home-menu .hm.first:not([hidden])') || {}).id, version: document.getElementById('home-version').textContent, status: document.getElementById('home-status').hidden, quit: document.getElementById('btn-quit').hidden, upd: document.getElementById('update').hidden, pol: __G.globals.uPolitical.value, locked: __G.mapcam.locked, saved: !!localStorage.getItem('genesis-save-v2'), hud: getComputedStyle(document.getElementById('tl')).display }));
+    check(h.mode === 'intro' && h.intro, 'the main menu is shown'); check(h.saved, 'the world was saved on the way'); check(h.cont && h.first === 'btn-load', 'Continue is the first entry'); check(h.line.includes(before.name) && /BC|AD/.test(h.line), 'it names the realm and the year: ' + h.line);
+    check(h.ticks === 9 && h.now === before.era, `nine ages, this one marked (${h.ticks}, ${h.now} against ${before.era})`); check(/Holocene \d+\.\d+\.\d+/.test(h.version), 'the version is shown: ' + h.version);
+    check(h.status && h.quit && h.upd, 'no update line, no Quit and no update note in a browser'); check(h.pol === 0 && h.locked && h.hud === 'none', 'no realm tints, no HUD, the globe is not steered');
+    // keys: down, down, up; Enter with nothing chosen takes the first entry
+    await page.keyboard.press('ArrowDown'); const f1 = await ev(() => document.activeElement.id); await page.keyboard.press('ArrowDown'); const f2 = await ev(() => document.activeElement.id); await page.keyboard.press('ArrowUp'); const f3 = await ev(() => document.activeElement.id);
+    check(f1 === 'btn-load' && f2 === 'btn-choose' && f3 === 'btn-load', `arrow keys walk the list (${f1}, ${f2}, ${f3})`);
+    await ev(() => document.getElementById('btn-news').click()); await frames(2);
+    const n = await ev(() => ({ open: document.getElementById('news').open, notes: document.querySelectorAll('#news .note').length, first: (document.querySelector('#news .note h3') || {}).textContent || '', sub: document.getElementById('news-sub').textContent }));
+    check(n.open && n.notes > 0 && n.first.length > 5, `what's new lists the notes (${n.notes})`); check(/Version \d/.test(n.sub), 'under its version: ' + n.sub); await ev(() => document.getElementById('news-close').click());
+    await ev(() => document.getElementById('btn-settings').click()); await frames(2);
+    const m = await ev(() => ({ open: document.getElementById('menu').open, title: document.getElementById('m-title').textContent, game: getComputedStyle(document.querySelector('#menu .ingame')).display, scale: !!document.getElementById('ui-scale').offsetParent }));
+    check(m.open && m.title === 'Settings' && m.game === 'none' && m.scale, 'Settings shows the options without the game\'s own buttons'); await ev(() => document.getElementById('m-close').click());
+    await ev(() => { if (document.activeElement) document.activeElement.blur(); }); await page.keyboard.press('Enter'); await page.waitForFunction(() => document.body.dataset.mode === 'play' && !__G.mapcam.fly, null, { timeout: 320000 }); await frames(3);
+    const a = await ev(() => ({ year: __G.sim.year, name: __G.sim.fullName(__G.sim.playerCiv()), pol: __G.globals.uPolitical.value, locked: __G.mapcam.locked, title: document.getElementById('m-title').textContent })); check(a.year === before.year && a.name === before.name, 'Enter continues the saved world'); check(a.pol === 1 && !a.locked, 'realm tints and steering are back');
+  });
+  await scenario('home: a new world leaves the saved one alone until it is replaced; cancelling comes back to it', async (check) => {
+    await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-new').click(); }); await frames(3);
+    const s0 = await ev(() => ({ civs: __G.sim.st.civCount, sub: document.getElementById('home-new-s').textContent })); check(s0.civs > 0, 'the home screen shows the saved world'); check(/replaces/.test(s0.sub), 'and says a new world replaces it: ' + s0.sub);
+    await ev(() => document.getElementById('btn-choose').click()); await frames(3);
+    const s1 = await ev(() => ({ mode: document.body.dataset.mode, civs: __G.sim.st.civCount, player: !!__G.sim.playerCiv(), saved: !!localStorage.getItem('genesis-save-v2') })); check(s1.mode === 'choose' && s1.civs === 0 && !s1.player, `New world begins on an empty Earth (${s1.civs} states)`); check(s1.saved, 'the saved world is still in storage');
+    await ev(() => document.getElementById('bannercancel').click()); await frames(3);
+    const s2 = await ev(() => ({ mode: document.body.dataset.mode, civs: __G.sim.st.civCount, cont: !document.getElementById('btn-load').hidden })); check(s2.mode === 'intro' && s2.civs > 0 && s2.cont, 'cancelling comes back to the saved world on the home screen');
+    await ev(() => document.getElementById('btn-load').click()); await page.waitForFunction(() => document.body.dataset.mode === 'play' && !__G.mapcam.fly, null, { timeout: 320000 }); await frames(3);
   });
   await scenario('save/load: loading with no save is handled; corrupt save is handled', async (check) => {
     await ev(() => { localStorage.removeItem('genesis-save-v2'); document.getElementById('btn-menu').click(); document.getElementById('m-load').click(); });

@@ -530,8 +530,9 @@
       // specular on water
       vec3 viewDir = normalize(-vViewPos);
       vec3 refl = reflect(-sunV, nV);
-      float spec = pow(max(dot(refl, viewDir), 0.0), 90.0) * (seaW + inlandW * 0.14) * day * (1.0 - frozen * 0.85);   // a river glints; it is not a mirror
-      lit += vec3(0.9, 0.95, 1.0) * spec * 0.9;
+      float specD = max(dot(refl, viewDir), 0.0); float highK = smoothstep(0.02, 0.4, uCamAlt);
+      float spec = mix(pow(specD, 90.0), pow(specD, 34.0) * 0.5, highK) * (seaW + inlandW * 0.14) * day * (1.0 - frozen * 0.85);   // a river glints; it is not a mirror. From orbit the sun on the sea is a wide soft patch
+      lit += mix(vec3(0.9, 0.95, 1.0), vec3(1.0, 0.93, 0.8), highK) * spec * 0.9;
       // night side: keep a little moonlight and city lights
       float night = 1.0 - smoothstep(-0.22, 0.02, sunUp);
       float light = sim.r; float highUp = smoothstep(0.003, 0.014, uCamAlt);   // orbital city lights fade out as real windows take over

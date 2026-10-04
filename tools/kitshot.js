@@ -1,7 +1,7 @@
 // kit viewer screenshot: node kitshot.js <name> "<query>"
 const { chromium } = require("playwright"); const http = require('http'); const fs = require('fs'); const path = require('path');
 const name = process.argv[2], query = process.argv[3] || '';
-const root = path.resolve('dist'); const MIME = { '.html': 'text/html', '.js': 'text/javascript' };
+const root = path.resolve('dist'); const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2' };
 const server = http.createServer((req, res) => { const p = path.join(root, decodeURIComponent(req.url.split('?')[0])); fs.readFile(p, (err, data) => { if (err) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream' }); res.end(data); }); });
 server.listen(0, async () => {
   const port = server.address().port;

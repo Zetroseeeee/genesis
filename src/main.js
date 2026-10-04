@@ -1,4 +1,4 @@
-// GENESIS main: boot, game flow, HUD, labels, minimap, chronicle, loop.
+// Holocene main: boot, home screen, game flow, HUD, labels, minimap, chronicle, updates, loop.
 (function () {
   const $ = (id) => document.getElementById(id);
   const W = 720, H = 360, N = W * H;
@@ -28,12 +28,24 @@
   const worldData = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
   const TURN_YEARS = [200, 120, 80, 50, 40, 30, 20, 10, 5];
   const speed = () => settings.continuous ? (paused ? 0 : SPEEDS[speedIdx]) : (turnRun.active ? 600 : 0);
-  function setMode(m) {
-    mode = m; document.body.dataset.mode = m;
-    const w = stage.clientWidth, h = stage.clientHeight;
-    if (m === 'intro' && w > 900) camera.setViewOffset(w, h, -w * 0.24, 0, w, h); else camera.clearViewOffset();
-    camera.updateProjectionMatrix();
+  // The home screen: the Earth stands large and runs off the right and the bottom of the picture, the edge of night
+  // keeps its place while the planet turns under it (the way it really turns: dusk travels west), and the list has the left.
+  const HOME = { dist: 1.02, cx: 0.8, cy: 0.76, lat: 10, spin: -0.3, sun: [-0.9, 0.36, -0.22] };
+  let homeK = 1, sunEase = 0;      // how far the picture is shifted for the home screen (1) or centred (0); seconds of easing left for the sun
+  function frameHome() {
+    const w = stage.clientWidth, h = stage.clientHeight; const wide = w > 900;
+    const cx = Math.min(0.92, Math.max(HOME.cx, (430 + 0.72 * h) / w));      // (in a small window the planet moves right, clear of the list)
+    if (homeK < 0.002) camera.clearViewOffset(); else camera.setViewOffset(w, h, -w * (wide ? cx - 0.5 : 0.1) * homeK, -h * (wide ? HOME.cy - 0.5 : 0.3) * homeK, w, h);
   }
+  function setMode(m) {
+    const was = mode; mode = m; document.body.dataset.mode = m;
+    frameHome(); camera.updateProjectionMatrix();
+    globals.uPolitical.value = m === 'intro' ? 0 : (view.political ? 1 : 0);
+    if ((was === 'intro') !== (m === 'intro')) { sunEase = 2.5; if (m !== 'intro' && mapcam) sunFor(mapcam.tLon); }      // leaving the home screen: morning where the camera is
+    renderUpdate();
+  }
+  // mid-morning at this longitude (the sun stands over the meridian 32 degrees to its east)
+  function sunFor(lon) { sunAngle = -(lon + 32) * Math.PI / 180; }
 
   // ---------- renderer ----------
   const stage = $('stage');
@@ -81,13 +93,13 @@
       const old = globals.uDet.value; globals.uDet.value = arr; if (old) old.dispose();
     } catch (e) { console.warn('detail array unavailable', e); }
   }
-  const _shC = new THREE.Vector3();
+  const _shC = new THREE.Vector3(), _sun = new THREE.Vector3();
   function loadImageData(url) {
     return new Promise((res, rej) => { const im = new Image(); im.onload = () => { const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(im, 0, 0); res(ctx.getImageData(0, 0, im.width, im.height)); }; im.onerror = () => rej(new Error('failed ' + url)); im.src = url; });
   }
   async function boot() {
     try {
-      loadSettings(); setMode('intro');
+      loadSettings(); setMode('intro'); homeInit();
       setLoad(6, 'terrain index');
       const index = await (await fetch('data/index.json')).json();
       setLoad(14, 'surface data');
@@ -113,13 +125,17 @@
       window.__G = { settings, get sim() { return sim; }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, startTurn, endTurn, turnRun, terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
       buildEconomy(); buildDock(); buildMinimapBase(); bindUI();
       newWorld((Math.random() * 2 ** 31) | 0);
+      previewSave(); homeAim(false);                // a saved world is shown on the home screen as it was left
       setLoad(80, 'first light');
-      $('btn-load').hidden = !hasSave();
+      await versionReady; homeRefresh();
+      // an update was just put to use while a world was being played: straight back into it
+      let resume = false; try { resume = sessionStorage.getItem('holocene-resume') === '1'; sessionStorage.removeItem('holocene-resume'); } catch (e) {}
+      if (resume && hasSave()) loadLocal(true);
       requestAnimationFrame(frame);
-      setTimeout(() => { setLoad(100); $('loading').hidden = true; }, 900);
+      setTimeout(() => { setLoad(100); const L = $('loading'); L.classList.add('gone'); if (mode === 'intro') $('intro').classList.add('enter'); setTimeout(() => { L.hidden = true; afterUpdate(); }, 750); }, 900);
       // generated materials and art arrive after first light; the world recompiles its shaders when they are in
       if (window.MODELS && settings.models !== false) MODELS.load(window.GENESIS_MODELS_URL).then((M) => { if (M.ready) { world.lastBuild.t = -1e9; console.log('models: ' + Object.keys(M.defs).length + ' in the library'); } });
-      if (window.TEX) TEX.load(renderer, TEX_URL).then((T) => { applyArt(); applyTextures(); if (T.ready) toast('Materials loaded'); else if (T.unsupported) console.warn('textures need WebGL2'); });
+      if (window.TEX) TEX.load(renderer, TEX_URL).then((T) => { applyArt(); applyTextures(); if (T.unsupported) console.warn('textures need WebGL2'); });
       try { sampleFn = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { sampleFn = null; }
       if (!sampleFn) $('btn-chronicle').textContent = 'Show the record';
     } catch (e) { console.error(e); $('loading').innerHTML = 'The Earth could not be assembled: ' + esc(e.message || e); }
@@ -127,7 +143,7 @@
 
   // ---------- game flow ----------
   function newWorld(seed) {
-    sim = createSim(worldData, seed); world.setSim(sim);
+    sim = createSim(worldData, seed); world.setSim(sim); previewing = false;
     deselect(); feedIdx = 0; seen.wars.clear(); seen.ack.clear(); seen.era = -1; seen.turns = 0; turnRun.active = false; turnRun.townSet = null; turnRun.capital = -1; paused = true; $('report').hidden = true; lastSample.year = -1e9;
     refreshAll(true);
   }
@@ -151,17 +167,38 @@
     setMode('play'); banner(null); mapcam.locked = false; mapcam.idleSpin = false; paused = true;
     seedOtherTribes(24, i); sim.recount(); world.refreshTextures(); world.updateBuildings(mapcam, true); snapshotTurn();
     setTimeout(() => toast('Your village stands. Open City to build, Expand to claim land, then press Advance to let the years run.'), 2600);
-    const [lon, lat] = siteOf(i);
+    const [lon, lat] = siteOf(i); sunFor(lon);
     mapcam.flyTo(lon, lat, viewDist(i), { duration: fromClick ? 2.4 : 3.8, tilt: 0.9, heading: mapcam.heading });
     select(i); $('intro').hidden = true; refreshAll(true);
     bigBanner(`${sim.fullName(c)}`, `settle ${sim.cellName.get(i)} · ${sim.fmtYear(sim.year)}`);
   }
   function randomStart() {
-    const LI = sim.LI; let best = -1, bs = -1;
+    freshWorld(); const LI = sim.LI; let best = -1, bs = -1;
     for (let t = 0; t < 6000; t++) { const i = LI[Math.floor(sim.rnd() * LI.length)]; const s = sim.fert[i] * (1 + ((sim.flags[i] & 2) ? 0.8 : 0)) * (1 + ((sim.flags[i] & 4) ? 0.15 : 0)) * sim.rnd(); if (s > bs) { bs = s; best = i; } }
     startPlayer(best, '', null, false);
   }
-  function chooseMode() { setMode('choose'); $('intro').hidden = true; mapcam.locked = false; mapcam.idleSpin = false; banner('Fly anywhere. Click the ground where your people begin.', true); setSoil(true); }
+  function chooseMode() { freshWorld(); setMode('choose'); $('intro').hidden = true; mapcam.locked = false; mapcam.idleSpin = false; mapcam.flyTo(mapcam.lon, mapcam.lat, 2.4, { duration: 1.8, tilt: 0, heading: 0 }); banner('Fly anywhere. Click the ground where your people begin.', true); setSoil(true); }
+  // the world shown on the home screen is the saved one: a new game begins on a new Earth
+  let previewing = false;
+  function freshWorld() { if (previewing) { newWorld((Math.random() * 2 ** 31) | 0); world.refreshTextures(); world.updateBuildings(mapcam, true); } }
+  // back to the home screen (from a game, which is saved first, or from choosing a homeland)
+  function goHomeScreen(save) {
+    if (save) { if (turnRun.active) endTurn('stopped'); saveLocal(false); }
+    if (tool) setTool(null); deselect(); $('found').hidden = true; pendingFound = null; banner(null); setSoil(false); document.body.classList.remove('dockopen'); $('l-build').classList.remove('on'); $('report').hidden = true;
+    setMode('intro'); $('intro').hidden = false; $('intro').classList.remove('enter');
+    mapcam.locked = true; mapcam.autoTilt = settings.autoTilt;
+    if (save) previewing = true; else previewSave();
+    homeAim(true); world.updateBuildings(mapcam, true); homeRefresh();
+  }
+  // Where the home screen looks: the saved world's capital stands in the last of the daylight, a little above the
+  // middle of what is seen of the planet (with no saved world: Mesopotamia). Then the Earth turns on from there.
+  function homeAim(fly) {
+    const pc = previewing && sim ? sim.playerCiv() : null; let lon = 72, lat = HOME.lat;
+    if (pc && pc.capital >= 0) { const [cl, ca] = cellCenter(pc.capital); lon = GEO.wrapLon(cl + 30); lat = clamp(ca - 22, -50, 40); }
+    mapcam.spin = HOME.spin;
+    if (fly) mapcam.flyTo(lon, lat, HOME.dist, { duration: 2.4, tilt: 0, heading: 0, onDone: () => { if (mode === 'intro') mapcam.idleSpin = true; } });
+    else { mapcam.fly = null; mapcam.tLon = mapcam.lon = lon; mapcam.tLat = mapcam.lat = lat; mapcam.tDist = mapcam.dist = HOME.dist; mapcam.tTilt = mapcam.tilt = 0; mapcam.tHeading = mapcam.heading = 0; mapcam.idleSpin = true; }
+  }
   function setSoil(on) { view.soil = on; globals.uFertView.value = on ? 0.6 : 0; $('v-soil').classList.toggle('on', on); }
   function showFoundCard(hit, i, cx, cy) {
     pendingFound = { hit, i }; const f = sim.flags[i]; const fert = sim.fert[i];
@@ -485,7 +522,7 @@
 
   // ---------- notifications ----------
   let bannerT = 0;
-  function toast(msg) { if (!msg) return; const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; $('tc').appendChild(t); setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 320); }, 2600); }
+  function toast(msg, ms) { if (!msg) return; const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; $('tc').appendChild(t); setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 320); }, ms || 2600); }
   function bigBanner(title, sub, art) { const now = performance.now(); if (now - bannerT < 4500) return; bannerT = now; const t = document.createElement('div'); t.className = 'toast big' + (art ? ' art' : ''); if (art) t.style.backgroundImage = `linear-gradient(to right, rgb(8 11 18 / 0.92), rgb(8 11 18 / 0.55) 40%, rgb(8 11 18 / 0.55) 60%, rgb(8 11 18 / 0.92)), url("${art}")`; t.innerHTML = `${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}`; $('tc').appendChild(t); setTimeout(() => { t.style.transition = 'opacity .4s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 420); }, art ? 5200 : 4000); }
   // ---------- generated art and materials ----------
   const TEX_URL = window.GENESIS_TEX_URL || 'data/tex/atlas.json';
@@ -499,7 +536,6 @@
   }
   function applyArt() {
     if (!window.TEX || !TEX.ui) return;
-    const hero = artOf('hero'); if (hero) $('intro-art').style.backgroundImage = `url("${hero}")`;
     document.body.classList.add('has-art');
     if (selected >= 0) renderBuild(selected);
   }
@@ -683,6 +719,7 @@
     const placedIds = new Set(); let n = 0; let nProjNull = 0, nBlocked = 0, nMeasured = 0;
     for (const c of cands) {
       if (n >= 140) break; const p = project(c.lon, c.lat, c.h); if (!p) { nProjNull++; continue; }
+      if (p[0] < -80 || p[0] > r.width + 80 || p[1] < -50 || p[1] > r.height + 50) { nProjNull++; continue; }      // outside the picture: not laid out (such labels used to pile up unseen above the top edge, and to use up the count)
       // the room a label takes: its real size once it has been drawn and measured (a guess from its length until then:
       // names in wide letters, a second line or an icon made the guess too small, and labels ran into each other)
       const dimKey = c.size + '|' + c.text + '|' + (c.sub || '') + '|' + (c.icon || ''); const el0 = labelEls.get(c.id); const dm = el0 && el0._dimKey === dimKey ? el0._dim : null;
@@ -783,7 +820,7 @@
     $('btn-menu').addEventListener('click', () => openMenu());
     $('m-close').addEventListener('click', () => $('menu').close()); $('m-resume').addEventListener('click', () => $('menu').close());
     $('m-save').addEventListener('click', () => { saveLocal(true); $('menu').close(); }); $('m-load').addEventListener('click', () => { if (loadLocal()) $('menu').close(); });
-    $('m-new').addEventListener('click', () => { $('menu').close(); newWorld((Math.random() * 2 ** 31) | 0); setMode('intro'); $('intro').hidden = false; mapcam.locked = true; mapcam.idleSpin = true; mapcam.tDist = 2.7; mapcam.tTilt = 0; mapcam.autoTilt = settings.autoTilt; world.updateBuildings(mapcam, true); });
+    $('m-new').addEventListener('click', () => { $('menu').close(); goHomeScreen(true); });
     $('ui-scale').value = settings.uiScale; $('ui-scale-v').textContent = settings.uiScale.toFixed(2); $('ui-scale').addEventListener('input', (e) => { settings.uiScale = +e.target.value; $('ui-scale-v').textContent = settings.uiScale.toFixed(2); applySettings(); });
     $('tip-delay').value = settings.tipDelay; $('tip-delay-v').textContent = settings.tipDelay; $('tip-delay').addEventListener('input', (e) => { settings.tipDelay = +e.target.value; $('tip-delay-v').textContent = settings.tipDelay; applySettings(); });
     $('opt-glass').checked = settings.glass; $('opt-glass').addEventListener('change', (e) => { settings.glass = e.target.checked; applySettings(); });
@@ -791,9 +828,11 @@
     $('opt-textures').checked = settings.textures !== false; $('opt-textures').addEventListener('change', (e) => { settings.textures = e.target.checked; applySettings(); });
     $('opt-quality').value = settings.quality; $('opt-quality').addEventListener('change', (e) => { settings.quality = e.target.value; settings.qualityPinned = true; applySettings(); });
     $('btn-choose').addEventListener('click', chooseMode); $('btn-random').addEventListener('click', () => { mapcam.locked = false; randomStart(); }); $('btn-load').addEventListener('click', () => loadLocal());
+    $('btn-settings').addEventListener('click', () => openMenu()); $('btn-news').addEventListener('click', () => openNews()); $('news-close').addEventListener('click', () => $('news').close());
+    $('btn-quit').addEventListener('click', () => { if (desktop) desktop.quit(); });
     $('found-ok').addEventListener('click', () => { if (!pendingFound) return; const { hit, i } = pendingFound; const y = (i / W) | 0, x = i - y * W; const su = clamp((hit.lon + 180) / 360 * W - x, 0.02, 0.98), sv = clamp((90 - hit.lat) / 180 * H - y, 0.02, 0.98); $('found').hidden = true; setSoil(false); startPlayer(i, $('found-name').value.trim(), [su, sv], true); pendingFound = null; });
     $('found-cancel').addEventListener('click', () => { $('found').hidden = true; pendingFound = null; });
-    $('bannercancel').addEventListener('click', () => { if (tool) setTool(null); else if (mode === 'choose') { setMode('intro'); $('intro').hidden = false; banner(null); mapcam.locked = true; mapcam.idleSpin = true; setSoil(false); } });
+    $('bannercancel').addEventListener('click', () => { if (tool) setTool(null); else if (mode === 'choose') goHomeScreen(false); });
     $('btn-close').addEventListener('click', deselect);
     $('btn-fly').addEventListener('click', () => { if (selected < 0) return; const [lon, lat] = placeOf(selected); mapcam.flyTo(lon, lat, Math.min(mapcam.dist, viewDist(selected)), { duration: 1.8 }); });
     $('l-chronicle').addEventListener('click', () => openChronicle('log')); $('l-empire').addEventListener('click', () => openRealm());
@@ -807,6 +846,7 @@
     $('homebtn').addEventListener('click', goHome); $('orbitbtn').addEventListener('click', () => { mapcam.flyTo(mapcam.lon, mapcam.lat, 2.6, { tilt: 0, heading: 0, duration: 2 }); mapcam.autoTilt = settings.autoTilt; });
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (mode === 'intro') { homeKey(e); return; }
       if (e.code === 'Space' || e.key === 'Enter') { if ($('chron').open || $('menu').open) return; e.preventDefault(); onTurnClick(); }
       else if (e.key === '+' || e.key === '=') { if (settings.continuous) setSpeedIdx(speedIdx + 1); } else if (e.key === '-' || e.key === '_') { if (settings.continuous) setSpeedIdx(speedIdx - 1); }
       else if (e.key === 'b' || e.key === 'B') { if (mode === 'play') openCity(); } else if (e.key === 'g' || e.key === 'G') $('l-build').click(); else if (e.key === 'r' || e.key === 'R') { if (mode === 'play') openRealm(); } else if (e.key === 'c' || e.key === 'C') { if (mode === 'play') openChronicle('log'); }
@@ -822,38 +862,173 @@
     labelLayer.addEventListener('dblclick', (e) => { const el = e.target.closest('.lbl'); if (!el) return; const id = el.dataset.id; if (id[0] === 'c') { const i = +id.slice(1); const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, viewDist(i)); select(i); } else { const c = sim.civs[+id.slice(1)]; if (c && c.capital >= 0) { const [lon, lat] = placeOf(c.capital); mapcam.flyTo(lon, lat, 0.15); select(c.capital); } } });
   }
   function goHome() { const c = sim.playerCiv(); if (!c || c.capital < 0) { toast('No capital yet'); return; } const [lon, lat] = placeOf(c.capital); mapcam.flyTo(lon, lat, viewDist(c.capital), { duration: 2 }); select(c.capital); }
-  function openMenu() { $('m-info').textContent = `Tiles ${terrain.stats.tiles} · imagery packs ${terrain.stats.packsI} · elevation packs ${terrain.stats.packsE} · buildings ${world.buildingCount}`; $('menu').showModal(); }
+  function openMenu() { $('m-title').textContent = mode === 'intro' ? 'Settings' : 'Menu'; $('m-info').textContent = `Tiles ${terrain.stats.tiles} · imagery packs ${terrain.stats.packsI} · elevation packs ${terrain.stats.packsE} · buildings ${world.buildingCount}`; $('menu').showModal(); }
   function refreshAll(force) { updateEconomy(); updateTurnButton(); updateClock(); updateDock(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); }
+
+  // ---------- home screen, version, updates ----------
+  // version.json is written by the build: what this game is and what changed lately. window.desktop is the app's
+  // bridge (desktop/preload.js); in a browser there is none, and with it no updates and no Quit.
+  let VERSION = { name: 'Holocene', version: '', commit: '', built: '', seq: 0, notes: [] }; window.GENESIS_VERSION = VERSION;
+  const desktop = window.desktop && window.desktop.update ? window.desktop : null;
+  const versionReady = fetch('version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => { if (v && v.version) { VERSION = v; window.GENESIS_VERSION = v; } }).catch(() => {});
+  const upd = { state: null, open: false, later: '', told: '' };
+  const fmtBytes = (n) => n >= 1e9 ? (n / 1e9).toFixed(2) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e8 ? 0 : 1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
+  const fmtDate = (d) => { const t = new Date(d + 'T12:00:00'); return isNaN(t) ? String(d || '') : t.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }); };
+  const firstPara = (b) => { const t = String(b || '').split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim(); return t.length > 460 ? t.slice(0, 440).replace(/\s+\S*$/, '') + '…' : t; };
+  const seenKey = 'holocene-news-seen';
+  function homeInit() {
+    document.querySelectorAll('.home-menu > *').forEach((el, k) => el.style.setProperty('--i', k));
+    if (desktop) {
+      $('btn-quit').hidden = false;
+      desktop.update.on((st) => { upd.state = st; onUpdateState(); }); desktop.update.onOpen(() => { upd.open = true; upd.later = ''; upd.asked = true; renderUpdate(); });
+      desktop.update.state().then((st) => { upd.state = st; onUpdateState(); }).catch(() => {});
+    }
+    $('home-status').addEventListener('click', () => { const st = upd.state; if (!st || !desktop) return; if (updLive(st) || st.notice) { upd.open = true; renderUpdate(); } else desktop.update.check(); });
+    $('upd-chip').addEventListener('click', () => { upd.open = true; renderUpdate(); });
+    $('up-close').addEventListener('click', () => closeUpdate()); $('up-alt').addEventListener('click', () => updateAlt()); $('up-go').addEventListener('click', () => updateGo());
+  }
+  // what the home screen says about the saved world, the version and updates
+  function homeRefresh() {
+    const has = hasSave(); const pc = has && previewing && sim ? sim.playerCiv() : null;
+    $('btn-load').hidden = !has; $('btn-load').classList.toggle('first', has); $('btn-choose').classList.toggle('first', !has);
+    $('home-save').textContent = !has ? '' : pc ? `${sim.fullName(pc)}, ${sim.fmtYear(sim.year)}` : previewing && sim ? `Your world, ${sim.fmtYear(sim.year)}` : 'Your saved world';
+    $('home-eras').hidden = !pc; if (pc) $('home-eras').innerHTML = sim.ERAS.map((e, k) => `<i class="${k < pc.era ? 'past' : k === pc.era ? 'now' : ''}"></i>`).join('') + `<span>${esc(sim.ERAS[pc.era][0])}</span>`;
+    $('home-new-s').textContent = has ? 'Choose where your people begin (replaces your saved world)' : 'Choose where your people begin';
+    $('home-version').textContent = VERSION.version ? `${VERSION.name || 'Holocene'} ${VERSION.version}` : (VERSION.name || 'Holocene');
+    let seenC = ''; try { seenC = localStorage.getItem(seenKey) || ''; } catch (e) {}
+    const newest = VERSION.notes && VERSION.notes[0] ? VERSION.notes[0].commit : ''; if (!seenC && newest) { seenC = newest; try { localStorage.setItem(seenKey, newest); } catch (e) {} }      // (a first start has nothing "new")
+    $('btn-news').classList.toggle('fresh', !!newest && newest !== seenC);
+    renderUpdate();
+  }
+  // up and down move through the list; Enter with nothing chosen takes the first entry
+  function homeKey(e) {
+    if ($('menu').open || $('news').open) return;
+    const items = [...document.querySelectorAll('.home-menu .hm')].filter((b) => !b.hidden); const at = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = items.length; items[at < 0 ? (e.key === 'ArrowDown' ? 0 : n - 1) : (at + (e.key === 'ArrowDown' ? 1 : n - 1)) % n].focus(); }
+    else if (e.key === 'Enter' && at < 0 && !(document.activeElement && document.activeElement.tagName === 'BUTTON')) { e.preventDefault(); const b = document.querySelector('.home-menu .hm.first:not([hidden])'); if (b) b.click(); }
+  }
+  function openNews(notes, sub) {
+    const mine = !notes; notes = (notes || VERSION.notes || []).slice(0, 30); let seenC = ''; try { seenC = localStorage.getItem(seenKey) || ''; } catch (e) {}
+    $('news-sub').textContent = sub || (VERSION.version ? 'Version ' + VERSION.version : '');
+    let fresh = mine && !!seenC && notes.some((n) => n.commit === seenC);      // everything above the last note read is new
+    $('news-body').innerHTML = notes.length ? notes.map((n) => { if (n.commit === seenC) fresh = false; const b = firstPara(n.body); return `<div class="note${fresh ? ' new' : ''}"><time>${esc(fmtDate(n.date))}</time><h3>${esc(n.title)}</h3>${b ? `<p>${esc(b)}</p>` : ''}</div>`; }).join('') : '<div class="hint">Nothing is recorded for this version.</div>';
+    if (mine && notes[0]) { try { localStorage.setItem(seenKey, notes[0].commit); } catch (e) {} $('btn-news').classList.remove('fresh'); }
+    const dlg = $('news'); if (!dlg.open) dlg.showModal(); $('news-body').scrollTop = 0;
+  }
+  // ---- updates (the app fetches them: desktop/updater.js; this is what the player sees of it) ----
+  const updLive = (st) => !!st && (st.phase === 'available' || st.phase === 'downloading' || st.phase === 'ready' || st.phase === 'app-required');
+  function onUpdateState() {
+    const st = upd.state; if (!st) return;
+    // a newly found update, or word that one was undone, shows itself once; "Later" keeps it to the spark
+    const id = st.notice ? 'notice:' + st.notice : updLive(st) && st.latest ? st.latest.commit + ':' + (st.phase === 'app-required' ? 'app' : 'files') : '';
+    if (id && id !== upd.told && id !== upd.later) { upd.told = id; upd.open = true; }
+    if (!id && st.phase !== 'checking') upd.open = false;      // (looking again does not put the note away)
+    // asked for from the menu: say how it came out even when there is nothing to show
+    if (upd.asked && st.phase !== 'checking') { upd.asked = false; if (!id) toast(st.checkError && st.checkError !== 'none published' ? 'Could not check for updates. Is this Mac online?' : `Holocene ${VERSION.version} is up to date`, 4000); }
+    renderUpdate();
+  }
+  function closeUpdate() { const st = upd.state; upd.open = false; if (st && st.notice && desktop) desktop.update.ack(); else if (st && st.latest) upd.later = upd.told; renderUpdate(); }
+  function renderUpdate() {
+    const st = upd.state; const box = $('update'), chip = $('upd-chip'), stat = $('home-status'); if (!box) return;
+    const live = updLive(st), pct = st && st.progress && st.progress.total ? Math.round(100 * st.progress.bytes / st.progress.total) : 0;
+    // the line at the foot of the home screen
+    if (!st || st.phase === 'off') stat.hidden = true; else {
+      stat.hidden = false; const v = st.latest ? st.latest.version : '';
+      const text = st.phase === 'checking' ? 'Checking for updates…' : st.phase === 'available' ? `Update ${v} is ready to fetch` : st.phase === 'downloading' ? `Fetching update ${v}, ${pct}%` : st.phase === 'ready' ? `Update ${v} is fetched. Restart to use it` : st.phase === 'app-required' ? `Version ${v} needs a new copy of the app` : st.checkError && st.checkError !== 'none published' ? 'Could not check for updates. Try again' : 'Up to date';
+      stat.innerHTML = (live ? '<i class="ember"></i>' : '') + esc(text); stat.disabled = st.phase === 'checking';
+    }
+    chip.hidden = !(live && !upd.open && mode !== 'intro'); if (!chip.hidden) $('upd-chip-t').textContent = st.phase === 'downloading' ? `Update ${pct}%` : st.phase === 'ready' ? 'Restart to update' : 'Update';
+    if (!st || !upd.open || !$('loading').hidden) { box.hidden = true; return; }
+    if (!(live || st.notice)) { if (st.phase !== 'checking') box.hidden = true; return; }      // (while it looks again, the note stays as it was)
+    box.hidden = false; const L = st.latest, go = $('up-go'), alt = $('up-alt'), bar = $('up-bar'), notes = $('up-notes'), err = $('up-err');
+    const set = (title, line, goText, altText) => { $('up-title').textContent = title; $('up-line').innerHTML = line; go.hidden = !goText; go.textContent = goText || ''; alt.hidden = !altText; alt.textContent = altText || ''; };
+    bar.hidden = true; notes.hidden = true; err.hidden = true; go.disabled = false;
+    if (st.notice) { set(st.notice === 'undone' ? 'The update was undone' : 'An update was removed', st.notice === 'undone' ? 'The new version did not start, so the game went back to the one that works. It will not be offered again.' : 'Files of the last update had gone missing, so the game is running the version the app came with. The update can be fetched again.', 'OK', ''); return; }
+    const list = () => { const n = L.notes || []; if (!n.length) return; notes.hidden = false; notes.innerHTML = n.slice(0, 4).map((x) => `<li>${esc(x.title)}</li>`).join('') + (n.length > 4 ? `<li class="more"><button class="linkish" id="up-more">and ${n.length - 4} more</button></li>` : ''); const m = $('up-more'); if (m) m.addEventListener('click', () => openNews(L.notes, 'Version ' + L.version)); };
+    if (st.error) { err.hidden = false; err.textContent = st.error; }
+    if (st.phase === 'available') { set('Update ready', `<b>Version ${esc(L.version)}</b> is out. ${L.files} ${L.files === 1 ? 'file' : 'files'} to fetch, ${fmtBytes(L.bytes)}.`, st.error ? 'Try again' : 'Update now', 'Later'); list(); }
+    else if (st.phase === 'downloading') { set('Fetching the update', `${fmtBytes(st.progress.bytes)} of ${fmtBytes(st.progress.total)}`, '', 'Stop'); bar.hidden = false; $('up-fill').style.transform = `scaleX(${Math.max(0.02, pct / 100)})`; }
+    else if (st.phase === 'ready') { set('Update fetched', `<b>Version ${esc(L.version)}</b> is ready to use${mode === 'play' ? ': your world is saved first, and you carry on where you were.' : '.'} Left for later, it goes in the next time the game is started.`, 'Restart now', 'Later'); list(); }
+    else if (st.phase === 'app-required') {
+      const a = st.app || {}, size = L.app ? fmtBytes(L.app.bytes) : '';
+      if (a.error) { err.hidden = false; err.textContent = a.error; }
+      if (a.phase === 'downloading') { const p = a.total ? a.bytes / a.total : 0; set('Fetching the new app', `${fmtBytes(a.bytes)} of ${fmtBytes(a.total)}`, '', 'Stop'); bar.hidden = false; $('up-fill').style.transform = `scaleX(${Math.max(0.02, p)})`; }
+      else if (a.phase === 'ready') set('The new app is here', 'Its disk image is open in Finder. Quit Holocene, drag the new Holocene onto Applications, and start it again. Your worlds are kept.', 'Quit Holocene', 'Show the file');
+      else { set('A new app is needed', `<b>Version ${esc(L.version)}</b> changes the app itself, so it comes as a fresh download${size ? ' (' + size + ')' : ''} instead of an update.`, a.error ? 'Try again' : 'Download it', 'Later'); list(); }
+    }
+  }
+  function updateGo() {
+    const st = upd.state; if (!st || !desktop) return;
+    if (st.notice) { closeUpdate(); return; }
+    if (st.phase === 'available') desktop.update.start();
+    else if (st.phase === 'ready') applyUpdate();
+    else if (st.phase === 'app-required') { if (st.app && st.app.phase === 'ready') desktop.quit(); else desktop.update.getApp(); }
+  }
+  function updateAlt() {
+    const st = upd.state; if (!st || !desktop) return;
+    if (st.phase === 'downloading') desktop.update.cancel();
+    else if (st.phase === 'app-required' && st.app && st.app.phase === 'downloading') desktop.update.cancelApp();
+    else if (st.phase === 'app-required' && st.app && st.app.phase === 'ready') desktop.update.showApp();
+    else closeUpdate();
+  }
+  // put a fetched update to use: the world is saved, the page comes up again on the new files, and play carries on
+  async function applyUpdate() {
+    try { sessionStorage.setItem('holocene-updated', VERSION.commit || '?'); if (mode === 'play') { if (turnRun.active) endTurn('stopped'); saveLocal(false); sessionStorage.setItem('holocene-resume', '1'); } } catch (e) {}
+    $('up-go').disabled = true;
+    let ok = false; try { ok = await desktop.update.apply(); } catch (e) {}
+    if (!ok) { try { sessionStorage.removeItem('holocene-updated'); sessionStorage.removeItem('holocene-resume'); } catch (e) {} $('up-go').disabled = false; toast('The update could not be put to use. Try fetching it again'); }
+  }
+  // after the page has come up again: say so if it is on a new version
+  function afterUpdate() {
+    try { sessionStorage.removeItem('holocene-updated'); const was = +localStorage.getItem('holocene-seq') || 0; if (VERSION.seq) { if (was && VERSION.seq > was) toast(`Updated to version ${VERSION.version}`, 6000); localStorage.setItem('holocene-seq', String(VERSION.seq)); } } catch (e) {}
+    renderUpdate();
+  }
 
   // ---------- persistence ----------
   const SAVE_KEY = 'genesis-save-v2';
   function saveLocal(announce) {
     if (!sim || mode !== 'play') { if (announce) toast('Nothing to save yet'); return; }
-    try { const s = sim.save(); s.cam = { lon: mapcam.lon, lat: mapcam.lat, dist: mapcam.dist, tilt: mapcam.tilt, heading: mapcam.heading }; localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (announce) toast('World saved to this browser'); } catch (e) { if (announce) toast('Could not save here (storage blocked or full)'); }
+    try { const s = sim.save(); s.cam = { lon: mapcam.lon, lat: mapcam.lat, dist: mapcam.dist, tilt: mapcam.tilt, heading: mapcam.heading }; localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (announce) toast('World saved'); } catch (e) { if (announce) toast('Could not save here (storage blocked or full)'); }
   }
-  function loadLocal() {
+  function readSave() { const raw = localStorage.getItem(SAVE_KEY); return raw ? JSON.parse(raw) : null; }
+  function loadLocal(quiet) {
     try {
-      const raw = localStorage.getItem(SAVE_KEY); if (!raw) { toast('No saved world in this browser'); return false; }
-      const s = JSON.parse(raw); sim = createSim(worldData, s.seed || 1); sim.load(s); world.setSim(sim);
-      setMode('play'); $('intro').hidden = true; banner(null); mapcam.locked = false; mapcam.idleSpin = false; paused = true;
-      if (s.cam) { mapcam.tLon = mapcam.lon = s.cam.lon; mapcam.tLat = mapcam.lat = s.cam.lat; mapcam.tDist = mapcam.dist = s.cam.dist; mapcam.tTilt = mapcam.tilt = s.cam.tilt; mapcam.tHeading = mapcam.heading = s.cam.heading; }
+      const s = readSave(); if (!s) { toast('No saved world here'); return false; }
+      sim = createSim(worldData, s.seed || 1); sim.load(s); world.setSim(sim); previewing = false;
+      const fromHome = mode === 'intro';
+      setMode('play'); $('intro').hidden = true; banner(null); mapcam.locked = false; mapcam.idleSpin = false; mapcam.fly = null; paused = true;
+      if (s.cam) {
+        sunFor(s.cam.lon);
+        // from the home screen the camera flies down to where the world was left; otherwise it is simply there
+        if (fromHome && !quiet) mapcam.flyTo(s.cam.lon, s.cam.lat, s.cam.dist, { duration: 2.8, tilt: s.cam.tilt, heading: s.cam.heading });
+        else { mapcam.tLon = mapcam.lon = s.cam.lon; mapcam.tLat = mapcam.lat = s.cam.lat; mapcam.tDist = mapcam.dist = s.cam.dist; mapcam.tTilt = mapcam.tilt = s.cam.tilt; mapcam.tHeading = mapcam.heading = s.cam.heading; }
+      }
       feedIdx = sim.worldEvents.length; seen.wars.clear(); seen.ack.clear(); seen.era = -1; seen.turns = 1; turnRun.active = false; turnRun.townSet = null; turnRun.capital = -1; paused = true; snapshotTurn(); refreshAll(true); world.updateBuildings(mapcam, true);
-      toast(`Welcome back. It is ${sim.fmtYear(sim.year)}.`); return true;
+      if (!quiet) toast(`Welcome back. It is ${sim.fmtYear(sim.year)}.`); return true;
     } catch (e) { console.warn('save could not be read', e); toast('The saved world could not be read'); return false; }
+  }
+  // the saved world, shown on the home screen without being entered: its lands, its towns, its lights after dark
+  function previewSave() {
+    let s = null; try { s = readSave(); } catch (e) {} if (!s) return false;
+    try {
+      sim = createSim(worldData, s.seed || 1); sim.load(s); world.setSim(sim); previewing = true; refreshAll(true);
+      return true;
+    } catch (e) { console.warn('the saved world could not be shown', e); newWorld((Math.random() * 2 ** 31) | 0); return false; }
   }
   function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
   setInterval(() => saveLocal(false), 60000);
+  window.addEventListener('beforeunload', () => saveLocal(false));      // closing the window or restarting the game keeps the world as it is
 
   // ---------- loop ----------
   let frameNo = 0; let last = performance.now(), acc = 0, texAge = 0, uiAge = 0, tpsCount = 0, tpsT = 0, sunAngle = 0.6, mmT = 0, olT = 0, seasonPhase = 0.45;
-  let frameEMA = 16, playSince = 0, autoQualityDone = false;
+  let frameEMA = 16, playSince = 0, autoQualityDone = false, framesDrawn = 0, lastReal = performance.now();
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     // auto graphics: if the first seconds of play run slowly, drop to Balanced once (the menu can put it back)
     frameEMA += (dt * 1000 - frameEMA) * 0.05;
     if (mode === 'play' && !autoQualityDone) { if (!playSince) playSince = now; else if (now - playSince > 5000) { autoQualityDone = true; if (frameEMA > 34 && settings.quality === 'high' && !settings.qualityPinned) { settings.quality = 'balanced'; $('opt-quality').value = 'balanced'; applySettings(); toast('Graphics set to Balanced for smoother flying (Menu › Graphics to change)'); } } }
-    const modalOpen = $('chron').open || $('menu').open;
+    const modalOpen = $('chron').open || $('menu').open || $('news').open;
     mapcam.update(dt);
     camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();      // everything this frame (sun in view space, shadow lookup) works from the camera where it now is
     // seasons: one year every four minutes of real time; the sun's declination swings with it and the ground follows
@@ -865,7 +1040,14 @@
       const coldN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.08) * Math.PI * 2);
       globals.uBare.value.set(leafOff(seasonPhase), leafOff((seasonPhase + 0.5) % 1), coldN, 1 - coldN);
       if (trees) { trees.season = globals.uSeason.value; trees.bareness = globals.uBare.value; } }
-    if (!window.__sunLock) { sunAngle += dt * 0.012; const cd = Math.sqrt(1 - decl * decl); globals.uSun.value.set(Math.cos(sunAngle) * cd, decl, Math.sin(sunAngle) * cd).normalize(); }
+    const real = Math.min(1.5, (now - lastReal) / 1000); lastReal = now;      // (the step above is capped for the simulation's sake; these go by the clock, so a slow machine is not left with a half-moved picture)
+    { const want = mode === 'intro' ? 1 : 0; if (Math.abs(want - homeK) > 0.0005) { homeK += (want - homeK) * (1 - Math.exp(-real * 3)); if (Math.abs(want - homeK) < 0.004) homeK = want; frameHome(); camera.updateProjectionMatrix(); } }
+    if (!window.__sunLock) {
+      // on the home screen the sun keeps its place in the picture; in the game it goes round once in nine minutes
+      if (mode === 'intro') _sun.set(HOME.sun[0], HOME.sun[1], HOME.sun[2]).normalize().transformDirection(camera.matrixWorld);
+      else { sunAngle += dt * 0.012; const cd = Math.sqrt(1 - decl * decl); _sun.set(Math.cos(sunAngle) * cd, decl, Math.sin(sunAngle) * cd).normalize(); }
+      if (sunEase > 0) { sunEase -= real; globals.uSun.value.lerp(_sun, 1 - Math.exp(-real * 3.5)).normalize(); } else globals.uSun.value.copy(_sun);
+    }
     globals.uTime.value = now / 1000; globals.uCamAlt.value = mapcam.alt;
     const sp = speed();
     if (sim && mode === 'play' && sp > 0) {
@@ -882,6 +1064,7 @@
     if (decal) decal.update(mapcam, sim, now, sim ? sim.year + ':' + world.texVersion : 0, globals.uSun.value, world, trees);
     if (trees) trees.update(mapcam, sim, now);
     const devH = stage.clientHeight * renderer.getPixelRatio();      // point sprites are sized in device pixels
+    world.starUniforms.uPx.value = renderer.getPixelRatio();
     const day = world.updateSky(mapcam, globals.uSun.value, now / 1000);
     if (life && mode === 'play') life.update(mapcam, sim, now, world.bUniforms.uDay.value, devH, camera.fov);      // (after the sky: smoke and fires take this frame's light, not the last one's)
     if (movers && mode === 'play') movers.update(mapcam, sim, decal, now, dt, world.bUniforms.uDay.value, devH, camera.fov);
@@ -915,6 +1098,7 @@
     if (now - mmT > 700) { mmT = now; updateMinimap(false); }
     tpsT += dt; if (tpsT > 1) { $('yps').textContent = tpsCount + ' yr/s'; tpsCount = 0; tpsT = 0; const d = $('debug'); if (d.style.display === 'block') d.textContent = `elev ${JSON.stringify(terrain.stats.elevLevels)} tiles ${terrain.stats.tiles} sse ${terrain.stats.sse | 0} packs i${terrain.stats.packsI} e${terrain.stats.packsE} loading ${terrain.stats.loading} buildings ${world.buildingCount} trees ${trees ? trees.count : 0} labels ${labelEls.size} movers ${movers ? movers.stats.agents + '/' + movers.stats.walkers + '/' + movers.stats.ships : 0} alt ${(mapcam.alt * 6371).toFixed(1)}km dist ${(mapcam.dist * 6371).toFixed(1)}km tilt ${(mapcam.tilt * 57.3).toFixed(0)}`; }
     if (!modalOpen || (now | 0) % 6 === 0) renderer.render(scene, camera);
+    if (++framesDrawn === 3 && desktop) desktop.ready();      // the game is up: an update put to use just now is kept
   }
   boot();
 })();
