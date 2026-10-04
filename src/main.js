@@ -680,10 +680,13 @@
     // HUD panels reserve their cells so labels never sit under the interface
     if (labelTick % 30 === 0 || !hudRects.length || performance.now() - hudRectsT > 1500) { hudRectsT = performance.now(); hudRects.length = 0; for (const id of ['tl', 'tr', 'left', 'right', 'bl', 'bc', 'report', 'advisor', 'turn', 'mapwrap']) { const el = $(id); if (!el || (id === 'left' && !el.classList.contains('open'))) continue; const b = el.getBoundingClientRect(); if (b.width > 0 && b.height > 0) hudRects.push([b.left - r.left, b.top - r.top, b.right - r.left, b.bottom - r.top]); } }
     for (const [x0, y0, x1, y1] of hudRects) { const gx0 = Math.max(0, Math.floor((x0 + 100) / GRID)), gx1 = Math.min(cols - 1, Math.floor((x1 + 100) / GRID)), gy0 = Math.max(0, Math.floor((y0 + 100) / GRID)), gy1 = Math.min(rows - 1, Math.floor((y1 + 100) / GRID)); for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) occ[gy * cols + gx] = 1; }
-    const placedIds = new Set(); let n = 0; let nProjNull = 0, nBlocked = 0;
+    const placedIds = new Set(); let n = 0; let nProjNull = 0, nBlocked = 0, nMeasured = 0;
     for (const c of cands) {
       if (n >= 140) break; const p = project(c.lon, c.lat, c.h); if (!p) { nProjNull++; continue; }
-      const w = Math.max(c.text.length, c.sub ? c.sub.length * 0.8 : 0) * c.size * (c.cls.startsWith('realm') ? 0.95 : 0.6) + (c.icon ? 26 : 18), h = c.icon ? Math.max(20, c.size * 1.8) : c.size * (c.sub ? 2.6 : 1.6); if ((c.cls === 'ruin' || c.icon) && n > 100) continue;
+      // the room a label takes: its real size once it has been drawn and measured (a guess from its length until then:
+      // names in wide letters, a second line or an icon made the guess too small, and labels ran into each other)
+      const dimKey = c.size + '|' + c.text + '|' + (c.sub || '') + '|' + (c.icon || ''); const el0 = labelEls.get(c.id); const dm = el0 && el0._dimKey === dimKey ? el0._dim : null;
+      const w = dm ? dm[0] + 6 : Math.max(c.text.length, c.sub ? c.sub.length * 0.8 : 0) * c.size * (c.cls.startsWith('realm') ? 0.95 : 0.6) + (c.icon ? 26 : 18), h = dm ? dm[1] + 2 : c.icon ? Math.max(20, c.size * 1.8) : c.size * (c.sub ? 2.6 : 1.6); if ((c.cls === 'ruin' || c.icon) && n > 100) continue;
       const lift = c.cls.startsWith('city') ? -Math.round(c.size * (altKm < 60 ? 1.6 : 0.9)) : 0; const x0 = p[0] - w / 2 + 100, y0 = p[1] + lift - h / 2 + 100;
       const gx0 = Math.max(0, Math.floor(x0 / GRID)), gx1 = Math.min(cols - 1, Math.floor((x0 + w) / GRID)), gy0 = Math.max(0, Math.floor(y0 / GRID)), gy1 = Math.min(rows - 1, Math.floor((y0 + h) / GRID));
       let free = true; for (let gy = gy0; gy <= gy1 && free; gy++) for (let gx = gx0; gx <= gx1; gx++) if (occ[gy * cols + gx]) { free = false; break; }
@@ -697,6 +700,7 @@
       el.className = 'lbl ' + c.cls + (st.shown ? ' show' : '');
       if (c.icon) { const sig = c.icon + '|' + c.text; if (el.dataset.sig !== sig) { el.dataset.sig = sig; el.innerHTML = goodSvg(c.icon) + (c.text ? `<span>${esc(c.text)}</span>` : ''); } } else if (c.sub !== undefined) { const sig = c.text + '|' + c.sub; if (el.dataset.sig !== sig) { el.dataset.sig = sig; el.innerHTML = esc(c.text) + (c.sub ? `<span class="sub">${esc(c.sub)}</span>` : ''); } } else if (el.textContent !== c.text) el.textContent = c.text;
       el.style.transform = `translate3d(${p[0].toFixed(1)}px,${(p[1] + lift).toFixed(1)}px,0) translate(-50%,-50%)`; el.style.fontSize = c.size + 'px';
+      if (el._dimKey !== dimKey && nMeasured < 10) { el._dim = [el.offsetWidth, el.offsetHeight]; el._dimKey = dimKey; nMeasured++; }      // (a few each round: measuring makes the browser lay the page out)
       el.style.opacity = st.shown ? (0.92 * p[2]).toFixed(2) : '0';
       if (c.color) el.style.color = lighten(c.color);
     }

@@ -145,14 +145,17 @@
   #advisor i { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex: none; box-shadow: 0 0 8px var(--gold); }
 
   /* turn report */
-  #report { width: 340px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; animation: drop .25s ease-out; }
+  /* (never taller than the room above the advisor line and the turn button: on a low window its list scrolls instead of pushing the panel off the top) */
+  #report { width: 340px; max-width: calc(100vw - 24px); max-height: calc(100vh - 222px); overflow: hidden; display: flex; flex-direction: column; animation: drop .25s ease-out; }
+  #report > * { flex: 0 0 auto; }
+  @media (max-height: 560px) { #report .rart { display: none !important; } }
   #report .rhead { padding: 8px 10px 8px 12px; }
   #report .rhead .micro { flex: 1; color: var(--gold); }
   #report .why { padding: 8px 12px 0; font-weight: 600; font-size: var(--fs-body); color: var(--warn); }
   #report .why.war { color: #F3A09A; } #report .why.era { color: var(--gold-2); } #report .why.capital, #report .why.stopped, #report .why.gone { color: var(--text-2); }
   #report .delta { display: flex; gap: 12px; padding: 8px 12px 2px; font-size: var(--fs-cap); color: var(--text-2); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
   #report .delta b { color: var(--text); font-weight: 600; }
-  #report .rbody { padding: 4px 8px 10px; gap: 2px; max-height: min(420px, calc(100vh - 300px)); }
+  #report .rbody { padding: 4px 8px 10px; gap: 2px; max-height: min(420px, calc(100vh - 300px)); flex: 0 1 auto; min-height: 44px; }
   #report .rg { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); padding: 8px 6px 3px; }
   #report .rg:first-child { padding-top: 4px; }
   #report .fe.mine { border-left: 0; padding-left: 6px; color: var(--text); }
