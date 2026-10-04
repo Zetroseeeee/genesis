@@ -34,7 +34,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Sign (ad hoc)
-        run: codesign --force --deep --sign - release/mac-arm64/GENESIS.app
+        run: codesign --force --deep --sign - release/mac-arm64/Holocene.app
       - name: Take the pictures
         env:
           ONLY: ${{ github.event.inputs.only }}
@@ -49,7 +49,7 @@ jobs:
             scene=$(echo "$scene" | xargs); settle=$(echo "${settle:-30}" | xargs)
             { cat tools/testcam.js; echo; echo "window.__scene = ${opts:-null};"; cat "$scene"; echo; echo "${script:-}"; } > "out/$name.js"
             GENESIS_SMOKE_SHOT="$PWD/out/scene-$name.png" GENESIS_SMOKE_SCRIPT="$PWD/out/$name.js" GENESIS_SMOKE_SETTLE="$settle" \
-              release/mac-arm64/GENESIS.app/Contents/MacOS/GENESIS --smoke < /dev/null 2>/dev/null | grep GENESIS-SMOKE | sed "s/^/$name /" >> out/scenes.log || true
+              release/mac-arm64/Holocene.app/Contents/MacOS/Holocene --smoke < /dev/null 2>/dev/null | grep GENESIS-SMOKE | sed "s/^/$name /" >> out/scenes.log || true
             tail -n 1 out/scenes.log | cut -c1-400
           done 3< out/list.txt
       - name: Keep them

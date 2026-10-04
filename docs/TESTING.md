@@ -1,4 +1,4 @@
-# GENESIS — test suites
+# Holocene — test suites
 
 Two suites. Both exit 1 on any failure and print a summary line.
 
@@ -26,6 +26,30 @@ Scenarios: boot; intro (choose homeland, sea click refused, random start); turns
 Software GL would drop the quality setting to balanced (no movers/trees) after 5 s; the harnesses pin `__G.settings.qualityPinned = true` (testcam.js, shot2.js) so people and builders stay visible.
 
 Timing caveats under SwiftShader: camera flights are paced by frame `dt` (capped at 0.1 s), so tests wait for `!__G.mapcam.fly` rather than the clock; toasts are recorded with a MutationObserver because they fade before slow frames catch them.
+
+## 3. Updates — `node tools/test_update.js`, `node tools/update/drill.js`
+
+`tools/test_update.js` runs `desktop/updater.js` under plain Node against a feed that the build's own publishing code
+(`tools/update/publish.js`) writes into a folder and a local web server hands out. It covers: the rules a list must
+meet; the first build of a line (nothing shelved); an update found, fetched, put to use and kept across a restart;
+an update that does not come up, undone after two tries and not offered again (and undone to the game before it,
+not all the way to the app); a file whose content went back to an earlier one; files that moved; a checksum that
+does not match; a line that drops part way (carried on with a Range request); server errors; a download stopped by
+the player; a shelved file that is gone; lists that cannot be read; an update fetched and then applied at the next
+start; a newer app installed over an updated copy; a store with a file missing; a newer list arriving while one is
+waiting; a build that needs a newer shell (the whole app is fetched, resumed, checked); and, over fourteen random
+builds, that every app of the line reaches the game in force with exactly its files. Exit code 1 on any failure.
+
+`tools/update/drill.js` does the same in the real app (`--xvfb` under Electron in a checkout, `--app <Holocene.app>`
+on a packed app): the shell's self-check (`--smoke` with `GENESIS_SMOKE_UPDATE=1`) takes whatever the feed offers
+and reports `update.result`; `GENESIS_SMOKE_EXPECT` names the result that passes (`updated`, `current`, `undone`,
+`app-required`, `nothing offered`). Environment the shell reads: `GENESIS_UPDATE_FEED` (where releases are downloaded
+from), `GENESIS_UPDATE_MANIFEST` (the list's name: the build's field test uses `manifest-next.json`),
+`GENESIS_USERDATA` (a folder of its own for saves and the store), `GENESIS_CONTENT` (the app's own list, for a
+checkout, which has none), `GENESIS_UPDATE_GUARD` (seconds an update is given to come up).
+
+`tools/update/walk.js` (under `xvfb-run`) clicks through what a player sees - the note on the home screen, fetching,
+the restart, "What's new", the spark while playing, the case where a whole new app is needed - and keeps pictures.
 
 ## Debug hooks
 `window.__G` (settings, sim, terrain, world, mapcam, movers, fx, turnRun, run(n), start(lon, lat, name), select(i), labelDbg) and `testcam.js` (`__T.cam/era/capital/erupt/fire/battle/quake/flood…`).

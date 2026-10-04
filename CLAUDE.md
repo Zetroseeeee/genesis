@@ -1,6 +1,11 @@
-# GENESIS — project notes for Claude
+# HOLOCENE — project notes for Claude
 
 God-game on the real Earth from 10,000 BC: autopilot civilisations plus one player-run empire. Owner: Emile.
+The game is called **Holocene** (it was first called GENESIS). Only what a player sees carries the new name: the app,
+its window, the wordmark, the disk image. Everything inside keeps the old one and must go on keeping it - the
+repository, the `genesis://` scheme, `GENESIS_*` environment variables, `GENESIS-SMOKE`, the save keys, `window.__G`,
+the bundle id `com.emilemajed.genesis` and the folder the saves live in (`~/Library/Application Support/GENESIS`,
+pinned in `desktop/main.js`): a new name must never cost anyone their worlds.
 Quality bar: Civ 6/7 × The Sims. Target: a **downloadable desktop game for high-end Apple Silicon Macs** (no need to
 hold back for phones or weak GPUs); a lighter web build may be published as a preview.
 
@@ -33,6 +38,15 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   workflow (`tools/scenes/tour.txt` lists the scenes: towns of every people and age, forests, seasons, dusk and night,
   dry countries, rivers). Look at these before believing anything about how the game looks.
 - `npm start` — desktop window (Electron).
+- `node tools/test_update.js` — the updater under plain Node: small games in folders, the publishing step writing a
+  feed, a web server that misbehaves on demand (270 checks, a few seconds). Run it after touching `desktop/updater.js`
+  or `tools/update/`.
+- `node tools/update/drill.js --xvfb` — the update drill in the real app: it takes an update from a feed on this
+  machine, keeps it across a restart, and undoes one that cannot start (four starts, ~2 minutes under software GL).
+  `--app <Holocene.app>` runs it on a packed app (the build does). `xvfb-run -a -s "-screen 0 1920x1200x24" node
+  tools/update/walk.js` takes pictures of everything a player sees of an update (`shots/up_*.png`).
+- `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
+  from the game's own picture of the Earth.
 
 Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md`.
 
@@ -49,7 +63,10 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/world.js` | `WORLD` | Turns town plans into instances near the camera; sky, clouds, atmosphere |
 | `src/textures.js` | `TEX` | Generated material atlases as texture arrays; UI art |
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
-| `src/main.js` | `__G` | Boot, camera, HUD, turn loop, build panel, saves |
+| `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
+| `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
+| `desktop/updater.js` | | Keeps the game's files current without replacing the app (plain Node, no Electron inside) |
+| `tools/update/` | | `manifest.js` (the list of a build's files), `publish.js` (the build gives an update out), `drill.js`, `walk.js` |
 
 Conventions that matter:
 - **Units.** The globe has radius 1 (Earth radius = 6,371,000 m = `R_M`). Town plans are in metres from the town centre.
@@ -71,6 +88,9 @@ Conventions that matter:
   in the manifest therefore only cover the ages that really build that way.
 - **Style packing.** `wall + roof*8 + culture*64 + flags*1024`; flags: landmark 1, block 2, neon 4, wonder 8, ruin 16, site 32, thing 64 (a cart or a boat: no door, windows or roof).
 - Keep modules independent (pure data in `town.js` and `sim.js`, rendering elsewhere): the game will grow to tens of GB of assets.
+- **Stars and air.** The stars are points on a sphere that goes with the camera, drawn at the far plane (anything hides
+  them); the air seen from outside is a shell that glows where it is looked through edge-on (`world.js`). Both fade as
+  the camera comes down into the sky dome's range.
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.
@@ -103,6 +123,37 @@ Conventions that matter:
 - **Shadows.** The sun's depth map holds what stands still (models, kit, near trees) and is redrawn only when the
   camera, the sun or the placements change (`castersVersion` follows a signature of everything placed). Things
   that move get their own cheap shadow (walkers: a streak on the ground in `movers.js`).
+
+## The home screen
+
+The game opens on the Earth itself, large, running off the right and the bottom of the window (`HOME` in `main.js`:
+distance, where the planet's centre sits, the sun's place in the picture). The sun is fixed to the camera there, so
+the edge of night stays put while the Earth turns under it the way it really turns, and towns light up as they pass
+into the dark. A saved world is loaded for show (`previewSave`): its lands and lights are what is on the globe, and
+"Continue" names the realm, the year and the age. Realm tints and labels are off. Leaving the home screen eases the
+picture back to the centre and sets the sun to mid-morning where the camera goes (`sunFor`). The typefaces are
+carried with the game (`vendor/fonts`, linked by `local.html`); the published web page still takes them from Google.
+
+## Updates (how a push reaches a copy already installed)
+
+- The app carries a list of every file it serves with its SHA-256 (`desktop/content.json`, made from the packed app
+  by the build). The build publishes the newest list (`update/manifest.json`) and, each under its hash, the files
+  that installed apps may lack (releases `content-0` ... `content-f`). An installed game asks for the list at start
+  and every twenty minutes, shows a note when it is newer, fetches the changed files into a store beside the saves
+  (`.../GENESIS/updates`), checks each against its hash, and on restart serves the game through the new list - a
+  file the app already has from the app, anything else from the store. Nothing inside the app is written.
+- A new game is on trial until its page has drawn three frames (`desktop.ready()`); if it does not come up in 150 s,
+  or twice running, the update is undone and not offered again. The build runs this as a drill on the packed app, and
+  then lets the app that is out now (the last published disk image) take the new build from the real feed, before
+  anything is put in force. A build that fails any of it is not given out (the run goes red; see `ci-logs`).
+- **Bump `version` in package.json with every push that changes the game**, and write the commit's subject and first
+  paragraph for the player: they are the update note and "What's new" (`tools/build.js` -> `dist/version.json`).
+- The shell (`desktop/`) only changes with a new app. If the game comes to need something new from the shell, raise
+  `holocene.shellApi` in package.json: installed apps are then told to fetch the whole app (the update note downloads
+  the disk image and opens it), and a new line of updates begins. The build prints a NOTE when the shell changed
+  without the number being raised.
+- Never delete or hand-edit the `update` and `content-*` releases; `tools/update/publish.js check --repo <repo>`
+  verifies them. The whole app is `https://github.com/Zetroseeeee/genesis/releases/download/latest/Holocene-mac-arm64.dmg`.
 
 ## Assets
 

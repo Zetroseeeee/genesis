@@ -16,23 +16,23 @@ jobs:
         id: check
         run: |
           set +e; set -uo pipefail
-          URL="https://github.com/${{ github.repository }}/releases/download/latest/GENESIS-mac-arm64.dmg"
+          URL="https://github.com/${{ github.repository }}/releases/download/latest/Holocene-mac-arm64.dmg"
           {
             echo "== $(date -u +%FT%TZ) on $(sw_vers -productName) $(sw_vers -productVersion) =="
-            curl -fL --retry 3 -sS -o GENESIS-mac-arm64.dmg "$URL" && echo "fetched $URL"
-            echo "bytes: $(stat -f%z GENESIS-mac-arm64.dmg)"
-            echo "sha256: $(shasum -a 256 GENESIS-mac-arm64.dmg | cut -d' ' -f1)"
-            echo "-- imageinfo"; hdiutil imageinfo GENESIS-mac-arm64.dmg | grep -E "Format|Checksum Type|partition-scheme|Total Bytes|Compressed Bytes" | head -12
-            echo "-- verify"; hdiutil verify GENESIS-mac-arm64.dmg 2>&1 | tail -3; echo "verify exit: ${PIPESTATUS[0]}"
-            echo "-- attach"; mkdir -p mnt; hdiutil attach -nobrowse -readonly -mountpoint mnt GENESIS-mac-arm64.dmg 2>&1 | tail -3; echo "attach exit: ${PIPESTATUS[0]}"
+            curl -fL --retry 3 -sS -o Holocene-mac-arm64.dmg "$URL" && echo "fetched $URL"
+            echo "bytes: $(stat -f%z Holocene-mac-arm64.dmg)"
+            echo "sha256: $(shasum -a 256 Holocene-mac-arm64.dmg | cut -d' ' -f1)"
+            echo "-- imageinfo"; hdiutil imageinfo Holocene-mac-arm64.dmg | grep -E "Format|Checksum Type|partition-scheme|Total Bytes|Compressed Bytes" | head -12
+            echo "-- verify"; hdiutil verify Holocene-mac-arm64.dmg 2>&1 | tail -3; echo "verify exit: ${PIPESTATUS[0]}"
+            echo "-- attach"; mkdir -p mnt; hdiutil attach -nobrowse -readonly -mountpoint mnt Holocene-mac-arm64.dmg 2>&1 | tail -3; echo "attach exit: ${PIPESTATUS[0]}"
             ls -la mnt | head -12
-            if [ -d mnt/GENESIS.app ]; then echo "APP FOUND: version $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' mnt/GENESIS.app/Contents/Info.plist)"; else echo "APP MISSING"; fi
-            codesign --verify --deep --strict mnt/GENESIS.app 2>&1 | tail -3; echo "codesign exit: ${PIPESTATUS[0]}"
+            if [ -d mnt/Holocene.app ]; then echo "APP FOUND: version $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' mnt/Holocene.app/Contents/Info.plist)"; else echo "APP MISSING"; fi
+            codesign --verify --deep --strict mnt/Holocene.app 2>&1 | tail -3; echo "codesign exit: ${PIPESTATUS[0]}"
             hdiutil detach mnt >/dev/null 2>&1 || hdiutil detach -force mnt >/dev/null 2>&1 || true
             # (two lengths: a whole number of 512-byte blocks, and not)
             for BYTES in 299999744 300000001; do
               echo "== a download that stopped part way: the first $BYTES bytes of the same file =="
-              head -c $BYTES GENESIS-mac-arm64.dmg > part.dmg
+              head -c $BYTES Holocene-mac-arm64.dmg > part.dmg
               echo "-- imageinfo"; hdiutil imageinfo part.dmg 2>&1 | grep -E "^Format|Class Name|partition-scheme|recognized|corrupt|failed|error" | head -6
               echo "-- attach without mounting"; OUT=$(hdiutil attach -nomount -readonly part.dmg 2>&1); echo "attach exit: $?"; echo "$OUT" | tail -4
               DEV=$(echo "$OUT" | grep -o '/dev/disk[0-9]*' | head -1)

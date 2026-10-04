@@ -1,47 +1,70 @@
-# Builds the downloadable Mac app and attaches it to the "latest" release.
+# Builds the downloadable Mac app, proves it on this Mac, and gives it out: the whole app as a disk image (the "latest"
+# release) and, to the copies already installed, as an update they fetch themselves (tools/update/publish.js).
+# Nothing is given out unless the packed app started here, loaded the world, took an update in a drill and - when an
+# earlier build is published - that earlier app took this very build from the real feed.
 name: Desktop build
 on:
   push:
     branches: [main]
     paths:
       - 'src/**'
+      - 'data/**'
+      - 'assets/**'
       - 'desktop/**'
       - 'vendor/**'
+      - 'build/**'
       - 'package.json'
       - 'tools/build.js'
+      - 'tools/update/**'
       - 'tools/scenes/**'
       - '.github/workflows/desktop.yml'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      new_epoch:
+        description: 'Begin a new line: installed apps are told to fetch the whole app instead of an update'
+        type: boolean
+        default: false
 permissions:
   contents: write
+# one at a time, and a build that has begun giving things out is never cut short (a newer push waits its turn)
 concurrency:
   group: desktop
-  cancel-in-progress: true
+  cancel-in-progress: false
+env:
+  APP: release/mac-arm64/Holocene.app
+  BIN: release/mac-arm64/Holocene.app/Contents/MacOS/Holocene
+  DMG: Holocene-mac-arm64.dmg
 jobs:
   mac:
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 80      # "What's new" is made from the latest commits
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci
+      - name: The updater's own tests
+        run: node tools/test_update.js
       - name: Fetch art and models
         run: npm run fetch
       - name: Package
         run: npm run pack:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Sign (ad hoc)
+      # The app's own list of what it carries, made from the packed files themselves; then the seal over all of it.
+      - name: List the app's files, sign (ad hoc)
         run: |
           set -euxo pipefail
-          APP="release/mac-arm64/GENESIS.app"
+          mkdir -p out
+          R="$APP/Contents/Resources"
+          node tools/update/manifest.js --app "$R/app/dist" --data "$R/data" --shell "$R/app/desktop" --pkg "$R/app/package.json" --out "$R/app/desktop/content.json"
+          cp "$R/app/desktop/content.json" out/content.json
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
-          mkdir -p out
       # Start the packaged app on this Mac, wait for the world, the models and the art, open a village and keep a picture.
-      # The result is recorded with the build; it does not hold the build back (a hosted runner's GPU is not a gaming Mac).
       - name: Launch check
         id: launch
         continue-on-error: true
@@ -49,11 +72,18 @@ jobs:
           set -uo pipefail
           cat tools/testcam.js tools/scenes/village.js > out/scene.js
           GENESIS_SMOKE_SHOT="$PWD/out/launch.png" GENESIS_SMOKE_SCRIPT="$PWD/out/scene.js" GENESIS_SMOKE_SETTLE=25 \
-            "release/mac-arm64/GENESIS.app/Contents/MacOS/GENESIS" --smoke 2>out/launch.err | tee out/launch.log
+            "$BIN" --smoke 2>out/launch.err | tee out/launch.log
           tail -n 40 out/launch.err || true
           grep -q '"ok":true' out/launch.log
-      # More of the game, seen on a real Apple GPU: towns of other peoples and ages, a forest. Pictures and frame rates
-      # go to the ci-logs release (out/scenes.log: one line per scene); none of it holds the build back.
+      # The packed app takes an update from a feed on this machine, keeps it across a restart, and undoes one that cannot start.
+      - name: Update drill
+        id: drill
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          node tools/update/drill.js --app "$APP" 2>&1 | tee out/drill.log
+      # More of the game, seen on a real Apple GPU: the home screen, towns of other peoples and ages, a forest. Pictures and
+      # frame rates go to the ci-logs release (out/scenes.log: one line per scene); none of it holds the build back.
       - name: More pictures from this Mac
         if: always()
         continue-on-error: true
@@ -62,61 +92,96 @@ jobs:
           shot() { # name, scene file, window.__scene (or null), script to run after it, seconds to settle
             { cat tools/testcam.js; echo; echo "window.__scene = $3;"; cat "$2"; echo; echo "$4"; } > "out/$1.js"
             GENESIS_SMOKE_SHOT="$PWD/out/$1.png" GENESIS_SMOKE_SCRIPT="$PWD/out/$1.js" GENESIS_SMOKE_SETTLE="${5:-30}" \
-              "release/mac-arm64/GENESIS.app/Contents/MacOS/GENESIS" --smoke 2>/dev/null | grep GENESIS-SMOKE | sed "s/^/$1 /" >> out/scenes.log || true
+              "$BIN" --smoke 2>/dev/null | grep GENESIS-SMOKE | sed "s/^/$1 /" >> out/scenes.log || true
           }
+          shot home tools/scenes/home.js 'null' '' 12
           shot mesopotamia tools/scenes/town.js '{lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:12,alt:650,tilt:1.15,out:0.45,turn:0.4}' ''
           shot north tools/scenes/town.js '{lon:10,lat:52,tech:0.1,pop:5,walls:2,special:12,alt:620,tilt:1.25,out:1.0}' ''
           shot forest tools/scenes/forest.js 'null' 'const f = () => __forest(26.5, 63.0, 420, 1.3, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000);' 35
           cat out/scenes.log || true
-      - name: Keep the launch check
+      - name: Keep the checks
         if: always()
         run: |
           gh release view ci-logs >/dev/null 2>&1 || gh release create ci-logs --title "CI logs" --notes "Logs from workflow runs." --latest=false
-          for f in out/launch.log out/launch.png out/launch.err out/scenes.log out/mesopotamia.png out/north.png out/forest.png; do [ -s "$f" ] && gh release upload ci-logs "$f" --clobber || true; done
+          for f in out/launch.log out/launch.png out/launch.err out/drill.log out/scenes.log out/home.png out/mesopotamia.png out/north.png out/forest.png; do [ -s "$f" ] && gh release upload ci-logs "$f" --clobber || true; done
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Wrap
         run: |
           set -euxo pipefail
-          APP="release/mac-arm64/GENESIS.app"
-          VERSION=$(node -p "require('./package.json').version")
           mkdir -p out/dmg && cp -R "$APP" out/dmg/ && ln -s /Applications out/dmg/Applications
           # hdiutil on hosted runners sometimes reports "Resource busy": try a few times
           for attempt in 1 2 3 4 5; do
-            if hdiutil create -volname "GENESIS" -srcfolder out/dmg -ov -format UDZO "out/GENESIS-$VERSION-mac-arm64.dmg"; then break; fi
+            if hdiutil create -volname "Holocene" -srcfolder out/dmg -ov -format UDZO "out/$DMG"; then break; fi
             if [ "$attempt" = 5 ]; then exit 1; fi
             sleep 10
           done
           # the image must open on a Mac before it is given out: its checksums, then mount it and look for the app inside
-          DMG="out/GENESIS-$VERSION-mac-arm64.dmg"
-          hdiutil verify "$DMG"
-          mkdir -p out/mnt && hdiutil attach -nobrowse -readonly -mountpoint out/mnt "$DMG"
-          test -d out/mnt/GENESIS.app && test -L out/mnt/Applications
-          codesign --verify --deep --strict out/mnt/GENESIS.app
+          hdiutil verify "out/$DMG"
+          mkdir -p out/mnt && hdiutil attach -nobrowse -readonly -mountpoint out/mnt "out/$DMG"
+          test -d out/mnt/Holocene.app && test -L out/mnt/Applications && test -s out/mnt/Holocene.app/Contents/Resources/app/desktop/content.json
+          codesign --verify --deep --strict out/mnt/Holocene.app
           hdiutil detach out/mnt || hdiutil detach -force out/mnt
-          cp "$DMG" out/GENESIS-mac-arm64.dmg      # the same file under a name that never changes: the link to give out
           ls -la out
-      - name: Publish
+      # From here on things are given out, and only if this build proved itself above.
+      # 1. The files that installed apps may lack go on the shelves and the new list is put up beside the one in force.
+      - name: Stage the update
+        id: stage
+        if: steps.launch.outcome == 'success' && steps.drill.outcome == 'success'
         run: |
+          set -euo pipefail
+          R="$APP/Contents/Resources"
+          node tools/update/publish.js stage --app "$R/app/dist" --data "$R/data" --shell "$R/app/desktop" --pkg "$R/app/package.json" --content out/content.json \
+            --dmg "out/$DMG" --repo "$GITHUB_REPOSITORY" --out out/manifest.json ${{ github.event.inputs.new_epoch == 'true' && '--new-epoch' || '' }} | tee out/stage.log
+          echo "expect=$(node -p "require('./out/manifest-plan.json').expect")" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # 2. The app that is out there now (the disk image published by the build before this one) takes this build from the
+      #    real feed: it must end up running it - or, when this build needs a newer app, must say so.
+      - name: Field test with the app that is out now
+        id: field
+        if: steps.stage.outcome == 'success' && steps.stage.outputs.expect != 'first'
+        run: |
+          set -uo pipefail
+          EXPECT="${{ steps.stage.outputs.expect }}"; [ "$EXPECT" = "same" ] && EXPECT="nothing offered"
+          mkdir -p out/prev out/prevmnt
+          if ! curl -fL --retry 3 -sS -o out/prev.dmg "https://github.com/$GITHUB_REPOSITORY/releases/download/latest/$DMG"; then echo "no earlier app is published under this name: nothing to test with"; exit 0; fi
+          hdiutil attach -nobrowse -readonly -mountpoint out/prevmnt out/prev.dmg >/dev/null && cp -R out/prevmnt/Holocene.app out/prev/ && { hdiutil detach out/prevmnt >/dev/null || hdiutil detach -force out/prevmnt >/dev/null; }
+          if [ ! -s out/prev/Holocene.app/Contents/Resources/app/desktop/content.json ]; then echo "the earlier app has no updater: nothing to test with"; exit 0; fi
+          echo "the app that is out: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' out/prev/Holocene.app/Contents/Info.plist); expecting: $EXPECT"
+          GENESIS_SMOKE=1 GENESIS_SMOKE_UPDATE=1 GENESIS_SMOKE_EXPECT="$EXPECT" GENESIS_UPDATE_MANIFEST=manifest-next.json GENESIS_USERDATA="$PWD/out/prev-userdata" GENESIS_SMOKE_SHOT="$PWD/out/field.png" \
+            out/prev/Holocene.app/Contents/MacOS/Holocene --smoke 2>out/field.err | tee out/field.log
+          grep '\[update\]' out/field.log || true
+          grep -q '"ok":true' out/field.log
+      # 3. The whole app first (an installed app that is told "fetch the app" must find this one), then the list goes in force.
+      - name: Publish
+        id: publish
+        if: steps.stage.outcome == 'success' && (steps.field.outcome == 'success' || steps.field.outcome == 'skipped')
+        run: |
+          set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           SHA=$(git rev-parse --short HEAD)
-          CHECK="${{ steps.launch.outcome == 'success' && 'The packaged app was started on the build Mac and loaded the world, the models and the art.' || 'The automatic launch check did not pass on the build Mac; see the ci-logs release.' }}"
-          BYTES=$(stat -f%z out/GENESIS-mac-arm64.dmg); SUM=$(shasum -a 256 out/GENESIS-mac-arm64.dmg | cut -d' ' -f1)
-          NOTES="GENESIS $VERSION for Apple Silicon Macs, built from $SHA. Open the .dmg and drag GENESIS to Applications. The app is not notarised by Apple: on first launch macOS will refuse it; open System Settings > Privacy & Security and choose Open Anyway. A whole download is $BYTES bytes (SHA-256 $SUM): a smaller file is a download that did not finish, and macOS will call it a disk it cannot read. $CHECK"
-          gh release view latest >/dev/null 2>&1 || gh release create latest --title "GENESIS (latest build)" --notes "$NOTES"
-          gh release edit latest --notes "$NOTES" --latest
-          # the link that is given out is replaced first and alone, so that it is missing for as short a time as can be;
-          # then the copy under its version's name, and last the copies of older versions go
-          gh release upload latest out/GENESIS-mac-arm64.dmg --clobber
-          gh release upload latest "out/GENESIS-$VERSION-mac-arm64.dmg" --clobber
-          for f in $(gh release view latest --json assets --jq '.assets[].name'); do case "$f" in GENESIS-mac-arm64.dmg|"GENESIS-$VERSION-mac-arm64.dmg") ;; *) gh release delete-asset latest "$f" --yes ;; esac; done
+          BYTES=$(stat -f%z "out/$DMG"); SUM=$(shasum -a 256 "out/$DMG" | cut -d' ' -f1)
+          NOTES="Holocene $VERSION for Apple Silicon Macs, built from $SHA. Open the .dmg and drag Holocene to Applications. The app is not notarised by Apple: on first launch macOS will refuse it; open System Settings > Privacy & Security and choose Open Anyway. From then on the game updates itself: it says when there is a newer version and fetches what changed. A whole download is $BYTES bytes (SHA-256 $SUM): a smaller file is a download that did not finish, and macOS will call it a disk it cannot read. The packaged app was started on the build Mac, loaded the world, the models and the art, and took an update in a drill."
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "Holocene (latest build)" --notes "$NOTES"
+          gh release edit latest --title "Holocene (latest build)" --notes "$NOTES" --latest
+          gh release upload latest "out/$DMG" --clobber
+          for f in $(gh release view latest --json assets --jq '.assets[].name'); do case "$f" in "$DMG") ;; *) gh release delete-asset latest "$f" --yes ;; esac; done
+          node tools/update/publish.js promote --manifest out/manifest.json --repo "$GITHUB_REPOSITORY"
+          node tools/update/publish.js check --repo "$GITHUB_REPOSITORY" | tee out/published.log
         env:
           GH_TOKEN: ${{ github.token }}
-      - name: Keep the log when something fails
-        if: failure()
+      - name: Keep the logs
+        if: always()
         run: |
-          { echo "run $GITHUB_RUN_ID at $(date -u)"; ls -la release out 2>&1 || true; } > desktop-failure.log
-          gh release view ci-logs >/dev/null 2>&1 || gh release create ci-logs --title "CI logs" --notes "Logs from failed workflow runs." --latest=false
-          gh release upload ci-logs desktop-failure.log --clobber
+          { echo "run $GITHUB_RUN_ID at $(date -u): launch ${{ steps.launch.outcome }}, drill ${{ steps.drill.outcome }}, stage ${{ steps.stage.outcome }}, field ${{ steps.field.outcome }}, publish ${{ steps.publish.outcome }}"; ls -la release out 2>&1 || true; } > out/desktop-run.log
+          gh release view ci-logs >/dev/null 2>&1 || gh release create ci-logs --title "CI logs" --notes "Logs from workflow runs." --latest=false
+          for f in out/desktop-run.log out/stage.log out/manifest-plan.json out/field.log out/field.err out/field.png out/published.log; do [ -s "$f" ] && gh release upload ci-logs "$f" --clobber || true; done
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Was it given out?
+        if: always()
+        run: |
+          if [ "${{ steps.publish.outcome }}" = "success" ]; then echo "published"; exit 0; fi
+          echo "NOT PUBLISHED: launch ${{ steps.launch.outcome }}, drill ${{ steps.drill.outcome }}, stage ${{ steps.stage.outcome }}, field ${{ steps.field.outcome }}, publish ${{ steps.publish.outcome }}. The app and the update in force are the ones from the last good build."
+          exit 1
