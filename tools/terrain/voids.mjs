@@ -185,11 +185,19 @@ async function fix() {
       h[i] = v; if (v > hMax) hMax = v; } }
     if (tiles) tiles.clear();
     if (!filled) continue;
+    // The tiles have stray pixels (a point at 5,000 m in a fjord, one at 1,700 m in the plain by Krakow), and the
+    // sea mask a stray dot of sea on the ice: new ground that stands far above its second-highest neighbour, or far
+    // below its second-lowest, takes the middle of its neighbours. (Only ground this run has touched; a ridge or a
+    // fjord has neighbours like itself and stays. Coarse levels are averages already, and their lone peaks are real.)
+    const STRAY = L >= 5 ? 250 : L === 4 ? 400 : L === 3 ? 700 : 0; let stray = 0;
+    if (STRAY) { const was = Float32Array.from(h), nb = new Float32Array(8);
+      for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) { const i = y * W + x; if (dist[i] >= FEATHER) continue; let k = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) nb[k++] = was[i + dy * W + dx]; nb.sort(); if (was[i] > nb[6] + STRAY || was[i] < nb[1] - STRAY) { h[i] = (nb[3] + nb[4]) / 2; stray++; } } }
+    hMax = 0; for (let i = 0; i < W * H; i++) if (h[i] > hMax) hMax = h[i];
     // the pack's scale must still reach its highest ground
     let rescaled = false; if (hMax > mn + 255 * sc) { sc = Math.ceil((hMax - mn) / 255 * 1000) / 1000; rescaled = true; PACKS[key] = [mn, sc]; changedIndex = true; }
     const out = Buffer.alloc(W * H * C); for (let i = 0; i < W * H; i++) { const b = Math.max(0, Math.min(255, Math.round((h[i] - mn) / sc))); for (let c = 0; c < C; c++) out[i * C + c] = c < 3 ? b : data[i * C + c]; }
     await sharp(out, { raw: { width: W, height: H, channels: C } }).png({ compressionLevel: 9 }).toFile(path.join(outDir, `${L}_${px}_${py}.png`));
-    const line = `${key}: ${filled} pixels given ground, ${eased} eased beside them, highest ${Math.round(hMax)} m${rescaled ? `, scale now ${sc}` : ''} (zoom ${z})`; report.push(line); console.log(line);
+    const line = `${key}: ${filled} pixels given ground, ${eased} eased beside them${stray ? `, ${stray} stray ones smoothed` : ''}, highest ${Math.round(hMax)} m${rescaled ? `, scale now ${sc}` : ''} (zoom ${z})`; report.push(line); console.log(line);
   }
   if (changedIndex) fs.writeFileSync(arg('out') ? path.join(outDir, 'index.json') : path.join(ROOT, 'data/index.json'), JSON.stringify(index));
   for (const [name, b] of beside) { const line = `beside ${name}: the ground that was there stands ${(b.o / b.s).toFixed(4)} times as tall as the tiles' (${b.n} pixels, all levels; new ground is raised ${TALL} times)`; report.push(line); console.log(line); }
