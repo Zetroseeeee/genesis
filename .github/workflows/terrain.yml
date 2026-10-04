@@ -1,0 +1,35 @@
+# Fills the holes in the elevation packs (tools/terrain/voids.mjs): fetches real heights for them from the Terrain Tiles
+# on AWS Open Data - a host the cloud workspace cannot reach - and publishes the changed packs as terrain-fix.tar.gz in
+# the ci-logs release, to be looked at and then committed. It changes nothing in the repository itself.
+name: Terrain
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the image library
+        run: npm ci --prefix tools/models
+      - name: The holes, before
+        run: node tools/terrain/voids.mjs scan | tee scan-before.txt
+      - name: Fill them
+        run: |
+          set -o pipefail
+          node tools/terrain/voids.mjs fix --out out/e 2>&1 | tee terrain-fix.log
+          ls -la out/e | head -60
+          tar czf terrain-fix.tar.gz -C out e
+          ls -la terrain-fix.tar.gz
+      - name: Publish for review
+        if: always()
+        run: |
+          gh release view ci-logs >/dev/null 2>&1 || gh release create ci-logs --title "CI logs" --notes "Logs from workflow runs." --latest=false
+          for f in terrain-fix.log scan-before.txt terrain-fix.tar.gz; do [ -s "$f" ] && gh release upload ci-logs "$f" --clobber || true; done
+        env:
+          GH_TOKEN: ${{ github.token }}
