@@ -44,7 +44,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `node tools/update/drill.js --xvfb` — the update drill in the real app: it takes an update from a feed on this
   machine, keeps it across a restart, and undoes one that cannot start (four starts, ~2 minutes under software GL).
   `--app <Holocene.app>` runs it on a packed app (the build does). `xvfb-run -a -s "-screen 0 1920x1200x24" node
-  tools/update/walk.js` takes pictures of everything a player sees of an update (`shots/up_*.png`).
+  tools/update/walk.js` takes pictures of everything a player sees of an update (`shots/up_*.png`), with made-up
+  versions; `tools/update/realwalk.js` (its header says how) takes them of the update that is really out, in a
+  checkout of the version before it, from a copy of the real feed (`tools/update/mirror.mjs`).
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
 - `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
@@ -72,7 +74,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
 | `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
 | `desktop/updater.js` | | Keeps the game's files current without replacing the app (plain Node, no Electron inside) |
-| `tools/update/` | | `manifest.js` (the list of a build's files), `publish.js` (the build gives an update out), `drill.js`, `walk.js` |
+| `tools/update/` | | `manifest.js` (the list of a build's files), `publish.js` (the build gives an update out), `drill.js`, `walk.js`, `realwalk.js`, `mirror.mjs` |
 
 Conventions that matter:
 - **Units.** The globe has radius 1 (Earth radius = 6,371,000 m = `R_M`). Town plans are in metres from the town centre.
