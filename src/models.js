@@ -73,7 +73,7 @@
       // the generated textures are photographs of lit buildings: full sun brings a surface to about its own brightness, no more
       // sky light from above, warm light thrown back by the ground from below: a wall in shade is neutral, not blue
       // (the higher the sun, the more the lit ground gives back: a wall in shade in a sunlit town is warm, not grey)
-      vec3 amb = mix(vec3(0.20, 0.25, 0.40) * (0.7 + 0.5 * sky), vec3(0.33, 0.34, 0.37) * (0.45 + 0.75 * sky) + uGround * (1.0 - sky) * (0.3 + 0.7 * max(dot(uUpV, uSunV), 0.0)) * 0.62, uDay)
+      vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.33, 0.34, 0.37) * (0.45 + 0.75 * sky) + uGround * (1.0 - sky) * (0.3 + 0.7 * max(dot(uUpV, uSunV), 0.0)) * 0.62, uDay)
         + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);        // moonlight is blue and enough to see by; at dusk the whole sky glows and lights what the sun no longer reaches
       float foot = 1.0 - 0.2 * smoothstep(0.05 * uH, 0.0, vLocal.y);
       vec3 lit = col * (amb + diff * 0.82 * uSunCol) * foot;

@@ -83,3 +83,7 @@ medieval_med | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.45,pop:14,wall
 renaissance_seasia | tools/scenes/town.js | {lon:104,lat:14,tech:0.58,pop:10,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 industrial_north | tools/scenes/town.js | {lon:10,lat:52,tech:0.7,pop:40,walls:0,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 modern_med   | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.85,pop:120,walls:0,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+# --- shrines and wonders that are models ---
+mena_temple  | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('temple', 5, 1.05, 0.3), 7000); | 32
+iron_med_wonder | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.2,pop:10,walls:2,special:94} | setTimeout(() => __sceneLook('town', 0.9, 1.0, 0.3), 7000); | 32
+medieval_north_gate | tools/scenes/town.js | {lon:10,lat:52,tech:0.45,pop:12,walls:2,special:14,alt:620,tilt:1.25,out:1.0} | | 30

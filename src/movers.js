@@ -56,7 +56,7 @@
       vec3 col = mix(vCol, vec3(0.74, 0.56, 0.42), vSkin);
       if (vSkin > 0.5 && vY > 1.60) col = vec3(0.16, 0.12, 0.09);                  // hair
       float diff = max(dot(n, uSunV), 0.0), sky = 0.5 + 0.5 * dot(n, uUpV);
-      vec3 amb = mix(vec3(0.20, 0.25, 0.40) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
+      vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
       vec3 lit = col * (amb + diff * 0.82 * uSunCol);
       float distKm = length(vView) * 6371.0; float low = smoothstep(0.035, 0.002, uCamAlt);
       float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;

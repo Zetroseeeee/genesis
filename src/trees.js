@@ -120,7 +120,7 @@
       float sky = 0.5 + 0.5 * dot(n, uUpV);
       float diff = 0.45 + 0.55 * max(dot(n, uSunV), 0.0) + 0.25 * max(dot(uUpV, uSunV), 0.0);     // the photograph is already softly lit: the sun adds a bright side
       diff *= 1.0 - 0.6 * vHid;
-      vec3 amb = mix(vec3(0.20, 0.25, 0.40) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
+      vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
       vec3 lit = col * (amb + diff * 0.72 * uSunCol);
       float distKm = length(vView) * uUnits; float low = smoothstep(0.035, 0.002, uCamAlt);
       float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;
@@ -337,7 +337,7 @@
               if (!tw) continue; const R = tw.R, F = tw.F;
               const ddm = GEO.distKm(lon, lat, tw.sLon, tw.sLat) * 1000; if (ddm > Math.max(F * 1.3, R * 2.8)) continue;
               // (within the town's fields only the odd tree is left standing - a tree by a town is drawn at the town's scale, and a quarter of a forest of those would still be a wood)
-              if (ddm < F * 1.3) density *= smooth(R * 0.9, R * 1.25, ddm) * (0.06 + 0.94 * smooth(F * 0.72, F * 1.12, ddm));
+              if (ddm < F * 1.3) density *= smooth(R * 0.9, R * 1.25, ddm) * (0.06 + 0.94 * smooth(F * 0.9, F * 1.25, ddm));
               if (density > 0 && ddm < R * 2.8 && townKeepsClear(tw.L, (lon - tw.sLon) * D2R * tw.cl * R_M, (lat - tw.sLat) * D2R * R_M, 3 * tw.k)) density = 0;
               const kTown = tw.k; if (kTown > kEff) kEff = Math.max(kEff, kTier + (kTown - kTier) * (1 - smooth(R * 1.4, R * 2.8, ddm))); }
             if (sim.owner[i] >= 0 && !sim.level[i]) density *= 1 - 0.35 * sim.cultivation(i);

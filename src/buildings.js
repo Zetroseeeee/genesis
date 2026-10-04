@@ -292,7 +292,7 @@
       float sky = 0.5 + 0.5 * dot(n, uUpV);
       // the same light as the models stand in (sky from above, warm light thrown back by the ground from below), and the
       // same exposure: full sun brings a pale wall to just under white and rolls off there, instead of burning it out
-      vec3 amb = mix(vec3(0.20, 0.25, 0.40) * (0.7 + 0.5 * sky), vec3(0.33, 0.34, 0.37) * (0.45 + 0.75 * sky) + uGround * (1.0 - sky) * (0.3 + 0.7 * max(dot(uUpV, uSunV), 0.0)) * 0.62, uDay)
+      vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.33, 0.34, 0.37) * (0.45 + 0.75 * sky) + uGround * (1.0 - sky) * (0.3 + 0.7 * max(dot(uUpV, uSunV), 0.0)) * 0.62, uDay)
         + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
       vec3 lit = col * (amb + diff * 0.95 * uSunCol) * ao;
       { vec3 x = max(lit - 0.78, 0.0) / 0.22; vec3 e = exp(-2.0 * x); lit = mix(lit, 0.78 + 0.22 * (1.0 - e) / (1.0 + e), step(0.78, lit)); }
