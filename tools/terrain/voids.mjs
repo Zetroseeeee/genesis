@@ -40,6 +40,12 @@ const VOIDS = [
   { name: 'East Antarctica', box: [89.5, 180.0, -85.06, -64.5], src: 'grid' },          // (south of 85.05 S the packs have ground from another source, and it is whole)
   { name: 'Antarctica by the date line', box: [180.0, 183.0, -85.06, -77.5], src: 'grid' },        // (past 180: it carries on from East Antarctica, and the two are filled as one)
 ];
+// The packs stand 2.8 % taller than the Earth: every lake in them does (Titicaca at 3,917 m for 3,812, Qinghai at 3,290
+// for 3,195, Tahoe at 1,950 for 1,897, Issyk-Kul at 1,655 for 1,607, Baikal at 471 for 456 - seventeen of them, all by
+// the same factor, at every level). It came with the first build of the packs and nothing depends on it, but ground
+// put in at its true height stands a hundred metres below the plateau beside it: a step along the hole's edge. So new
+// ground is raised to match. (fix reports the factor it finds beside the holes; it should say the same.)
+const TALL = 1.0282;
 const CAP = -85.0511;       // where the Mercator tiles end
 const FEATHER = 10;         // pixels over which old ground is eased toward new beside a hole
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > 0 ? process.argv[i + 1] : d; };
@@ -147,7 +153,9 @@ async function fix() {
   const srcOf = (v) => (v.src === 'tiles' && tiles ? tiles : grid);
   const ofGrid = VOIDS.filter((v) => srcOf(v) === grid); const land = ofGrid.length ? await landMask() : null, rim = ofGrid.length ? await rimDelta(grid, ofGrid) : null;
   // what a hole's source has for a point: null where it has no ground to give (the sea)
-  const ground = (v, z, lon, lat) => { const src = srcOf(v); const s = Math.max(0, src.at(z, lon, lat)); if (src !== grid) return s > 0.5 ? s : null; return land.at(lon, lat) >= 0.36 ? Math.max(1, s + rim(lon, lat)) : null; };
+  // (the tiles' true heights are raised as the packs are; the grid is brought to the packs by its rim)
+  const ground = (v, z, lon, lat) => { const src = srcOf(v); const s = Math.max(0, src.at(z, lon, lat)); if (src !== grid) return s > 0.5 ? s * TALL : null; return land.at(lon, lat) >= 0.36 ? Math.max(1, s + rim(lon, lat)) : null; };
+  const beside = new Map();       // per hole: the old ground and the tiles' own, a little way out from the hole (past the rim's ringing)
   const outDir = arg('out', path.join(ROOT, 'data/e')); fs.mkdirSync(outDir, { recursive: true }); const only = arg('levels') ? arg('levels').split(',').map(Number) : null;
   const report = []; let changedIndex = false;
   for (const key of Object.keys(PACKS).sort((a, b) => a.split('/')[0] - b.split('/')[0])) {
@@ -172,7 +180,7 @@ async function fix() {
     // new heights: a hole takes the source's ground; ground beside it is eased toward the source so the two meet
     const h = new Float32Array(W * H); let filled = 0, eased = 0, hMax = 0;
     for (let y = 0; y < H; y++) { const lat = g.lat(y); for (let x = 0; x < W; x++) { const i = y * W + x; const old = mn + data[i * C] * sc; let v = old; const d = dist[i];
-      if (d < FEATHER) { const lon = g.lon(x); const v0 = holeOf(lon, lat); if (!v0) { h[i] = v; if (v > hMax) hMax = v; continue; } const s = ground(v0, z, lon, lat); if (isVoid[i]) { if (s !== null) { v = s; filled++; } } else if (old > 0 && s !== null) { const w = 1 - d / FEATHER; v = old + (s - old) * w * w * (3 - 2 * w); eased++; } }
+      if (d < FEATHER) { const lon = g.lon(x); const v0 = holeOf(lon, lat); if (!v0) { h[i] = v; if (v > hMax) hMax = v; continue; } const s = ground(v0, z, lon, lat); if (isVoid[i]) { if (s !== null) { v = s; filled++; } } else if (old > 0 && s !== null) { const w = 1 - d / FEATHER; v = old + (s - old) * w * w * (3 - 2 * w); eased++; if (d >= 6 && s > 300 && srcOf(v0) !== grid) { let b = beside.get(v0.name); if (!b) beside.set(v0.name, b = { o: 0, s: 0, n: 0 }); b.o += old; b.s += s / TALL; b.n++; } } }
       h[i] = v; if (v > hMax) hMax = v; } }
     if (tiles) tiles.clear();
     if (!filled) continue;
@@ -183,7 +191,8 @@ async function fix() {
     const line = `${key}: ${filled} pixels given ground, ${eased} eased beside them, highest ${Math.round(hMax)} m${rescaled ? `, scale now ${sc}` : ''} (zoom ${z})`; report.push(line); console.log(line);
   }
   if (changedIndex) fs.writeFileSync(arg('out') ? path.join(outDir, 'index.json') : path.join(ROOT, 'data/index.json'), JSON.stringify(index));
-  console.log(`${report.length} packs changed (${tiles ? tiles.stats() : 'no tiles: the half-degree grid everywhere'})${changedIndex ? '; index.json has new scales' : ''}`);
+  for (const [name, b] of beside) { const line = `beside ${name}: the ground that was there stands ${(b.o / b.s).toFixed(4)} times as tall as the tiles' (${b.n} pixels, all levels; new ground is raised ${TALL} times)`; report.push(line); console.log(line); }
+  console.log(`${report.length - beside.size} packs changed (${tiles ? tiles.stats() : 'no tiles: the half-degree grid everywhere'})${changedIndex ? '; index.json has new scales' : ''}`);
   fs.writeFileSync(path.join(outDir, 'voids-report.txt'), report.join('\n') + '\n');
 }
 

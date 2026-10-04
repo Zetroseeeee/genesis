@@ -47,6 +47,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   tools/update/walk.js` takes pictures of everything a player sees of an update (`shots/up_*.png`).
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
+- `node tools/terrain/voids.mjs scan` — holes in the elevation packs (`data/e`): ground at zero where the simulation's
+  grid has land well above the sea. It must report none. `fix` fills them (real heights from the Terrain Tiles on AWS;
+  Antarctica from the half-degree grid, made to meet the ice beside it); that host is out of reach from here, so the
+  Terrain workflow runs it and publishes the changed packs to the `ci-logs` release (`terrain-fix.tar.gz`) for review.
 
 Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md`.
 
