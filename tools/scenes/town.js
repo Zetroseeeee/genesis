@@ -2,6 +2,7 @@
 // Evaluated in the page after tools/testcam.js. Options in window.__scene (all optional):
 //   lon, lat: where to found the realm      tech: 0..1 (0.1 Bronze, 0.2 Iron, 0.33 Classical, 0.45 Medieval ...)
 //   pop: thousands of people in the capital  walls: wall level (0 none)   special: works bitmask (1 port, 2 academy, 4 temple, 8 market, 16 wonder, 512 mine)
+//   ind: the town's workshops, one plot (1..) for each of sim.IND in order (workshop, weaver, smithy, brewery, granary, warehouse, shipyard, factory, refinery, lab); 0 = none
 //   grow: newest ring of houses still going up   settled: the age has been here long enough for every house to be rebuilt
 //   alt (m), tilt (rad), out (fraction of the wall radius the camera looks at; 0 = the square), turn (rad), gate (index)
 //   sun: [height, bearing] in radians (default an afternoon sun from the west, so shadows show from most angles), null = let the day run
@@ -17,6 +18,7 @@
   if (!G.sim.playerCiv || !G.sim.playerCiv()) G.start(P.lon, P.lat, 'Test');
   const S = G.sim, c = S.playerCiv(), cap = c.capital;
   c.tech = P.tech; S.pop[cap] = P.pop; S.walls[cap] = P.walls; if (P.special) S.special[cap] |= P.special;
+  if (P.ind) S.ind.set(cap, Uint8Array.from(P.ind));
   G.run(3);
   if (P.settled) c.eraSince = S.year - 200;
   if (P.grow) { S.gPrev[cap] = Math.max(0, S.gBand[cap] - 2); S.gYear[cap] = S.year - 4; }
