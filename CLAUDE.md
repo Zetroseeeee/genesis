@@ -47,6 +47,8 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   tools/update/walk.js` takes pictures of everything a player sees of an update (`shots/up_*.png`).
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
+- `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
+  their neighbours begin with (they must: see "A pack is a texture of its own"); `fix` makes them.
 - `node tools/terrain/voids.mjs scan` — holes in the elevation packs (`data/e`): ground at zero where the simulation's
   grid has land well above the sea. It must report none. `fix` fills them (real heights from the Terrain Tiles on AWS;
   Antarctica from the half-degree grid, made to meet the ice beside it); that host is out of reach from here, so the
@@ -81,7 +83,9 @@ Conventions that matter:
   or it meets the old ground in a step.
 - **A pack is a texture of its own** and is not smoothed across its edge: whatever is in two packs' facing texels
   shows as a line if it differs. Edges of packs are every 45° in the picture of the Earth (`data/i`), 22.5° and finer
-  in the elevation.
+  in the elevation. The picture's facing texels are therefore kept equal in the data (and the packs written without
+  loss, so that they stay equal): `node tools/imagery/seams.mjs check` must say every edge meets; after anything that
+  rewrites `data/i`, run `seams.mjs fix`. The elevation's edges are not matched (a step of a texel's worth of height).
 - **Representational scale.** Towns are planned at true scale and drawn `scaleOf(Rt) = 20/(1+Rt/1200)` times larger
   (a village ~19×, a metropolis ~3×) so they read from region height. Shader patterns divide by that factor.
 - **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
