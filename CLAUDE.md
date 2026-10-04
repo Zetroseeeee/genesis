@@ -17,7 +17,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   `tools/scenes/forest.js` (`__forest(lon, lat, alt, tilt, heading, season)`). Software GL is slow: models take
   minutes to arrive and until then plots stand empty, so wait ~170 s before the first shot, run it in the
   background (`nohup ... &`), and judge nothing from a frame taken while files are still coming in.
-  `SHADOW=4096` turns the shadow map on at its real size (software GL goes without), `TREES=1` and `LOD=1` give full forests and the finest models, `DIST=<dir>` serves a snapshot build.
+  `SHADOW=4096` turns the shadow map on at its real size (software GL goes without), `TREES=1` and `LOD=1` give full forests and the finest models, `GRID=1` the terrain mesh at its real fineness, `DIST=<dir>` serves a snapshot build.
   What the software renderer gets less of, so that a frame takes a second and not a minute: a quarter of the pixels
   (not for screenshots), a terrain mesh a quarter as fine each way (the vertex shader's texture lookups run on the
   CPU), few trees and none that fill the picture (`trees.coverCap`), coarser models, no shadow map. Instance buffers
@@ -62,11 +62,13 @@ Conventions that matter:
   **Cultures** 0–9: med, north, east, mena, africa, sasia, easia, seasia, america, namerica.
 - **The old ways last.** A town is planned in the manner of `TOWN.styleEra(era, culture)`, not always of its own era:
   where people went on building as their forebears had (`OLD_UNTIL` in `town.js`: the north and the steppe through
-  the Classical era, the mud-brick lands and India likewise, Africa and south-east Asia until the Renaissance, the
-  Americas until the conquest) a later town keeps its Iron Age houses, walls, shrines and lanes, so it stays fully
-  modelled. Rome and China build anew (the kit, until their sets are generated). `L.era` is the style era, `L.eraReal`
-  the civilisation's; the world picks models by `it.era` if set (old houses in a new age, a wonder of an earlier one),
-  else by `L.era`. A model's `eras` in the manifest therefore only cover the ages that really build that way.
+  the Classical era, the mud-brick lands, India and China likewise, Africa and south-east Asia until the Renaissance,
+  the Americas until the conquest) a later town keeps its Iron Age houses, walls, shrines and lanes, so it stays fully
+  modelled. Greece and Rome build anew (the kit, until their sets are generated). The medieval north and east are
+  `timberTown`s: half-timbered and log houses gable by gable inside a palisade, round a great hall, a well and a
+  shrine of the old kind - all models. `L.era` is the style era, `L.eraReal` the civilisation's; the world picks
+  models by `it.era` if set (old houses in a new age, a wonder of an earlier one), else by `L.era`. A model's `eras`
+  in the manifest therefore only cover the ages that really build that way.
 - **Style packing.** `wall + roof*8 + culture*64 + flags*1024`; flags: landmark 1, block 2, neon 4, wonder 8, ruin 16, site 32, thing 64 (a cart or a boat: no door, windows or roof).
 - Keep modules independent (pure data in `town.js` and `sim.js`, rendering elsewhere): the game will grow to tens of GB of assets.
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a

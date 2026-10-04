@@ -208,6 +208,19 @@
       "med",
       "easia"
      ]
+    },
+    {
+     "kinds": [
+      "academy"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "north",
+      "east"
+     ]
     }
    ]
   },
@@ -604,6 +617,19 @@
       "seasia",
       "africa",
       "namerica"
+     ]
+    },
+    {
+     "kinds": [
+      "shrine"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "north",
+      "east"
      ]
     }
    ]
@@ -1058,7 +1084,23 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154509_6c8fb2dc-6ff6-4363-921a-091b0f4b2e62.png",
    "mesh": "0204768d-aaa9-447b-a163-274d7daf21a3",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154741_0204768d-aaa9-447b-a163-274d7daf21a3.glb",
-   "site": "bronze_timber_site"
+   "site": "bronze_timber_site",
+   "also": [
+    {
+     "kinds": [
+      "hall",
+      "palace"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "north",
+      "east"
+     ]
+    }
+   ]
   },
   {
    "id": "bronze_easia_hall_a",
@@ -1210,7 +1252,22 @@
    "concept": "403d997d-984e-4a37-aa5a-1ada72a9dd1e",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154843_403d997d-984e-4a37-aa5a-1ada72a9dd1e.png",
    "mesh": "f0487e6c-706f-4c64-90a2-885f72be89f8",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155832_f0487e6c-706f-4c64-90a2-885f72be89f8.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_155832_f0487e6c-706f-4c64-90a2-885f72be89f8.glb",
+   "also": [
+    {
+     "kinds": [
+      "market"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "north",
+      "east"
+     ]
+    }
+   ]
   },
   {
    "id": "tree_spruce_a",
@@ -1389,7 +1446,7 @@
    "set": "bronze",
    "eras": [
     0,
-    3
+    4
    ],
    "cultures": null,
    "kinds": [
@@ -1455,7 +1512,20 @@
      ],
      "eras": [
       0,
-      3
+      4
+     ]
+    },
+    {
+     "kinds": [
+      "well"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "north",
+      "east"
      ]
     }
    ]

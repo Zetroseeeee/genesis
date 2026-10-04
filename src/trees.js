@@ -164,8 +164,8 @@
     let O = L._edge; const key = (L.shoreKey || '') + ':' + L.items.length;
     if (!O || O.key !== key) {
       O = L._edge = { key, items: [], yard: [], streets: [] }; const edge = L.R * 0.85, out = (L.wallR || L.R) * 1.08;
-      // (what stands out in the fields - a farmstead, a mine - has a yard of open ground around it, a dozen paces wide)
-      for (const it of L.items) { if (it.kind === 'palisade' || it.kind === 'wall' || it.kind === 'gatehouse') continue; const rr = Math.hypot(it.x, it.z); if (rr + 0.5 * Math.hypot(it.w, it.d) > edge) { O.items.push(it); O.yard.push(rr > out ? 12 * L.k : 0); } }
+      // (what stands out in the fields - a farmstead, a mine - has open ground around it, wide enough that no crown hangs over its roof)
+      for (const it of L.items) { if (it.kind === 'palisade' || it.kind === 'wall' || it.kind === 'gatehouse') continue; const rr = Math.hypot(it.x, it.z); if (rr + 0.5 * Math.hypot(it.w, it.d) > edge) { O.items.push(it); O.yard.push(rr > out ? 24 * L.k : 0); } }
       for (const st of L.streets || []) if (Math.hypot(st[0], st[1]) > edge || Math.hypot(st[2], st[3]) > edge) O.streets.push(st);
     }
     for (let q = 0; q < O.items.length; q++) {
@@ -336,7 +336,8 @@
               if (tw === undefined) { const c = sim.civs[sim.owner[j]]; if (c) { const [sLon, sLat] = TOWN.siteOf(sim, j, c, T, null); tw = { sLon, sLat, R: TOWN.radiusM(sim, j, c), F: TOWN.fieldsM(sim, j, c), k: TOWN.scaleOf(TOWN.radiusTrue(sim, j, c)), L: TOWN.layout(sim, j, c, { coarse: false }), cl: Math.max(0.15, Math.cos((90 - (y2 + 0.5) / H * 180) * D2R)) }; } else tw = null; towns.set(j, tw); }
               if (!tw) continue; const R = tw.R, F = tw.F;
               const ddm = GEO.distKm(lon, lat, tw.sLon, tw.sLat) * 1000; if (ddm > Math.max(F * 1.3, R * 2.8)) continue;
-              if (ddm < F * 1.3) density *= smooth(R * 0.9, R * 1.25, ddm) * (0.25 + 0.75 * smooth(F * 0.7, F * 1.2, ddm));
+              // (within the town's fields only the odd tree is left standing - a tree by a town is drawn at the town's scale, and a quarter of a forest of those would still be a wood)
+              if (ddm < F * 1.3) density *= smooth(R * 0.9, R * 1.25, ddm) * (0.06 + 0.94 * smooth(F * 0.72, F * 1.12, ddm));
               if (density > 0 && ddm < R * 2.8 && townKeepsClear(tw.L, (lon - tw.sLon) * D2R * tw.cl * R_M, (lat - tw.sLat) * D2R * R_M, 3 * tw.k)) density = 0;
               const kTown = tw.k; if (kTown > kEff) kEff = Math.max(kEff, kTier + (kTown - kTier) * (1 - smooth(R * 1.4, R * 2.8, ddm))); }
             if (sim.owner[i] >= 0 && !sim.level[i]) density *= 1 - 0.35 * sim.cultivation(i);

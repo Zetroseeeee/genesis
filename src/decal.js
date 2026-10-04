@@ -188,7 +188,7 @@
           const c = sim.civs[owner[i]]; if (!c) continue; const lvl = level[i];
           const [sx, sy] = site(i); const R = TOWN.radiusM(sim, i, c); const spread = Math.max(R * 1.24, mpp * 3) / R_M;      // the trodden ground of the town itself: all of it within the walls, fading into the fields outside
           const cult = sim.cultivation(i);
-          if (cult > 0.03) { const rr = Math.max(TOWN.fieldsM(sim, i, c), mpp * 4) / R_M; disc(sx, sy, rr / r.cl, rr, Math.min(1, 0.4 + cult * 0.6), 2, 24, 0.62); }      // fields all the way out to where the farmsteads stand, thinning beyond
+          if (cult > 0.03) { const rr = Math.max(TOWN.fieldsM(sim, i, c), mpp * 4) / R_M; disc(sx, sy, rr / r.cl, rr, Math.min(1, 0.4 + cult * 0.6), 2, 24, 0.78); }      // fields all the way out to where the farmsteads stand, thinning beyond
           disc(sx, sy, spread / r.cl, spread, 0.16 + 0.05 * lvl + 0.1 * Math.min(1, c.era / 6), 1, 20, 0.85);
           // the town's own streets and square, once we are close enough for them to be more than a pixel
           if (mpp < 420) { // streets are drawn at the town's representational scale, so they show from region height

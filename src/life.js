@@ -12,18 +12,20 @@
   // widens, leans over with the wind and thins to nothing. Close together and nearly transparent, they read as one
   // column of smoke and not as beads.
   const VERT = `
-    attribute vec3 aBase, aUp, aEast, aNorth; attribute vec4 aSeed;   // seed.x phase, seed.y rise (m), seed.z size (m), seed.w what it is: 1 hearth smoke, 0 a furnace chimney's, 2 a flame in the open, 3 the light a fire throws on the ground
+    attribute vec3 aBase, aUp, aEast, aNorth; attribute vec4 aSeed, aH;   // seed.x phase, seed.y rise (m), seed.z size (m), seed.w what it is: 1 hearth smoke, 0 a furnace chimney's, 2 a flame in the open, 3 the light a fire throws on the ground
     uniform float uTime, uFovK, uWind;
     varying float vAge, vHeat, vSeed, vFade; varying vec2 vQ;
     void main() {
       float age = fract(uTime * 0.05 + aSeed.x);               // twenty seconds from the smoke hole to nothing
       vAge = age; vHeat = aSeed.w; vSeed = aSeed.x * 91.0; vQ = position.xy;
       if (aSeed.w > 2.5) {
-        // the pool of light at a fire's foot lies on the ground, in pieces that each follow the slope where they are
-        // (aUp: where this piece sits in the whole pool, and its share of the width), and breathes with the flame
+        // the pool of light at a fire's foot lies on the ground, in pieces whose corners stand on it (aUp: where this
+        // piece sits in the whole pool, and its share of the width; aH: the height of its four corners above the
+        // fire's foot - neighbours share them, so the pieces meet edge to edge), and it breathes with the flame
         vAge = 0.8 + 0.13 * sin(uTime * 9.0 + aSeed.x * 60.0) + 0.07 * sin(uTime * 23.0 + aSeed.x * 31.0); vFade = 1.0;
-        vQ = position.xy * aUp.z + aUp.xy;
-        vec3 w = aBase + (aEast * position.x + aNorth * position.y) * (aSeed.z / ${R_M.toFixed(1)});
+        vQ = position.xy * aUp.z + aUp.xy; vec2 t = position.xy + 0.5;
+        float hh = mix(mix(aH.x, aH.y, t.x), mix(aH.z, aH.w, t.x), t.y);
+        vec3 w = aBase + ((aEast * vQ.x + aNorth * vQ.y) * aSeed.z + normalize(aBase) * hh) / ${R_M.toFixed(1)};
         gl_Position = projectionMatrix * (modelViewMatrix * vec4(w, 1.0));
       } else {
         float rise = aSeed.y * age * (2.0 - age);
@@ -85,6 +87,7 @@
       g.setAttribute('aEast', new THREE.InstancedBufferAttribute(this.east, 3).setUsage(THREE.DynamicDrawUsage));
       g.setAttribute('aNorth', new THREE.InstancedBufferAttribute(this.north, 3).setUsage(THREE.DynamicDrawUsage));
       g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(this.seed, 4).setUsage(THREE.DynamicDrawUsage));
+      this.hq = new Float32Array(MAXP * 4); g.setAttribute('aH', new THREE.InstancedBufferAttribute(this.hq, 4).setUsage(THREE.DynamicDrawUsage));
       g.instanceCount = 0;
       this.uniforms = { uTime: { value: 0 }, uFovK: { value: 1000 }, uWind: { value: 1 }, uDay: { value: 1 } };
       this.mat = new THREE.ShaderMaterial({ uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, premultipliedAlpha: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide });
@@ -159,28 +162,26 @@
             for (let q = 0; q < items.length && clear; q++) { const o = items[q]; if (q === hi || o.kind === 'gatehouse' || o.kind === 'wall' || o.kind === 'palisade') continue; if (Math.hypot(o.x - fx, o.z - fz) < Math.max(o.fw || o.w, o.fd || o.d) * 0.5 + 2 * kS) clear = false; }
             if (clear) { spots.push([fx, fz, 0.85 + 0.3 * hash(i, 930 + k)]); got++; }
           }
-          const put = (b, e, nn, u, sx, sy, sz, sw) => { const j = n * 3; this.pos[j] = b.x; this.pos[j + 1] = b.y; this.pos[j + 2] = b.z; this.up[j] = u.x; this.up[j + 1] = u.y; this.up[j + 2] = u.z; this.east[j] = e.x; this.east[j + 1] = e.y; this.east[j + 2] = e.z; this.north[j] = nn.x; this.north[j + 1] = nn.y; this.north[j + 2] = nn.z; const s4 = n * 4; this.seed[s4] = sx; this.seed[s4 + 1] = sy; this.seed[s4 + 2] = sz; this.seed[s4 + 3] = sw; n++; };
-          const _p = new THREE.Vector3(), _e = new THREE.Vector3(), _n = new THREE.Vector3(), _u = new THREE.Vector3();
+          const put = (b, e, nn, u, sx, sy, sz, sw) => { const j = n * 3; this.pos[j] = b.x; this.pos[j + 1] = b.y; this.pos[j + 2] = b.z; this.up[j] = u.x; this.up[j + 1] = u.y; this.up[j + 2] = u.z; this.east[j] = e.x; this.east[j + 1] = e.y; this.east[j + 2] = e.z; this.north[j] = nn.x; this.north[j + 1] = nn.y; this.north[j + 2] = nn.z; const s4 = n * 4; this.seed[s4] = sx; this.seed[s4 + 1] = sy; this.seed[s4 + 2] = sz; this.seed[s4 + 3] = sw; this.hq[s4] = _h[0]; this.hq[s4 + 1] = _h[1]; this.hq[s4 + 2] = _h[2]; this.hq[s4 + 3] = _h[3]; n++; };
+          const _u = new THREE.Vector3(), _h = [0, 0, 0, 0];
           for (let k = 0; k < spots.length; k++) {
             const [fx, fz, fh] = spots[k]; const lon = sLon + fx / (R_M * cl * D2R), lat = sLat + fz / (R_M * D2R);
             if (T.isWater(lon, lat)) continue;                   // not on the water
             const f = GEO.enu(lon, lat); const h = T.heightAt(lon, lat) * exag; const base = f.up.clone().multiplyScalar(1 + h / R_M);
-            // the light on the ground: eight flame-heights out each way, in pieces that each lie on the ground where they
-            // are (one flat sheet that wide would cut into every rise and hang over every dip)
-            const rad = fh * 8 * kS, N = rad > 180 ? 4 : 3, step = rad * 2 / N, ph = hash(i, 950 + k), lift = 0.5 * kS; if (n + N * N + 1 > MAXP) break;
+            // the light on the ground: eight flame-heights out each way, in pieces whose corners stand on the ground
+            // (one flat sheet that wide would cut into every rise and hang over every dip)
+            const rad = fh * 8 * kS, N = rad > 180 ? 4 : 3, ph = hash(i, 950 + k), lift = 0.5 * kS; if (n + N * N + 1 > MAXP) break;
             const hs = []; for (let b = 0; b <= N; b++) for (let a = 0; a <= N; a++) hs.push(T.heightAt(lon + (a / N - 0.5) * 2 * rad / (R_M * cl * D2R), lat + (b / N - 0.5) * 2 * rad / (R_M * D2R)) * exag);
             for (let b = 0; b < N; b++) for (let a = 0; a < N; a++) {
-              const h00 = hs[b * (N + 1) + a], h10 = hs[b * (N + 1) + a + 1], h01 = hs[(b + 1) * (N + 1) + a], h11 = hs[(b + 1) * (N + 1) + a + 1];
-              const sE = (h10 + h11 - h00 - h01) / (2 * step), sN = (h01 + h11 - h00 - h10) / (2 * step), u0 = (a + 0.5) / N - 0.5, v0 = (b + 0.5) / N - 0.5;
-              _p.copy(base).addScaledVector(f.east, u0 * 2 * rad / R_M).addScaledVector(f.north, v0 * 2 * rad / R_M).addScaledVector(f.up, ((h00 + h10 + h01 + h11) / 4 - h + lift) / R_M);
-              _e.copy(f.east).addScaledVector(f.up, sE); _n.copy(f.north).addScaledVector(f.up, sN); _u.set(u0, v0, 1 / N);
-              put(_p, _e, _n, _u, ph, 0, step, 3);
+              _h[0] = hs[b * (N + 1) + a] - h + lift; _h[1] = hs[b * (N + 1) + a + 1] - h + lift; _h[2] = hs[(b + 1) * (N + 1) + a] - h + lift; _h[3] = hs[(b + 1) * (N + 1) + a + 1] - h + lift;
+              _u.set((a + 0.5) / N - 0.5, (b + 0.5) / N - 0.5, 1 / N);
+              put(base, f.east, f.north, _u, ph, 0, rad * 2, 3);
             }
-            put(base, f.east, f.north, f.up, ph, 0, fh * 1.25 * kS, 2);
+            _h[0] = _h[1] = _h[2] = _h[3] = 0; put(base, f.east, f.north, f.up, ph, 0, fh * 1.25 * kS, 2);
           }
         }
       }
-      const g = this.points.geometry; for (const k of ['aBase', 'aUp', 'aEast', 'aNorth', 'aSeed']) GEO.touch(g.attributes[k], n);
+      const g = this.points.geometry; for (const k of ['aBase', 'aUp', 'aEast', 'aNorth', 'aSeed', 'aH']) GEO.touch(g.attributes[k], n);
       g.instanceCount = n; this.count = n; return true;
     }
   }

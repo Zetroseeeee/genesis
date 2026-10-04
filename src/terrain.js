@@ -382,7 +382,8 @@
       #ifdef USE_TEXARR
       if (gOn > 0.002 && dec.b > 0.04) {
         vec3 flags = mix(gtex(uLanduse, 9.0, 4.0), gtex(uLanduse, 12.0, 2.0), modernGround);
-        urbanCol = mix(urbanCol, mix(mix(gtex(uGround, 14.0, 4.0) * 1.06, gtex(uGround, 3.0, 4.0) * 0.9, arid * 0.75), flags, paved), gOn);
+        // (trodden earth: paler where the land is dry, and sand only in true desert)
+        urbanCol = mix(urbanCol, mix(mix(gtex(uGround, 14.0, 4.0) * (1.06 + 0.3 * arid), gtex(uGround, 3.0, 4.0) * 0.9, desertK * 0.75), flags, paved), gOn);
       }
       #endif
       land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * mix(0.7, 0.9, smoothstep(0.3, 0.45, dec.b)) * (1.0 - ice));
@@ -453,7 +454,7 @@
         nWater = normalize(mix(nWater, wn, waveMix));
       }
       float foam = smoothstep(0.55, 0.9, n2.b) * smoothstep(0.35, 0.6, a) * (1.0 - smoothstep(0.6, 0.75, a)) * closeFade;
-      vec3 inland = mix(vec3(0.05, 0.23, 0.33), vec3(0.09, 0.33, 0.41), n1.r) * (1.0 - 0.22 * smoothstep(0.3, 0.9, info.b));      // lake water: deep blue-green, darker in the north (peat and depth)
+      vec3 inland = mix(vec3(0.06, 0.27, 0.36), vec3(0.10, 0.38, 0.43), n1.r) * (1.0 - 0.3 * smoothstep(0.2, 0.9, info.b));      // lake water: deep blue-green, darker in the north (peat and depth)
       // vector rivers: shallow bright banks, dark deep channel, a pale wet bank line
       float rdepth = smoothstep(0.52, 0.95, rivR) * (0.5 + 0.5 * dec.g);
       vec3 riverCol = mix(vec3(0.20, 0.37, 0.34), vec3(0.03, 0.15, 0.25), rdepth);

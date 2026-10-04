@@ -148,9 +148,12 @@
   const VERT = `
     attribute vec4 aInfo;                 // era, seed, style (wall + roof*8 + culture*64 + flags*1024), representational scale (drawn size / true size)
     uniform float uMetres;                // scene units -> metres (R_M on the globe, 1 in the kit viewer)
-    varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView;
+    varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView; varying float vPick;
     void main() {
       mat4 im = instanceMatrix;
+      // one draw between 0 and 1 for this building: which of a material's variants it gets. Made here, from the instance's
+      // own exact numbers - a hash of the seed taken per pixel would differ from pixel to pixel (a speckled roof)
+      { vec2 q = fract(vec2(aInfo.y * 7.31, aInfo.y * 3.17 + 0.37)); q += dot(q, q.yx + 19.19); vPick = fract((q.x + q.y) * q.x); }
       float rep = aInfo.w > 0.05 ? aInfo.w : 1.0;   // patterns (windows, courses, planks) stay at life size however big the town is drawn
       vScale = vec3(length(im[0].xyz), length(im[1].xyz), length(im[2].xyz)) * uMetres / rep;
       vLocal = position; vLN = normal;
@@ -161,9 +164,9 @@
     }`;
   const FRAG = `
     precision highp float;
-    uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uCamAlt, uTime, uSnow, uDusk;
+    uniform vec3 uSunV, uUpV, uSunCol, uGround; uniform float uDay, uCamAlt, uTime, uSnow, uDusk;
     ${window.SHADOWS ? SHADOWS.GLSL : 'const vec4 uShadowP = vec4(0.0); float sunHidden(vec3 p) { return 0.0; }'}
-    varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView;
+    varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView; varying float vPick;
     const vec3 LUM = vec3(0.299, 0.587, 0.114);
     #ifdef USE_TEXARR
     // generated materials (textures.js): 16 wall and 16 roof tiles, metres per tile and the mean colour of each
@@ -176,7 +179,7 @@
       if (mat == 2.0) return 2.0;                                                                           // daub between the timbers
       if (mat == 3.0) {                                                                                     // stone
         if (landmark > 0.5) return (cul == 0.0 && era <= 4.0) ? 9.0 : (cul == 3.0 || cul == 4.0) ? 15.0 : 8.0;   // marble temples, sandstone in the desert, dressed ashlar elsewhere
-        if (cul == 8.0) return 12.0; if (cul == 3.0 && seed > 0.5) return 15.0; return seed > 0.75 ? 8.0 : 3.0;
+        if (cul == 8.0) return 12.0; if (cul == 3.0) return 15.0; return 3.0;      // (one stone for all a town builds: a wall is many pieces, and must not come out a patchwork)
       }
       if (mat == 4.0) return ((cul == 0.0 || cul == 5.0) && seed > 0.4) ? 10.0 : 4.0;                      // red brick; yellow stock in the south
       if (mat == 5.0) return 5.0;
@@ -201,6 +204,7 @@
     void main() {
       // aInfo is constant per instance but arrives through varyings: round before decoding so exact comparisons hold
       vec3 n = normalize(vN); float era = floor(vInfo.x + 0.5), seed = vInfo.y, style = floor(vInfo.z + 0.5);
+      float pick = vPick;      // which of a material's variants this building gets (its seed runs past 1, so it cannot be used for that as it is)
       float wallMat = mod(style, 8.0); float roofMat = mod(floor(style / 8.0), 8.0); float culture = mod(floor(style / 64.0), 16.0); float flags = floor(style / 1024.0);
       float isBlock = mod(floor(flags / 2.0), 2.0), isNeon = mod(floor(flags / 4.0), 2.0), isLandmark = mod(flags, 2.0), isRuin = mod(floor(flags / 16.0), 2.0), isSite = mod(floor(flags / 32.0), 2.0), isThing = mod(floor(flags / 64.0), 2.0);   // thing: a cart or a boat, not a building (no door, no windows, no roof of its own)
       float roof = smoothstep(0.22, 0.4, vLN.y) * (1.0 - isThing);      // sloped and flat tops
@@ -226,7 +230,7 @@
       {
         // the generated material replaces the procedural pattern; painted surfaces keep the palette colour and take only the
         // texture's relief, materials with a colour of their own (stone, brick, wood) keep theirs with a hint of the palette
-        float wl = wallLayer(wallMat, culture, era, isLandmark, seed); int wi = int(wl + 0.5);
+        float wl = wallLayer(wallMat, culture, era, isLandmark, pick); int wi = int(wl + 0.5);
         vec3 tw = texture(uWallTex, vec3(fuv / uWallM[wi], wl)).rgb; vec3 mw = max(uWallMean[wi], vec3(0.05));
         float relief = dot(tw, LUM) / max(dot(mw, LUM), 0.05);
         float painted = (wallMat == 0.0 || wallMat == 1.0 || wallMat == 2.0 || wallMat == 5.0 || wl == 13.0) ? 1.0 : 0.0;
@@ -264,7 +268,7 @@
       else { rc = vec3(0.36, 0.55, 0.48) * (0.92 + 0.12 * vnoise(ruv * 0.5)); }                                                                                                       // weathered copper
       #ifdef USE_TEXARR
       {
-        float rl = roofLayer(roofMat, culture, era, isLandmark, seed); int ri = int(rl + 0.5);
+        float rl = roofLayer(roofMat, culture, era, isLandmark, pick); int ri = int(rl + 0.5);
         vec3 tr = texture(uRoofTex, vec3(ruv / uRoofM[ri], rl)).rgb; float rrel = dot(tr, LUM) / max(dot(uRoofMean[ri], LUM), 0.05);
         vec3 trc = tr;
         if (roofMat == 3.0 && rl != 10.0) trc = vCol * 0.85 * rrel;                                                                     // flat roofs are the wall's own material
@@ -286,8 +290,12 @@
       float diff = max(dot(n, uSunV), 0.0);
       diff *= 1.0 - sunHidden(vView + n * uShadowP.w * 2.5);        // what stands between this wall and the sun (read a little way out, so a wall does not shade itself)
       float sky = 0.5 + 0.5 * dot(n, uUpV);
-      vec3 amb = mix(vec3(0.20, 0.25, 0.40), vec3(0.40, 0.43, 0.5), uDay) * (0.7 + 0.5 * sky) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
-      vec3 lit = col * (amb + diff * 1.15 * uSunCol) * ao;
+      // the same light as the models stand in (sky from above, warm light thrown back by the ground from below), and the
+      // same exposure: full sun brings a pale wall to just under white and rolls off there, instead of burning it out
+      vec3 amb = mix(vec3(0.20, 0.25, 0.40) * (0.7 + 0.5 * sky), vec3(0.33, 0.34, 0.37) * (0.45 + 0.75 * sky) + uGround * (1.0 - sky) * (0.3 + 0.7 * max(dot(uUpV, uSunV), 0.0)) * 0.62, uDay)
+        + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
+      vec3 lit = col * (amb + diff * 0.95 * uSunCol) * ao;
+      { vec3 x = max(lit - 0.78, 0.0) / 0.22; vec3 e = exp(-2.0 * x); lit = mix(lit, 0.78 + 0.22 * (1.0 - e) / (1.0 + e), step(0.78, lit)); }
       // night: oil light from the Bronze Age, electric from the Industrial era; glass towers glow
       float night = 1.0 - uDay;
       float lampOn = step(era >= 6.0 ? 0.66 : 0.55, h21(gi * 3.1 + seed * 11.0 + faceId));
