@@ -100,8 +100,7 @@
     3
    ],
    "cultures": [
-    "med",
-    "north"
+    "med"
    ],
    "kinds": [
     "temple"
@@ -132,7 +131,8 @@
    "concept": "368ff7b1-22cb-42ac-ac04-49248222f1c6",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124220_368ff7b1-22cb-42ac-ac04-49248222f1c6.png",
    "mesh": "b866d1ab-c895-43d0-b46d-678c61902746",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124305_b866d1ab-c895-43d0-b46d-678c61902746.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124305_b866d1ab-c895-43d0-b46d-678c61902746.glb",
+   "site": "bronze_timber_site"
   },
   {
    "id": "stone_roundhouse_b",
@@ -307,7 +307,7 @@
    "set": "stone",
    "eras": [
     0,
-    5
+    2
    ],
    "cultures": [
     "namerica"
@@ -327,7 +327,7 @@
    "set": "stone",
    "eras": [
     0,
-    4
+    2
    ],
    "cultures": [
     "namerica"
@@ -401,7 +401,7 @@
    "set": "stone",
    "eras": [
     0,
-    5
+    2
    ],
    "cultures": [
     "africa",
@@ -444,7 +444,7 @@
    "set": "stone",
    "eras": [
     0,
-    6
+    2
    ],
    "cultures": [
     "seasia"
@@ -479,7 +479,7 @@
    "set": "stone",
    "eras": [
     0,
-    3
+    2
    ],
    "cultures": [
     "america"
@@ -770,7 +770,22 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_152048_b29afb73-544d-47dd-8728-7560af5f4613.png",
    "mesh": "69592a9e-a7ef-4d6a-8ce8-9f646eeacf1f",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153342_69592a9e-a7ef-4d6a-8ce8-9f646eeacf1f.glb",
-   "site": "bronze_timber_site"
+   "site": "bronze_timber_site",
+   "also": [
+    {
+     "kinds": [
+      "gable"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "north",
+      "east"
+     ]
+    }
+   ]
   },
   {
    "id": "tree_oak_a",
@@ -863,7 +878,7 @@
    "set": "bronze",
    "eras": [
     1,
-    3
+    2
    ],
    "cultures": [
     "america"
@@ -902,7 +917,7 @@
    "set": "stone",
    "eras": [
     0,
-    4
+    2
    ],
    "cultures": [
     "namerica"
@@ -1103,7 +1118,7 @@
    "set": "bronze",
    "eras": [
     1,
-    3
+    2
    ],
    "cultures": [
     "america"
@@ -1180,8 +1195,8 @@
    "title": "Market shelter and stalls",
    "set": "bronze",
    "eras": [
-    1,
-    3
+    0,
+    2
    ],
    "cultures": null,
    "kinds": [
@@ -1321,7 +1336,7 @@
    "set": "bronze",
    "eras": [
     1,
-    3
+    2
    ],
    "cultures": [
     "namerica"

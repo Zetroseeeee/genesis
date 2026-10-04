@@ -18,6 +18,7 @@
       this.buildingGroup = new THREE.Group(); this.scene.add(this.buildingGroup);
       this.inst = {}; const MAXI = BKIT.MAXI;
       this.bUniforms = { uSunV: { value: new THREE.Vector3(0, 1, 0) }, uUpV: { value: new THREE.Vector3(0, 1, 0) }, uDay: { value: 1 }, uCamAlt: { value: 1 }, uTime: { value: 0 }, uMetres: { value: R_M }, uTexMix: { value: 0 }, uGround: { value: new THREE.Vector3(0.42, 0.4, 0.26) }, uSnow: { value: 0 }, uSunCol: { value: new THREE.Vector3(1, 1, 1) }, uDusk: { value: 0 } };      // uGround: the colour of the land around, for bounced light; uSnow: how much snow lies here now
+      if (window.SHADOWS) Object.assign(this.bUniforms, SHADOWS.uniforms);      // the kit takes the sun's depth map as the models do
       this.bMat = new THREE.ShaderMaterial({ uniforms: this.bUniforms, vertexShader: BKIT.VERT, fragmentShader: BKIT.FRAG });
       this.textured = false;
       this.info = {};
@@ -67,7 +68,8 @@
         } else { od[j] = 0; od[j + 1] = 0; od[j + 2] = 0; od[j + 3] = 0; }
         const p = pop[i]; let light = 0;
         if (p > 0.2) { const t = c ? c.tech : 0; light = Math.min(1, Math.log10(p + 1) * (0.12 + t * 0.55)); if (t < 0.12) light *= 0.35; }
-        sd[j] = light * 255; sd[j + 1] = (c ? c.tech : 0) * 255; sd[j + 2] = c ? Math.round(sim.cultivation(i) * 255 * (sim.level[i] ? 1 : 0.6)) : 0;
+        // (green: how far along a people is, for the look of its ground - paving comes with the Classical age, but not where the old ways last)
+        sd[j] = light * 255; sd[j + 1] = (c ? (TOWN.styleEra(c.era, TOWN.civCulture(sim, c)) < c.era ? Math.min(c.tech, 0.25) : c.tech) : 0) * 255; sd[j + 2] = c ? Math.round(sim.cultivation(i) * 255 * (sim.level[i] ? 1 : 0.6)) : 0;
       }
       for (const c of civs) if (c) { const rgb = c.rgb; this.palData[c.id * 4] = rgb[0] * 255; this.palData[c.id * 4 + 1] = rgb[1] * 255; this.palData[c.id * 4 + 2] = rgb[2] * 255; this.palData[c.id * 4 + 3] = 255; }
       this.ownerTex.needsUpdate = true; this.simTex.needsUpdate = true; this.palTex.needsUpdate = true;
@@ -130,9 +132,9 @@
           // a wall that reaches the river is cut at the bank (2: its lengths are tried one by one when it is drawn); a gate whose own ground is dry stands
           if (wet) L.mask[k] = (it.kind === 'palisade' || it.kind === 'wall' || (it.kind === 'gatehouse' && !mid)) && wet < ns ? 2 : 1; } }
         const mask = L.mask; const hts = L.hts;
-        if (useModels && !coarse && L.fitEra !== c.era + ':' + Object.keys(MODELS.defs).length) { L.fit = this.fitHouses(L, i, c.era, L.culture || 0); L.fitEra = c.era + ':' + Object.keys(MODELS.defs).length; }
+        if (useModels && !coarse && L.fitEra !== c.era + ':' + Object.keys(MODELS.defs).length) { L.fit = this.fitHouses(L, i, L.era === undefined ? c.era : L.era, L.culture || 0); L.fitEra = c.era + ':' + Object.keys(MODELS.defs).length; }
         const fits = useModels && !coarse ? L.fit : null;
-        const era = c.era; const seed = (i % 997) / 997; const kRep = L.k || 1; const cul = L.culture || 0;
+        const era = L.era === undefined ? c.era : L.era; const seed = (i % 997) / 997; const kRep = L.k || 1; const cul = L.culture || 0;      // the era whose manner the town is built in (TOWN.styleEra: the old ways last)
         const wantCasters = dKm < 40 && !coarse;
         for (let k = 0; k < n; k++) {
           if (mask && mask[k] === 1) continue;
@@ -410,7 +412,7 @@
             { vec2 sc = vec2(atan(dir.z, dir.x) * 38.0, asin(clamp(dir.y, -1.0, 1.0)) * 38.0); vec2 cell = floor(sc); vec2 f = fract(sc) - 0.5; float hs = h21(cell); vec2 o = vec2(h21(cell + 3.1), h21(cell + 7.7)) - 0.5; float dd = length(f - o * 0.8); float mag = smoothstep(0.962, 1.0, hs); float st = smoothstep(0.16, 0.0, dd) * mag * mag * (0.7 + 0.3 * sin(uTime * 2.0 + hs * 60.0)); add += mix(vec3(1.0, 0.9, 0.8), vec3(0.8, 0.88, 1.0), h21(cell + 1.3)) * st * night * smoothstep(0.0, 0.12, el) * 3.0; }
             // the moon: a lit disc with a soft halo, phase from its angle to the sun
             vec3 moon = normalize(uMoon); float md = dot(dir, moon);
-            if (md > 0.9994) { vec3 e = normalize(cross(moon, up)); vec3 n2 = normalize(cross(e, moon)); vec3 off = dir - moon * md; vec2 uv = vec2(dot(off, e), dot(off, n2)) / 0.0346; float r2 = dot(uv, uv); if (r2 < 1.0) { vec3 nrm = vec3(uv, sqrt(1.0 - r2)); vec3 toSun = normalize(vec3(dot(sun, e), dot(sun, n2), dot(sun, moon))); float lit = max(dot(nrm, toSun), 0.0); float mare = 0.75 + 0.25 * vn(uv * 4.0 + 7.0); add += vec3(0.93, 0.93, 0.9) * mare * (0.22 + 1.1 * lit) * (1.0 - smoothstep(0.92, 1.0, r2)) * (0.5 + 0.5 * night); } }
+            if (md > 0.99975) { vec3 e = normalize(cross(moon, up)); vec3 n2 = normalize(cross(e, moon)); vec3 off = dir - moon * md; vec2 uv = vec2(dot(off, e), dot(off, n2)) / 0.022; float r2 = dot(uv, uv); if (r2 < 1.0) { vec3 nrm = vec3(uv, sqrt(1.0 - r2)); vec3 toSun = normalize(vec3(dot(sun, e), dot(sun, n2), dot(sun, moon))); float lit = max(dot(nrm, toSun), 0.0); float mare = 0.75 + 0.25 * vn(uv * 4.0 + 7.0); add += vec3(0.93, 0.93, 0.9) * mare * (0.22 + 1.1 * lit) * (1.0 - smoothstep(0.92, 1.0, r2)) * (0.22 + 0.78 * night); } }      // (two and a half degrees across: five times life, as a painter would have it; by day a pale ghost)
             add += vec3(0.8, 0.85, 0.95) * pow(max(md, 0.0), 600.0) * 0.25 * night;
             // aurora: curtains to the pole on clear nights at high latitude
             float auroraLat = smoothstep(52.0, 66.0, abs(uLat));

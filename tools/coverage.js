@@ -23,7 +23,7 @@ for (const era of eras) {
     c.tech = TECH[era]; c.era = sim.eraOf(c.tech); sim.pop[c.capital] = 6; sim.walls[c.capital] = 2; sim.special[c.capital] |= 1 | 2 | 4 | 8 | 512 | (wonder ? 16 | (era << 5) : 0); for (let t = 0; t < 3; t++) sim.tick(); c.eraSince = sim.year - 300;
     const L = window.TOWN.layout(sim, c.capital, c, {}); const cul = L.culture;
     const real = {}, kit = {};
-    for (const it of L.items) { const e = it.era !== undefined ? it.era : c.era; let ids = it.as ? pick(it.as, e, cul) : []; if (!ids.length) ids = pick(it.kind, e, cul); const key = it.kind + (it.as ? '/' + it.as : '') + (it.tag ? '#' + it.tag : ''); if (ids.length) { real[key] = real[key] || { n: 0, ids: new Set() }; real[key].n++; ids.forEach((x) => real[key].ids.add(x)); } else kit[key] = (kit[key] || 0) + 1; }
+    for (const it of L.items) { const e = it.era !== undefined ? it.era : L.era; let ids = it.as ? pick(it.as, e, cul) : []; if (!ids.length) ids = pick(it.kind, e, cul); const key = it.kind + (it.as ? '/' + it.as : '') + (it.tag ? '#' + it.tag : ''); if (ids.length) { real[key] = real[key] || { n: 0, ids: new Set() }; real[key].n++; ids.forEach((x) => real[key].ids.add(x)); } else kit[key] = (kit[key] || 0) + 1; }
     const nReal = Object.values(real).reduce((a, r) => a + r.n, 0), nKit = Object.values(kit).reduce((a, n) => a + n, 0);
     console.log(`${name.padEnd(9)} era ${c.era} culture ${CULT[cul]}: ${nReal} of ${nReal + nKit} items are models` + (nKit ? `  | KIT: ${Object.entries(kit).map(([k, n]) => k + ' x' + n).join(', ')}` : ''));
     if (all) for (const k in real) console.log(`      ${k.padEnd(28)} x${String(real[k].n).padEnd(4)} ${[...real[k].ids].join(', ')}`);

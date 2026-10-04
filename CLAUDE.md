@@ -25,7 +25,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `tools/peek.sh <name> <url> ...` — contact sheet of generated images via the Peek workflow (`shots/peek/<name>.jpg`).
 - `node tools/coverage.js [eras] [--all] [--wonder]` — which planned buildings are real models and which still fall
   back to the kit, for a capital of every culture with every work built. Run it after touching the manifest or the
-  planner: eras 0–2 must show nothing but `stall` (the market model brings its own) and `rubble`.
+  planner: eras 0–2 must show nothing but `stall` (the market model brings its own) and `rubble`, and so must the
+  later eras of the peoples who keep the old ways (`node tools/coverage.js 3,4,5`). `node tools/density.js` reports
+  how much of a town's ground its houses cover.
 - `node tools/dbg3.js "<script>" "<probe>" <wait>` — run a script in the page and print a probe object.
 - `tools/macshots.sh [scene names]` — the real thing: pictures of this commit taken on an Apple GPU by the Scenes
   workflow (`tools/scenes/tour.txt` lists the scenes: towns of every people and age, forests, seasons, dusk and night,
@@ -58,6 +60,13 @@ Conventions that matter:
   are never turned to fit their plot (their front stays on the square); houses may be.
 - **Eras** 0–8: Stone, Bronze, Iron, Classical, Medieval, Renaissance, Industrial, Modern, Information.
   **Cultures** 0–9: med, north, east, mena, africa, sasia, easia, seasia, america, namerica.
+- **The old ways last.** A town is planned in the manner of `TOWN.styleEra(era, culture)`, not always of its own era:
+  where people went on building as their forebears had (`OLD_UNTIL` in `town.js`: the north and the steppe through
+  the Classical era, the mud-brick lands and India likewise, Africa and south-east Asia until the Renaissance, the
+  Americas until the conquest) a later town keeps its Iron Age houses, walls, shrines and lanes, so it stays fully
+  modelled. Rome and China build anew (the kit, until their sets are generated). `L.era` is the style era, `L.eraReal`
+  the civilisation's; the world picks models by `it.era` if set (old houses in a new age, a wonder of an earlier one),
+  else by `L.era`. A model's `eras` in the manifest therefore only cover the ages that really build that way.
 - **Style packing.** `wall + roof*8 + culture*64 + flags*1024`; flags: landmark 1, block 2, neon 4, wonder 8, ruin 16, site 32, thing 64 (a cart or a boat: no door, windows or roof).
 - Keep modules independent (pure data in `town.js` and `sim.js`, rendering elsewhere): the game will grow to tens of GB of assets.
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
@@ -84,6 +93,11 @@ Conventions that matter:
   roads and towns. The decal's red channel is a distance to the water (1 centre line, 0.5 the water's edge, 0 the end
   of the bank), from which the ground shader draws the water, a green bank and, where a road crosses, a deck.
   Everything that asks where the water is (`decal.nearestRiver`) gets the drawn width; walls are cut at the bank.
+- **After dark** (`life.js`): open fires burn from dusk till morning in towns that have no lamps yet (style era ≤ 5):
+  a great one on the square, braziers either side of each gate and before the great buildings, a few before house
+  doors where there is room. Each is two instances of the smoke mesh: a flame (a card facing the eye) and the pool of
+  light it throws on the ground (a quad laid to the slope, added to what is under it). Houses show firelight in
+  their openings (`models.js`).
 - **Shadows.** The sun's depth map holds what stands still (models, kit, near trees) and is redrawn only when the
   camera, the sun or the placements change (`castersVersion` follows a signature of everything placed). Things
   that move get their own cheap shadow (walkers: a streak on the ground in `movers.js`).

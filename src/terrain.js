@@ -275,22 +275,23 @@
       if (gOn > 0.002) {
         float dith = (nMic.r - 0.5) * 0.35 + (nFin.g - 0.5) * 0.15;
         float tropic = 1.0 - smoothstep(0.27, 0.31, latN0 + dith * 0.1);
-        float gL = (clim + dith * 0.3 > 0.22 && tropic > 0.5 && warm > 0.3) ? 9.0 : (clim + dith * 0.3 > 0.42 || (lum + dith > 0.5 && green < 0.7)) ? 1.0 : 0.0;    // savanna, steppe, meadow
+        float savK = (clim + dith * 0.3 > 0.22 && tropic > 0.5 && warm > 0.3) ? 1.0 : 0.0;
+        float gL = (savK > 0.5 || clim + dith * 0.3 > 0.42 || (lum + dith > 0.5 && green < 0.7)) ? 1.0 : 0.0;    // savanna and steppe (straw), meadow
         float fL = (vH > treeLine - 600.0 || latN0 + dith > 0.62) ? 8.0 : 7.0;                                  // tundra above the trees and in the far north, else forest floor
         float rL = (nMid.a + dith > 0.58) ? 11.0 : 5.0;                                                           // scree, bare rock
         float wD = wDesert > 0.02 ? wDesert : 0.0, wR = wRock > 0.02 ? wRock : 0.0;
         vec3 tex = gtex(uGround, gL, 4.0) * wGrass + gtex(uGround, fL, 4.0) * wForest;
         if (wD > 0.0) {
           // the dry ground of the place. True desert: dunes where the photograph is brightest, stony plain and stretches of
-          // scrub elsewhere, salt flats where it is white; steppe: dry grass and scrub; savanna: red earth and grass tufts;
+          // scrub elsewhere, salt flats where it is white; steppe: dry grass and scrub; savanna: straw grass, red earth in places;
           // a humid country lying bare: pale dry grass. Kinds of ground run into each other, they do not meet at an edge.
-          float patchN = smoothstep(0.4, 0.6, nMid.b + (nMic.r - 0.5) * 0.25);
+          float patchN = smoothstep(0.36, 0.64, nMac.g * 0.5 + nMid.b * 0.32 + nMic.r * 0.18);      // broad stretches with ragged edges, not spots of one size
           float isDesert = step(0.5, desertK + dith * 0.4), isSteppe = step(0.5, steppeK + dith * 0.4) * (1.0 - isDesert);
           float isSav = step(0.22, clim + dith * 0.3) * step(0.5, tropic) * (1.0 - isDesert) * (1.0 - isSteppe);
           float salt = isDesert * step(0.62, lum) * step(green, 0.25) * step(warm, 0.4);
-          float sandW = isDesert * (1.0 - salt) * smoothstep(0.5, 0.66, lum + (nMac.r - 0.5) * 0.2 + (nMid.g - 0.5) * 0.08);
+          float sandW = isDesert * (1.0 - salt) * smoothstep(0.46, 0.7, lum + (nMac.r - 0.5) * 0.26 + (nMid.g - 0.5) * 0.035 + (nMic.g - 0.5) * 0.035);
           // three layers and their shares, chosen without branching (the texture lookups stay in step with their neighbours)
-          float LA = mix(mix(mix(1.0, 9.0, isSav), 1.0, isSteppe), mix(4.0, 15.0, salt), isDesert);
+          float LA = mix(1.0, mix(4.0, 15.0, salt), isDesert);
           float LB = mix(mix(1.0, 2.0, isSteppe), 2.0, isDesert);
           float wB = patchN * (isDesert * (1.0 - salt) * (1.0 - sandW) + isSteppe * 0.8 + isSav * 0.45);
           vec3 dryTex = gtex(uGround, LA, 4.0) * (1.0 - wB - sandW) + gtex(uGround, LB, 4.0) * wB + gtex(uGround, 3.0, 4.0) * sandW;
@@ -298,6 +299,9 @@
         }
         if (wR > 0.0) tex += gtex(uGround, rL, 4.0) * wR;
         tex /= max(wGrass + wForest + wD + wR, 1e-3);
+        // savanna is tall straw-coloured grass; in stretches the red earth shows between the tufts (softly: no edge to it)
+        { float redK = savK * smoothstep(0.5, 0.8, nMac.g * 0.45 + nMid.b * 0.4 + nMic.r * 0.15) * 0.5 * (wGrass + wD) / max(wGrass + wForest + wD + wR, 1e-3) * (1.0 - desertK) * (1.0 - steppeK);
+          tex = mix(tex, gtex(uGround, 9.0, 4.0) * vec3(0.92, 0.95, 0.9), redK); }
         float bl = dot(texture(uGround, vec3(gcr(), gL)).rgb, vec3(0.299, 0.587, 0.114));                       // a rotated coarse copy breaks the repeat
         tex *= 0.74 + 0.52 * bl;
         float snowW = max(snow, ice * 0.95); if (snowW > 0.01) tex = mix(tex, gtex(uGround, 6.0, 4.0) * 1.04, snowW);
@@ -319,6 +323,7 @@
         float dSite = length((inCell - site) * vec2(1.0, 1.0));
         float near = 1.0 - smoothstep(0.08 + cult * 0.25, 0.2 + cult * 0.4, dSite);
         near = mix(near, clamp(dec.a * 1.5, 0.0, 1.0), inDecal);   // inside the decal, fields hug the real settlement
+        near *= 1.0 - smoothstep(0.04, 0.15, dec.b) * inDecal;      // and nothing is sown on the trodden ground of the town itself, nor on a road
         near *= (0.3 + 0.7 * smoothstep(0.1, 0.45, sim.a)) * (0.45 + 0.55 * green);   // farmland follows fertile, watered ground
         float fine = smoothstep(0.0012, 0.0004, uCamAlt);                 // close in, every field shows its plots
         // fields are long rectangles on lines that bend with the land, not with the map; each is cut into plots, three by two,
@@ -394,8 +399,9 @@
       land = mix(land, roadCol * (0.85 + 0.3 * dl), smoothstep(0.4, 0.7, dec.b) * (1.0 - ice));
       // winter where winters are white: snow lies over the country for as long as the climate keeps it (weeks in a mild
       // one, and then in patches; half the year in the taiga). Beaten tracks and trodden town ground show through.
+      float snowLying = 0.0;
       { float cold = info.b; float thr = 1.02 - 0.55 * cold;
-        float lying = smoothstep(thr, thr + 0.1, mix(uBare.w, uBare.z, hemi)) * smoothstep(0.08, 0.5, cold);
+        float lying = smoothstep(thr, thr + 0.1, mix(uBare.w, uBare.z, hemi)) * smoothstep(0.08, 0.5, cold); snowLying = lying;
         if (lying > 0.003) {
           float cover = smoothstep(1.0 - lying * 1.15, 1.15 - lying * 1.15, nMid.r * 0.55 + nMic.g * 0.3 + nFin.b * 0.15);
           cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - 0.4 * wForest * (1.0 - bare));
@@ -406,7 +412,8 @@
           land = mix(land, snowCol, cover * 0.96 * (1.0 - ice));
         } }
       // beach: a sand strip where the land runs down into the sea
-      float beach = (1.0 - smoothstep(0.42, 0.8, a)) * landW * closeFade * (1.0 - ice) * (1.0 - lakeW) * (1.0 - bandW);
+      // (only on the sea's side of the shore line: a lake's shore is grass or forest to the water, and snow lies on a beach as on anything)
+      float beach = (1.0 - smoothstep(0.40, 0.52, a)) * landW * closeFade * (1.0 - ice) * (1.0 - lakeW) * (1.0 - bandW) * (1.0 - snowLying * 0.85);
       vec3 beachCol = vec3(0.82, 0.76, 0.6) * (0.85 + 0.3 * dl);
       #ifdef USE_TEXARR
       if (gOn > 0.002 && beach > 0.01) beachCol = mix(beachCol, gtex(uGround, nMid.g > 0.55 ? 13.0 : 3.0, 4.0) * 1.08, gOn);
@@ -446,24 +453,31 @@
         nWater = normalize(mix(nWater, wn, waveMix));
       }
       float foam = smoothstep(0.55, 0.9, n2.b) * smoothstep(0.35, 0.6, a) * (1.0 - smoothstep(0.6, 0.75, a)) * closeFade;
-      vec3 inland = mix(vec3(0.07, 0.30, 0.38), vec3(0.12, 0.42, 0.45), n1.r);
+      vec3 inland = mix(vec3(0.05, 0.23, 0.33), vec3(0.09, 0.33, 0.41), n1.r) * (1.0 - 0.22 * smoothstep(0.3, 0.9, info.b));      // lake water: deep blue-green, darker in the north (peat and depth)
       // vector rivers: shallow bright banks, dark deep channel, a pale wet bank line
       float rdepth = smoothstep(0.52, 0.95, rivR) * (0.5 + 0.5 * dec.g);
       vec3 riverCol = mix(vec3(0.20, 0.37, 0.34), vec3(0.03, 0.15, 0.25), rdepth);
       riverCol = mix(riverCol, vec3(0.36, 0.34, 0.24), arid * 0.4 * (1.0 - rdepth * 0.5));        // the rivers of dry countries run brown with silt
       inland = mix(inland, riverCol, vecRiver);
       inland = mix(inland, vec3(0.36, 0.33, 0.22), floodW * 0.85);
+      // where the snow lies long, still water freezes: lakes and rivers under white ice (blown clear in places), and in
+      // the hardest winters the sea stands fast along the shore
+      float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
+      vec3 lakeIce = mix(vec3(0.70, 0.78, 0.84), vec3(0.90, 0.93, 0.96), smoothstep(0.3, 0.7, nMac.b * 0.6 + nMid.b * 0.25 + nMic.a * 0.15)) * (0.86 + 0.2 * dl);
+      inland = mix(inland, lakeIce, frozen * 0.94);
+      nWater = normalize(mix(nWater, vec3(0.0, 0.0, 1.0), frozen * 0.85));       // ice does not ripple
       // polar sea ice
       float iceEdge = 0.86 - 0.22 * winter;                               // the pack ice spreads toward the equator in the hemisphere's winter
       float seaIce = smoothstep(iceEdge - 0.08, iceEdge + 0.04, latN0 + (nMac.r - 0.5) * 0.08) * seaW;
       float floe = smoothstep(0.35, 0.65, nMid.b + 0.3 * nMic.a) * smoothstep(0.0, 0.08, latN0 - iceEdge + 0.1);
       vec3 iceCol = mix(vec3(0.74, 0.82, 0.9), vec3(0.9, 0.93, 0.96), floe);
       water = mix(water, iceCol, seaIce * mix(0.55, 1.0, floe));
+      water = mix(water, lakeIce, frozen * smoothstep(0.86, 0.97, shelf) * 0.94);
       // ---------- compose surface ----------
-      float inlandMix = max(inlandW * mix(0.9, 0.7, closeFade), vecRiver * 0.97);   // a river is water from bank to bank, not a tint on the ground
+      float inlandMix = max(max(inlandW * mix(0.9, 0.7, closeFade), lakeW * 0.95), vecRiver * 0.97);   // a river is water from bank to bank, and a lake from shore to shore, not a tint on the ground
       vec3 col = mix(land, inland, inlandMix) * landW + water * seaW;
       col = mix(col, mix(vec3(0.33, 0.25, 0.17), vec3(0.50, 0.48, 0.44), paves) * (0.78 + 0.44 * nFin.r), bridgeW * landW);     // the deck of the crossing
-      col += vec3(0.9) * foam * 0.5;
+      col += vec3(0.9) * foam * 0.5 * (1.0 - frozen);
       float flatW = max(1.0 - landW, min(1.0, inlandW * 1.4));        // rivers and lakes lie flat and ripple, whatever the slope they cross
       vec3 nLocal = normalize(mix(nEnu, nWater, flatW));
       // ---------- lighting ----------
@@ -515,7 +529,7 @@
       // specular on water
       vec3 viewDir = normalize(-vViewPos);
       vec3 refl = reflect(-sunV, nV);
-      float spec = pow(max(dot(refl, viewDir), 0.0), 90.0) * (seaW + inlandW * 0.14) * day;   // a river glints; it is not a mirror
+      float spec = pow(max(dot(refl, viewDir), 0.0), 90.0) * (seaW + inlandW * 0.14) * day * (1.0 - frozen * 0.85);   // a river glints; it is not a mirror
       lit += vec3(0.9, 0.95, 1.0) * spec * 0.9;
       // night side: keep a little moonlight and city lights
       float night = 1.0 - smoothstep(-0.22, 0.02, sunUp);
@@ -528,7 +542,7 @@
         lit += lcol * light * sp * (0.5 + lp2) * night * landW * 1.4 * highUp;
       }
       // closer in, the built-up ground itself glows softly under the lamps and hearths
-      lit += mix(vec3(1.0, 0.62, 0.25), vec3(1.0, 0.9, 0.7), sim.g) * smoothstep(0.08, 0.3, dec.b) * night * (1.0 - highUp) * (0.06 + 0.22 * sim.g);
+      lit += mix(vec3(1.0, 0.62, 0.25), vec3(1.0, 0.9, 0.7), sim.g) * smoothstep(0.08, 0.3, dec.b) * night * (1.0 - highUp) * (0.02 + 0.26 * sim.g);      // (a town without lamps is dark but for its fires)
       lit += col * night * 0.045;
       // fresh fire glows through the night
       float front = smoothstep(0.08, 0.5, dec2.g) * (1.0 - smoothstep(0.7, 0.97, dec2.g));    // the fire front: the fringe of what is burning now

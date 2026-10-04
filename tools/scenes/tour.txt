@@ -64,3 +64,22 @@ iron_med     | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.2,pop:10,walls
 iron_mena    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.2,pop:12,walls:3,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 iron_easia   | tools/scenes/town.js | {lon:113,lat:35,tech:0.2,pop:10,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 iron_america | tools/scenes/town.js | {lon:-99,lat:19.3,tech:0.2,pop:9,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+# --- after dark: the fire on the square, braziers at the gate and before the great buildings ---
+night_square | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,sun:[-0.45,4.75]} | setTimeout(() => __sceneLook('town', 0.28, 1.05, 0.6), 7000); | 32
+night_gate   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,alt:260,tilt:1.25,out:1.0,turn:0.2,sun:[-0.45,4.75]} | | 30
+night_north  | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14,sun:[-0.45,4.75]} | setTimeout(() => __sceneLook('town', 0.4, 1.05, 0.6), 7000); | 32
+dusk_mena    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,sun:[0.05,4.75]} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+# --- later ages: where the old ways last the towns stay as they were (TOWN.styleEra); Rome and China build anew (the kit) ---
+classical_north | tools/scenes/town.js | {lon:10,lat:52,tech:0.33,pop:10,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+classical_mena | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.33,pop:14,walls:3,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+classical_sasia | tools/scenes/town.js | {lon:80,lat:26,tech:0.33,pop:12,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+classical_med | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.33,pop:12,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+classical_easia | tools/scenes/town.js | {lon:113,lat:35,tech:0.33,pop:12,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+medieval_north | tools/scenes/town.js | {lon:10,lat:52,tech:0.45,pop:12,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+medieval_east | tools/scenes/town.js | {lon:37,lat:52,tech:0.45,pop:10,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+medieval_africa | tools/scenes/town.js | {lon:0,lat:10,tech:0.45,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+medieval_america | tools/scenes/town.js | {lon:-99,lat:19.3,tech:0.45,pop:10,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+medieval_med | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.45,pop:14,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+renaissance_seasia | tools/scenes/town.js | {lon:104,lat:14,tech:0.58,pop:10,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+industrial_north | tools/scenes/town.js | {lon:10,lat:52,tech:0.7,pop:40,walls:0,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+modern_med   | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.85,pop:120,walls:0,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32

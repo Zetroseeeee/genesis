@@ -878,8 +878,8 @@
     if (decal) decal.update(mapcam, sim, now, sim ? sim.year + ':' + world.texVersion : 0, globals.uSun.value, world, trees);
     if (trees) trees.update(mapcam, sim, now);
     const devH = stage.clientHeight * renderer.getPixelRatio();      // point sprites are sized in device pixels
-    if (life && mode === 'play') life.update(mapcam, sim, now, world.bUniforms.uDay.value, devH, camera.fov);
     const day = world.updateSky(mapcam, globals.uSun.value, now / 1000);
+    if (life && mode === 'play') life.update(mapcam, sim, now, world.bUniforms.uDay.value, devH, camera.fov);      // (after the sky: smoke and fires take this frame's light, not the last one's)
     if (movers && mode === 'play') movers.update(mapcam, sim, decal, now, dt, world.bUniforms.uDay.value, devH, camera.fov);
     if (fx && mode === 'play') { fx.update(mapcam, sim, now, dt, world.bUniforms.uDay.value, devH, camera.fov); if (fx.shake > 0.001) { const a = fx.shake * fx.shake * mapcam.dist * 0.02; camera.position.x += (Math.random() - 0.5) * a; camera.position.y += (Math.random() - 0.5) * a; camera.position.z += (Math.random() - 0.5) * a; camera.updateMatrixWorld(); } }
     if (world.cloudTex && globals.uClouds.value !== world.cloudTex) globals.uClouds.value = world.cloudTex;

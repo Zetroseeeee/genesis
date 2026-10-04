@@ -162,6 +162,7 @@
   const FRAG = `
     precision highp float;
     uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uCamAlt, uTime, uSnow, uDusk;
+    ${window.SHADOWS ? SHADOWS.GLSL : 'const vec4 uShadowP = vec4(0.0); float sunHidden(vec3 p) { return 0.0; }'}
     varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView;
     const vec3 LUM = vec3(0.299, 0.587, 0.114);
     #ifdef USE_TEXARR
@@ -283,6 +284,7 @@
       float ao = 1.0 - 0.28 * (1.0 - roof) * smoothstep(0.86, 1.0, vLocal.y) - 0.18 * smoothstep(0.08, 0.0, vLocal.y);
       // ---------- lighting ----------
       float diff = max(dot(n, uSunV), 0.0);
+      diff *= 1.0 - sunHidden(vView + n * uShadowP.w * 2.5);        // what stands between this wall and the sun (read a little way out, so a wall does not shade itself)
       float sky = 0.5 + 0.5 * dot(n, uUpV);
       vec3 amb = mix(vec3(0.20, 0.25, 0.40), vec3(0.40, 0.43, 0.5), uDay) * (0.7 + 0.5 * sky) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
       vec3 lit = col * (amb + diff * 1.15 * uSunCol) * ao;

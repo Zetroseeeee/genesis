@@ -85,11 +85,11 @@
       // night: in a lived-in house the fire shows in the doorway and through every dark opening in the walls, and a
       // little of it lies on the wall beside (the texture's own darkest places low on a wall are its openings)
       float night = 1.0 - uDay;
-      float home = step(0.3, fract(seed * 91.7)) * (1.0 - isRuin) * step(0.999, prog) * uHome;
+      float home = smoothstep(0.25, 0.75, fract(seed * 91.7)) * (1.0 - isRuin) * step(0.999, prog) * uHome;      // some hearths burn high, some are embers, a quarter of the houses are dark
       vec3 lamp = era >= 6.0 ? vec3(1.0, 0.86, 0.62) : vec3(1.0, 0.56, 0.24);
       float wallish = 1.0 - smoothstep(0.2, 0.5, dot(ng, uUpV)), lowW = smoothstep(0.62 * uH, 0.12 * uH, vLocal.y);
       float opening = smoothstep(0.2, 0.06, lum0) * wallish * lowW;
-      lit += lamp * night * home * (opening * 1.1 + col * 0.55 * lowW * wallish) * (0.85 + 0.15 * sin(uTime * 7.0 + seed * 50.0));
+      lit += lamp * night * home * (opening * 1.3 + col * 0.22 * lowW * wallish) * (0.85 + 0.15 * sin(uTime * 7.0 + seed * 50.0));
       // aerial perspective shared with the terrain and the kit
       float distKm = length(vView) * uUnits; float low = smoothstep(0.035, 0.002, uCamAlt);
       float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;

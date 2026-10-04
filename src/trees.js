@@ -163,12 +163,13 @@
     if (L.wallR && Math.abs(r - L.wallR) < 9 * L.k + m) return true;
     let O = L._edge; const key = (L.shoreKey || '') + ':' + L.items.length;
     if (!O || O.key !== key) {
-      O = L._edge = { key, items: [], streets: [] }; const edge = L.R * 0.85;
-      for (const it of L.items) { if (it.kind === 'palisade' || it.kind === 'wall' || it.kind === 'gatehouse') continue; if (Math.hypot(it.x, it.z) + 0.5 * Math.hypot(it.w, it.d) > edge) O.items.push(it); }
+      O = L._edge = { key, items: [], yard: [], streets: [] }; const edge = L.R * 0.85, out = (L.wallR || L.R) * 1.08;
+      // (what stands out in the fields - a farmstead, a mine - has a yard of open ground around it, a dozen paces wide)
+      for (const it of L.items) { if (it.kind === 'palisade' || it.kind === 'wall' || it.kind === 'gatehouse') continue; const rr = Math.hypot(it.x, it.z); if (rr + 0.5 * Math.hypot(it.w, it.d) > edge) { O.items.push(it); O.yard.push(rr > out ? 12 * L.k : 0); } }
       for (const st of L.streets || []) if (Math.hypot(st[0], st[1]) > edge || Math.hypot(st[2], st[3]) > edge) O.streets.push(st);
     }
-    for (const it of O.items) {
-      if (it.off) continue; const hw = (it.fw || it.w) * 0.5 + m, hd = (it.fd || it.d) * 0.5 + m; const dx = x - it.x, dz = z - it.z; if (dx * dx + dz * dz > hw * hw + hd * hd) continue;
+    for (let q = 0; q < O.items.length; q++) {
+      const it = O.items[q]; if (it.off) continue; const hw = (it.fw || it.w) * 0.5 + m + O.yard[q], hd = (it.fd || it.d) * 0.5 + m + O.yard[q]; const dx = x - it.x, dz = z - it.z; if (dx * dx + dz * dz > hw * hw + hd * hd) continue;
       const yaw = it.fyaw === undefined ? it.yaw : it.fyaw; const c = Math.cos(yaw), sn = Math.sin(yaw); if (Math.abs(dx * c + dz * sn) < hw && Math.abs(dx * sn - dz * c) < hd) return true;
     }
     for (const st of O.streets) {
@@ -353,7 +354,8 @@
           let fall = 0, bare = 0;
           if (this.season && (def ? def.flora.deciduous : zone === 'temperate' || zone === 'easia')) { const north = lat > 0; const off = this.bareness ? (north ? this.bareness.x : this.bareness.y) : 0, autumn = north ? this.season.y : this.season.w; const decid = smooth(0.26, 0.4, fw.latN); fall = autumn * decid * (1 - off); bare = off * decid; }
           const lifeH = def ? def.h : 0;
-          if (def && bare > 0.12 + 0.7 * hash2(gx, gy, 71) && def.flora.bare) { const B = MODELS.defs[def.flora.bare]; if (B && B.card) { def = B; fall = 0; bare = 0; } }      // its leafless picture
+          let leafless = false;
+          if (def && bare > 0.12 + 0.7 * hash2(gx, gy, 71) && def.flora.bare) { const B = MODELS.defs[def.flora.bare]; if (B && B.card) { def = B; fall = 0; bare = 0; leafless = true; } }      // its leafless picture
           const f = GEO.enu(lon, lat);
           if (def) {
             // a real tree: life height by species, times the scale of the place it stands in
@@ -370,6 +372,7 @@
               s.set(hgt * I.userData.aspect / R_M, hgt / R_M, (hash2(gx, gy, 31) < 0.5 ? 1 : 3) / R_M); m.compose(p, q, s); I.setMatrixAt(I.count, m);
               const fr2 = 1 - fall, br = 1 - bare;                                    // the season: leaves turn, then go
               col.setRGB(v * (fr2 * br + fall * 1.75 + bare * 0.95), v * (fr2 * br + fall * 0.95 + bare * 0.78), v * (fr2 * br + fall * 0.35 + bare * 0.62));
+              if (leafless) col.setRGB(v * 0.86, v * 0.77, v * 0.63);              // bare twigs are bark-brown and dark (the photographs, cut from a blue screen, come out pale and a little pink)
               // where snow lies it lies on the trees too: boughs and twigs go pale with it
               if (this.bareness && fw.kc) { const cold = Trees.COLD[fw.kc]; if (cold > 0.08) { const thr = 1.02 - 0.55 * cold; const frost = smooth(thr, thr + 0.1, lat > 0 ? this.bareness.z : this.bareness.w) * smooth(0.08, 0.5, cold) * (0.6 + 0.4 * hash2(gx, gy, 91));
                 if (frost > 0.02) col.setRGB(col.r * (1 + 0.32 * frost), col.g * (1 + 0.34 * frost), col.b * (1 + 0.46 * frost)); } }

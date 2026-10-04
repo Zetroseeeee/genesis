@@ -242,7 +242,7 @@
       const ships = []; const T = this.terrain;
       const rad = 10; const cy0 = Math.floor((90 - cam.lat) / 180 * H), cx0 = Math.floor((cam.lon + 180) / 360 * W);
       const ports = [];
-      for (let dy = -rad; dy <= rad; dy++) { const y = cy0 + dy; if (y < 0 || y >= H) continue; for (let dx = -rad; dx <= rad; dx++) { const x = ((cx0 + dx) % W + W) % W; const i = y * W + x; if ((sim.special[i] & 1) && sim.level[i] && sim.owner[i] >= 0) { const c = sim.civs[sim.owner[i]]; if (!c) continue; const [lon, lat] = TOWN.siteOf(sim, i, c, T, null); ports.push({ i, lon, lat, o: sim.owner[i], era: c.era, v: GEO.toVec(lon, lat) }); } } }
+      for (let dy = -rad; dy <= rad; dy++) { const y = cy0 + dy; if (y < 0 || y >= H) continue; for (let dx = -rad; dx <= rad; dx++) { const x = ((cx0 + dx) % W + W) % W; const i = y * W + x; if ((sim.special[i] & 1) && sim.level[i] && sim.owner[i] >= 0) { const c = sim.civs[sim.owner[i]]; if (!c) continue; const [lon, lat] = TOWN.siteOf(sim, i, c, T, null); ports.push({ i, lon, lat, o: sim.owner[i], era: TOWN.styleEra(c.era, TOWN.civCulture(sim, c)), v: GEO.toVec(lon, lat) });      /* (peoples who build the old way sail the old boats) */ } } }
       const seen = new Set();
       for (const p of ports) {
         let best = null, bd = 900;

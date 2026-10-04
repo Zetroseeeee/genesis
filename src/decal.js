@@ -118,9 +118,15 @@
         aux.push(1, cls, kind, -1, cls, kind, 1, cls, kind, -1, cls, kind);
         idx.push(vi, vi + 1, vi + 2, vi + 2, vi + 1, vi + 3); vi += 4;
       };
-      const disc = (cx, cy, rLon, rLat, cls, kind, n) => {
-        // soft-edged polygon: centre fully covered, rim fades out
+      const disc = (cx, cy, rLon, rLat, cls, kind, n, core) => {
+        // soft-edged polygon: centre fully covered, rim fades out (core: the share of the radius that stays fully covered; without it the fade begins half way out)
         const c0 = vi; pos.push(cx, cy, 0); aux.push(0, cls, kind); vi++;
+        if (core) {
+          for (let ring = 0; ring < 2; ring++) for (let k = 0; k <= n; k++) { const a = k / n * Math.PI * 2, f = ring ? 1 : core; pos.push(cx + Math.cos(a) * rLon * f, cy + Math.sin(a) * rLat * f, 0); aux.push(ring ? 1 : kind === 2 ? 0.25 : 0.55, cls, kind); vi++; }      /* (the inner ring sits where each kind's fade begins) */
+          const i0 = c0 + 1, o0 = c0 + 2 + n;
+          for (let k = 0; k < n; k++) idx.push(c0, i0 + k, i0 + k + 1, i0 + k, o0 + k, i0 + k + 1, i0 + k + 1, o0 + k, o0 + k + 1);
+          return;
+        }
         for (let k = 0; k <= n; k++) { const a = k / n * Math.PI * 2; pos.push(cx + Math.cos(a) * rLon, cy + Math.sin(a) * rLat, 0); aux.push(1, cls, kind); vi++; }
         for (let k = 0; k < n; k++) idx.push(c0, c0 + 1 + k, c0 + 2 + k);
       };
@@ -180,14 +186,14 @@
         // land use around every settlement, at true scale: cultivated ring (A) and the built-up ground itself (B)
         for (const i of settled) {
           const c = sim.civs[owner[i]]; if (!c) continue; const lvl = level[i];
-          const [sx, sy] = site(i); const R = TOWN.radiusM(sim, i, c); const spread = Math.max(R * 1.12, mpp * 3) / R_M;
+          const [sx, sy] = site(i); const R = TOWN.radiusM(sim, i, c); const spread = Math.max(R * 1.24, mpp * 3) / R_M;      // the trodden ground of the town itself: all of it within the walls, fading into the fields outside
           const cult = sim.cultivation(i);
-          if (cult > 0.03) { const rr = Math.max(TOWN.fieldsM(sim, i, c), mpp * 4) / R_M; disc(sx, sy, rr / r.cl, rr, Math.min(1, 0.4 + cult * 0.6), 2, 16); }
-          disc(sx, sy, spread / r.cl, spread, 0.16 + 0.05 * lvl + 0.1 * Math.min(1, c.era / 6), 1, 14);
+          if (cult > 0.03) { const rr = Math.max(TOWN.fieldsM(sim, i, c), mpp * 4) / R_M; disc(sx, sy, rr / r.cl, rr, Math.min(1, 0.4 + cult * 0.6), 2, 24, 0.62); }      // fields all the way out to where the farmsteads stand, thinning beyond
+          disc(sx, sy, spread / r.cl, spread, 0.16 + 0.05 * lvl + 0.1 * Math.min(1, c.era / 6), 1, 20, 0.85);
           // the town's own streets and square, once we are close enough for them to be more than a pixel
           if (mpp < 420) { // streets are drawn at the town's representational scale, so they show from region height
             const L = TOWN.layout(sim, i, c, { coarse: false }); const mLon = 1 / (R_M * r.cl), mLat = 1 / R_M;
-            disc(sx, sy, L.plaza * mLon, L.plaza * mLat, L.streetCls, 1, 12);
+            disc(sx, sy, L.plaza * mLon, L.plaza * mLat, L.streetCls, 1, 28);
             for (const st of L.streets) { const hwm = Math.max(st[4], mpp * 0.8); quad(sx + st[0] * mLon, sy + st[1] * mLat, sx + st[2] * mLon, sy + st[3] * mLat, hwm * mLon, hwm * mLat, L.streetCls, 1); }
           }
         }
@@ -219,7 +225,7 @@
             const px = -dy / L * L * 0.18 * h1 / r.cl, py = dx / L * L * 0.18 * h1;
             P.push(q0, [q0[0] + (q3[0] - q0[0]) * 0.33 + px, q0[1] + (q3[1] - q0[1]) * 0.33 + py], [q0[0] + (q3[0] - q0[0]) * 0.66 + px * 0.8, q0[1] + (q3[1] - q0[1]) * 0.66 + py * 0.8], q3);
             if (sep > (ra + rb) * 1.5) P.push([sbx + Math.cos(gb) * rb / Math.max(0.15, Math.cos(sby)), sby + Math.sin(gb) * rb]);
-            const cls = c.era <= 2 ? 0.58 : c.era <= 6 ? 0.72 : 0.9;   // dirt track, cobbled road, asphalt (the terrain shader reads the class)
+            const sE = TOWN.styleEra(c.era, TOWN.civCulture(sim, c)); const cls = sE <= 2 ? 0.58 : sE <= 6 ? 0.72 : 0.9;   // dirt track, cobbled road, asphalt (the terrain shader reads the class)
             for (let q = 0; q + 1 < P.length; q++) quad(P[q][0], P[q][1], P[q + 1][0], P[q + 1][1], hw, hw, cls, 1);
             nroad++;
             // the road as a curve for the movers (cached so their height samples survive rebuilds; remade when a gate moves)
