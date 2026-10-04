@@ -109,7 +109,21 @@
    "concept": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_124221_190f769d-bbe0-4baa-9ae4-870d8bf10cea.png",
    "mesh": "b06e4dd1-d1e4-4336-9484-eac03513881e",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_125442_b06e4dd1-d1e4-4336-9484-eac03513881e.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_125442_b06e4dd1-d1e4-4336-9484-eac03513881e.glb",
+   "also": [
+    {
+     "kinds": [
+      "temple"
+     ],
+     "eras": [
+      2,
+      2
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "medieval_north_timberhouse_a",
@@ -1056,7 +1070,22 @@
    "concept": "47f25e33-7766-4bc7-bbe2-554de3ad55ea",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_153420_47f25e33-7766-4bc7-bbe2-554de3ad55ea.png",
    "mesh": "3242e088-f499-4710-8382-f8223856e0a9",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154600_3242e088-f499-4710-8382-f8223856e0a9.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261003_154600_3242e088-f499-4710-8382-f8223856e0a9.glb",
+   "also": [
+    {
+     "kinds": [
+      "shrine"
+     ],
+     "eras": [
+      1,
+      2
+     ],
+     "cultures": [
+      "mena",
+      "sasia"
+     ]
+    }
+   ]
   },
   {
    "id": "bronze_hall_a",

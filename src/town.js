@@ -172,7 +172,7 @@
     namerica: ['menhirs', 'mound', 'mound', 'pueblo', 'church', 'station', 'stadium', 'spire'],
   };
   const WONDER = {
-    med: ['menhirs', 'pyramid', 'lighthouse', 'colosseum', 'cathedral', 'basilica', 'irontower', 'stadium', 'spire'],
+    med: ['menhirs', 'pyramid', 'temple', 'colosseum', 'cathedral', 'basilica', 'irontower', 'stadium', 'spire'],      // (Iron Age: a great temple in stone, as at Ephesus and Samos)
     north: ['menhirs', 'menhirs', 'menhirs', 'colosseum', 'cathedral', 'palace', 'crystal', 'stadium', 'spire'],
     east: ['menhirs', 'menhirs', 'hall', 'hall', 'onion', 'palace', 'irontower', 'stadium', 'spire'],
     mena: ['menhirs', 'pyramid', 'ziggurat', 'lighthouse', 'mosque', 'mosque', 'crystal', 'stadium', 'spire'],
