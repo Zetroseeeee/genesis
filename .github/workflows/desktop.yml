@@ -87,18 +87,29 @@ jobs:
             if [ "$attempt" = 5 ]; then exit 1; fi
             sleep 10
           done
-          cp "out/GENESIS-$VERSION-mac-arm64.dmg" out/GENESIS-mac-arm64.dmg      # the same file under a name that never changes: the link to give out
+          # the image must open on a Mac before it is given out: its checksums, then mount it and look for the app inside
+          DMG="out/GENESIS-$VERSION-mac-arm64.dmg"
+          hdiutil verify "$DMG"
+          mkdir -p out/mnt && hdiutil attach -nobrowse -readonly -mountpoint out/mnt "$DMG"
+          test -d out/mnt/GENESIS.app && test -L out/mnt/Applications
+          codesign --verify --deep --strict out/mnt/GENESIS.app
+          hdiutil detach out/mnt || hdiutil detach -force out/mnt
+          cp "$DMG" out/GENESIS-mac-arm64.dmg      # the same file under a name that never changes: the link to give out
           ls -la out
       - name: Publish
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SHA=$(git rev-parse --short HEAD)
           CHECK="${{ steps.launch.outcome == 'success' && 'The packaged app was started on the build Mac and loaded the world, the models and the art.' || 'The automatic launch check did not pass on the build Mac; see the ci-logs release.' }}"
-          NOTES="GENESIS $VERSION for Apple Silicon Macs, built from $SHA. Open the .dmg and drag GENESIS to Applications. The app is not notarised by Apple: on first launch macOS will refuse it; open System Settings > Privacy & Security and choose Open Anyway. $CHECK"
+          BYTES=$(stat -f%z out/GENESIS-mac-arm64.dmg); SUM=$(shasum -a 256 out/GENESIS-mac-arm64.dmg | cut -d' ' -f1)
+          NOTES="GENESIS $VERSION for Apple Silicon Macs, built from $SHA. Open the .dmg and drag GENESIS to Applications. The app is not notarised by Apple: on first launch macOS will refuse it; open System Settings > Privacy & Security and choose Open Anyway. A whole download is $BYTES bytes (SHA-256 $SUM): a smaller file is a download that did not finish, and macOS will call it a disk it cannot read. $CHECK"
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "GENESIS (latest build)" --notes "$NOTES"
           gh release edit latest --notes "$NOTES" --latest
-          for f in $(gh release view latest --json assets --jq '.assets[].name'); do gh release delete-asset latest "$f" --yes; done
-          gh release upload latest out/*.dmg --clobber
+          # the link that is given out is replaced first and alone, so that it is missing for as short a time as can be;
+          # then the copy under its version's name, and last the copies of older versions go
+          gh release upload latest out/GENESIS-mac-arm64.dmg --clobber
+          gh release upload latest "out/GENESIS-$VERSION-mac-arm64.dmg" --clobber
+          for f in $(gh release view latest --json assets --jq '.assets[].name'); do case "$f" in GENESIS-mac-arm64.dmg|"GENESIS-$VERSION-mac-arm64.dmg") ;; *) gh release delete-asset latest "$f" --yes ;; esac; done
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Keep the log when something fails
