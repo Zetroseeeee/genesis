@@ -113,9 +113,9 @@ server.listen(0, async () => {
     check((await ev(() => document.getElementById('id-era').textContent)).includes('BRONZE') || /Bronze/i.test(await ev(() => document.getElementById('id-era').textContent)), 'identity strip shows Bronze Age');
   });
   await scenario('turn: disaster on your land interrupts with an amber alert', async (check) => {
-    const yStart = await ev(() => { document.getElementById('turn').click(); return __G.sim.year; });
-    await page.waitForFunction((y) => __G.sim.year > y, yStart, { timeout: 60000 }); // a disaster counts once the turn's first year has run
-    await ev(() => { const S = __G.sim; const c = S.playerCiv(); S.logEvent(c, 'An earthquake shakes the land in ' + S.fullName(c), true, 'disaster', c.capital); S.quakes.push({ i: c.capital, year: S.year, mag: 7.5 }); S.rubble.set(c.capital, S.year); });
+    // a disaster counts once the turn's first year has run: it is struck from inside the page, on the first frame after
+    // that year (asked for from out here it sometimes arrived after the whole turn had run, and interrupted nothing)
+    await ev(() => new Promise((res) => { const S = __G.sim; const y0 = S.year; document.getElementById('turn').click(); const f = () => { if (S.year > y0) { const c = S.playerCiv(); S.logEvent(c, 'An earthquake shakes the land in ' + S.fullName(c), true, 'disaster', c.capital); S.quakes.push({ i: c.capital, year: S.year, mag: 7.5 }); S.rubble.set(c.capital, S.year); res(); } else requestAnimationFrame(f); }; requestAnimationFrame(f); }));
     await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 60000 }); await frames(2);
     const s = await state(); check(/state-warn/.test(s.turn) && s.t1 === 'Disaster', 'amber Disaster state: ' + s.turn + ' ' + s.t1);
     await ev(() => document.getElementById('turn').click()); await wait(500); await frames(2); check((await state()).t1 !== 'Disaster', 'acknowledged');
@@ -312,7 +312,8 @@ server.listen(0, async () => {
     check(n.city > 0, 'city labels near the capital (' + n.city + ')'); check(n.overlap <= 1, 'labels do not overlap (' + n.overlap + ' overlaps: ' + n.pairs.join(' | ') + ')');
   });
   await scenario('goods: markers on the map and yields in the inspector', async (check) => {
-    const g = await ev(() => { const S = __G.sim; const c = S.playerCiv(); const cap = c.capital; const y0 = (cap / 720) | 0, x0 = cap - y0 * 720; let best = -1, bd = 1e9; for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) { const i = (y0 + dy) * 720 + ((x0 + dx + 720) % 720); if (i < 0 || i >= S.N || !S.goods[i] || !(S.ERA_MASKS[c.era] & (1 << S.goods[i]))) continue; const d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } } if (best < 0) return { none: true }; const y = (best / 720) | 0, x = best - y * 720; const lon = (x + 0.5) / 720 * 360 - 180, lat = 90 - (y + 0.5) / 360 * 180; __G.mapcam.fly = null; __T.cam(lon, lat, 0.004, 0.5, 0); __G.select(best); return { i: best, good: S.GOODS[S.goods[best]].name, cell: document.getElementById('sel-cell').textContent }; });
+    // (the nearest good on land where nobody lives, if there is any: a town's name takes the room its good's marker would stand in)
+    const g = await ev(() => { const S = __G.sim; const c = S.playerCiv(); const cap = c.capital; const y0 = (cap / 720) | 0, x0 = cap - y0 * 720; let best = -1, bd = 1e9; for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) { const i = (y0 + dy) * 720 + ((x0 + dx + 720) % 720); if (i < 0 || i >= S.N || !S.goods[i] || !(S.ERA_MASKS[c.era] & (1 << S.goods[i]))) continue; const d = dx * dx + dy * dy + (S.level[i] ? 1000 : 0); if (d < bd) { bd = d; best = i; } } if (best < 0) return { none: true }; const y = (best / 720) | 0, x = best - y * 720; const lon = (x + 0.5) / 720 * 360 - 180, lat = 90 - (y + 0.5) / 360 * 180; __G.mapcam.fly = null; __T.cam(lon, lat, 0.004, 0.5, 0); __G.select(best); return { i: best, good: S.GOODS[S.goods[best]].name, cell: document.getElementById('sel-cell').textContent }; });
     if (g.none) { check(false, 'no goods cell within 6 cells of the capital'); return; }
     check(/Yields/.test(g.cell) && g.cell.includes(g.good), `inspector lists the yield (${g.good}): ` + g.cell.replace(/\s+/g, ' ').slice(0, 80));
     await wait(500); await frames(6);

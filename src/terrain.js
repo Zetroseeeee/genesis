@@ -542,6 +542,10 @@
         float lp2 = smoothstep(0.5, 0.9, noise2(gc(58.0)).r);
         vec3 lcol = mix(vec3(1.0, 0.62, 0.25), vec3(1.0, 0.92, 0.75), sim.g);
         lit += lcol * light * sp * (0.5 + lp2) * night * landW * 1.4 * highUp;
+        // from far out the single lamps cannot be told apart (the sparkle above averages away to almost nothing): the
+        // lights of a country run together into warm points where its towns are, strung along where people live
+        float farUp = smoothstep(0.1, 0.45, uCamAlt);
+        if (farUp > 0.001) { vec4 nz = noise2(gc(0.6)); float pts = smoothstep(0.35, 0.95, nz.r * 0.6 + nz.g * 0.6); lit += mix(vec3(1.0, 0.6, 0.24), vec3(1.0, 0.8, 0.48), sim.g) * light * light * (0.3 + 1.9 * pts) * night * landW * farUp * 1.1; }
       }
       // closer in, the built-up ground itself glows softly under the lamps and hearths
       lit += mix(vec3(1.0, 0.62, 0.25), vec3(1.0, 0.9, 0.7), sim.g) * smoothstep(0.08, 0.3, dec.b) * night * (1.0 - highUp) * (0.02 + 0.26 * sim.g);      // (a town without lamps is dark but for its fires)

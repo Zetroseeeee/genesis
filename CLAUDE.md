@@ -74,6 +74,14 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 
 Conventions that matter:
 - **Units.** The globe has radius 1 (Earth radius = 6,371,000 m = `R_M`). Town plans are in metres from the town centre.
+- **Heights.** An elevation pack is eight bits: metres = min + byte × scale (`elev.packs` in `data/index.json`, 7–27 m
+  to the step; under a low sun the steps show as contour lines on ice and plains). The packs stand 2.8 % taller than
+  the Earth (every lake in them does, at every level: it came with their first build), and the ground is drawn twice
+  as tall again (`exag: 2.0`). Ground put into a pack must be raised the same (`TALL` in `tools/terrain/voids.mjs`),
+  or it meets the old ground in a step.
+- **A pack is a texture of its own** and is not smoothed across its edge: whatever is in two packs' facing texels
+  shows as a line if it differs. Edges of packs are every 45° in the picture of the Earth (`data/i`), 22.5° and finer
+  in the elevation.
 - **Representational scale.** Towns are planned at true scale and drawn `scaleOf(Rt) = 20/(1+Rt/1200)` times larger
   (a village ~19×, a metropolis ~3×) so they read from region height. Shader patterns divide by that factor.
 - **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
