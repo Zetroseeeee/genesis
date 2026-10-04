@@ -190,8 +190,9 @@ async function fix() {
     // below its second-lowest, takes the middle of its neighbours. (Only ground this run has touched; a ridge or a
     // fjord has neighbours like itself and stays. Coarse levels are averages already, and their lone peaks are real.)
     const STRAY = L >= 5 ? 250 : L === 4 ? 400 : L === 3 ? 700 : 0; let stray = 0;
-    if (STRAY) { const was = Float32Array.from(h), nb = new Float32Array(8);
-      for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) { const i = y * W + x; if (dist[i] >= FEATHER) continue; let k = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) nb[k++] = was[i + dy * W + dx]; nb.sort(); if (was[i] > nb[6] + STRAY || was[i] < nb[1] - STRAY) { h[i] = (nb[3] + nb[4]) / 2; stray++; } } }
+    // (a few times over: three stray pixels in a row hide one another until the outer two are gone)
+    if (STRAY) for (let pass = 0, found = 1; pass < 4 && found; pass++) { const was = Float32Array.from(h), nb = new Float32Array(8); found = 0;
+      for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) { const i = y * W + x; if (dist[i] >= FEATHER) continue; let k = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) nb[k++] = was[i + dy * W + dx]; nb.sort(); if (was[i] > nb[6] + STRAY || was[i] < nb[1] - STRAY) { h[i] = (nb[3] + nb[4]) / 2; found++; } } stray += found; }
     hMax = 0; for (let i = 0; i < W * H; i++) if (h[i] > hMax) hMax = h[i];
     // the pack's scale must still reach its highest ground
     let rescaled = false; if (hMax > mn + 255 * sc) { sc = Math.ceil((hMax - mn) / 255 * 1000) / 1000; rescaled = true; PACKS[key] = [mn, sc]; changedIndex = true; }
