@@ -17,6 +17,10 @@
 //    Used for Antarctica, where the tiles give the rock under the ice, not the ice one would stand on; an ice sheet
 //    is smooth enough for half a degree to do. With --no-tiles it is used everywhere (coarse: for trying the
 //    machinery where there is no network).
+//    Two things are done to it: the sea is kept where the imagery's own mask has sea (the grid's coast is half a
+//    degree soft), and the fill is made to meet the ground beside the hole - the grid is an average, rounded down, and
+//    stands some tens of metres off the real ice, which left a step running dead straight along the hole's edge. The
+//    difference is measured along the rim and carried into the hole, dying away over some tens of kilometres.
 // Where new ground meets old, the old is eased toward the new over a few pixels, so no seam is left.
 // Needs sharp: tools/models/node_modules (npm ci --prefix tools/models).
 import fs from 'node:fs';
@@ -34,7 +38,7 @@ const VOIDS = [
   { name: 'Bohemia, Silesia, Lower Austria, Slovakia, southern Poland', box: [11.5, 24.5, 47.7, 52.5], src: 'tiles' },
   { name: 'the tip of Chukotka, Wrangel Island', box: [-180.0, -177.0, 64.5, 72.0], src: 'tiles' },
   { name: 'East Antarctica', box: [89.5, 180.0, -85.06, -64.5], src: 'grid' },          // (south of 85.05 S the packs have ground from another source, and it is whole)
-  { name: 'Antarctica by the date line', box: [-180.0, -177.0, -85.06, -77.5], src: 'grid' },
+  { name: 'Antarctica by the date line', box: [180.0, 183.0, -85.06, -77.5], src: 'grid' },        // (past 180: it carries on from East Antarctica, and the two are filled as one)
 ];
 const CAP = -85.0511;       // where the Mercator tiles end
 const FEATHER = 10;         // pixels over which old ground is eased toward new beside a hole
@@ -43,7 +47,8 @@ const index = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/index.json'), 'ut
 const packFile = (L, px, py) => path.join(ROOT, 'data/e', `${L}_${px}_${py}.png`);
 // a pack's pixel -> the centre of that pixel on the Earth (tiles of level L are 360/2^(L+1) degrees across)
 const geo = (L, px, py, W) => { const td = 360 / (2 << L); const n = index.elev.packTiles; return { lon: (x) => -180 + (px * n + (x + 0.5) / TILE) * td, lat: (y) => 90 - (py * n + (y + 0.5) / TILE) * td, td }; };
-const voidAt = (lon, lat) => { for (const v of VOIDS) if (lon >= v.box[0] && lon <= v.box[1] && lat >= v.box[2] && lat <= v.box[3]) return v; return null; };
+const inLon = (v, lon) => (lon >= v.box[0] && lon <= v.box[1]) || (lon + 360 >= v.box[0] && lon + 360 <= v.box[1]);
+const voidAt = (lon, lat) => { for (const v of VOIDS) if (inLon(v, lon) && lat >= v.box[2] && lat <= v.box[3]) return v; return null; };
 
 // ---- where heights come from ----
 function terrarium(cacheDir) {
@@ -86,6 +91,40 @@ async function worldGrid() {
   return { name: 'grid', land: (lon, lat) => data[(Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W) + W) % W) * C + 2] & 1, raw: (lon, lat) => data[(Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W) + W) % W) * C], at(z, lon, lat) { return Math.max(0, (byte(lon, lat) - 23) * 30); } };
 }
 
+// the sea, as the game draws it: the alpha of the finest imagery (1 land, 0 sea; the ground shader's shore is at 0.36)
+async function landMask() {
+  const L = index.img.maxLevel, n = index.img.packTiles, td = 360 / (2 << L); const mem = new Map();
+  const load = async (px, py) => { const k = px + '/' + py; if (!mem.has(k)) { const f = path.join(ROOT, 'data/i', `${L}_${px}_${py}.webp`); mem.set(k, fs.existsSync(f) ? await sharp(f).ensureAlpha().extractChannel(3).raw().toBuffer({ resolveWithObject: true }) : null); } return mem.get(k); };
+  const nx = (2 << L) / n, ny = (1 << L) / n; for (let py = 0; py < ny; py++) for (let px = 0; px < nx; px++) await load(px, py);
+  const px1 = (X, Y) => { const W = TILE * n; const gx = ((X % (W * nx)) + W * nx) % (W * nx), gy = Math.min(W * ny - 1, Math.max(0, Y)); const p = mem.get(Math.floor(gx / W) + '/' + Math.floor(gy / W)); return p ? p.data[(gy % W) * p.info.width + (gx % W)] / 255 : 1; };
+  return { at(lon, lat) { const gx = (lon + 180) / td * TILE - 0.5, gy = (90 - lat) / td * TILE - 0.5; const x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0; return px1(x0, y0) * (1 - fx) * (1 - fy) + px1(x0 + 1, y0) * fx * (1 - fy) + px1(x0, y0 + 1) * (1 - fx) * fy + px1(x0 + 1, y0 + 1) * fx * fy; } };
+}
+// The rim: how far the ground that was there stands above the half-degree grid, along the edge of the holes filled
+// from the grid, carried into the holes and dying away over REACH km (a screened diffusion on a coarse raster: holes
+// that touch share one, so they meet each other too). Returns metres to add to the grid at a point.
+async function rimDelta(grid, voids) {
+  const dLon = 0.25, dLat = 0.1, ML = 1.0, MB = 0.5, REACH = 80; const L = index.elev.maxLevel, n = index.elev.packTiles, td = 360 / (2 << L);
+  const mem = new Map(); const old = async (px, py) => { const k = px + '/' + py; if (!mem.has(k)) { const f = packFile(L, px, py); mem.set(k, fs.existsSync(f) && PACKS[`${L}/${k}`] ? { ...(await sharp(f).raw().toBuffer({ resolveWithObject: true })), sc: PACKS[`${L}/${k}`] } : null); } return mem.get(k); };
+  const oldAt = async (lon, lat) => { const gx = (lon + 180) / td, gy = (90 - lat) / td; const px = Math.floor(gx / n), py = Math.floor(gy / n); const p = await old(px, py); if (!p) return 0; const x = Math.min(p.info.width - 1, Math.floor((gx - px * n) * TILE)), y = Math.min(p.info.height - 1, Math.floor((gy - py * n) * TILE)); return p.sc[0] + p.data[(y * p.info.width + x) * p.info.channels] * p.sc[1]; };
+  // holes whose rectangles touch are one piece
+  const groups = []; for (const v of voids) { const near = groups.filter((g) => g.some((u) => u.box[0] <= v.box[1] + ML && u.box[1] >= v.box[0] - ML && u.box[2] <= v.box[3] + MB && u.box[3] >= v.box[2] - MB)); const g = [v].concat(...near); for (const o of near) groups.splice(groups.indexOf(o), 1); groups.push(g); }
+  const rasters = [];
+  for (const g of groups) {
+    const lon0 = Math.min(...g.map((v) => v.box[0])) - ML, lon1 = Math.max(...g.map((v) => v.box[1])) + ML, lat0 = Math.max(-90, Math.min(...g.map((v) => v.box[2])) - MB), lat1 = Math.min(90, Math.max(...g.map((v) => v.box[3])) + MB);
+    const W = Math.ceil((lon1 - lon0) / dLon), H = Math.ceil((lat1 - lat0) / dLat); const c = new Float32Array(W * H), known = new Uint8Array(W * H); let rim = 0, sum = 0, worst = 0;
+    for (let y = 0; y < H; y++) { const lat = lat1 - (y + 0.5) * dLat; for (let x = 0; x < W; x++) { const lon = ((lon0 + (x + 0.5) * dLon + 540) % 360) - 180; const o = await oldAt(lon, lat); if (o > 0.5) { known[y * W + x] = 1; c[y * W + x] = o - grid.at(0, lon, lat); } } }
+    // (how far off the grid stands where it matters: known cells that have a hole beside them)
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) { const i = y * W + x; if (known[i] && !(known[i - 1] && known[i + 1] && known[i - W] && known[i + W]) && voidAt(((lon0 + (x + 0.5) * dLon + 540) % 360) - 180, lat1 - (y + 0.5) * dLat)) { rim++; sum += c[i]; worst = Math.max(worst, Math.abs(c[i])); } }
+    const k = (dLat * 111.2 / REACH) ** 2;
+    for (let it = 0; it < 800; it++) for (let yy = 0; yy < H; yy++) { const y = it & 1 ? H - 1 - yy : yy; const wx = Math.min(400, (dLat / (dLon * Math.max(0.01, Math.cos((lat1 - (y + 0.5) * dLat) * Math.PI / 180)))) ** 2);
+      for (let xx = 0; xx < W; xx++) { const x = it & 1 ? W - 1 - xx : xx; const i = y * W + x; if (known[i]) continue; const l = x > 0 ? c[i - 1] : c[i], r = x < W - 1 ? c[i + 1] : c[i], u = y > 0 ? c[i - W] : c[i], d = y < H - 1 ? c[i + W] : c[i]; c[i] = (wx * (l + r) + u + d) / (2 * wx + 2 + k); } }
+    rasters.push({ lon0, lat1, W, H, c }); console.log(`the rim of ${g.map((v) => v.name).join(' + ')}: ${rim} places beside the hole where the grid can be measured against the ground; it stands ${rim ? (sum / rim).toFixed(0) : 0} m off on average, ${worst.toFixed(0)} m at worst`);
+  }
+  return (lon, lat) => { for (const r of rasters) { let gx = (lon - r.lon0) / dLon - 0.5; if (gx < -0.5 || gx > r.W - 0.5) gx = (lon + 360 - r.lon0) / dLon - 0.5; const gy = (r.lat1 - lat) / dLat - 0.5; if (gx < -0.5 || gx > r.W - 0.5 || gy < -0.5 || gy > r.H - 0.5) continue;
+    const x0 = Math.max(0, Math.min(r.W - 1, Math.floor(gx))), y0 = Math.max(0, Math.min(r.H - 1, Math.floor(gy))), x1 = Math.min(r.W - 1, x0 + 1), y1 = Math.min(r.H - 1, y0 + 1), fx = Math.max(0, Math.min(1, gx - x0)), fy = Math.max(0, Math.min(1, gy - y0));
+    return r.c[y0 * r.W + x0] * (1 - fx) * (1 - fy) + r.c[y0 * r.W + x1] * fx * (1 - fy) + r.c[y1 * r.W + x0] * (1 - fx) * fy + r.c[y1 * r.W + x1] * fx * fy; } return 0; };
+}
+
 // ---- scan ----
 async function scan() {
   const grid = await worldGrid(); const dir = arg('dir', path.join(ROOT, 'data/e')); const G = 0.5, cells = new Map();
@@ -106,6 +145,9 @@ async function scan() {
 async function fix() {
   const grid = await worldGrid(); const tiles = process.argv.includes('--no-tiles') ? null : terrarium(arg('cache', path.join(ROOT, 'tools/terrain/cache')));
   const srcOf = (v) => (v.src === 'tiles' && tiles ? tiles : grid);
+  const ofGrid = VOIDS.filter((v) => srcOf(v) === grid); const land = ofGrid.length ? await landMask() : null, rim = ofGrid.length ? await rimDelta(grid, ofGrid) : null;
+  // what a hole's source has for a point: null where it has no ground to give (the sea)
+  const ground = (v, z, lon, lat) => { const src = srcOf(v); const s = Math.max(0, src.at(z, lon, lat)); if (src !== grid) return s > 0.5 ? s : null; return land.at(lon, lat) >= 0.36 ? Math.max(1, s + rim(lon, lat)) : null; };
   const outDir = arg('out', path.join(ROOT, 'data/e')); fs.mkdirSync(outDir, { recursive: true }); const only = arg('levels') ? arg('levels').split(',').map(Number) : null;
   const report = []; let changedIndex = false;
   for (const key of Object.keys(PACKS).sort((a, b) => a.split('/')[0] - b.split('/')[0])) {
@@ -114,7 +156,7 @@ async function fix() {
     if (mn > 0) continue;          // (a pack whose lowest ground is above the sea has no hole in it)
     // the pack's part that lies in a hole's rectangle
     const lonA = g.lon(0), lonB = g.lon(W - 1), latA = g.lat(0), latB = g.lat(H - 1);
-    const touches = VOIDS.some((v) => lonB >= v.box[0] && lonA <= v.box[1] && latA >= v.box[2] && latB <= v.box[3]); if (!touches) continue;
+    const touches = VOIDS.some((v) => ((lonB >= v.box[0] && lonA <= v.box[1]) || (lonB + 360 >= v.box[0] && lonA + 360 <= v.box[1])) && latA >= v.box[2] && latB <= v.box[3]); if (!touches) continue;
     const isVoid = new Uint8Array(W * H); let nVoid = 0; const pts = [];
     for (let y = 0; y < H; y++) { const lat = g.lat(y); for (let x = 0; x < W; x++) { if (data[(y * W + x) * C] !== 0) continue; const lon = g.lon(x); if (voidAt(lon, lat)) { isVoid[y * W + x] = 1; nVoid++; } } }
     if (!nVoid) continue;
@@ -130,7 +172,7 @@ async function fix() {
     // new heights: a hole takes the source's ground; ground beside it is eased toward the source so the two meet
     const h = new Float32Array(W * H); let filled = 0, eased = 0, hMax = 0;
     for (let y = 0; y < H; y++) { const lat = g.lat(y); for (let x = 0; x < W; x++) { const i = y * W + x; const old = mn + data[i * C] * sc; let v = old; const d = dist[i];
-      if (d < FEATHER) { const lon = g.lon(x); const v0 = holeOf(lon, lat); if (!v0) { h[i] = v; if (v > hMax) hMax = v; continue; } const s = Math.max(0, srcOf(v0).at(z, lon, lat)); if (isVoid[i]) { if (s > 0.5) { v = s; filled++; } } else if (old > 0 && s > 0.5) { const w = 1 - d / FEATHER; v = old + (s - old) * w * w * (3 - 2 * w); eased++; } }
+      if (d < FEATHER) { const lon = g.lon(x); const v0 = holeOf(lon, lat); if (!v0) { h[i] = v; if (v > hMax) hMax = v; continue; } const s = ground(v0, z, lon, lat); if (isVoid[i]) { if (s !== null) { v = s; filled++; } } else if (old > 0 && s !== null) { const w = 1 - d / FEATHER; v = old + (s - old) * w * w * (3 - 2 * w); eased++; } }
       h[i] = v; if (v > hMax) hMax = v; } }
     if (tiles) tiles.clear();
     if (!filled) continue;
