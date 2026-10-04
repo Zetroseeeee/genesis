@@ -48,6 +48,7 @@ const VOIDS = [
 const TALL = 1.0282;
 const CAP = -85.0511;       // where the Mercator tiles end
 const FEATHER = 10;         // pixels over which old ground is eased toward new beside a hole
+const RIM = 2;              // the ground right at a hole's edge is not ground: the packs were resampled across the edge, which left it mixed with the hole's zero (and overshooting a few per cent just before). That much is replaced outright.
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > 0 ? process.argv[i + 1] : d; };
 const index = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/index.json'), 'utf8')); const PACKS = index.elev.packs; const TILE = index.tile;
 const packFile = (L, px, py) => path.join(ROOT, 'data/e', `${L}_${px}_${py}.png`);
@@ -180,7 +181,7 @@ async function fix() {
     // new heights: a hole takes the source's ground; ground beside it is eased toward the source so the two meet
     const h = new Float32Array(W * H); let filled = 0, eased = 0, hMax = 0;
     for (let y = 0; y < H; y++) { const lat = g.lat(y); for (let x = 0; x < W; x++) { const i = y * W + x; const old = mn + data[i * C] * sc; let v = old; const d = dist[i];
-      if (d < FEATHER) { const lon = g.lon(x); const v0 = holeOf(lon, lat); if (!v0) { h[i] = v; if (v > hMax) hMax = v; continue; } const s = ground(v0, z, lon, lat); if (isVoid[i]) { if (s !== null) { v = s; filled++; } } else if (old > 0 && s !== null) { const w = 1 - d / FEATHER; v = old + (s - old) * w * w * (3 - 2 * w); eased++; if (d >= 6 && s > 300 && srcOf(v0) !== grid) { let b = beside.get(v0.name); if (!b) beside.set(v0.name, b = { o: 0, s: 0, n: 0 }); b.o += old; b.s += s / TALL; b.n++; } } }
+      if (d < FEATHER) { const lon = g.lon(x); const v0 = holeOf(lon, lat); if (!v0) { h[i] = v; if (v > hMax) hMax = v; continue; } const s = ground(v0, z, lon, lat); if (isVoid[i]) { if (s !== null) { v = s; filled++; } } else if (old > 0 && s !== null) { const w = Math.min(1, (FEATHER - d) / (FEATHER - RIM)); v = old + (s - old) * w * w * (3 - 2 * w); eased++; if (d >= 6 && s > 300 && srcOf(v0) !== grid) { let b = beside.get(v0.name); if (!b) beside.set(v0.name, b = { o: 0, s: 0, n: 0 }); b.o += old; b.s += s / TALL; b.n++; } } }
       h[i] = v; if (v > hMax) hMax = v; } }
     if (tiles) tiles.clear();
     if (!filled) continue;
