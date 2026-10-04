@@ -132,6 +132,19 @@ async function rimDelta(grid, voids) {
     return r.c[y0 * r.W + x0] * (1 - fx) * (1 - fy) + r.c[y0 * r.W + x1] * fx * (1 - fy) + r.c[y1 * r.W + x0] * (1 - fx) * fy + r.c[y1 * r.W + x1] * fx * fy; } return 0; };
 }
 
+// The ice of the real packs is not smooth: it undulates some ten metres over tens of kilometres, and in eight bits
+// that shows as wandering contour lines under a low sun. The grid's ice is as smooth as glass: its contours run in long
+// clean arcs - plainly a different surface, and it begins at a dead straight line. So the grid's high ground is given
+// the roughness measured in the packs beside the hole (6 m within 4 km, 9 m within 12 km, 12 m within 40 km, of which
+// the eight bits themselves are 5): smooth noise of three sizes, laid out in kilometres from the nearer pole.
+const hash2 = (x, y, s) => { let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 1442695041)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295 * 2 - 1; };
+const vnoise = (x, y, s) => { const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy); return (hash2(x0, y0, s) * (1 - ux) + hash2(x0 + 1, y0, s) * ux) * (1 - uy) + (hash2(x0, y0 + 1, s) * (1 - ux) + hash2(x0 + 1, y0 + 1, s) * ux) * uy; };
+// An ice shelf stands some sixty metres out of the sea and is flat (the packs have the Ross shelf at 66 m, one level of
+// their eight bits); the grid has it anywhere from nought to thirty, which in eight bits is a staircase of contours.
+const SHELF = 62;
+const ROUGH = [[30, 14], [10, 14], [3, 9]];        // cell (km), height (m): each gives about 0.43 of its height as its spread
+const rough = (lon, lat) => { const r = (90 - Math.abs(lat)) * 111.2, a = lon * Math.PI / 180, X = r * Math.cos(a), Y = r * Math.sin(a); let v = 0; for (let k = 0; k < ROUGH.length; k++) v += ROUGH[k][1] * vnoise(X / ROUGH[k][0], Y / ROUGH[k][0], k + 1); return v; };
+
 // ---- scan ----
 async function scan() {
   const grid = await worldGrid(); const dir = arg('dir', path.join(ROOT, 'data/e')); const G = 0.5, cells = new Map();
@@ -155,7 +168,7 @@ async function fix() {
   const ofGrid = VOIDS.filter((v) => srcOf(v) === grid); const land = ofGrid.length ? await landMask() : null, rim = ofGrid.length ? await rimDelta(grid, ofGrid) : null;
   // what a hole's source has for a point: null where it has no ground to give (the sea)
   // (the tiles' true heights are raised as the packs are; the grid is brought to the packs by its rim)
-  const ground = (v, z, lon, lat) => { const src = srcOf(v); const s = Math.max(0, src.at(z, lon, lat)); if (src !== grid) return s > 0.5 ? s * TALL : null; return land.at(lon, lat) >= 0.36 ? Math.max(1, s + rim(lon, lat)) : null; };
+  const ground = (v, z, lon, lat) => { const src = srcOf(v); const s = Math.max(0, src.at(z, lon, lat)); if (src !== grid) return s > 0.5 ? s * TALL : null; if (land.at(lon, lat) < 0.36) return null; const k = Math.min(1, Math.max(0, (s - 60) / 440)); return Math.max(SHELF, s + rim(lon, lat) + rough(lon, lat) * k * k * (3 - 2 * k)); };      // (the roughness comes in as the ground climbs)
   const beside = new Map();       // per hole: the old ground and the tiles' own, a little way out from the hole (past the rim's ringing)
   const outDir = arg('out', path.join(ROOT, 'data/e')); fs.mkdirSync(outDir, { recursive: true }); const only = arg('levels') ? arg('levels').split(',').map(Number) : null;
   const report = []; let changedIndex = false;
@@ -200,7 +213,9 @@ async function fix() {
     await sharp(out, { raw: { width: W, height: H, channels: C } }).png({ compressionLevel: 9 }).toFile(path.join(outDir, `${L}_${px}_${py}.png`));
     const line = `${key}: ${filled} pixels given ground, ${eased} eased beside them${stray ? `, ${stray} stray ones smoothed` : ''}, highest ${Math.round(hMax)} m${rescaled ? `, scale now ${sc}` : ''} (zoom ${z})`; report.push(line); console.log(line);
   }
-  if (changedIndex) fs.writeFileSync(arg('out') ? path.join(outDir, 'index.json') : path.join(ROOT, 'data/index.json'), JSON.stringify(index));
+  // (written the way the file is written - a space after every comma and colon - so that only the changed scales show as changed)
+  const asWritten = (v) => Array.isArray(v) ? '[' + v.map(asWritten).join(', ') + ']' : v && typeof v === 'object' ? '{' + Object.entries(v).map(([k, x]) => JSON.stringify(k) + ': ' + asWritten(x)).join(', ') + '}' : JSON.stringify(v);
+  if (changedIndex) fs.writeFileSync(arg('out') ? path.join(outDir, 'index.json') : path.join(ROOT, 'data/index.json'), asWritten(index));
   for (const [name, b] of beside) { const line = `beside ${name}: the ground that was there stands ${(b.o / b.s).toFixed(4)} times as tall as the tiles' (${b.n} pixels, all levels; new ground is raised ${TALL} times)`; report.push(line); console.log(line); }
   console.log(`${report.length - beside.size} packs changed (${tiles ? tiles.stats() : 'no tiles: the half-degree grid everywhere'})${changedIndex ? '; index.json has new scales' : ''}`);
   fs.writeFileSync(path.join(outDir, 'voids-report.txt'), report.join('\n') + '\n');
