@@ -7,6 +7,7 @@
 function createSim(world, seed) {
   const W = 720, H = 360, N = W * H;
   const MAXC = 512;
+  const ECON = window.ECON;      // goods, recipes and the market (econ.js, loaded before this file)
   const { land, fert, elev, flags } = world;   // land Uint8, fert Float32 0..1, elev Uint8, flags Uint8 (1 land,2 river,4 coast,8 ice)
 
   // ---------- RNG ----------
@@ -47,59 +48,13 @@ function createSim(world, seed) {
   const shufflePerm = () => { for (let i = perm.length - 1; i > 0; i--) { const j = rint(i + 1); const t = perm[i]; perm[i] = perm[j]; perm[j] = t; } };
   shufflePerm();
 
-  // ---------- goods: what the land yields, and what realms trade ----------
-  // kind: food / material / luxury / strategic.  era: when the good starts to matter.  Placement is fixed by the land itself (same on every seed).
-  const GOODS = [null,
-    { key: 'grain', name: 'Grain', kind: 'food', era: 0 }, { key: 'fish', name: 'Fish', kind: 'food', era: 0 }, { key: 'cattle', name: 'Cattle', kind: 'food', era: 0 },
-    { key: 'timber', name: 'Timber', kind: 'material', era: 0 }, { key: 'stone', name: 'Stone', kind: 'material', era: 0 }, { key: 'salt', name: 'Salt', kind: 'material', era: 0 },
-    { key: 'copper', name: 'Copper', kind: 'strategic', era: 1 }, { key: 'tin', name: 'Tin', kind: 'strategic', era: 1 }, { key: 'iron', name: 'Iron', kind: 'strategic', era: 2 }, { key: 'horses', name: 'Horses', kind: 'strategic', era: 1 },
-    { key: 'gold', name: 'Gold', kind: 'luxury', era: 1 }, { key: 'gems', name: 'Gems', kind: 'luxury', era: 1 }, { key: 'wine', name: 'Wine', kind: 'luxury', era: 2 }, { key: 'spices', name: 'Spices', kind: 'luxury', era: 2 },
-    { key: 'silk', name: 'Silk', kind: 'luxury', era: 3 }, { key: 'furs', name: 'Furs', kind: 'luxury', era: 0 }, { key: 'ivory', name: 'Ivory', kind: 'luxury', era: 1 }, { key: 'cotton', name: 'Cotton', kind: 'material', era: 3 },
-    { key: 'coal', name: 'Coal', kind: 'strategic', era: 6 }, { key: 'oil', name: 'Oil', kind: 'strategic', era: 7 }];
-  const GOOD_ID = {}; GOODS.forEach((g, k) => { if (g) GOOD_ID[g.key] = k; });
-  const goods = new Uint8Array(N);
-  {
-    const h32 = (i, k) => { let x = (i * 374761393 + k * 668265263) | 0; x = Math.imul(x ^ (x >>> 13), 1274126177); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
-    const inBox = (lon, lat, b) => lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3];
-    // where history found things (lon0, lat0, lon1, lat1)
-    const REGION = {
-      silk: [[100, 20, 122, 40]], spices: [[72, 6, 80, 20], [95, -10, 130, 15]], ivory: [[-15, -30, 50, 12], [72, 8, 88, 25]],
-      gold: [[16, -34, 32, -22], [-12, 5, 2, 14], [-124, 34, -118, 41], [114, -34, 152, -20], [-80, -16, -70, 4], [100, 55, 140, 68]],
-      cotton: [[68, 8, 90, 30], [29, 24, 33, 32], [-100, 28, -80, 36], [-104, 14, -88, 22]], horses: [[20, 44, 120, 55], [-110, 32, -95, 50]],
-      tin: [[-6, 49.5, -4, 51], [98, 1, 104, 7], [-70, -22, -64, -16]], wine: [[-10, 35, 30, 50], [-124, 32, -118, 40], [-74, -40, -68, -30]],
-      coal: [[-4, 51, 2, 56], [6, 50, 9, 52], [-85, 36, -78, 42], [36, 47, 40, 49], [108, 34, 114, 40], [148, -34, 152, -30]],
-      oil: [[44, 24, 56, 32], [48, 36, 54, 44], [-104, 27, -94, 34], [-72, 7, -62, 11], [3, 4, 8, 7], [0, 56, 4, 62], [60, 58, 80, 68]],
-    };
-    for (let k = 0; k < LI.length; k++) {
-      const i = LI[k]; if (flags[i] & 8) continue;
-      const y = (i / W) | 0, x = i - y * W; const lon = (x + 0.5) / W * 360 - 180, lat = 90 - (y + 0.5) / H * 180; const al = Math.abs(lat);
-      const f = fert[i], e = elev[i] / 255, coast = !!(flags[i] & 4), river = !!(flags[i] & 2); const r = h32(i, 1), r2 = h32(i, 2);
-      let g = 0;
-      if (river && f > 0.62 && r < 0.55) g = GOOD_ID.grain; // the great river valleys feed the world first
-      // regional specialities next
-      if (!g) for (const key in REGION) { if (REGION[key].some(b => inBox(lon, lat, b)) && r2 < (key === 'horses' ? 0.14 : key === 'coal' || key === 'oil' ? 0.3 : key === 'gold' || key === 'ivory' ? 0.1 : key === 'tin' ? 0.4 : 0.22)) { g = GOOD_ID[key]; break; } }
-      if (!g) {
-        if (coast && r < 0.3) g = GOOD_ID.fish;
-        else if (e > 0.55 && r < 0.5) g = r2 < 0.12 ? GOOD_ID.gold : r2 < 0.22 ? GOOD_ID.gems : r2 < 0.55 ? GOOD_ID.iron : GOOD_ID.stone;
-        else if (e > 0.32 && r < 0.45) g = r2 < 0.3 ? GOOD_ID.copper : r2 < 0.6 ? GOOD_ID.iron : r2 < 0.75 ? GOOD_ID.coal : GOOD_ID.stone;
-        else if (r > 0.95) g = r < 0.98 ? GOOD_ID.iron : GOOD_ID.copper; // ore in the lowlands too, now and then
-        else if (f > 0.62 && (river || r < 0.25)) g = GOOD_ID.grain;
-        else if (f > 0.3 && f < 0.7 && al > 42 && al < 66 && r < 0.3) g = r2 < 0.65 ? GOOD_ID.timber : GOOD_ID.furs;
-        else if (f > 0.5 && al < 12 && r < 0.2) g = r2 < 0.5 ? GOOD_ID.spices : GOOD_ID.timber;
-        else if (f > 0.2 && f < 0.5 && al > 30 && al < 56 && r < 0.18) g = r2 < 0.55 ? GOOD_ID.cattle : GOOD_ID.horses;
-        else if (f < 0.25 && (coast || r < 0.08) && r2 < 0.3) g = GOOD_ID.salt;
-        else if (al > 60 && r < 0.25) g = GOOD_ID.furs;
-        else if (f > 0.4 && al > 28 && al < 50 && r < 0.12) g = GOOD_ID.wine;
-      }
-      goods[i] = g;
-    }
-  }
-  const goodsMask = new Int32Array(MAXC), importMask = new Int32Array(MAXC); // per realm: goods it holds / goods its trading partners hold
-  const popcnt = (v) => { v = v - ((v >>> 1) & 0x55555555); v = (v & 0x33333333) + ((v >>> 2) & 0x33333333); return (((v + (v >>> 4)) & 0x0F0F0F0F) * 0x01010101) >>> 24; };
-  const kindMask = (kind) => { let m = 0; GOODS.forEach((g, k) => { if (g && g.kind === kind) m |= 1 << k; }); return m; };
-  const LUX_MASK = kindMask('luxury'), STRAT_MASK = kindMask('strategic');
-  const eraMask = (era) => { let m = 0; GOODS.forEach((g, k) => { if (g && g.era <= era) m |= 1 << k; }); return m; };
-  const ERA_MASKS = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(eraMask);
+  // ---------- goods: what the land yields (econ.js lays them out; the market further down prices and trades them) ----------
+  // goods[i]: the good of a cell (0 = none).  gera[i]: the age in which that place begins to yield it.  wood[i]: how much
+  // timber any inhabited cell gives beside its own good (every country has some wood and stone; the sea gives salt).
+  const GOODS = ECON.GOODS, GOOD_ID = ECON.ID, NG = ECON.NG, NC = ECON.NC, CAT = ECON.CAT;
+  const { goods, gera, wood } = ECON.place(world, W, H);
+  const G_TIMBER = GOOD_ID.timber, G_STONE = GOOD_ID.stone, G_SALT = GOOD_ID.salt;
+  const STRAT_RAW = []; GOODS.forEach((g, k) => { if (g && g.raw && g.kind === 'strategic') STRAT_RAW.push(k); });
 
   const cosLat = new Float32Array(H);
   for (let y = 0; y < H; y++) cosLat[y] = Math.max(0.08, Math.cos((90 - (y + 0.5) / H * 180) * Math.PI / 180));
@@ -194,6 +149,9 @@ function createSim(world, seed) {
   const popOf = new Float32Array(MAXC), cellsOf = new Int32Array(MAXC), strengthOf = new Float32Array(MAXC);
   const acad = new Int32Array(MAXC), temples = new Int32Array(MAXC), ports = new Int32Array(MAXC), markets = new Int32Array(MAXC), wonders = new Int32Array(MAXC), mines = new Int32Array(MAXC), bestCell = new Int32Array(MAXC), bestPop = new Float32Array(MAXC);
   const contact = new Uint16Array(MAXC * MAXC);
+  // what the market needs to know of each realm: the people living on each raw good's land (mines counted over), whether
+  // it holds such land at all (known to it or not), its townspeople, and up to four of its harbours
+  const rawPop = new Float32Array(MAXC * NG), held = new Uint8Array(MAXC * NG), urban = new Float32Array(MAXC), portCells = new Int32Array(MAXC * 4).fill(-1);
   const worldEvents = [];
   let year = -10000, civCount = 0, tickCount = 0, player = -1;
   const st = { year, civCount, player };
@@ -238,7 +196,9 @@ function createSim(world, seed) {
       warStart: {}, cellsAtWar: {}, peakCells: 1, lastCapital: year, eraSince: year - 500,
     };
     c.era = eraOf(c.tech); fmOf[id] = foodMult(c.tech);
-    civs[id] = c; civCount++; st.civCount = civCount;
+    civs[id] = c; civCount++; st.civCount = civCount; lastNb[id] = null;
+    for (let k = 0; k < MAXC; k++) { contact[k * MAXC + id] = 0; contact[id * MAXC + k] = 0; const l = lastNb[k]; if (l) { const j = l.indexOf(id); if (j >= 0) l.splice(j, 1); } }      // (the number may have been a dead realm's: its borders are not this one's)
+    market.born(id, opts.from === undefined ? -1 : opts.from, opts.share || 0);
     owner[home] = id; if (pop[home] < 0.6) pop[home] = 0.6;
     if (!cellName.has(home)) cellName.set(home, makeName(style, 2, 3));
     newRuler(c, true);
@@ -257,6 +217,23 @@ function createSim(world, seed) {
   };
   const traitOf = (c) => (c && c.ruler && TRAITS[c.ruler.trait]) || null;
   const tv = (c, k, d) => { const t = traitOf(c); return t && t[k] !== undefined ? t[k] : d; };
+  // ---------- the market: prices, workshops and trade between realms (econ.js), stepped once a year ----------
+  // what a town raises to work its goods (see BUILD): cell -> for each kind, the plot it stands on + 1 (0 = not built)
+  const IND = ['workshop', 'weaver', 'smithy', 'brewery', 'granary', 'warehouse', 'shipyard', 'factory', 'refinery', 'lab'];
+  const IND_SEC = { workshop: 0, smithy: 1, weaver: 2, brewery: 3, shipyard: 4, factory: 5, refinery: 6, lab: 7 };      // the kind of work each makes cheaper (ECON.SECTORS)
+  const ind = new Map(); const indN = new Int32Array(MAXC * IND.length);
+  const eff = new Float32Array(MAXC * 8).fill(1), keep = new Float32Array(MAXC).fill(1), hold = new Float32Array(MAXC).fill(1);
+  const market = ECON.create({ MAXC, civs, popOf, cellsOf, ports, markets, rawPop, urban, portCells, eff, keep, hold, cellDist, seaRange, tv, seed, year: () => year, player: () => player });
+  // count each realm's workshops, and what they do for it: every kind of work a third cheaper for the first of its
+  // workshops (then by the square root of how many), food kept longer for its granaries, merchants holding more for its warehouses
+  function countIndustry() {
+    indN.fill(0); const NI = IND.length;
+    for (const [i, a] of ind) { const o = owner[i]; if (o < 0 || !civs[o] || !level[i]) continue; for (let k = 0; k < NI; k++) if (a[k]) indN[o * NI + k]++; }
+    for (let c = 0; c < MAXC; c++) { if (!civs[c]) continue; const b = c * NI; for (let k = 0; k < NI; k++) { const sec = IND_SEC[IND[k]]; if (sec !== undefined) eff[c * 8 + sec] = 1 + 0.3 * Math.sqrt(indN[b + k]); } keep[c] = 1 / (1 + 0.6 * Math.sqrt(indN[b + 4])); hold[c] = 1 + 0.5 * Math.sqrt(indN[b + 5]); }
+  }
+  const lastNb = new Array(MAXC).fill(null);
+  const satOf = (c, key) => market.sat[c * NC + CAT[key]];
+  const buildCost = (c) => 1.15 - 0.3 * satOf(c, 'build');      // timber, stone and tools to hand make every work cheaper; short of them, dearer
   function pickTrait(c) {
     const w = { conqueror: 1 + (c.aggression > 0.6 ? 1 : 0), builder: 1, pious: c.religion ? 1.4 : 0.6, scholar: c.era >= 3 ? 1.3 : 0.4, merchant: c.era >= 2 ? 1.2 : 0.3, tyrant: 0.5, steward: 1, navigator: c.era >= 3 && ports[c.id] ? 1.4 : 0.2 };
     let sum = 0; for (const k in w) sum += w[k]; let r = rnd() * sum; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return 'steward';
@@ -298,9 +275,16 @@ function createSim(world, seed) {
     return k;
   }
   function strength(c) {
-    const strat = popcnt(goodsMask[c.id] & STRAT_MASK & ERA_MASKS[c.era]) + Math.min(3, mines[c.id]) * 0.5; // iron, horses, coal... each worth a tenth more; mines dig deeper
+    const strat = (c.era >= 1 ? 4 * satOf(c.id, 'arms') : 0) + Math.min(3, mines[c.id]) * 0.5; // an army with all the arms, horses and guns it wants is two fifths stronger than one with none; mines dig deeper
     const s = (popOf[c.id] + 2) * (0.25 + c.tech * 1.6) * c.policy.military * (year < c.army ? 1.6 : 1) * (0.6 + c.stability * 0.5) * (1 + 0.1 * strat);
     return s;
+  }
+  // what a cell brings its realm's market: its own good, if the realm's age can work it (a mine digs more than twice as
+  // much), and the wood, stone and sea salt any country has
+  function yieldsOf(i, o, c, p) {
+    const g = goods[i], b = o * NG;
+    if (g) { held[b + g] = 1; if (c.era >= gera[i]) rawPop[b + g] += (special[i] & 512) ? p * 2.2 : p; }
+    const wd = wood[i]; if (wd) rawPop[b + G_TIMBER] += p * wd; rawPop[b + G_STONE] += p * 0.1; if (flags[i] & 4) rawPop[b + G_SALT] += p * 0.08;
   }
   const NB = [-W - 1, -W, -W + 1, -1, 1, W - 1, W, W + 1];
   function nbOf(i, k) { // wrap-safe neighbour
@@ -345,7 +329,7 @@ function createSim(world, seed) {
     }
     if (cells.length < 3) return null;
     const style = rnd() < 0.7 ? c.style : styleFor(seedCell);
-    const nc = newCiv(seedCell, { style, tech: c.tech * (0.92 + rnd() * 0.08) });
+    const nc = newCiv(seedCell, { style, tech: c.tech * (0.92 + rnd() * 0.08), from: c.id, share: Math.min(0.9, cells.length / Math.max(1, cellsOf[c.id])) });
     if (!nc) return null;
     nc.gov = c.gov === 'tribe' ? 'tribe' : c.gov === 'empire' ? 'kingdom' : c.gov; nc.era = eraOf(nc.tech);
     nc.religion = c.religion;
@@ -364,7 +348,7 @@ function createSim(world, seed) {
     const top = []; for (let c = 0; c < MAXC; c++) if (civs[c]) top.push([c, popOf[c], cellsOf[c]]);
     top.sort((a, b) => b[1] - a[1]);
     let best = 0; for (const c of civs) if (c && c.tech > best) best = c.tech;
-    history.push({ year, pop: total, wild, civs: civCount, best, top: top.slice(0, 12).map(t => [t[0], Math.round(t[1]), t[2]]) });
+    history.push({ year, pop: total, wild, civs: civCount, best, gdp: Math.round(market.worldGdp), trade: Math.round(market.worldTrade), top: top.slice(0, 12).map(t => [t[0], Math.round(t[1]), t[2]]) });
   }
   // ---------- main tick ----------
   let meanTech = 0.02, lastFounding = -99999;
@@ -372,7 +356,7 @@ function createSim(world, seed) {
     tickCount++; year++;
     if (tickCount % 25 === 0) shufflePerm();
     // per-civ accumulators
-    popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); bestPop.fill(-1); goodsMask.fill(0);
+    popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); bestPop.fill(-1); rawPop.fill(0); held.fill(0); urban.fill(0); portCells.fill(-1);
     const budget = new Float32Array(MAXC);
     let techSum = 0, techN = 0;
     for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; strengthOf[c] = strength(cv); fmOf[c] = foodMult(cv.tech); techSum += cv.tech; techN++; }
@@ -390,19 +374,19 @@ function createSim(world, seed) {
       }
       if (c) {
         popOf[o] += p; cellsOf[o]++;
-        if (special[i] & 1) ports[o]++; if (special[i] & 2) acad[o]++; if (special[i] & 4) temples[o]++; if (special[i] & 8) markets[o]++; if (special[i] & 16) wonders[o]++; if (special[i] & 512) mines[o]++;
-        if (goods[i] && p > 0.05) goodsMask[o] |= 1 << goods[i];
+        if (special[i] & 1) { if (ports[o] < 4) portCells[o * 4 + ports[o]] = i; ports[o]++; } if (special[i] & 2) acad[o]++; if (special[i] & 4) temples[o]++; if (special[i] & 8) markets[o]++; if (special[i] & 16) wonders[o]++; if (special[i] & 512) mines[o]++;
+        if (p > 0.05) yieldsOf(i, o, c, p);
         if (p > bestPop[o]) { bestPop[o] = p; bestCell[o] = i; }
         // settlement level, relative to what the era can feed
         const fm = fmOf[o]; const s1 = 6 * fm + 0.2, s2 = 25 * fm + 1, s3 = 90 * fm + 4, s4 = 300 * fm + 15;
         const prevLvl = level[i];
         level[i] = p >= s4 ? 4 : p >= s3 ? 3 : p >= s2 ? 2 : p >= s1 ? 1 : 0;
-        if (level[i] >= 2) { const q = Math.min(255, Math.round(Math.log2(p * 20 + 1) * 16)); if (q > peak[i]) peak[i] = q; }
+        if (level[i] >= 2) { urban[o] += p; const q = Math.min(255, Math.round(Math.log2(p * 20 + 1) * 16)); if (q > peak[i]) peak[i] = q; }
         if (level[i]) { const b = Math.min(255, Math.round(Math.log2(p * 1000 + 1) * 3)); if (b > gBand[i]) { gPrev[i] = gBand[i]; gBand[i] = b; gYear[i] = year; } else if (b < gBand[i]) { gBand[i] = b; gPrev[i] = b; } }
         else if (gBand[i]) { gBand[i] = 0; gPrev[i] = 0; gYear[i] = -1e9; }
         // a town that shrinks to a hamlet, or dies, leaves its stones (sudden or slow); a town rebuilt over them clears them
         if (prevLvl >= 2 && level[i] < 2) markRuin(i, c.era, c.culture);
-        else if (level[i] >= 2 && ruins.has(i) && year - ruins.get(i).year > 5) { ruins.delete(i); }
+        else if (level[i] >= 2 && p >= s2 * 1.1 && ruins.has(i) && year - ruins.get(i).year > 5) { ruins.delete(i); }      // (well clear of the size of a town: a saved world's rounded numbers must not rebuild one)
         if (c.capital === i && level[i] < 1) level[i] = 1;
         if (level[i] && !cellName.has(i)) cellName.set(i, makeName(c.style, 2, 3));
         if (level[i] && siteU[i] < 0) { siteU[i] = 0.25 + rnd() * 0.5; siteV[i] = 0.25 + rnd() * 0.5; }
@@ -420,15 +404,16 @@ function createSim(world, seed) {
       cv.tech = Math.min(1, cv.tech + dt);
       syncEra(cv, c);
       // wealth
-      const known = ERA_MASKS[cv.era]; const own = goodsMask[c] & known, imp = importMask[c] & known & ~own; const nGoods = popcnt(own) + popcnt(imp) * 0.5, nLux = popcnt(own & LUX_MASK) + popcnt(imp & LUX_MASK) * 0.5;
-      cv.trade = { own, imp, n: nGoods };
-      const income = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * (1 + ports[c] * 0.05 + Math.min(0.3, markets[c] * 0.04) + Math.min(0.3, mines[c] * 0.05) + Math.min(0.4, nGoods * 0.025) * (1 + Math.min(0.5, markets[c] * 0.1))) * tv(cv, 'income', 1) - popOf[c] * 0.05 * (cv.policy.military - 1);
+      // (how well the people live, by last year's market: fed, clothed, housed and supplied; and what the customs took at the border)
+      const living = market.LS[c], customs = market.rev[c];
+      cv.trade = { living, customs, imp: market.impV[c], exp: market.expV[c] };
+      const income = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * (1 + ports[c] * 0.05 + Math.min(0.3, markets[c] * 0.04) + Math.min(0.3, mines[c] * 0.05) + 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1))) * tv(cv, 'income', 1) - popOf[c] * 0.05 * (cv.policy.military - 1) + customs;
       cv.income = income; cv.wealth += income;
       // stability: drifts to a target set by war, overreach, taxes and stance; crises knock it down
       const atWarN = Object.keys(cv.wars).length;
       const overreach = Math.max(0, cellsOf[c] / (40 + cv.tech * 3000) - 1);
-      const target = 1 - atWarN * 0.12 - overreach * 0.5 - (cv.policy.tax - 1) * 0.3 - (cv.policy.stance === 'aggressive' ? 0.12 : 0) + Math.min(0.15, temples[c] * 0.03) + Math.min(0.15, wonders[c] * 0.05) + Math.min(0.12, nLux * 0.02) + tv(cv, 'stab', 0);
-      aiBuild(cv);
+      const target = 1 - atWarN * 0.12 - overreach * 0.5 - (cv.policy.tax - 1) * 0.3 - (cv.policy.stance === 'aggressive' ? 0.12 : 0) + Math.min(0.15, temples[c] * 0.03) + Math.min(0.15, wonders[c] * 0.05) + 0.12 * satOf(c, 'luxury') - 0.2 * Math.max(0, 0.75 - satOf(c, 'food')) + tv(cv, 'stab', 0);
+      aiBuild(cv); aiIndustry(cv);
       cv.stability += (Math.min(1, target) - cv.stability) * 0.012;
       if (cellsOf[c] > 30 && rnd() < 0.0035 * Math.min(1, cellsOf[c] / 1500) + 0.0004) {
         cv.stability -= 0.25 + rnd() * 0.3;
@@ -533,25 +518,28 @@ function createSim(world, seed) {
           const n = contact[c * MAXC + b]; if (!n) continue;
           const bv = civs[b]; if (!bv || isAtWar(a, b) || (a.truce[b] || -1e9) > year) continue;
           const sa = strengthOf[c], sb = strengthOf[b];
-          const covetMask = goodsMask[b] & STRAT_MASK & ERA_MASKS[a.era] & ~goodsMask[c];
-          if (sa > sb * 1.15 && rnd() < a.aggression * tv(a, 'agg', 1) * 0.14 * (a.policy.stance === 'aggressive' ? 2 : 1) * (covetMask ? 1.6 : 1)) { let why; if (covetMask) { let k = 1; while (!(covetMask & (1 << k))) k++; why = `for its ${GOODS[k].name.toLowerCase()}`; } else why = pick(['over a border dispute', 'for glory', 'to seize its fields', 'after an insult to its ruler', 'to punish raids', '', '']); declareWar(a, bv, why); break; }
+          // (a strategic good its own age can use, that the other holds and it does not: the one it is shortest of)
+          let covet = 0, worst = -1; for (const g of STRAT_RAW) { if (GOODS[g].era > a.era || !held[b * NG + g] || held[c * NG + g]) continue; const sh = market.shortOf(c, g); if (sh > worst) { worst = sh; covet = g; } }
+          if (sa > sb * 1.15 && rnd() < a.aggression * tv(a, 'agg', 1) * 0.14 * (a.policy.stance === 'aggressive' ? 2 : 1) * (covet ? 1.6 : 1)) { let why; if (covet) why = `for its ${GOODS[covet].name.toLowerCase()}`; else why = pick(['over a border dispute', 'for glory', 'to seize its fields', 'after an insult to its ruler', 'to punish raids', '', '']); declareWar(a, bv, why); break; }
         }
       }
-      // tech diffusion, religion spread and trade
-      importMask[c] = 0;
+      // tech diffusion, religion spread, and who the merchants can reach by land (the realms touched in these ten years or the ten before)
+      const nb = [];
       for (let b = 0; b < MAXC; b++) {
-        const n = contact[c * MAXC + b]; if (!n) continue; const bv = civs[b]; if (!bv) continue;
-        if (!isAtWar(a, b)) importMask[c] |= goodsMask[b];
+        const n = contact[c * MAXC + b]; if (!n) continue; const bv = civs[b]; if (!bv) { contact[c * MAXC + b] = 0; continue; }
+        nb.push(b);
         if (bv.tech > a.tech) a.tech += (bv.tech - a.tech) * 0.015;
         if (!a.religion && bv.religion && rnd() < 0.08) { a.religion = bv.religion; logEvent(a, `${fullName(a)} adopts ${bv.religion}`, cellsOf[c] > 40); }
         contact[c * MAXC + b] = 0;
       }
+      { const was = lastNb[c]; lastNb[c] = nb; let all = nb; if (was) { all = nb.slice(); for (const b of was) if (civs[b] && all.indexOf(b) < 0) all.push(b); } market.touch(c, all); }
       syncEra(a, c);
     }
     // random disasters
     if (rnd() < 0.012) plague(pick(LI), 8 + rint(14), true);
     finishWorks();
     livingWorld();
+    countIndustry(); market.step(); if (tickCount % 3 === 0) hungerWatch();
     if (year % 20 === 0) record();
     st.year = year; st.civCount = civCount;
   }
@@ -643,7 +631,7 @@ function createSim(world, seed) {
     for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
       const yy = y0 + dy; if (yy < 0 || yy >= H) continue; const i = yy * W + ((x0 + dx + W) % W);
       if (!land[i]) continue; const o = owner[i]; if (o >= 0 && civs[o]) hit = civs[o]; if (level[i] >= 2 && o >= 0 && civs[o]) markRuin(i, civs[o].era, civs[o].culture);
-      pop[i] = 0; owner[i] = -1; infra[i] = 0; walls[i] = 0; special[i] = 0; level[i] = 0; bonusFert[i] = Math.max(-0.5, bonusFert[i] - 0.4);
+      pop[i] = 0; owner[i] = -1; infra[i] = 0; walls[i] = 0; special[i] = 0; level[i] = 0; ind.delete(i); bonusFert[i] = Math.max(-0.5, bonusFert[i] - 0.4);
     }
     if (hit) logEvent(hit, `Fire falls from the sky upon ${fullName(hit)}`, true); else pushWorld({ year, text: `A meteor strikes ${describeCell(center)}`, civ: -1, type: 'disaster', loc: center });
   }
@@ -687,7 +675,17 @@ function createSim(world, seed) {
     market: { cost: 70, dur: 8, slot: true, name: 'Market', desc: 'A market quarter. +4% income, and trade goods earn more.' },
     temple: { cost: 80, dur: 12, slot: true, name: 'Temple', desc: 'A temple quarter. +3% stability; faith spreads from here.' },
     academy: { cost: 150, dur: 14, slot: true, name: 'Academy', desc: 'Scholars and a library. +8% knowledge growth.' },
-    mine: { cost: 110, dur: 10, slot: true, name: 'Mine', desc: 'Works the ore under this land. +10% strength and income from what it yields.' },
+    mine: { cost: 110, dur: 10, slot: true, name: 'Mine', desc: 'Works what this land yields, in earnest: more than twice as much of it comes to market.' },
+    workshop: { cost: 60, dur: 8, slot: true, ind: true, name: 'Workshops', desc: 'Potters, tanners, glassmakers, papermakers and jewellers under one roof. Their work costs a third less.' },
+    weaver: { cost: 60, dur: 8, slot: true, ind: true, name: 'Weaving house', desc: 'Looms for wool, cotton and flax. Cloth costs a third less to make.' },
+    smithy: { cost: 80, dur: 10, slot: true, ind: true, name: 'Smithy', desc: 'Forges for bronze, tools, arms and guns. Metalwork costs a third less.' },
+    brewery: { cost: 50, dur: 6, slot: true, ind: true, name: 'Brewery', desc: 'Brewers and distillers. Beer and spirits cost a third less to make.' },
+    granary: { cost: 50, dur: 6, slot: true, ind: true, name: 'Granary', desc: 'Food keeps: far less of the stored harvest rots, so a bad year does less harm.' },
+    warehouse: { cost: 80, dur: 8, slot: true, ind: true, name: 'Warehouse', desc: 'Merchants hold half as much again, so more passes through your markets and more reaches them.' },
+    shipyard: { cost: 120, dur: 12, slot: true, ind: true, name: 'Shipyard', desc: 'Slips and sheds by the harbour. Ships cost a third less to build.' },
+    factory: { cost: 260, dur: 10, slot: true, ind: true, name: 'Factory', desc: 'Steel, engines, mills and motor works. Heavy industry costs a third less.' },
+    refinery: { cost: 320, dur: 10, slot: true, ind: true, name: 'Refinery', desc: 'Fuel, plastics, aluminium and powder. Chemical work costs a third less.' },
+    lab: { cost: 400, dur: 10, slot: true, ind: true, name: 'Electronics works', desc: 'Clean rooms and assembly lines. Electronics cost a third less to make.' },
     wonder: { cost: 420, dur: 60, slot: true, name: 'Wonder', desc: 'A work of ages in the capital. +5% stability, remembered forever.' },
     capital: { cost: 200, dur: 0, slot: false, name: 'Move capital', desc: 'The court moves to this town.' },
     levy: { cost: 120, dur: 0, slot: false, name: 'Levy', desc: 'Raise a great army for 30 years.' },
@@ -695,15 +693,18 @@ function createSim(world, seed) {
   const COST = {}; for (const k in BUILD) COST[k] = BUILD[k].cost; COST.develop = COST.farm; COST.fortify = COST.walls;
   const DUR_ERA = [1.4, 1.2, 1.1, 1, 1, 0.9, 0.6, 0.4, 0.3];
   const durOf = (kind, era) => BUILD[kind].dur ? Math.max(1, Math.round(BUILD[kind].dur * DUR_ERA[Math.min(8, era)])) : 0;
-  function costOf(kind) { const c = playerCiv(); const f = c ? 1 + c.tech * 4 + Math.sqrt(popOf[c.id]) / 40 : 1; return Math.round((COST[kind] || 0) * f); }
+  function costOf(kind) { const c = playerCiv(); const f = c ? (1 + c.tech * 4 + Math.sqrt(popOf[c.id]) / 40) * (BUILD[kind] && BUILD[kind].dur ? buildCost(c.id) : 1) : 1; return Math.round((COST[kind] || 0) * f); }
   const SLOT_SHIFT = { temple: 0, academy: 4, market: 8, wonder: 12 };
-  const slotOf = (i, kind) => kind === 'mine' ? (slotB[i] & 15) - 1 : SLOT_SHIFT[kind] !== undefined ? ((slotA[i] >> SLOT_SHIFT[kind]) & 15) - 1 : -1;
+  const indAt = (i, kind) => { const a = ind.get(i); return a ? a[IND.indexOf(kind)] : 0; };      // plot + 1 of a workshop of this kind here, or 0
+  const slotOf = (i, kind) => kind === 'mine' ? (slotB[i] & 15) - 1 : SLOT_SHIFT[kind] !== undefined ? ((slotA[i] >> SLOT_SHIFT[kind]) & 15) - 1 : BUILD[kind] && BUILD[kind].ind ? indAt(i, kind) - 1 : -1;
   const setSlot = (i, kind, slot) => { if (kind === 'mine') slotB[i] = (slotB[i] & 0xF0) | ((slot + 1) & 15); else if (SLOT_SHIFT[kind] !== undefined) slotA[i] = (slotA[i] & ~(15 << SLOT_SHIFT[kind])) | (((slot + 1) & 15) << SLOT_SHIFT[kind]); };
   const NSLOTS = 12;
-  function usedSlots(i) { const used = new Set(); for (const k of ['temple', 'academy', 'market', 'wonder', 'mine']) { const sl = slotOf(i, k); if (sl >= 0) used.add(sl); } const w = works.get(i); if (w) for (const x of w) if (x.slot >= 0) used.add(x.slot); return used; }
+  function usedSlots(i) { const used = new Set(); for (const k of ['temple', 'academy', 'market', 'wonder', 'mine']) { const sl = slotOf(i, k); if (sl >= 0) used.add(sl); } const a = ind.get(i); if (a) for (let k = 0; k < a.length; k++) if (a[k]) used.add(a[k] - 1); const w = works.get(i); if (w) for (const x of w) if (x.slot >= 0) used.add(x.slot); return used; }
+  // what the work on a cell's own good is called: a mine, a quarry, a vineyard...
+  const WORK_NAME = { stone: 'Quarry', salt: 'Saltworks', oil: 'Oil field', gas: 'Gas field', fish: 'Fishery', cattle: 'Ranch', horses: 'Stud farm', wool: 'Sheep run', timber: 'Lumber camp', furs: 'Trapping post', ivory: 'Hunting camp', wine: 'Vineyard', olives: 'Olive groves', silk: 'Silk farm', amber: 'Amber diggings', grain: 'Great farm', rice: 'Paddy estate', maize: 'Great farm' };
+  const workName = (i) => { const g = goods[i] ? GOODS[goods[i]] : null; return !g ? 'Mine' : WORK_NAME[g.key] || (g.mine ? 'Mine' : 'Plantation'); };
   function freeSlots(i) { const used = usedSlots(i); const out = []; for (let k = 0; k < NSLOTS; k++) if (!used.has(k)) out.push(k); return out; }
   const inProgress = (i, kind) => { const w = works.get(i); return w ? w.find(x => x.k === kind) || null : null; };
-  const MINEABLE = ['copper', 'tin', 'iron', 'coal', 'oil', 'gold', 'gems', 'stone', 'salt'];
   // can this realm start this work here? returns null when it can, else the reason
   function cannot(c, kind, i) {
     const B = BUILD[kind]; if (!B) return 'Unknown work';
@@ -723,7 +724,14 @@ function createSim(world, seed) {
     if (kind === 'academy') return level[i] < 2 ? 'Needs a town or city' : c.era < 3 ? 'Academies come with the Classical age' : (special[i] & 2) ? 'Already has an academy' : null;
     if (kind === 'temple') return level[i] < 1 ? 'Needs a settlement' : (special[i] & 4) ? 'Already has a temple' : null;
     if (kind === 'market') return level[i] < 1 ? 'Needs a settlement' : c.era < 1 ? 'Markets come with the Bronze Age' : (special[i] & 8) ? 'Already has a market' : null;
-    if (kind === 'mine') { const g = goods[i] ? GOODS[goods[i]] : null; return !g || !MINEABLE.includes(g.key) ? 'Nothing here to mine' : !(ERA_MASKS[c.era] & (1 << goods[i])) ? `Your people cannot yet work ${g.name.toLowerCase()}` : (special[i] & 512) ? 'Already mined' : level[i] < 1 ? 'Needs a settlement' : null; }
+    if (B.ind) {
+      if (indAt(i, kind)) return 'Already built here';
+      const need = { smithy: 1, warehouse: 1, shipyard: 2, factory: 6, refinery: 7, lab: 8 }[kind] || 0; if (c.era < need) return `Not before the ${ERAS[need][0]}${/Age$/.test(ERAS[need][0]) ? '' : ' age'}`;
+      if (kind === 'shipyard') return !(special[i] & 1) ? 'Needs a harbour' : null;
+      if (kind === 'smithy' || kind === 'warehouse' || kind === 'factory' || kind === 'refinery' || kind === 'lab') return level[i] < 2 ? 'Needs a town or city' : null;
+      return level[i] < 1 ? 'Needs a settlement' : null;
+    }
+    if (kind === 'mine') { const g = goods[i] ? GOODS[goods[i]] : null; return !g ? 'This land yields nothing to work' : c.era < gera[i] ? `Your people cannot yet work ${g.name.toLowerCase()}` : (special[i] & 512) ? 'Already mined' : level[i] < 1 ? 'Needs a settlement' : null; }
     if (kind === 'wonder') return i !== c.capital ? 'Wonders rise in the capital' : level[i] < 2 ? 'The capital must be a town first' : (special[i] & 16) ? 'The capital already has its wonder' : null;
     if (kind === 'capital') return level[i] < 2 ? 'A capital needs at least a town' : c.capital === i ? 'Already the capital' : null;
     return null;
@@ -736,13 +744,14 @@ function createSim(world, seed) {
     if (kind === 'capital') { c.capital = i; logEvent(c, `The court moves to ${cellName.get(i)}`, false); return 'Capital moved'; }
     let sl = -1; if (B.slot) { const free = freeSlots(i); if (!free.length) { c.wealth += cost; return 'No room left around the town'; } sl = free.includes(slot) ? slot : free[rint(free.length)]; }
     const dur = durOf(kind, c.era); const list = works.get(i) || []; list.push({ k: kind, slot: sl, start: year, dur }); works.set(i, list);
-    return `${B.name} under construction · ${dur} year${dur === 1 ? '' : 's'}`;
+    return `${kind === 'mine' ? workName(i) : B.name} under construction · ${dur} year${dur === 1 ? '' : 's'}`;
   }
   function applyWork(c, i, w) {
     const k = w.k; if (k === 'farm') infra[i] = Math.min(5, infra[i] + 1); else if (k === 'walls') walls[i] = Math.min(3, walls[i] + 1); else if (k === 'port') special[i] |= 1; else if (k === 'academy') special[i] |= 2; else if (k === 'temple') special[i] |= 4; else if (k === 'market') special[i] |= 8; else if (k === 'mine') special[i] |= 512;
+    else if (BUILD[k].ind) { let a = ind.get(i); if (!a) ind.set(i, a = new Uint8Array(IND.length)); a[IND.indexOf(k)] = Math.max(1, w.slot + 1); }
     else if (k === 'wonder') { special[i] = (special[i] & ~(15 << 5)) | 16 | ((c ? c.era : 0) << 5); if (c) logEvent(c, `${fullName(c)} completes a wonder at ${cellName.get(i)}`, true, 'state', i); }
     if (w.slot >= 0) setSlot(i, k, w.slot);
-    if (c && c.player && k !== 'wonder') logEvent(c, `${BUILD[k].name} finished at ${cellName.get(i) || 'the town'}`, false, 'city', i);
+    if (c && c.player && k !== 'wonder') logEvent(c, `${k === 'mine' ? workName(i) : BUILD[k].name} finished at ${cellName.get(i) || 'the town'}`, false, 'city', i);
   }
   function finishWorks() {
     for (const [i, list] of works) {
@@ -756,7 +765,7 @@ function createSim(world, seed) {
   function rankOf(cv) { let r = 1; const p = popOf[cv.id]; for (const o of civs) if (o && o !== cv && popOf[o.id] > p) r++; return r; }
   function aiBuild(cv) {
     if (cv.player || cv.wealth < 30 || rnd() > 0.3 * tv(cv, 'buildRate', 1)) return;
-    const c = cv.id; const f = (1 + cv.tech * 4 + Math.sqrt(popOf[c]) / 40) * 0.6;
+    const c = cv.id; const f = (1 + cv.tech * 4 + Math.sqrt(popOf[c]) / 40) * 0.6 * buildCost(c);
     const i = rnd() < 0.45 ? cv.capital : bestCell[c]; if (i < 0 || owner[i] !== c || !level[i]) return;
     const e = cv.era, lv = level[i]; const opts = [];
     if (e >= 1 && !(special[i] & 8)) opts.push(['market', 8]);
@@ -765,7 +774,7 @@ function createSim(world, seed) {
     if (e >= 2 && (flags[i] & 4) && !(special[i] & 1)) opts.push(['port', 1]);
     if (e >= 1 && e <= 5 && lv >= 2 && walls[i] < (e >= 4 ? 3 : 2) && (Object.keys(cv.wars).length || rnd() < 0.5)) opts.push(['walls', 0]);
     if (infra[i] < 5 && rnd() < 0.5) opts.push(['farm', 0]);
-    if (goods[i] && MINEABLE.includes(GOODS[goods[i]].key) && (ERA_MASKS[e] & (1 << goods[i])) && !(special[i] & 512)) opts.push(['mine', 512]);
+    if (goods[i] && e >= gera[i] && !(special[i] & 512) && (GOODS[goods[i]].mine || rnd() < 0.4)) opts.push(['mine', 512]);
     if (i === cv.capital && !(special[i] & 16) && lv >= 2 && rankOf(cv) <= 4) opts.push(['wonder', 16]);
     if (!opts.length) return;
     const want = tv(cv, 'build', null); const pref = want ? opts.filter(o => want.includes(o[0])) : []; const from = pref.length && rnd() < 0.7 ? pref : opts;
@@ -773,6 +782,28 @@ function createSim(world, seed) {
     const w = works.get(i); if (w && w.length >= 2) return; // one or two sites at a time
     startWork(cv, k, i, -1, cost);
     if (k === 'wonder') logEvent(cv, `${fullName(cv)} begins a wonder at ${cellName.get(i)}`, cellsOf[c] > 60, 'state', i);
+  }
+  // hunger: when a realm that was fed finds itself with less than half the food it wants, the chronicle hears of it
+  // (always in the player's realm, now and then elsewhere), and the people are restless for it
+  function hungerWatch() {
+    if (market.steps < 30) return;
+    for (let c = 0; c < MAXC; c++) {
+      const cv = civs[c]; if (!cv) continue; const f = satOf(c, 'food'); const was = cv.fed === undefined ? 1 : cv.fed; cv.fed = f;
+      if (f >= 0.45 || was < 0.45 || year - (cv.hungerAt || -1e9) < 30) continue;
+      cv.hungerAt = year; cv.stability = Math.max(0, cv.stability - 0.06);
+      if (cv.player || (cellsOf[c] > 80 && rnd() < 0.25)) logEvent(cv, `${pick(['Famine', 'Hunger', 'A failed harvest'])} in ${fullName(cv)}: there is bread for ${Math.round(f * 100)} in a hundred`, cellsOf[c] > 300 || cv.player, 'disaster');
+    }
+  }
+  // AI workshops: now and then a state raises one in its capital or its greatest town, of a kind its age and its goods call for
+  function aiIndustry(cv) {
+    if (cv.player || cv.wealth < 60 || rnd() > 0.12 * tv(cv, 'buildRate', 1)) return;
+    const c = cv.id; const i = rnd() < 0.5 ? cv.capital : bestCell[c]; if (i < 0 || owner[i] !== c || !level[i]) return;
+    const w = works.get(i); if (w && w.length >= 2) return; if (freeSlots(i).length < 3) return;      // (plots are kept for the temple, the market and the rest)
+    const b = c * NG; const has = (key) => held[b + GOOD_ID[key]] || market.imp[b + GOOD_ID[key]] > 0; const opts = [];
+    for (const k of IND) { if (cannot(cv, k, i)) continue; if (k === 'smithy' && !(has('copper') || has('iron'))) continue; if (k === 'brewery' && !(has('grain') || has('sugar') || has('wine'))) continue; opts.push(k); }
+    if (!opts.length) return; const k = opts[Math.floor(rnd() * opts.length)];
+    const cost = COST[k] * (1 + cv.tech * 4 + Math.sqrt(popOf[c]) / 40) * 0.6 * buildCost(c); if (cv.wealth < cost) return;
+    startWork(cv, k, i, -1, cost);
   }
   function act(kind, i, slot) {
     if (kind === 'develop') kind = 'farm'; if (kind === 'fortify') kind = 'walls';
@@ -802,6 +833,7 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(cellsOf[c.id] > 20 || c.player ? -30 : -8), rulers: c.rulers.slice(-10) } : null), worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]),
     };
   }
   function load(s) {
@@ -815,6 +847,7 @@ function createSim(world, seed) {
     for (let k = 0; k < s.special.length; k += 2) special[s.special[k]] = s.special[k + 1];
     peak.fill(0); if (s.peak) for (let k = 0; k < s.peak.length; k += 2) peak[s.peak[k]] = s.peak[k + 1];
     slotA.fill(0); if (s.slotA) for (let k = 0; k < s.slotA.length; k += 2) slotA[s.slotA[k]] = s.slotA[k + 1]; slotB.fill(0); if (s.slotB) for (let k = 0; k < s.slotB.length; k += 2) slotB[s.slotB[k]] = s.slotB[k + 1];
+    ind.clear(); if (s.ind) for (const [i, a] of s.ind) { const u = new Uint8Array(IND.length); u.set(a.slice(0, IND.length)); ind.set(+i, u); }
     works.clear(); if (s.works) for (const [i, l] of s.works) works.set(+i, l.map(([k, slot, start, dur]) => ({ k, slot, start, dur })));
     gBand.fill(0); gPrev.fill(0); gYear.fill(-1e9); if (s.grow) for (let k = 0; k < s.grow.length; k += 4) { gBand[s.grow[k]] = s.grow[k + 1]; gPrev[s.grow[k]] = s.grow[k + 2]; gYear[s.grow[k]] = s.grow[k + 3]; }
     ruins.clear(); if (s.ruins) for (const [k, v] of s.ruins) ruins.set(+k, v); if (s.volc) s.volc.forEach((v, k) => { if (volcanoes[k]) { volcanoes[k].last = v[0]; volcanoes[k].erupting = v[1]; } }); if (s.comet !== undefined) comet = s.comet;
@@ -825,21 +858,29 @@ function createSim(world, seed) {
     civs.fill(null); freeIds.length = 0; civCount = 0;
     for (let c = MAXC - 1; c >= 0; c--) { if (s.civs[c]) { civs[c] = s.civs[c]; civCount++; fmOf[c] = foodMult(civs[c].tech); if (civs[c].eraSince === undefined) civs[c].eraSince = year - 500; } else freeIds.push(c); }
     worldEvents.length = 0; worldEvents.push(...s.worldEvents); history.length = 0; if (s.history) history.push(...s.history);
-    recount(); st.year = year; st.civCount = civCount; st.player = player;
+    recount(); countIndustry(); st.year = year; st.civCount = civCount; st.player = player;
+    // the market as it was left; a world saved before there was one gets thirty quiet years to find its prices
+    if (!market.load(s.econ)) { for (let c = 0; c < MAXC; c++) if (civs[c]) market.born(c, -1, 0); touchAll(); market.warm(30); } else touchAll();
+  }
+  // who touches whom by land, read off the map (the tick keeps it up from border contacts afterwards)
+  function touchAll() {
+    const sets = new Map();
+    for (let k = 0; k < LI.length; k++) { const i = LI[k]; const o = owner[i]; if (o < 0) continue; for (const d of [1, W]) { const y = (i / W) | 0; const j = d === 1 ? y * W + ((i - y * W + 1) % W) : i + W; if (j >= N) continue; const on = owner[j]; if (on >= 0 && on !== o) { let a = sets.get(o); if (!a) sets.set(o, a = new Set()); a.add(on); let b = sets.get(on); if (!b) sets.set(on, b = new Set()); b.add(o); } } }
+    for (let c = 0; c < MAXC; c++) { const l = civs[c] && sets.has(c) ? [...sets.get(c)].filter(b => civs[b]) : null; lastNb[c] = l; market.touch(c, l); }
   }
   // rebuild everything the tick derives from the cell arrays (levels, per-realm totals, strengths) so a loaded or edited world reads right before its first year runs
   function recount() {
-    popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); bestPop.fill(-1); goodsMask.fill(0);
+    popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); bestPop.fill(-1); rawPop.fill(0); held.fill(0); urban.fill(0); portCells.fill(-1);
     for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; fmOf[c] = foodMult(cv.tech); }
     for (let k = 0; k < LI.length; k++) {
       const i = LI[k]; const o = owner[i]; const c = o >= 0 ? civs[o] : null; const p = pop[i];
       if (!c) { level[i] = 0; continue; }
       popOf[o] += p; cellsOf[o]++;
-      if (special[i] & 1) ports[o]++; if (special[i] & 2) acad[o]++; if (special[i] & 4) temples[o]++; if (special[i] & 8) markets[o]++; if (special[i] & 16) wonders[o]++; if (special[i] & 512) mines[o]++;
-      if (goods[i] && p > 0.05) goodsMask[o] |= 1 << goods[i];
+      if (special[i] & 1) { if (ports[o] < 4) portCells[o * 4 + ports[o]] = i; ports[o]++; } if (special[i] & 2) acad[o]++; if (special[i] & 4) temples[o]++; if (special[i] & 8) markets[o]++; if (special[i] & 16) wonders[o]++; if (special[i] & 512) mines[o]++;
+      if (p > 0.05) yieldsOf(i, o, c, p);
       if (p > bestPop[o]) { bestPop[o] = p; bestCell[o] = i; }
       const fm = fmOf[o]; const s1 = 6 * fm + 0.2, s2 = 25 * fm + 1, s3 = 90 * fm + 4, s4 = 300 * fm + 15;
-      level[i] = p >= s4 ? 4 : p >= s3 ? 3 : p >= s2 ? 2 : p >= s1 ? 1 : 0;
+      level[i] = p >= s4 ? 4 : p >= s3 ? 3 : p >= s2 ? 2 : p >= s1 ? 1 : 0; if (level[i] >= 2) urban[o] += p;
       if (c.capital === i && level[i] < 1) level[i] = 1;
       if (level[i] && !cellName.has(i)) cellName.set(i, makeName(c.style, 2, 3));
       if (level[i] && !gBand[i]) { gBand[i] = Math.min(255, Math.round(Math.log2(p * 1000 + 1) * 3)); gPrev[i] = gBand[i]; }
@@ -852,7 +893,16 @@ function createSim(world, seed) {
     BUILD, works, slotA, slotB, gBand, gPrev, gYear, NSLOTS, slotOf, freeSlots, inProgress, durOf, cannot(kind, i) { const c = playerCiv(); return c ? cannot(c, kind, i) : 'No state'; },
     popOf, cellsOf, strengthOf, acad, temples, ports, markets, wonders, worldEvents, allEvents, history, ERAS, COST,
     volcanoes, fires, floods, quakes, battles, plagues, ruins, rubble, get comet() { return comet; },
-    goods, GOODS, GOOD_ID, goodsMask, importMask, ERA_MASKS, LUXMASK: LUX_MASK, STRATMASK: STRAT_MASK, popcnt, goodsList(mask) { const out = []; for (let k = 1; k < GOODS.length; k++) if (mask & (1 << k)) out.push(GOODS[k]); return out; },
+    goods, gera, GOODS, GOOD_ID, market, rawPop, held, urban, satOf, touchAll, IND, ind, indN, indAt, workName, eff,
+    cellDist,
+    // where a realm's yearly income comes from (the same sum the tick makes), for the ledger
+    incomeParts(cv) {
+      const c = cv.id, base = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * tv(cv, 'income', 1), living = market.LS[c];
+      const parts = { taxes: base, ports: base * ports[c] * 0.05, markets: base * Math.min(0.3, markets[c] * 0.04), mines: base * Math.min(0.3, mines[c] * 0.05), living: base * 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1)), customs: market.rev[c], upkeep: popOf[c] * 0.05 * (cv.policy.military - 1) };
+      parts.net = parts.taxes + parts.ports + parts.markets + parts.mines + parts.living + parts.customs - parts.upkeep; return parts;
+    },
+    // does this realm's age know how to work what this cell yields?
+    knows(c, i) { return !!goods[i] && !!c && c.era >= gera[i]; },
     tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, plague, meteor, bounty,
     TRAITS, traitOf, fullName, fmtYear, describeCell, isAtWar, capacity, eraOf, strength, save, load, recount, rnd, religionName, makeName, logEvent, evolveGovAll,
     settlementsOf(id) { const out = []; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === id && level[i]) out.push(i); } out.sort((a, b) => pop[b] - pop[a]); return out; },

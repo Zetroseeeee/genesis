@@ -1,11 +1,12 @@
 // Which buildings of a town are real models and which still fall back to the procedural kit, by culture and era.
 //   node tools/coverage.js [eras, default 0,1,2] [--all] [--wonder]     (needs data/models/index.json: tools/models/fetch.mjs)
 //   --all lists the model behind every role; --wonder plans the capital with its age's wonder in place of the landmark
-// For every culture a capital is planned with every work built (walls, port, academy, temple, market, wonder, mine)
+// For every culture a capital is planned with every work built (walls, port, academy, temple, market, wonder, mine,
+// and every workshop its age knows)
 // and each planned item is looked up the way the game does it (role first, then kind).
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
-require('../src/geo.js'); (0, eval)(fs.readFileSync('src/town.js', 'utf8')); (0, eval)(fs.readFileSync('src/sim.js', 'utf8'));
+require('../src/geo.js'); (0, eval)(fs.readFileSync('src/town.js', 'utf8')); (0, eval)(fs.readFileSync('src/econ.js', 'utf8')); (0, eval)(fs.readFileSync('src/sim.js', 'utf8'));
 const W = 720, H = 360, N = W * H; const png = PNG.sync.read(fs.readFileSync('data/world.png'));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
 for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.data[i * 4 + 1] / 255; wd.flags[i] = png.data[i * 4 + 2]; wd.land[i] = png.data[i * 4 + 2] & 1; }
@@ -20,7 +21,8 @@ for (const era of eras) {
   for (const name of Object.keys(SITES)) {
     const [lon, lat] = SITES[name]; const sim = createSim(wd, 7); const i = Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
     const c = sim.setPlayer(i, 'T', [0.5, 0.5]); if (!c) { console.log(name, 'cannot found here'); continue; }
-    c.tech = TECH[era]; c.era = sim.eraOf(c.tech); sim.pop[c.capital] = 6; sim.walls[c.capital] = 2; sim.special[c.capital] |= 1 | 2 | 4 | 8 | 512 | (wonder ? 16 | (era << 5) : 0); for (let t = 0; t < 3; t++) sim.tick(); c.eraSince = sim.year - 300;
+    c.tech = TECH[era]; c.era = sim.eraOf(c.tech); sim.pop[c.capital] = 6; sim.walls[c.capital] = 2; sim.special[c.capital] |= 1 | 2 | 4 | 8 | 512 | (wonder ? 16 | (era << 5) : 0); { const a = new Uint8Array(sim.IND.length); let plot = 4; sim.IND.forEach((k, q) => { if (!/Not before/.test(sim.cannot(k, c.capital) || '')) a[q] = 1 + (plot++ % 12); }); sim.ind.set(c.capital, a); }      // every workshop the age knows
+    for (let t = 0; t < 3; t++) sim.tick(); c.eraSince = sim.year - 300;
     const L = window.TOWN.layout(sim, c.capital, c, {}); const cul = L.culture;
     const real = {}, kit = {};
     for (const it of L.items) { const e = it.era !== undefined ? it.era : L.era; let ids = it.as ? pick(it.as, e, cul) : []; if (!ids.length) ids = pick(it.kind, e, cul); const key = it.kind + (it.as ? '/' + it.as : '') + (it.tag ? '#' + it.tag : ''); if (ids.length) { real[key] = real[key] || { n: 0, ids: new Set() }; real[key].n++; ids.forEach((x) => real[key].ids.add(x)); } else kit[key] = (kit[key] || 0) + 1; }

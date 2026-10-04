@@ -3,6 +3,7 @@
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
+(0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -107,9 +108,9 @@ log('2. player actions and god powers');
   finish(sim.durOf('wonder', c.era) + 1); check(!!(sim.special[i0] & 16), 'wonder finished'); check(((sim.special[i0] >> 5) & 15) === c.era, 'wonder remembers its era');
   r.wonder3 = sim.act('wonder', i0); check(/already/.test(r.wonder3), `second wonder refused: "${r.wonder3}"`);
   check(sim.works.get(i0) === undefined, 'no works left at the capital');
-  const mineCell = sim.LI.find(j => sim.owner[j] === c.id && sim.goods[j] && ['copper', 'iron', 'tin', 'stone', 'gold', 'salt', 'gems', 'coal', 'oil'].includes(sim.GOODS[sim.goods[j]].key) && sim.level[j]);
-  r.mineNo = sim.act('mine', i0); check(/Nothing here to mine|Already|cannot yet/.test(r.mineNo) || /Mine under construction/.test(r.mineNo), `mine check at the capital: "${r.mineNo}"`);
-  if (mineCell !== undefined && !sim.inProgress(mineCell, 'mine') && !(sim.special[mineCell] & 512)) { const why = sim.cannot('mine', mineCell); if (!why) { r.mine = sim.act('mine', mineCell, 0); check(/Mine under construction/.test(r.mine), `mine: "${r.mine}"`); finish(sim.durOf('mine', c.era) + 1); check(!!(sim.special[mineCell] & 512) && sim.slotOf(mineCell, 'mine') === 0, 'mine finished on plot 1'); } }
+  const mineCell = sim.LI.find(j => sim.owner[j] === c.id && sim.goods[j] && sim.knows(c, j) && sim.level[j]);
+  r.mineNo = sim.act('mine', i0); check(/yields nothing to work|Already|cannot yet/.test(r.mineNo) || /under construction/.test(r.mineNo), `work on the capital's own good: "${r.mineNo}"`);
+  if (mineCell !== undefined && !sim.inProgress(mineCell, 'mine') && !(sim.special[mineCell] & 512)) { const why = sim.cannot('mine', mineCell); if (!why) { r.mine = sim.act('mine', mineCell, 0); check(new RegExp(sim.workName(mineCell) + ' under construction').test(r.mine), `${sim.workName(mineCell)}: "${r.mine}"`); finish(sim.durOf('mine', c.era) + 1); check(!!(sim.special[mineCell] & 512) && sim.slotOf(mineCell, 'mine') === 0, 'mine finished on plot 1'); } }
   r.levy = sim.act('levy', -1); check(/Army raised/.test(r.levy) && c.army > sim.year, `levy: "${r.levy}"`);
   const other = sim.settlementsOf(c.id).find(j => j !== i0 && sim.level[j] >= 2);
   if (other !== undefined) { r.capital = sim.act('capital', other); check(/Capital moved/.test(r.capital) && c.capital === other, `capital: "${r.capital}"`); sim.act('capital', i0); }
@@ -208,20 +209,20 @@ log('6. rulers and trade goods');
   const sim = createSim(wd, 31), simB = createSim(wd, 32);
   let same = true; for (let i = 0; i < N; i++) if (sim.goods[i] !== simB.goods[i]) { same = false; break; } check(same, 'goods placement is fixed by the land, not the seed');
   let withGoods = 0, onIce = 0; const used = new Set(); for (const i of sim.LI) { const g = sim.goods[i]; if (g) { withGoods++; used.add(g); if (sim.flags[i] & 8) onIce++; } }
-  const frac = withGoods / sim.LI.length; check(frac > 0.15 && frac < 0.4, `goods cover a sensible share of the land (${(frac * 100).toFixed(0)}%)`); check(onIce === 0, 'no goods on the ice'); check(used.size === sim.GOODS.length - 1, `every good occurs somewhere (${used.size}/${sim.GOODS.length - 1})`);
+  const frac = withGoods / sim.LI.length; check(frac > 0.15 && frac < 0.4, `goods cover a sensible share of the land (${(frac * 100).toFixed(0)}%)`); check(onIce === 0, 'no goods on the ice'); { const raws = sim.GOODS.filter(g => g && g.raw).length; check(used.size === raws, `every raw good occurs somewhere (${used.size}/${raws})`); }
   const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Traders', null); for (let k = 0; k < 24; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
   for (const cv of sim.civs) if (cv) { cv.tech = 0.12; cv.era = sim.eraOf(cv.tech); } // the Bronze Age: copper, tin and horses start to matter
   for (let y = 0; y < 3000; y++) sim.tick();
-  check(!!c.trade && c.trade.n >= 0 && typeof c.trade.own === 'number', 'player realm has a trade record');
-  let anyImports = 0, traits = new Set(), badTrait = 0, badRulers = 0; for (const cv of sim.civs) { if (!cv) continue; if (cv.trade && cv.trade.imp) anyImports++; if (!cv.ruler || !sim.TRAITS[cv.ruler.trait]) badTrait++; traits.add(cv.ruler && cv.ruler.trait); if (cv.rulers.length > 60 || cv.rulers.some(r => !r.name || !r.title)) badRulers++; }
+  check(!!c.trade && c.trade.living >= 0 && c.trade.living <= 1 && typeof c.trade.imp === 'number', 'player realm has a trade record');
+  let anyImports = 0, traits = new Set(), badTrait = 0, badRulers = 0; for (const cv of sim.civs) { if (!cv) continue; if (cv.trade && cv.trade.imp > 0) anyImports++; if (!cv.ruler || !sim.TRAITS[cv.ruler.trait]) badTrait++; traits.add(cv.ruler && cv.ruler.trait); if (cv.rulers.length > 60 || cv.rulers.some(r => !r.name || !r.title)) badRulers++; }
   check(anyImports > 0, `some realms import goods from neighbours (${anyImports})`); check(badTrait === 0, 'every ruler has a known personality'); check(traits.size >= 5, `personalities vary (${traits.size} kinds in play)`); check(badRulers === 0, 'ruler histories are bounded and complete');
   const remembered = sim.civs.filter(x => x).reduce((a, x) => a + x.rulers.filter(r => r.ep).length, 0); check(remembered > 0, `some dead rulers earned epithets (${remembered})`);
-  const covetWars = sim.allEvents.filter(e => /declares war .* for its (copper|tin|iron|horses|coal|oil)/.test(e.text)).length; check(covetWars > 0, `wars are fought over strategic goods (${covetWars})`);
-  const strongWithIron = sim.civs.filter(x => x && x.era >= 2 && (sim.goodsMask[x.id] & (1 << sim.GOOD_ID.iron))).length; log(`   realms with iron in the Iron Age or later: ${strongWithIron}; imports seen in ${anyImports}; coveting wars ${covetWars}`);
+  const covetWars = sim.allEvents.filter(e => /declares war .* for its (copper|tin|iron|horses|coal|oil|saltpetre|rubber|natural gas|uranium|rare earths|lithium)/.test(e.text)).length; check(covetWars > 0, `wars are fought over strategic goods (${covetWars})`);
+  const strongWithIron = sim.civs.filter(x => x && x.era >= 2 && sim.held[x.id * sim.market.NG + sim.GOOD_ID.iron]).length; log(`   realms with iron in the Iron Age or later: ${strongWithIron}; imports seen in ${anyImports}; coveting wars ${covetWars}`);
   // save/load keeps the ruler's personality
   const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, s.seed || 1); sim2.load(s); const p2 = sim2.playerCiv(); check(p2.ruler.trait === c.ruler.trait && p2.ruler.seed === c.ruler.seed, 'ruler personality survives save/load');
   // an old save without personalities still works
-  for (const cv of s.civs) if (cv) { delete cv.ruler.trait; delete cv.trade; } const sim3 = createSim(wd, 1); sim3.load(s); sim3.tick(); check(sim3.playerCiv().trade.n >= 0 && sim3.playerCiv().ruler.name, 'a save from before personalities loads and ticks');
+  for (const cv of s.civs) if (cv) { delete cv.ruler.trait; delete cv.trade; } delete s.econ; delete s.ind; const sim3 = createSim(wd, 1); sim3.load(s); sim3.tick(); check(sim3.playerCiv().trade.living >= 0 && sim3.playerCiv().ruler.name, 'a save from before personalities and markets loads and ticks');
 }
 }
 if (want(7)) {
@@ -256,6 +257,83 @@ log('7. construction, growth and the planner');
   sim.act('walls', i0); const sv = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, sv.seed || 1); sim2.load(sv);
   check(sim2.works.has(i0) && sim2.works.get(i0).some(w => w.k === 'walls'), 'works in progress survive save/load'); check(sim2.slotOf(i0, 'temple') === sim.slotOf(i0, 'temple'), 'plots survive save/load'); check(sim2.gBand[i0] === sim.gBand[i0], 'growth band survives save/load');
   for (let y = 0; y < 30; y++) sim2.tick(); check(sim2.walls[i0] >= 1, 'a loaded site still finishes');
+}
+}
+if (want(8)) {
+// ---------- 8. the market: goods, prices, workshops, trade, the state's own dealings ----------
+log('8. the market');
+{
+  const E = window.ECON; const NG = E.NG, NC = E.NC, NR = E.NR;
+  // the tables hang together
+  check(E.GOODS.length === NG && E.GOODS.filter(g => g && g.raw).length === 42 && E.GOODS.filter(g => g && !g.raw).length === 21, `63 goods: 42 from the land, 21 made (${E.GOODS.length - 1})`);
+  check(new Set(E.GOODS.filter(Boolean).map(g => g.tk)).size === 63 && new Set(E.GOODS.filter(Boolean).map(g => g.key)).size === 63, 'every good has its own name and ticker');
+  check(E.GOODS.every(g => !g || (g.base > 0 && g.bulk > 0 && g.rot >= 0 && g.rot < 1)), 'every good has a usual price, a bulk and a rate of rot');
+  { let bad = 0; E.RECIPES.forEach((R, r) => { for (const [g] of R.in) if (!E.GOODS[g].raw && !E.MAKES[g].some(q => q < r)) bad++; if (!(R.l > 0) || R.sec < 0) bad++; }); check(bad === 0, `every recipe's materials are made above it (${bad} out of order)`); }
+  { const wanted = new Set(); for (const C of E.CATS) for (const m of C.m) wanted.add(m.g); for (const R of E.RECIPES) for (const [g] of R.in) wanted.add(g); const idle = E.GOODS.filter(g => g && !wanted.has(g.id)).map(g => g.key); check(idle.length === 0, `every good is wanted by someone or used by some workshop (idle: ${idle.join(', ') || 'none'})`); }
+  { const missing = E.GOODS.filter(g => g && g.raw && !(E.CAL[g.key] > 0)).map(g => g.key); check(missing.length === 0, `every raw good has a measured yield (missing: ${missing.join(', ') || 'none'}; run tools/econ/calibrate.js --write)`); }
+  { const made = E.GOODS.filter(g => g && !g.raw); check(made.every(g => E.MAKES[g.id].length > 0), 'every made good has a recipe'); }
+  // a world of traders
+  const sim = createSim(wd, 77); const M = sim.market; const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2));
+  const c = sim.setPlayer(i0, 'Merchants', null); for (let k = 0; k < 30; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
+  for (const cv of sim.civs) if (cv) { cv.tech = 0.2; cv.era = sim.eraOf(cv.tech); }
+  let tM = 0, nM = 0; { const st0 = M.step; M.step = (o) => { const t = process.hrtime.bigint(); st0(o); tM += Number(process.hrtime.bigint() - t) / 1e6; nM++; }; }
+  for (let y = 0; y < 1500; y++) sim.tick();
+  const live = sim.civs.filter(Boolean); log(`   ${sim.fmtYear(sim.year)}: ${live.length} realms, ${M.links.length} trade links, world product ${M.worldGdp.toFixed(0)}, trade ${M.worldTrade.toFixed(0)}; the market takes ${(tM / nM).toFixed(2)} ms a year`);
+  check(tM / nM < 6, `the market is quick enough (${(tM / nM).toFixed(2)} ms a year with ${live.length} realms)`);
+  const sane = (tag, S) => {
+    let bad = 0, pxBad = 0, satBad = 0, gotBad = 0;
+    for (const cv of S.civs) { if (!cv) continue; const o = cv.id * NG; for (let g = 1; g < NG; g++) { const st = S.market.stock[o + g], p = S.market.px[o + g]; if (!(st >= 0) || !isFinite(st) || !isFinite(S.market.need[o + g]) || !isFinite(S.market.out[o + g])) bad++; if (!(p >= 0.199 && p <= 8.001)) pxBad++; if (S.market.got[o + g] > S.market.fin[o + g] * 1.0001 + 1e-9) gotBad++; }
+      for (let k = 0; k < NC; k++) { const v = S.market.sat[cv.id * NC + k]; if (!(v >= 0 && v <= 1)) satBad++; } if (!(S.market.LS[cv.id] >= 0 && S.market.LS[cv.id] <= 1) || !(S.market.util[cv.id] >= 0 && S.market.util[cv.id] <= 1.0001)) satBad++; if (!isFinite(cv.income) || !isFinite(cv.wealth)) bad++; }
+    check(bad === 0, `${tag}: stores, wants and treasuries are finite and not negative (${bad} bad)`); check(pxBad === 0, `${tag}: every price is between a fifth and eight times the usual (${pxBad} out)`); check(satBad === 0, `${tag}: wants are met between not at all and wholly (${satBad} out)`); check(gotBad === 0, `${tag}: nobody is given more than they wanted (${gotBad})`);
+  };
+  sane('after 1,500 years', sim);
+  check(M.links.length > 10 && M.worldTrade > 0 && M.worldGdp > 0, `realms trade (${M.links.length} links, ${(100 * M.worldTrade / M.worldGdp).toFixed(0)}% of the world's product crosses a border)`);
+  { let worst = 0, name = ''; for (let g = 1; g < NG; g++) { let im = 0, ex = 0; for (const cv of live) { im += M.imp[cv.id * NG + g]; ex += M.exp[cv.id * NG + g]; } const d = Math.abs(im - ex) / Math.max(1e-6, im + ex); if (d > worst) { worst = d; name = E.GOODS[g].key; } } check(worst < 1e-3, `what leaves one realm arrives in another (worst: ${name}, ${(worst * 100).toFixed(3)}% astray)`); }
+  { const ls = live.map(cv => M.LS[cv.id]); const lo = Math.min(...ls), hi = Math.max(...ls); check(hi - lo > 0.08, `realms live differently well (${lo.toFixed(2)} to ${hi.toFixed(2)})`); check(ls.reduce((a, b) => a + b, 0) / ls.length > 0.5, `and most live decently (mean ${(ls.reduce((a, b) => a + b, 0) / ls.length).toFixed(2)})`); }
+  { const g = E.ID.grain; const ps = live.filter(cv => M.need[cv.id * NG + g] > 0.01).map(cv => M.px[cv.id * NG + g]); check(ps.length > 3 && Math.max(...ps) / Math.min(...ps) > 1.3, `grain costs more in one place than another (${Math.min(...ps).toFixed(2)}x to ${Math.max(...ps).toFixed(2)}x)`); }
+  { let lines = 0; for (const cv of live) for (let r = 0; r < NR; r++) if (M.mk[cv.id * NR + r] > 0) lines++; check(lines > live.length * 2, `workshops are at work (${lines} lines in ${live.length} realms)`); const made = E.GOODS.filter(g => g && !g.raw && g.era <= 2 && M.wOut[g.id] > 0).map(g => g.key); check(made.length >= 7, `the made goods of the age are being made (${made.join(', ')})`); }
+  { const pts = M.series(E.ID.grain); check(pts.length > 60 && pts.every(p => p[1] > 0 && isFinite(p[1])) && pts[0][0] > pts[pts.length - 1][0], `the price of grain is on record (${pts.length} points over ${pts[0][0]} years)`); check(M.series(E.ID.grain, true).length === 64, 'and so is its price at home, for the last 64 years'); }
+  { const gs = M.goodsOf(c.id); check(gs.own.length > 0 && gs.own.every(g => M.out[c.id * NG + g] > 0), `the player's realm makes things (${gs.own.slice(0, 6).map(g => E.GOODS[g].key).join(', ')}${gs.own.length > 6 ? '…' : ''}; ${gs.imp.length} more come from abroad)`); }
+  // the state's own dealings
+  const e = M.econOf(c); c.wealth = 1e6;
+  { e.customs = 0; sim.tick(); const r0 = M.rev[c.id]; e.customs = 0.2; sim.tick(); sim.tick(); check(r0 === 0 && (M.impV[c.id] === 0 || M.rev[c.id] > 0), `customs bring money in when goods come in (${M.rev[c.id].toFixed(2)} on imports worth ${M.impV[c.id].toFixed(1)})`); check(Math.abs(c.trade.customs - M.rev[c.id]) < 1e-6 || c.trade.customs >= 0, 'the treasury is told'); e.customs = 0.03; }
+  { e.noM = []; e.noX = []; for (let g = 1; g < NG; g++) { e.noM.push(g); e.noX.push(g); } sim.tick(); let im = 0, ex = 0; for (let g = 1; g < NG; g++) { im += M.imp[c.id * NG + g]; ex += M.exp[c.id * NG + g]; } check(im === 0 && ex === 0, `a ban on everything stops everything at the border (${im} in, ${ex} out)`); e.noM = []; e.noX = []; for (let y = 0; y < 5; y++) sim.tick(); }
+  { // buy for the reserve, sell from it, release it at home
+    let g = 0, bk = null; for (let k = 1; k < NG && !g; k++) { const b = M.book(c.id, k); if (b.asks.length && b.asks[0].q > 1e-4) { g = k; bk = b; } }
+    check(g > 0, `somebody has something to sell (${g ? E.GOODS[g].key + ' at ' + bk.asks[0].p.toFixed(2) : 'nothing on offer'})`);
+    if (g) { const w0 = c.wealth; const q = bk.asks[0].q * 0.5; const dry = M.stateBuy(c.id, g, q, 0, true); const r = M.stateBuy(c.id, g, q); check(r.q > 0 && Math.abs(r.q - q) < q * 1e-6 && Math.abs(w0 - c.wealth - r.cost) < 1e-6 && Math.abs((e.res[g] || 0) - r.q) < 1e-9, `the state buys ${E.GOODS[g].key} for its reserve and pays for it (${r.q.toFixed(3)} lots for ${r.cost.toFixed(2)})`); check(Math.abs(dry.cost - r.cost) < 1e-6 && Math.abs(dry.q - r.q) < 1e-9, 'a quote is what the purchase then costs');
+      const big = M.stateBuy(c.id, g, 1e9); check(big.q < 1e9 && big.avg >= r.avg - 1e-9, `buying everything on offer costs more a lot (${r.avg.toFixed(2)} then ${big.avg.toFixed(2)})`);
+      const have = e.res[g]; const w1 = c.wealth; const rel = M.stateRelease(c.id, g, have * 0.5); check(rel.q > 0 && c.wealth > w1 && Math.abs(e.res[g] - have * 0.5) < 1e-6, 'releasing from the reserve puts goods on the home market and coin in the treasury');
+      const w2 = c.wealth; const sold = M.stateSell(c.id, g, 1e9); check(sold.q <= have * 0.5 + 1e-9 && c.wealth >= w2, `the state sells what it can find buyers for (${sold.q.toFixed(3)} of ${(have * 0.5).toFixed(3)})`);
+      e.orders.push({ id: 1, g, side: 'buy', q: 0.01, limit: 1e9 }); const before = e.res[g] || 0; for (let y = 0; y < 3; y++) sim.tick(); check((e.res[g] || 0) >= before && e.orders.length === 1 && e.orders[0].done >= 0, `a standing order is worked year by year (${((e.res[g] || 0) - before).toFixed(4)} bought in 3 years)`); e.orders = [];
+    }
+  }
+  // workshops, granaries, and working the land's own good
+  { const cap = c.capital; sim.pop[cap] = Math.max(sim.pop[cap], 60); sim.tick(); c.wealth = 1e6;
+    const eff0 = sim.eff[c.id * 8 + 0]; const msg = sim.act('workshop', cap, 3); check(/Workshops under construction/.test(msg), `workshops: "${msg}"`); check(/Already being built/.test(sim.act('workshop', cap)), 'and not twice at once');
+    const g1 = sim.act('granary', cap); check(/Granary under construction/.test(g1), `granary: "${g1}"`);
+    check(/Not before the Industrial age/.test(sim.cannot('factory', cap)), `no factory in the Iron Age: "${sim.cannot('factory', cap)}"`); check(/harbour/.test(sim.cannot('shipyard', cap)) || (sim.special[cap] & 1), 'a shipyard wants a harbour');
+    for (let y = 0; y < 30; y++) sim.tick();
+    check(sim.indAt(cap, 'workshop') > 0 && sim.slotOf(cap, 'workshop') >= 0 && !sim.freeSlots(cap).includes(sim.slotOf(cap, 'workshop')), `the workshops stand on their plot (${sim.slotOf(cap, 'workshop') + 1})`);
+    check(sim.eff[c.id * 8 + 0] > eff0 + 0.25, `and make the crafts cheaper (${eff0.toFixed(2)} to ${sim.eff[c.id * 8 + 0].toFixed(2)})`); check(/Already built/.test(sim.cannot('workshop', cap)), 'one of a kind to a town');
+    check(sim.indAt(cap, 'granary') > 0 && sim.indN[c.id * sim.IND.length + sim.IND.indexOf('granary')] === 1, 'the granary is counted');
+    let ai = 0; for (const [i] of sim.ind) if (sim.owner[i] !== c.id) ai++; check(ai > 0, `other realms raise workshops too (${ai} towns)`);
+    const farm = sim.LI.find(j => sim.owner[j] === c.id && sim.goods[j] && !sim.GOODS[sim.goods[j]].mine && sim.knows(c, j) && sim.level[j] && !(sim.special[j] & 512));
+    if (farm !== undefined) { const nm = sim.workName(farm); const r = sim.act('mine', farm); check(nm !== 'Mine' && new RegExp(nm + ' under construction').test(r), `land that is not ore is worked too: "${r}"`); } else log('   (the player holds no worked field with a settlement on it)');
+  }
+  sane('after the player has dealt', sim);
+  // save and load
+  { const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, s.seed || 1); sim2.load(s); const M2 = sim2.market; let dp = 0, ds = 0, da = 0, dl = 0;
+    for (const cv of live) { if (!sim.civs[cv.id]) continue; const o = cv.id * NG; for (let g = 1; g < NG; g++) { dp = Math.max(dp, Math.abs(M2.px[o + g] / M.px[o + g] - 1)); if (M.stock[o + g] > 1e-6) ds = Math.max(ds, Math.abs(M2.stock[o + g] / M.stock[o + g] - 1)); } for (let r = 0; r < NR; r++) if (M.act[cv.id * NR + r] > 1e-6) da = Math.max(da, Math.abs(M2.act[cv.id * NR + r] / M.act[cv.id * NR + r] - 1)); dl = Math.max(dl, Math.abs(M2.LS[cv.id] - M.LS[cv.id])); }
+    check(dp < 0.02 && ds < 0.002 && da < 0.002 && dl < 0.01, `the market survives save and load (prices within ${(dp * 100).toFixed(1)}%, stores ${(ds * 100).toFixed(2)}%, plans ${(da * 100).toFixed(2)}%, living ${dl.toFixed(3)})`);
+    check(sim2.indAt(c.capital, 'workshop') === sim.indAt(c.capital, 'workshop') && sim2.ind.size === sim.ind.size, 'so do the workshops'); check(JSON.stringify(sim2.playerCiv().econ) === JSON.stringify(c.econ), "and the state's reserve and orders");
+    sim.tick(); sim2.tick(); const a = M.LS[c.id], b = M2.LS[c.id]; check(Math.abs(a - b) < 0.03, `and the next year goes the same way (living ${a.toFixed(3)} and ${b.toFixed(3)})`); check(M2.links.length > 0 && Math.abs(M2.links.length - M.links.length) <= Math.max(6, M.links.length * 0.25), `the merchants find their roads again (${M2.links.length} links, ${M.links.length} before)`);
+    sane('a loaded world', sim2);
+    // a world saved before there was a market: it finds its prices in the loading
+    delete s.econ; delete s.ind; for (const cv of s.civs) if (cv) { delete cv.econ; delete cv.trade; } const sim3 = createSim(wd, 1); sim3.load(s); const M3 = sim3.market; const p3 = sim3.playerCiv();
+    let moved = 0; for (let g = 1; g < NG; g++) if (Math.abs(M3.px[p3.id * NG + g] - 1) > 0.02) moved++; check(moved > 5 && M3.LS[p3.id] !== 0.6, `a world from before the market finds its prices on loading (${moved} goods off the usual price, living ${M3.LS[p3.id].toFixed(2)})`);
+    for (let y = 0; y < 50; y++) sim3.tick(); sane('an old world, 50 years on', sim3);
+  }
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

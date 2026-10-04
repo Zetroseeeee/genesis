@@ -47,6 +47,11 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   tools/update/walk.js` takes pictures of everything a player sees of an update (`shots/up_*.png`), with made-up
   versions; `tools/update/realwalk.js` (its header says how) takes them of the update that is really out, in a
   checkout of the version before it, from a copy of the real feed (`tools/update/mirror.mjs`).
+- `node tools/econ/probe.js [seed] [last year] [goods]` — the world's economy through the ages in numbers: prices
+  against the usual, output against need, who is short, how much crosses borders, what the workshops make, and how
+  long the market takes a year. `node tools/econ/calibrate.js [seed] --write` measures how much each raw good's land
+  must yield and writes the table into `src/econ.js` (between its CAL marks): run it after changing where goods lie
+  (`PLACES`), what people want (`CATS`) or how things are made (`RECIPES`), or a good will be far too scarce or too plenty.
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
 - `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
@@ -62,7 +67,8 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 
 | File | Global | Role |
 | --- | --- | --- |
-| `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters |
+| `src/econ.js` | `ECON` | Goods, recipes, wants; where the Earth keeps things; one world's market: prices, workshops, trade between realms |
+| `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, biome shader, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
 | `src/buildings.js` | `BKIT` | Procedural building kit (unit archetypes) and its material shader |
@@ -71,6 +77,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/world.js` | `WORLD` | Turns town plans into instances near the camera; sky, clouds, atmosphere |
 | `src/textures.js` | `TEX` | Generated material atlases as texture arrays; UI art |
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
+| `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
 | `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
 | `desktop/updater.js` | | Keeps the game's files current without replacing the app (plain Node, no Electron inside) |
@@ -104,6 +111,25 @@ Conventions that matter:
   shrine of the old kind - all models. `L.era` is the style era, `L.eraReal` the civilisation's; the world picks
   models by `it.era` if set (old houses in a new age, a wonder of an earlier one), else by `L.era`. A model's `eras`
   in the manifest therefore only cover the ages that really build that way.
+- **The market** (`econ.js`; `sim.market`). 63 goods: 42 the land yields (a cell has one, `sim.goods[i]`, and the age
+  in which that place begins to yield it, `sim.gera[i]`: cocoa is old in Mesoamerica and came to West Africa with the
+  plantations) and 21 made by recipes. A quantity is in lots, a price in coin per lot: the treasury's coin. Every year,
+  per realm: the land's yield (people living on the good's cells, more from a mine, more when the price is high),
+  what people and the state want by category (within a category they take what is cheap just now), the workshops
+  (each line of work grows while it pays, inside what the towns' hands can do), then trade over links (realms that
+  touch; harbours within reach), goods going from where they are cheap to where they are dear until the gap is the
+  freight plus the buyer's customs. A price is the usual price times (there / wanted)^-0.75, between 0.2 and 8.
+  What comes back into the simulation, a year late: how well people live (`market.LS`) in the income, luxuries and
+  hunger in stability, arms in strength, building materials in what works cost. The first twenty goods lie where they
+  always lay (old worlds keep their mines); new places go in `PLACES`. The step must stay cheap (it is a quarter of a
+  year's cost with 200 realms): flat typed arrays, no objects in the yearly loops. The player's own dealings (customs,
+  bans, the reserve, standing orders) live on the realm as `civ.econ` and are saved with it; the market's state is
+  saved packed (`save().econ`), and a world saved before the market finds its prices on loading (`market.warm`).
+- **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
+  kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
+  lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by
+  what it works (`sim.workName`). The planner draws them with the models every people has (barn, granary, well), so
+  towns of the early ages stay fully modelled; they carry a role (`as: 'workshop'`...) for models of their own later.
 - **Style packing.** `wall + roof*8 + culture*64 + flags*1024`; flags: landmark 1, block 2, neon 4, wonder 8, ruin 16, site 32, thing 64 (a cart or a boat: no door, windows or roof).
 - Keep modules independent (pure data in `town.js` and `sim.js`, rendering elsewhere): the game will grow to tens of GB of assets.
 - **Stars and air.** The stars are points on a sphere that goes with the camera, drawn at the far plane (anything hides

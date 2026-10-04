@@ -136,7 +136,7 @@ server.listen(0, async () => {
   await scenario('city: build panel lists works with cost and years, starts them, places on a plot, shows the queue', async (check) => {
     await ev(() => { const S = __G.sim; S.playerCiv().wealth = 1e6; const c = S.playerCiv(); __G.select(c.capital); });
     const cards = await ev(() => [...document.querySelectorAll('#bgrid .bq')].map(b => ({ k: b.dataset.kind, dis: b.disabled, txt: b.textContent })));
-    check(cards.map(c => c.k).join() === 'farm,walls,port,market,temple,academy,mine,wonder,capital,levy', 'cards listed: ' + cards.map(c => c.k).join());
+    { const ks = cards.map(c => c.k); const must = ['farm', 'walls', 'port', 'market', 'temple', 'academy', 'workshop', 'weaver', 'brewery', 'granary', 'wonder', 'capital', 'levy']; check(must.every(k => ks.includes(k)) && ks.indexOf('farm') === 0 && ks.indexOf('levy') === ks.length - 1, 'cards listed: ' + ks.join()); check(!ks.includes('factory') && !ks.includes('refinery') && !ks.includes('lab'), 'what the age has not reached is left off the list: ' + ks.join()); }
     check(!cards.find(c => c.k === 'farm').dis && !cards.find(c => c.k === 'walls').dis && !cards.find(c => c.k === 'temple').dis, 'farms, walls and temple are buildable in a village');
     const era = await ev(() => __G.sim.playerCiv().era); const mk = cards.find(c => c.k === 'market'); check(era >= 1 ? !mk.dis : (mk.dis && /Bronze/.test(mk.txt)), era >= 1 ? 'market buildable from the Bronze Age' : 'market card says it needs the Bronze Age');
     check(/\d+ · \d+ yrs?/.test(cards.find(c => c.k === 'farm').txt), 'cards show cost and years: ' + cards.find(c => c.k === 'farm').txt);
@@ -215,7 +215,7 @@ server.listen(0, async () => {
     await ev(() => document.querySelector('#logfilters [data-f="mine"]').click()); const mine = await ev(() => [...document.querySelectorAll('#log .fe')].every(e => e.classList.contains('mine'))); check(mine, 'Mine filter shows only own events');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="powers"]').click()); check((await ev(() => document.querySelectorAll('#powers .pw').length)) > 3, 'powers list');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="graphs"]').click()); await frames(2); check((await ev(() => { const c = document.getElementById('g-world'); return c.width > 0 && c.height > 0; })), 'graphs drawn');
-    await ev(() => document.querySelector('#chron .tabs [data-ctab="stats"]').click()); check((await ev(() => document.querySelectorAll('#stats .tile').length)) === 8, 'eight stat tiles');
+    await ev(() => document.querySelector('#chron .tabs [data-ctab="stats"]').click()); check((await ev(() => document.querySelectorAll('#stats .tile').length)) === 10, 'ten stat tiles');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="log"]').click()); await ev(() => document.querySelector('#logfilters [data-f="all"]').click());
     const d0 = (await state()).dist; await ev(() => { const fe = [...document.querySelectorAll('#log .fe')].find(e => e); fe.click(); }); await frames(2);
     r = await ev(() => ({ open: document.getElementById('chron').open, fly: !!__G.mapcam.fly })); check(!r.open, 'clicking an event closes the modal'); check(r.fly, 'and flies there'); void d0;
@@ -313,13 +313,67 @@ server.listen(0, async () => {
   });
   await scenario('goods: markers on the map and yields in the inspector', async (check) => {
     // (the nearest good on land where nobody lives, if there is any: a town's name takes the room its good's marker would stand in)
-    const g = await ev(() => { const S = __G.sim; const c = S.playerCiv(); const cap = c.capital; const y0 = (cap / 720) | 0, x0 = cap - y0 * 720; let best = -1, bd = 1e9; for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) { const i = (y0 + dy) * 720 + ((x0 + dx + 720) % 720); if (i < 0 || i >= S.N || !S.goods[i] || !(S.ERA_MASKS[c.era] & (1 << S.goods[i]))) continue; const d = dx * dx + dy * dy + (S.level[i] ? 1000 : 0); if (d < bd) { bd = d; best = i; } } if (best < 0) return { none: true }; const y = (best / 720) | 0, x = best - y * 720; const lon = (x + 0.5) / 720 * 360 - 180, lat = 90 - (y + 0.5) / 360 * 180; __G.mapcam.fly = null; __T.cam(lon, lat, 0.004, 0.5, 0); __G.select(best); return { i: best, good: S.GOODS[S.goods[best]].name, cell: document.getElementById('sel-cell').textContent }; });
+    const g = await ev(() => { const S = __G.sim; const c = S.playerCiv(); const cap = c.capital; const y0 = (cap / 720) | 0, x0 = cap - y0 * 720; let best = -1, bd = 1e9; for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) { const i = (y0 + dy) * 720 + ((x0 + dx + 720) % 720); if (i < 0 || i >= S.N || !S.goods[i] || !S.knows(c, i)) continue; const d = dx * dx + dy * dy + (S.level[i] ? 1000 : 0); if (d < bd) { bd = d; best = i; } } if (best < 0) return { none: true }; const y = (best / 720) | 0, x = best - y * 720; const lon = (x + 0.5) / 720 * 360 - 180, lat = 90 - (y + 0.5) / 360 * 180; __G.mapcam.fly = null; __T.cam(lon, lat, 0.004, 0.5, 0); __G.select(best); return { i: best, good: S.GOODS[S.goods[best]].name, cell: document.getElementById('sel-cell').textContent }; });
     if (g.none) { check(false, 'no goods cell within 6 cells of the capital'); return; }
     check(/Yields/.test(g.cell) && g.cell.includes(g.good), `inspector lists the yield (${g.good}): ` + g.cell.replace(/\s+/g, ' ').slice(0, 80));
     await wait(500); await frames(6);
     try { await page.waitForFunction(() => document.querySelectorAll('.lbl.good').length > 0, null, { timeout: 90000 }); } catch (e) {}
     const n = await ev(() => ({ markers: document.querySelectorAll('.lbl.good').length, withText: [...document.querySelectorAll('.lbl.good')].filter(e => e.textContent.trim()).length, dbg: __G.labelDbg }));
     check(n.markers > 0, `goods markers drawn (${n.markers}; ${JSON.stringify(n.dbg)})`); check(n.withText > 0, 'markers carry the good\'s name this close');
+  });
+  await scenario('market: the board, a good and its book, a purchase, an order, the tabs', async (check) => {
+    await ev(() => { const S = __G.sim; for (const c of S.civs) if (c && c.tech < 0.2) { c.tech = 0.2; c.era = S.eraOf(c.tech); } S.playerCiv().wealth = 1e6; __G.run(60); });
+    await page.keyboard.press('m'); await frames(3);
+    let r = await ev(() => ({ open: document.getElementById('market').open, rows: document.querySelectorAll('#mk-table button.mk-row').length, groups: document.querySelectorAll('#mk-table .mk-group').length, tape: document.querySelectorAll('#mk-tape .mk-roll button').length, figs: document.getElementById('mk-tape').textContent, sub: document.getElementById('mk-sub').textContent, realm: __G.sim.fullName(__G.sim.playerCiv()), purse: document.getElementById('mk-purse').textContent, good: document.querySelector('#mk-good h3') ? document.querySelector('#mk-good h3').textContent : '' }));
+    check(r.open, 'M opens the market'); check(r.rows >= 20 && r.groups === 4, `the board lists the goods of the age in four groups (${r.rows} rows, ${r.groups} groups)`); check(r.tape >= 6 && /World product/.test(r.figs), `the tape runs the world's prices (${r.tape} entries)`); check(r.sub.includes(r.realm) && /\d/.test(r.purse), 'the head names the realm and its treasury: ' + r.sub + ' / ' + r.purse); check(r.good.length > 2, 'a good is open: ' + r.good);
+    // grain: its page has a drawn chart, figures, what it is for
+    await ev(() => MARKET.showGood(__G.sim.GOOD_ID.grain)); await frames(3);
+    r = await ev(() => { const cv = document.getElementById('mk-chart'); const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let ink = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 40) ink++; return { name: document.querySelector('#mk-good h3').textContent, ink, tiles: document.querySelectorAll('#mk-good .mk-tiles > div').length, uses: [...document.querySelectorAll('#mk-good .mk-rc b')].map(b => b.textContent), on: document.querySelector('#mk-table .mk-row.on .nm').textContent, cats: document.querySelector('#mk-good .mk-cats') ? document.querySelector('#mk-good .mk-cats').textContent : '' }; });
+    check(r.name === 'Grain' && r.on === 'Grain', 'the row and the page agree: ' + r.name); check(r.ink > 300, `the price chart is drawn (${r.ink} px)`); check(r.tiles === 6, 'six figures for the realm'); check(r.uses.includes('Brewers') && /Food/.test(r.cats), 'the page says what grain is for: ' + r.cats + ' / ' + r.uses.join(', '));
+    // filters and sorting
+    await ev(() => document.querySelector('#mk-filters [data-f="ours"]').click()); await frames(1); const ours = await ev(() => document.querySelectorAll('#mk-table button.mk-row').length);
+    await ev(() => { document.querySelector('#mk-filters [data-f="all"]').click(); document.querySelector('#mk-table .mk-row.head [data-sort="price"]').click(); }); await frames(1);
+    r = await ev(() => { const ps = [...document.querySelectorAll('#mk-table button.mk-row')].map(b => parseFloat(b.children[1].textContent.replace(/,/g, ''))).filter(v => isFinite(v)); return { n: ps.length, sorted: ps.every((v, k) => !k || v <= ps[k - 1] + 1e-9), groups: document.querySelectorAll('#mk-table .mk-group').length }; });
+    check(ours > 0 && ours < r.n + 40, `"We make" narrows the board (${ours} goods)`); check(r.sorted && r.groups === 0, 'a click on Price sorts dearest first, without the groups');
+    await ev(() => document.querySelector('#mk-table .mk-row.head [data-sort="kind"]').click());
+    // a purchase for the reserve, a release, a standing order, a ban
+    const g = await ev(() => { const S = __G.sim, M = S.market, c = S.playerCiv(); for (let k = 1; k < M.NG; k++) { const b = M.book(c.id, k); if (b.asks.length && b.asks[0].q > 1e-3) { MARKET.showGood(k); return { g: k, name: S.GOODS[k].name, q: b.asks[0].q * 0.5, w: c.wealth }; } } return null; });
+    check(!!g, 'something is on offer in the book'); if (g) {
+      await ev((q) => { const el = document.getElementById('mk-qty'); el.value = String(q); el.dispatchEvent(new Event('input')); }, g.q); await frames(1);
+      const quote = await ev(() => document.getElementById('mk-quote').textContent); check(/would cost/.test(quote), 'a quote before buying: ' + quote);
+      await ev(() => document.getElementById('mk-buy').click()); await frames(2);
+      r = await ev((gg) => { const S = __G.sim, c = S.playerCiv(), e = S.market.econOf(c); return { res: e.res[gg] || 0, w: c.wealth, text: document.querySelector('#mk-good .mk-res').textContent, toasts: window.__toasts.slice(-1)[0] || '' }; }, g.g);
+      check(r.res > 0 && r.w < g.w, `bought ${g.name} for the reserve (${r.res.toFixed(3)} lots, ${(g.w - r.w).toFixed(2)} coin)`); check(/Bought/.test(r.toasts), 'the purchase is announced: ' + r.toasts); check(/Reserve/.test(r.text) && !/Reserve 0$/.test(r.text.trim()), 'the page shows the reserve: ' + r.text);
+      await ev((q) => { const el = document.getElementById('mk-qty'); el.value = String(q); el.dispatchEvent(new Event('input')); document.getElementById('mk-release').click(); }, r.res * 0.5); await frames(2);
+      const after = await ev((gg) => __G.sim.market.econOf(__G.sim.playerCiv()).res[gg] || 0, g.g); check(after < r.res && after > 0, `half of it released at home (${after.toFixed(3)} left)`);
+      await ev(() => { document.getElementById('mk-od-q').value = '0.5'; document.getElementById('mk-od-p').value = '99999'; document.getElementById('mk-od-add').click(); }); await frames(2);
+      r = await ev(() => ({ n: __G.sim.market.econOf(__G.sim.playerCiv()).orders.length, shown: document.querySelectorAll('#mk-good .mk-od').length })); check(r.n === 1 && r.shown === 1, 'a standing order is placed and listed');
+      await ev(() => document.querySelector('#mk-good [data-cancel]').click()); await frames(1); check(await ev(() => __G.sim.market.econOf(__G.sim.playerCiv()).orders.length) === 0, 'and cancelled');
+      await ev(() => document.getElementById('mk-nox').click()); check(await ev((gg) => __G.sim.market.econOf(__G.sim.playerCiv()).noX.includes(gg), g.g), 'an export ban is set from the page'); await ev(() => document.getElementById('mk-nox').click());
+    }
+    // the other tabs
+    await ev(() => document.querySelector('#mk-tabs [data-mtab="trade"]').click()); await frames(2);
+    r = await ev(() => { const sl = document.getElementById('mk-cust'); sl.value = '0.2'; sl.dispatchEvent(new Event('input')); return { tiles: document.querySelectorAll('#mk-trade .mk-tiles > div').length, cust: __G.sim.market.econOf(__G.sim.playerCiv()).customs, shown: document.getElementById('mk-cust-v').textContent, rows: document.querySelectorAll('#mk-trade .mk-prow:not(.head)').length, hint: document.getElementById('mk-trade').textContent.includes('No merchants reach you') }; });
+    check(r.tiles === 4 && r.cust === 0.2 && r.shown === '20%', `the customs are set from the Trade tab (${r.shown})`); check(r.rows > 0 || r.hint, `partners are listed, or the page says how to get some (${r.rows} partners)`);
+    await ev(() => document.querySelector('#mk-tabs [data-mtab="works"]').click()); await frames(2);
+    r = await ev(() => ({ inds: document.querySelectorAll('#mk-works .mk-ind').length, lines: document.querySelectorAll('#mk-works .mk-wrow:not(.head)').length, hands: document.querySelector('#mk-works .mk-tiles b').textContent })); check(r.inds === 10 && r.lines > 2 && /%/.test(r.hands), `the Workshops tab lists what towns can raise and the lines of work (${r.lines} lines, hands ${r.hands})`);
+    await ev(() => document.querySelector('#mk-tabs [data-mtab="ledger"]').click()); await frames(2);
+    r = await ev(() => ({ rows: document.querySelectorAll('#mk-ledger .mk-lrow').length, wants: document.querySelectorAll('#mk-ledger .mk-want').length, net: document.querySelector('#mk-ledger .mk-lrow.sum b').textContent, income: __G.sim.playerCiv().income })); check(r.rows >= 8 && r.wants >= 10, `the Ledger has the treasury's year and how the people live (${r.rows} rows, ${r.wants} bars)`); check(Math.abs(parseFloat(r.net.replace(/[^\d.\-]/g, '')) - Math.abs(r.income)) < Math.max(0.6, Math.abs(r.income) * 0.02), `its net is the realm's income (${r.net} vs ${r.income.toFixed(2)})`);
+    await page.keyboard.press('Escape'); await frames(2); check(!(await ev(() => document.getElementById('market').open)), 'Esc closes it');
+    // the top bar and the bottom bar
+    r = await ev(() => { __G.run(1); return { live: document.getElementById('eco-live').textContent, movers: document.getElementById('movers').hidden ? -1 : document.querySelectorAll('#movers button').length }; }); check(/^\d+%$/.test(r.live), 'the top bar says how the people live: ' + r.live); check(r.movers >= -1, 'movers on the bottom bar: ' + r.movers);
+    await ev(() => document.getElementById('l-market').click()); await frames(2); check(await ev(() => document.getElementById('market').open), 'the Market button opens it too'); await ev(() => MARKET.close());
+  });
+  await scenario('market: workshops are raised from the town panel and stand on their plot', async (check) => {
+    await ev(() => { const S = __G.sim; const c = S.playerCiv(); c.wealth = 1e6; S.pop[c.capital] = Math.max(S.pop[c.capital], 40); __G.run(1); __G.select(c.capital); }); await frames(2);
+    await ev(() => document.querySelector('.bq[data-kind="workshop"]').click()); await frames(3);
+    let r = await ev(() => ({ banner: document.getElementById('bannertext').textContent, plots: document.querySelectorAll('#plots .plot').length })); check(/Place the workshops/.test(r.banner) && r.plots === 12, 'placing the workshops: ' + r.banner);
+    await ev(() => { const el = [...document.querySelectorAll('#plots .plot')].find(p => !p.classList.contains('used')); el.click(); }); await frames(2);
+    r = await ev(() => { const S = __G.sim; const c = S.playerCiv(); const w = S.inProgress(c.capital, 'workshop'); return { slot: w ? w.slot : -1, queue: document.getElementById('bqueue').textContent, eff: S.eff[c.id * 8] }; }); check(r.slot >= 0 && /Workshops · plot/.test(r.queue), `the workshops are going up on plot ${r.slot + 1}: ` + r.queue);
+    await ev(() => { const S = __G.sim; const c = S.playerCiv(); __G.run(S.durOf('workshop', c.era) + 2); __G.select(c.capital); }); await frames(2);
+    r = await ev(() => { const S = __G.sim; const c = S.playerCiv(); const L = TOWN.layout(S, c.capital, c, {}); return { at: S.indAt(c.capital, 'workshop'), eff: S.eff[c.id * 8], item: L.items.some(it => it.as === 'workshop'), card: document.querySelector('.bq[data-kind="workshop"]').textContent, taken: L.plots.filter(p => p.used).length }; });
+    check(r.at > 0 && r.eff > 1.25, `the workshops stand and make the crafts cheaper (${r.eff.toFixed(2)}×)`); check(r.item, 'the planner draws them'); check(/Already built/.test(r.card), 'the card says they are built'); check(r.taken >= 1, 'their plot is taken');
+    await ev(() => MARKET.open('works')); await frames(2); const n = await ev(() => document.querySelector('#mk-works .mk-ind.has b').textContent); check(n === '1', 'the Workshops tab counts them: ' + n); await ev(() => MARKET.close());
   });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
