@@ -35,11 +35,11 @@ window.__T.headingTo = function (v) { const f = GEO.enu(__G.mapcam.lon, __G.mapc
 // build Mac's frame rates are the only ones that count. Each setting in turn (a name and what turns it on; they add up, so a later
 // one must undo an earlier one if it should not count) runs for four seconds, and the frame rates are written into the picture with
 // how many quads of ground were drawn. A tour line needs about five seconds a setting and fifteen over.
-window.__T.cost = function (list, secs) {
+window.__T.cost = function (list, secs, settle) {
   const T = __G.terrain, out = [], el = document.createElement('div'); el.style.cssText = 'position:fixed;left:24%;top:8%;z-index:99999;background:#000;color:#fff;font:21px monospace;padding:14px;white-space:pre'; document.body.appendChild(el);
   let i = 0; const next = () => {
     if (i >= list.length) { out.push('tiles ' + T.stats.tiles + ', quads ' + T.stats.quads + ', ratio ' + window.devicePixelRatio + ', canvas ' + __G.renderer.domElement.width + 'x' + __G.renderer.domElement.height); el.textContent = out.join('\n'); return; }
-    list[i][1](); setTimeout(() => { let n = 0; const t0 = performance.now(); const tick = () => { n++; if (performance.now() - t0 < (secs || 4) * 1000) requestAnimationFrame(tick); else { out.push(list[i][0].padEnd(28) + (n / ((performance.now() - t0) / 1000)).toFixed(1) + ' fps  ' + T.stats.quads); el.textContent = out.join('\n'); i++; next(); } }; requestAnimationFrame(tick); }, 800); };
+    list[i][1](); setTimeout(() => { let n = 0; const t0 = performance.now(); const tick = () => { n++; if (performance.now() - t0 < (secs || 4) * 1000) requestAnimationFrame(tick); else { out.push(list[i][0].padEnd(28) + (n / ((performance.now() - t0) / 1000)).toFixed(1) + ' fps  ' + T.stats.quads); el.textContent = out.join('\n'); i++; next(); } }; requestAnimationFrame(tick); }, settle || 800); };
   next();
 };
 // the usual questions, each undone before the next: the picture's last steps, the air, the ground's meshes, the pixels, the ground itself, the houses
@@ -48,6 +48,14 @@ window.__T.costs = function () {
   __T.cost([['all', () => {}], ['post off', () => { POST.off = true; }], ['and the air off', () => { AIR.on = false; }], ['air on, the old meshes', () => { AIR.on = true; T.quadPx = 0; }],
     ['a quarter of the pixels', () => { T.quadPx = q; R.setPixelRatio(r0 / 2); }], ['all pixels, no ground', () => { R.setPixelRatio(r0); T.group.visible = false; }],
     ['ground, no houses', () => { T.group.visible = true; __G.world.buildingGroup.visible = false; MODELS.group.visible = false; }], ['all again', () => { __G.world.buildingGroup.visible = true; MODELS.group.visible = true; POST.off = false; }]]);
+};
+// what the ground's own materials cost: how finely they are filtered, the two steps of the ladder lying over each other, and the
+// ground drawn the old way, in the same view (each waits two and a half seconds first: a new shader has to be made)
+window.__T.costsGround = function () {
+  const T = __G.terrain, g = window.TEX && TEX.ground, U = __G.globals; if (!g) return 'no materials'; const full = window.GENESIS_ANISO || 16, z = U.uGndT.value.z;
+  __T.cost([['all', () => {}], ['materials 8 ways', () => { __T.aniso(8, g.albedo, g.relief); }], ['materials 4 ways', () => { __T.aniso(4, g.albedo, g.relief); }],
+    ['all ways, one step at a time', () => { __T.aniso(full, g.albedo, g.relief); U.uGndT.value.z = 0.02; }], ['two steps, the old ground', () => { U.uGndT.value.z = z; TEX.ground = null; T.setTextures(TEX, true); }],
+    ['the materials again', () => { TEX.ground = g; T.setTextures(TEX, true); }]], 4, 2500);
 };
 // how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
 window.__T.aniso = function (n, ...texs) {

@@ -152,7 +152,7 @@
     // which two steps, and how much of the upper one: from how many cells a pixel covers across its narrow way (the card's own
     // filtering has the long way, where the ground runs away from the eye). And the one size at which the far layers are laid.
     void ladder() {
-      vec2 loc = vGLf * uLadK, dx = dFdx(vGLf) * uLadK, dy = dFdy(vGLf) * uLadK; gLoc = loc; gDx = dx; gDy = dy;
+      vec2 loc = vGLf * uLadK, dx = gDx, dy = gDy; gLoc = loc;      // (gDx, gDy: how far a pixel reaches in cells, worked out before any branch)
       float a = dot(dx, dx), d = dot(dy, dy), b = dot(dx, dy), disc = sqrt(max((a - d) * (a - d) + 4.0 * b * b, 0.0));
       float major = sqrt(0.5 * (a + d + disc)), minor = sqrt(max(0.5 * (a + d - disc), 0.0)), rho = max(minor, major / 12.0);
       float l = clamp(log2(max(rho, 1e-7) * uGndK.w / 8.0), 0.0, 14.0);
@@ -167,7 +167,7 @@
       gMix = smoothstep(-uGndT.z, uGndT.z, f - 0.5 + pb * uGndT.w * f * (1.0 - f));
       // the far layers: one size, and two copies of it moved apart, of which the higher shows (two woods laid over each other are
       // a wood; the copies change places slowly across the country, so the same crowns do not come round every repeat)
-      float nf = uGndFarN, nw = nf * 16.0; vec3 w = textureGrad(uNoise, (mod(uLadN, nw) + uLadF + loc) / nw + 0.17, dx / nw, dy / nw).rgb - 0.5;
+      float nf = uGndFarN, nw = nf * 16.0, gq = max(0.03125, max(length(dx), length(dy)) / nw); vec3 w = textureGrad(uNoise, (mod(uLadN, nw) + uLadF + loc) / nw + 0.17, vec2(gq, 0.0), vec2(0.0, gq)).rgb - 0.5;      // (read coarse, like the bend of the ladder's steps)
       float kf = w.g * 9.0 + 4.0, ki = floor(kf); gFk = kf - ki;
       gUf = (mod(uLadN, nf) + uLadF + loc) / nf + w.rg * (1.2 * uGndK.z); gUg = gUf + sin(vec2(3.0, 7.0) * (ki + 1.0)); gUf += sin(vec2(3.0, 7.0) * ki); gFx = dx / nf; gFy = dy / nf;
       gDistM = length(vViewPos) * ${R_M.toFixed(1)};
@@ -348,11 +348,12 @@
       wForest /= ws; wGrass /= ws; wDesert /= ws; wRock /= ws;
       #ifdef USE_GROUND
       // ---------- what the ground is made of: its materials under the biome weights, at every height up to where the planet is one thing ----------
-      float gOn = uTexMix * smoothstep(0.085, 0.02, uCamAlt);
+      float gOn = uTexMix * smoothstep(0.085, 0.02, uCamAlt) * (1.0 - smoothstep(1.47, 1.5, abs(vLat)));      // (not on the last four degrees round a pole: the frame the materials lie in has no place for a pole, and what lies there is plain white)
       float snow = smoothstep(snowLine0 - 150.0, snowLine0 + 700.0, vH) * (1.0 - smoothstep(0.35, 0.7, slope)) * mix(0.25 + 0.75 * white, 0.85, winter * 0.8);
       float fall = autumn * decid; float bare = mix(uBare.y, uBare.x, hemi) * smoothstep(0.18, 0.4, latN0) * decid;
       float dl = 0.45, dl2 = 0.45, forestFar = 1.0, forestOpen = 1.0; vec2 gRel = vec2(0.0); float gRelK = 0.0;
       vec3 land = base * 0.98;
+      gDx = dFdx(vGLf) * uLadK; gDy = dFdy(vGLf) * uLadK;
       if (gOn > 0.002) {
         ladder();
         // settled country is cleared country: most of what would be wood there is pasture with trees standing in it (the game draws
@@ -394,6 +395,7 @@
         CAND(9.0, (wGrass + wDesert) * redK, vec2(0.3, 0.5))
         #undef CAND
         if (uGndShow >= 0.0) { L1 = uGndShow; w1 = 1.0; w2 = 0.0; }
+        vec3 dusty = mix(vec3(1.0), vec3(1.10, 1.0, 0.82), smoothstep(0.35, 0.65, clim));      // (in dry country what is bare is dusted with the country's earth: grey stone goes tan there)
         float chromaOn = max(lum, 0.03), hueOn = 1.0 - white;      // (where the photograph shows snow or cloud its colour says nothing of the ground's)
         // A material takes the brightness the photograph has there (up to its cap) and some of its hue. The hue is for what gives
         // the material its colour (the grass of a meadow, the sand of a dune), not for what merely lies in it: a texel is tinted
@@ -405,7 +407,7 @@
           vec3 ct = t / max(dot(t, vec3(0.299, 0.587, 0.114)), 1e-3) - 1.0, cm = m / lm - 1.0; float am = dot(cm, cm), at = dot(ct, ct); \
           float like = smoothstep(0.5, 0.9, dot(ct, cm) / sqrt(max(at * am, 1e-8))) * smoothstep(0.09, 0.64, at / max(am, 1e-4)); \
           like = mix(1.0, like, smoothstep(0.02, 0.12, am)); \
-          vec3 k = mix(vec3(1.0), mix(mix(vec3(1.0), clamp(base / chromaOn, 0.6, 1.6), 0.6), clamp((base / chromaOn) / (m / lm), 0.4, 2.5), like), min(h.x * hueOn * uGndT.y, 1.0)); \
+          vec3 k = mix(vec3(1.0), mix(mix(vec3(1.0), clamp(base / chromaOn, 0.6, 1.6), 0.6) * dusty, clamp((base / chromaOn) / (m / lm), 0.4, 2.5), like), min(h.x * hueOn * uGndT.y, 1.0)); \
           vec3 o = t * k; o.b = min(o.b, max(t.b * max(k.r, k.g), min(o.r, o.g))); c = o * pow(lt / lm, uGndT.x); }
         // A scan's heights and relief are those of ground a few metres across. Laid out a hundred times larger they would be hills
         // that are not there: patches a mile wide of one material in another's hollows, and faces of them turned from the sun. So
