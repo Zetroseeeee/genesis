@@ -1,0 +1,35 @@
+# Packs the ground's materials (assets/ground/materials.json: colours, relief and heights from the free CC0 libraries)
+# into the two atlases the game loads, and keeps them in the "ground" release. tools/ground/fetch.mjs brings them into
+# data/tex/. (The workspace cannot reach the libraries; GitHub can.) tools/ground/pack.sh runs it.
+name: Ground
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release to keep the pack in'
+        required: false
+        default: 'ground'
+permissions:
+  contents: write
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch and pack
+        env:
+          KEEP_GOING: '1'
+        run: |
+          set -euo pipefail
+          python3 -c 'import PIL, numpy' 2>/dev/null || python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow numpy || python3 -m pip install --quiet --disable-pip-version-check pillow numpy
+          python3 tools/ground/build.py 2>&1 | tee out.log
+          cp out.log out/ground_build.log
+      - name: Keep
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          case "$TAG" in *[!A-Za-z0-9_-]*|'') echo "bad tag"; exit 1;; esac
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "Ground materials" --notes "The ground's materials, packed by tools/ground/build.py from public-domain (CC0) scans: polyhaven.com, ambientcg.com. Fetched by tools/ground/fetch.mjs." --latest=false
+          gh release upload "$TAG" out/* -R "$GITHUB_REPOSITORY" --clobber
