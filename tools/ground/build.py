@@ -11,6 +11,7 @@ into two atlases of cols x rows cells:
     out/ground.json          what the game needs to know: the cells, each layer's mean colour, the layer that takes its place far off
     out/ground_sheet.jpg     a sheet to look at: every layer's colours, relief and heights side by side
     out/ground_try.jpg       the same for the materials listed under "try" (not packed: candidates to look at)
+    out/ground_native.jpg    a piece of every layer and candidate at the size the game has it, texel for pixel
 
 Run by the Ground workflow (the workspace cannot reach the libraries; GitHub can), which keeps the four files in the
 "ground" release; tools/ground/fetch.mjs brings them into data/tex/.  LOCAL=<dir> packs from files already on disk
@@ -204,9 +205,17 @@ def main():
     lay([(f"{k} {L['id']}: {L['asset']}" + (f"  far: {L['far']} from {L.get('farFrom')} m, {L.get('farSize')} m a repeat" if L.get('far') else '') + ('  FAILED' if 'failed' in L else ''), A[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell], N[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell]) for k, L in enumerate(layers)], 'out/ground_sheet.jpg')
     tries = []
     for spec in man.get('try', []) if not os.environ.get('NO_TRY') else []:
-        try: a, nn, info = layer(dict(spec, id=spec['asset']), 512); tries.append((f"{spec['asset']}  mean {info['mean']}", a, nn)); print('  try', spec['asset'], info['mean'])
+        try: a, nn, info = layer(dict(spec, id=spec['asset']), cell); tries.append((f"{spec['asset']}  mean {info['mean']}", a, nn)); print('  try', spec['asset'], info['mean'])
         except Exception as e: tries.append((f"{spec['asset']}  FAILED {e!r}"[:60], None, None)); print('  try', spec['asset'], 'FAILED', repr(e)[:200])
     if tries: lay(tries, 'out/ground_try.jpg')
+    # and a piece of every material as large as the game has it, texel for pixel: how sharp a scan really is cannot be told from a
+    # small picture of the whole (the candidates after the layers)
+    q = 400; per = 6; pieces = [(f"{k} {L['id']}", A[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell]) for k, L in enumerate(layers)] + [(lb.split('  ')[0], a) for lb, a, nn in tries if a is not None]
+    rws = (len(pieces) + per - 1) // per; nat = Image.new('RGB', (per * (q + gap) + gap, rws * (q + lab + gap) + gap), (26, 26, 26)); dr = ImageDraw.Draw(nat)
+    for k, (label, a) in enumerate(pieces):
+        sx = gap + (k % per) * (q + gap); sy = gap + (k // per) * (q + lab + gap); o = (a.shape[0] - q) // 2
+        nat.paste(Image.fromarray(a[o:o + q, o:o + q]), (sx, sy)); dr.text((sx + 2, sy + q + 2), label, fill=(235, 235, 235), font=font)
+    nat.save('out/ground_native.jpg', quality=92)
     for f in sorted(os.listdir('out')): print(' ', f, os.path.getsize(os.path.join('out', f)))
     if failed: print('FAILED:', ', '.join(failed)); sys.exit(0 if os.environ.get('KEEP_GOING') else 1)
 

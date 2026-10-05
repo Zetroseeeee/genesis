@@ -4,7 +4,7 @@
   "_order": "The game knows the layers by their names (GROUND in src/textures.js gives each the number the shader uses): a new one is added there too, with the layer that stands in for it in a pack made before.",
   "cell": 1024, "cols": 6, "rows": 4,
   "layers": [
-    {"id": "meadow", "from": "ambientcg", "asset": "Ground037"},
+    {"id": "meadow", "from": "ambientcg", "asset": "Grass004"},
     {"id": "steppe", "from": "polyhaven", "asset": "aerial_grass_rock"},
     {"id": "scrub", "from": "polyhaven", "asset": "aerial_ground_rock"},
     {"id": "sand", "from": "polyhaven", "asset": "aerial_beach_01"},
@@ -27,6 +27,6 @@
     {"id": "sandstone", "from": "polyhaven", "asset": "marble_cliff_03"}
   ],
   "try": [
-    {"from": "polyhaven", "asset": "aerial_rocks_04"}, {"from": "polyhaven", "asset": "marble_cliff_06"}, {"from": "polyhaven", "asset": "marble_cliff_01"}, {"from": "polyhaven", "asset": "rocky_terrain"}, {"from": "polyhaven", "asset": "rocky_terrain_03"}, {"from": "polyhaven", "asset": "snow_field_aerial"}, {"from": "ambientcg", "asset": "Grass004"}, {"from": "polyhaven", "asset": "dirt_aerial_03"}
+    {"from": "ambientcg", "asset": "Grass001"}, {"from": "ambientcg", "asset": "Grass003"}, {"from": "ambientcg", "asset": "Grass005"}, {"from": "ambientcg", "asset": "Ground037"}, {"from": "polyhaven", "asset": "aerial_rocks_04"}, {"from": "polyhaven", "asset": "rocky_terrain"}, {"from": "polyhaven", "asset": "forrest_ground_01"}, {"from": "polyhaven", "asset": "snow_field_aerial"}
   ]
 }
