@@ -49,7 +49,10 @@ jobs:
       - name: The updater's own tests
         run: node tools/test_update.js
       - name: Fetch art and models
-        run: npm run fetch
+        run: |
+          npm run fetch
+          # (built without the ground's materials the game would draw the ground the old way, and nobody would be told)
+          node -e "const fs = require('fs'), j = JSON.parse(fs.readFileSync('data/tex/ground.json', 'utf8')); for (const f of [j.albedo, j.normal]) if (!(fs.statSync('data/tex/' + f).size > 1e6)) throw new Error('ground: ' + f + ' is missing'); console.log('ground: ' + j.layers.length + ' materials, made ' + j.made);"
       - name: Package
         run: npm run pack:mac
         env:

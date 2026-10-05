@@ -58,6 +58,7 @@ window.__T.aniso = function (n, ...texs) {
 
 // The ground's shaders, taken anew from src/terrain.js into a page that is running (tools/live.js: /load?file=terrain.js, then
 // __T.reshade()): every tile is given the new ones, and tiles made from now on get them too. Seconds, where a new page takes minutes.
-window.__T.reshade = function () { const T = __G.terrain; Object.setPrototypeOf(T, TERRAIN.Terrain.prototype); let n = 0; for (const t of T.tiles.values()) { const m = t.mesh.material; m.vertexShader = TERRAIN.VERT; m.fragmentShader = TERRAIN.FRAG; m.needsUpdate = true; n++; } return n; };
+window.__T.reshade = function (more) { const T = __G.terrain; Object.setPrototypeOf(T, TERRAIN.Terrain.prototype); if (more) for (const k in more) if (!T.globals[k]) T.globals[k] = { value: more[k] };      // (more: uniforms the new shader has and the page's game does not yet know, { name: value })
+  let n = 0; for (const t of T.tiles.values()) { const m = t.mesh.material; for (const k in T.globals) if (!m.uniforms[k]) m.uniforms[k] = T.globals[k]; m.vertexShader = TERRAIN.VERT; m.fragmentShader = TERRAIN.FRAG; m.needsUpdate = true; n++; } return n; };
 // The ground's materials read again from data/tex (a new pack: tools/ground/pack.sh) and put to use; resolves to when the pack was made.
 window.__T.reground = function () { return TEX.reloadGround().then((g) => { __G.terrain.setTextures(TEX, true); return g ? g.made : null; }); };

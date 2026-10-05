@@ -112,7 +112,7 @@
     precision highp sampler2DArray;
     uniform sampler2DArray uLanduse; uniform float uTexMix;
     #ifdef USE_GROUND
-    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[24], uGndFarN; uniform vec2 uGndFarD[24]; uniform vec3 uGndMean[25]; uniform vec4 uGndK, uGndT; uniform float uGndShow;
+    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[24], uGndFarN; uniform vec2 uGndFarD[24]; uniform vec3 uGndMean[25]; uniform vec4 uGndK, uGndT; uniform float uGndShow, uGndV;
     #else
     uniform sampler2DArray uGround;
     #ifndef DET_SHALLOWS
@@ -351,7 +351,7 @@
       float gOn = uTexMix * smoothstep(0.085, 0.02, uCamAlt);
       float snow = smoothstep(snowLine0 - 150.0, snowLine0 + 700.0, vH) * (1.0 - smoothstep(0.35, 0.7, slope)) * mix(0.25 + 0.75 * white, 0.85, winter * 0.8);
       float fall = autumn * decid; float bare = mix(uBare.y, uBare.x, hemi) * smoothstep(0.18, 0.4, latN0) * decid;
-      float dl = 0.45, dl2 = 0.45, forestFar = 1.0; vec2 gRel = vec2(0.0); float gRelK = 0.0;
+      float dl = 0.45, dl2 = 0.45, forestFar = 1.0, forestOpen = 1.0; vec2 gRel = vec2(0.0); float gRelK = 0.0;
       vec3 land = base * 0.98;
       if (gOn > 0.002) {
         ladder();
@@ -376,17 +376,18 @@
         float isSav = step(0.22, clim + dith * 0.3) * step(0.5, tropic) * (1.0 - isDesert) * (1.0 - isSteppe);
         float salt = isDesert * step(0.62, lum) * step(green, 0.25) * step(warm, 0.4);
         float sandW = isDesert * (1.0 - salt) * smoothstep(0.46, 0.7, lum + (nMac.r - 0.5) * 0.26 + (nMid.g - 0.5) * 0.035 + (nMic.g - 0.5) * 0.035);
-        float LA = mix(1.0, mix(4.0, 15.0, salt), isDesert), LB = mix(mix(1.0, 18.0, isSteppe), 2.0, isDesert);      // (steppe: dry grass, and heath in stretches; desert: stony plain or salt, and dry scrubland)
-        float wB = patchN * (isDesert * (1.0 - salt) * (1.0 - sandW) + isSteppe * 0.8 + isSav * 0.45);
+        float LA = mix(1.0, mix(4.0, 15.0, salt), isDesert), LB = mix(mix(1.0, 14.0, isSteppe), 2.0, isDesert);      // (steppe: dry grass, and bare earth here and there; desert: stony plain or salt, and dry scrubland)
+        float wB = patchN * (isDesert * (1.0 - salt) * (1.0 - sandW) + isSteppe * 0.4 + isSav * 0.45);
         float redK = savK * smoothstep(0.5, 0.8, nMac.g * 0.45 + nMid.b * 0.4 + nMic.r * 0.15) * 0.5 * (1.0 - desertK) * (1.0 - steppeK);      // savanna: in stretches the red earth shows between the tufts
         // the two that count most here; how far the regional colour of the photograph may tint each (a rock stays the colour of rock),
         // and how bright each may be at most (where the photograph is bright with snow or haze, grass under it is still grass)
-        float L1 = gL, w1 = wGrass * (1.0 - redK) * (1.0 - stony), L2 = fL, w2 = wForest; vec2 h1 = vec2(0.75, 0.42), h2 = vec2(0.8, 0.32);
+        float L1 = gL, w1 = wGrass * (1.0 - redK) * (1.0 - stony), L2 = fL, w2 = wForest; vec2 h1 = vec2(gL > 0.5 ? 0.5 : 0.75, 0.42), h2 = fL > 7.5 ? vec2(0.7, 0.45) : vec2(0.8, 0.32);      // (dry grass is straw whatever the earth under it: the red of a red country is its soil's; the fell is open ground, lighter than the floor of a wood)
+        forestOpen = fL > 7.5 ? 0.3 : 1.0;
         if (w2 > w1) { float t; t = L1; L1 = L2; L2 = t; t = w1; w1 = w2; w2 = t; vec2 th = h1; h1 = h2; h2 = th; }
         #define CAND(L, w, h) { float wc = w; if (wc > w1) { L2 = L1; w2 = w1; h2 = h1; L1 = L; w1 = wc; h1 = h; } else if (wc > w2) { L2 = L; w2 = wc; h2 = h; } }
         CAND(rL, wRock * (1.0 - screeK), rL > 19.0 ? vec2(0.6, 0.8) : vec2(0.2, 0.62))      // (the rock of dry country takes the colour of the country: red, ochre or pale)
-        CAND(11.0, wRock * screeK, vec2(0.2, 0.62))
-        CAND(16.0, wGrass * (1.0 - redK) * stony, vec2(0.75, 0.42))
+        CAND(11.0, wRock * screeK, vec2(mix(0.2, 0.75, smoothstep(0.4, 0.6, clim)), 0.62))      // (loose stone is the colour of the rock it broke from: grey in the mountains of green countries, the country's own in the dry ones)
+        CAND((latN0 + dith * 0.2 > 0.6 || vH > treeLine - 500.0) ? 18.0 : 16.0, wGrass * (1.0 - redK) * stony, vec2(0.75, 0.42))      // (stony pasture; in the north and on the heights dark moor with slabs of rock in it)
         CAND(LA, wDesert * (1.0 - wB - sandW) * (1.0 - redK), vec2(0.85, 2.0))
         CAND(LB, wDesert * wB * (1.0 - redK), vec2(0.85, 2.0))
         CAND(3.0, wDesert * sandW, vec2(0.9, 2.0))
@@ -395,23 +396,28 @@
         if (uGndShow >= 0.0) { L1 = uGndShow; w1 = 1.0; w2 = 0.0; }
         float chromaOn = max(lum, 0.03), hueOn = 1.0 - white;      // (where the photograph shows snow or cloud its colour says nothing of the ground's)
         // A material takes the brightness the photograph has there (up to its cap) and some of its hue. The hue is for what gives
-        // the material its colour (grass, sand), not for a grey stone lying in it: a texel much less coloured than its material
-        // on the whole keeps its own. And nothing is tinted past grey into blue: where the photograph is blue it shows shade,
-        // haze or snow, not ground.
+        // the material its colour (the grass of a meadow, the sand of a dune), not for what merely lies in it: a texel is tinted
+        // as far as its own colour is the material's (a grey stone in the grass stays grey, a patch of brown earth brown: tinted
+        // with the grass they turn blue and mauve), and what is not gets a little of the country's colour as a grey thing would
+        // (bare ground between the tufts is tan in the savanna). And nothing is tinted past grey into blue: where the photograph
+        // is blue it shows shade, haze or snow, not ground.
         #define TONE(c, L, h) { vec3 m = gndMean(L), t = c * m; float lm = dot(m, vec3(0.299, 0.587, 0.114)), lt = chromaOn / pow(1.0 + pow(chromaOn / h.y, 4.0), 0.25); \
-          float hi = max(t.r, max(t.g, t.b)), sat = (hi - min(t.r, min(t.g, t.b))) / max(hi, 1e-3), mh = max(m.r, max(m.g, m.b)), satM = (mh - min(m.r, min(m.g, m.b))) / mh; \
-          vec3 k = mix(vec3(1.0), clamp((base / chromaOn) / (m / lm), 0.4, 2.5), min(h.x * hueOn * uGndT.y, 1.0) * mix(1.0, smoothstep(0.3, 0.8, sat / max(satM, 0.05)), smoothstep(0.15, 0.4, satM))); \
+          vec3 ct = t / max(dot(t, vec3(0.299, 0.587, 0.114)), 1e-3) - 1.0, cm = m / lm - 1.0; float am = dot(cm, cm), at = dot(ct, ct); \
+          float like = smoothstep(0.5, 0.9, dot(ct, cm) / sqrt(max(at * am, 1e-8))) * smoothstep(0.09, 0.64, at / max(am, 1e-4)); \
+          like = mix(1.0, like, smoothstep(0.02, 0.12, am)); \
+          vec3 k = mix(vec3(1.0), mix(mix(vec3(1.0), clamp(base / chromaOn, 0.6, 1.6), 0.6), clamp((base / chromaOn) / (m / lm), 0.4, 2.5), like), min(h.x * hueOn * uGndT.y, 1.0)); \
           vec3 o = t * k; o.b = min(o.b, max(t.b * max(k.r, k.g), min(o.r, o.g))); c = o * pow(lt / lm, uGndT.x); }
         // A scan's heights and relief are those of ground a few metres across. Laid out a hundred times larger they would be hills
         // that are not there: patches a mile wide of one material in another's hollows, and faces of them turned from the sun. So
         // from the step of the ladder where a stone would be a house they count for less and less (gNear: 1 near, 0 far), and
         // what is left to say where one ground ends and the next begins is the lie of the land itself.
         float gNear = 1.0 - smoothstep(2.5, 6.5, gJ + gMix);
-        vec4 A = gnd(L1); vec3 ca = A.rgb; TONE(ca, L1, h1)
+        float sage = 1.0 - 0.4 * smoothstep(0.4, 0.7, clim);      // (what grows in dry country is grey with it: sage and straw, not the green-gold of a wet meadow gone dry)
+        vec4 A = gnd(L1); vec3 ca = A.rgb; TONE(ca, L1, h1) if (L1 == 1.0) ca = mix(vec3(dot(ca, vec3(0.299, 0.587, 0.114))), ca, sage);
         float hU = mix(0.5, A.a, gNear), t2 = w2 / max(w1 + w2, 1e-4), kB = 0.0; vec3 tex = ca; dl = 0.45 * dot(A.rgb, vec3(0.299, 0.587, 0.114));
         if (t2 > 0.04 && L2 != L1) {
           // one lies in the hollows of the other: the higher of the two shows, each raised by its share
-          vec4 B = gnd(L2); vec3 cb = B.rgb; TONE(cb, L2, h2)
+          vec4 B = gnd(L2); vec3 cb = B.rgb; TONE(cb, L2, h2) if (L2 == 1.0) cb = mix(vec3(dot(cb, vec3(0.299, 0.587, 0.114))), cb, sage);
           float hB = mix(0.5, B.a, gNear), ha = hU + (1.0 - t2) * 1.6, hb = hB + t2 * 1.6, top = max(ha, hb) - mix(0.5, 0.16, gNear), ba = max(ha - top, 0.0), bb = max(hb - top, 0.0);
           kB = bb / (ba + bb); tex = mix(ca, cb, kB); hU = mix(hU, hB, kB); dl = mix(dl, 0.45 * dot(B.rgb, vec3(0.299, 0.587, 0.114)), kB);
         }
@@ -419,6 +425,11 @@
         gRel = gndN(L1); if (kB > 0.03) gRel = mix(gRel, gndN(L2), kB);
         gRel *= 0.25 + 0.75 * gNear;
         tex *= 1.0 + 0.18 * wDesert;      // (dry ground is bright ground: the photograph of the Earth has the deserts darker than they stand in the sun)
+        // No two stretches of a meadow are one green: here it is lusher, there drier and yellower, in stretches from a stone's
+        // throw to a mile across. These lie where they lie (the noise of the place, not of the ladder), so they are what the eye
+        // holds on to while the grain of the ground changes under it as it draws back.
+        { float veg = wGrass + wForest, lush = (nMic.g - 0.5) * 0.5 + (nFin.r - 0.5) * 0.35 + (nMid.b - 0.43) * 0.35, dryish = (nMic.r - 0.5) * 0.6 + (nFin.g - 0.5) * 0.4;
+          tex *= (1.0 + lush * (0.36 + 0.44 * veg) * uGndV) * mix(vec3(1.0), vec3(1.0 + dryish * 0.45, 1.0, 1.0 - dryish * 0.6), veg * uGndV); }
         dl = clamp(dl, 0.12, 0.9); dl2 = dl;
         forestFar = 1.0 - gndFarK(7.0);      // (how much of a wood's floor is seen, and not its canopy: only the floor lies in the trees' shade)
         land = mix(land, tex, gOn * uGndK.y);
@@ -525,9 +536,11 @@
       // (from the height at which single trees are drawn; farmland has cleared its share)
       { float canopy = wForest * smoothstep(0.0085, 0.005, uCamAlt) * (1.0 - cult * 0.6) * (1.0 - max(snow, ice));
         #ifdef USE_GROUND
-        canopy *= forestFar;
-        #endif
+        canopy *= forestFar * forestOpen;      // (few trees stand on the fell, and they throw little shade)
+        land *= 1.0 - canopy * (0.30 + 0.26 * smoothstep(0.3, 0.58, nFin.b)) * mix(1.0, 0.45, bare); }      // (flecks of sun a few paces across)
+        #else
         land *= 1.0 - canopy * (0.30 + 0.26 * nFin.a) * mix(1.0, 0.45, bare); }
+        #endif
       if (cult > 0.03 && closeFade > 0.0) {
         // fields cluster around the settlement site (sim.a? no: site is unknown here) -> use noise clusters within the cell
         vec2 sc0 = geo * uSimRes; vec2 cellId0 = floor(sc0); vec2 inCell = sc0 - cellId0;
@@ -616,7 +629,9 @@
         // (trodden earth: paler where the land is dry, and sand only in true desert)
         #ifdef USE_GROUND
         // (trodden earth has the relief of trodden earth, whatever grew there before; paving has none)
-        vec3 earth = mix(gnd(14.0).rgb * mix(vec3(0.43, 0.37, 0.29), vec3(0.64, 0.55, 0.41), arid), gnd(3.0).rgb * vec3(0.70, 0.61, 0.43), desertK * 0.75);
+        // (and where feet go most, along the lanes and across the yards, it is beaten pale and bare)
+        float trod = smoothstep(0.24, 0.4, dec.b);
+        vec3 earth = mix(gnd(14.0).rgb * mix(mix(vec3(0.40, 0.345, 0.27), vec3(0.53, 0.46, 0.36), trod), vec3(0.64, 0.55, 0.41), arid), gnd(3.0).rgb * vec3(0.70, 0.61, 0.43), desertK * 0.75);
         urbanCol = mix(urbanCol, mix(earth, flags, paved), gOn);
         { float uw = smoothstep(0.04, 0.22, dec.b) * (1.0 - ice); gRel = mix(gRel, gndN(14.0), uw); gRelK *= 1.0 - 0.85 * paved * uw; }
         #else
@@ -624,7 +639,13 @@
         #endif
       }
       #endif
+      #ifdef USE_GROUND
+      // (between the houses of a town that is not paved the ground is not all bare: off the beaten ways grass and weeds hold on, in patches)
+      { float green0 = (1.0 - paves) * (1.0 - arid) * smoothstep(0.42, 0.6, nMic.b * 0.6 + nFin.r * 0.4 + nFin.b * 0.25) * (1.0 - smoothstep(0.2, 0.34, dec.b));
+        land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * mix(0.72 - 0.42 * green0, 0.9, smoothstep(0.3, 0.45, dec.b)) * (1.0 - ice)); }
+      #else
       land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * mix(0.7, 0.9, smoothstep(0.3, 0.45, dec.b)) * (1.0 - ice));
+      #endif
       // burnt and ash-covered ground (fresh fire black, old scars grey-brown with new green coming through)
       vec3 burnCol = mix(vec3(0.30, 0.27, 0.22), vec3(0.11, 0.1, 0.095), smoothstep(0.3, 0.9, burnW)) * (0.75 + 0.5 * nMic.g);
       land = mix(land, burnCol * (0.8 + 0.4 * dl2), smoothstep(0.03, 0.25, burnW) * (0.7 + 0.3 * nMid.r) * (0.75 + 0.25 * smoothstep(0.3, 0.6, nMic.a)) * (1.0 - ice));
