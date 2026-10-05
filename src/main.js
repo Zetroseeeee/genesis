@@ -1201,7 +1201,7 @@
     }
     // the air for this frame (air.js): where the planet and the sun are from the camera, how far the eye is opened. The sky is drawn through it, so behind everything is the black of space
     if (window.AIR) { camera.updateMatrixWorld(); AIR.update(camera, globals.uSun.value, mapcam.alt, mapcam.dist); }
-    const posted = postOk && !POST.off && settings.quality === 'high'; globals.uGlow.value = world.bUniforms.uGlow.value = posted ? 1 : 0; if (life) life.uniforms.uGlow.value = posted ? 1 : 0;
+    const posted = postOk && !POST.off && !POST.broken && settings.quality === 'high'; globals.uGlow.value = world.bUniforms.uGlow.value = posted ? 1 : 0; if (life) life.uniforms.uGlow.value = posted ? 1 : 0;
     updateLabels(); updatePlots(); updateFlows();
     if (now - mmT > 700) { mmT = now; updateMinimap(false); }
     tpsT += dt; if (tpsT > 1) { $('yps').textContent = tpsCount + ' yr/s'; tpsCount = 0; tpsT = 0; const d = $('debug'); if (d.style.display === 'block') d.textContent = `elev ${JSON.stringify(terrain.stats.elevLevels)} tiles ${terrain.stats.tiles} sse ${terrain.stats.sse | 0} packs i${terrain.stats.packsI} e${terrain.stats.packsE} loading ${terrain.stats.loading} buildings ${world.buildingCount} trees ${trees ? trees.count : 0} labels ${labelEls.size} movers ${movers ? movers.stats.agents + '/' + movers.stats.walkers + '/' + movers.stats.ships : 0} alt ${(mapcam.alt * 6371).toFixed(1)}km dist ${(mapcam.dist * 6371).toFixed(1)}km tilt ${(mapcam.tilt * 57.3).toFixed(0)}`; }

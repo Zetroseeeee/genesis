@@ -16,7 +16,7 @@
 // Nothing here knows about the game: main.js hands over the renderer, the scene and the camera, and how high the camera is.
 window.POST = (function () {
   'use strict';
-  const P = { ready: false, hdr: false, w: 0, h: 0, drawn: 0,
+  const P = { ready: false, hdr: false, w: 0, h: 0, drawn: 0, broken: false, asked: false,
     // what can be turned: each 0 = off, 1 = as designed
     shade: 1, glow: 1, develop: 1, reach: null, far: 60,      // (reach: [share of the distance, near, wide] to try other shades by hand; far: the shade is down to a third at 1 / far Earth radii: 106 km)
     wide: 1.0,         // how much more each wider ring of the glow counts than the one inside it: 0 = a tight glow, more = a broad glare round the sun
@@ -179,11 +179,20 @@ window.POST = (function () {
     up.pop();      // (the smallest is brought up from itself)
   }
   const _sz = new THREE.Vector2();
+  // Can the card really draw into these targets? Asked once for each set of them, after the first frame has gone through (the renderer
+  // builds them on first use, and does not ask). If not, P.broken is set and the game draws straight to the screen as it did before.
+  function sound(renderer) {
+    const gl = renderer.getContext(); let ok = true;
+    for (const t of [rtScene, rtA, rtB, down[0], up[0]]) { const pr = t && renderer.properties.get(t); if (!pr) continue; for (const fb of [pr.__webglMultisampledFramebuffer, pr.__webglFramebuffer]) if (fb) { gl.bindFramebuffer(gl.FRAMEBUFFER, fb); if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) ok = false; } }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);      // (where the renderer left it: the last pass went to the screen)
+    return ok;
+  }
   const run = (renderer, m, to) => { quad.material = m; renderer.setRenderTarget(to); renderer.render(qScene, qCam); };
 
   // one frame. alt: how high the camera is, in Earth radii (the shade is for what is near: from orbit there is nothing to shade)
   P.render = function (renderer, scene, camera, alt, time) {
-    renderer.getDrawingBufferSize(_sz); const w = _sz.x | 0, h = _sz.y | 0; if (w !== P.w || h !== P.h || !rtScene) resize(w, h);
+    if (P.broken) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
+    renderer.getDrawingBufferSize(_sz); const w = _sz.x | 0, h = _sz.y | 0; if (w !== P.w || h !== P.h || !rtScene) { resize(w, h); P.asked = false; }
     renderer.setRenderTarget(rtScene); renderer.render(scene, camera);
     const shade = P.shade * Math.min(1, Math.max(0, 1 - (alt - 0.003) / 0.02));
     const e = camera.projectionMatrix.elements; U.shade.uProj.value.set(e[0], e[5], camera.near, camera.far); U.shade.tDepth.value = U.smooth.tDepth.value = U.fin.tDepth.value = rtScene.depthTexture;
@@ -204,6 +213,7 @@ window.POST = (function () {
     U.fin.tGlow.value = P.glow > 0.01 ? up[0].texture : black; U.fin.uGlow.value = 0.6 * P.glow / (P._sum || LEVELS);
     U.fin.uDevelop.value = P.develop; U.fin.uShow.value = P.show || 0; U.fin.uTime.value = time || 0; U.fin.uRes.value.set(w, h);
     run(renderer, M.fin, null); P.drawn++; P.levels = LEVELS;
+    if (!P.asked) { P.asked = true; if (!sound(renderer)) { P.broken = true; console.warn('post: the card cannot draw into the picture\'s targets; drawing straight to the screen'); } }
   };
   return P;
 })();
