@@ -112,7 +112,7 @@
     precision highp sampler2DArray;
     uniform sampler2DArray uLanduse; uniform float uTexMix;
     #ifdef USE_GROUND
-    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[16], uGndFarN; uniform vec2 uGndFarD[16]; uniform vec3 uGndMean[17]; uniform vec4 uGndK; uniform float uGndShow;
+    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[16], uGndFarN; uniform vec2 uGndFarD[16]; uniform vec3 uGndMean[17]; uniform vec4 uGndK, uGndT; uniform float uGndShow;
     #else
     uniform sampler2DArray uGround;
     #ifndef DET_SHALLOWS
@@ -136,7 +136,7 @@
     // of the land-use tiles without their bands: whole cells at the tile's centre (uLadN, exact) plus the fraction plus the precise
     // offset from the centre. Every lookup is given its own derivatives (the step of the ladder changes from pixel to pixel, and
     // what the card would work out across such a seam is nonsense), which also lets a lookup stand inside a branch.
-    float gJ, gMix, gSwA, gSwB, gFarOn, gDistM; vec2 gUa, gUb, gAx, gAy, gBx, gBy, gUf, gFx, gFy;
+    float gJ, gMix, gSwA, gSwB, gFarOn, gDistM; vec2 gUa, gUb, gAx, gAy, gBx, gBy, gUf, gFx, gFy, gLoc, gDx, gDy;
     void ladStep(float j, vec2 loc, vec2 dx, vec2 dy, out vec2 uv, out vec2 ddx, out vec2 ddy, out float sw) {
       float n = 8.0 * exp2(j), nw = n * 16.0;
       // (a slow bend from the noise, a few repeats long, so that the repeats do not stand in rows; each step is moved and every
@@ -151,7 +151,7 @@
     // which two steps, and how much of the upper one: from how many cells a pixel covers across its narrow way (the card's own
     // filtering has the long way, where the ground runs away from the eye). And the one size at which the far layers are laid.
     void ladder() {
-      vec2 loc = vGLf * uLadK, dx = dFdx(vGLf) * uLadK, dy = dFdy(vGLf) * uLadK;
+      vec2 loc = vGLf * uLadK, dx = dFdx(vGLf) * uLadK, dy = dFdy(vGLf) * uLadK; gLoc = loc; gDx = dx; gDy = dy;
       float a = dot(dx, dx), d = dot(dy, dy), b = dot(dx, dy), disc = sqrt(max((a - d) * (a - d) + 4.0 * b * b, 0.0));
       float major = sqrt(0.5 * (a + d + disc)), minor = sqrt(max(0.5 * (a + d - disc), 0.0)), rho = max(minor, major / 12.0);
       float l = clamp(log2(max(rho, 1e-7) * uGndK.w / 8.0), 0.0, 14.0);
@@ -175,6 +175,13 @@
       return c;
     }
     vec3 gndMean(float L) { int i = int(L + 0.5); return mix(uGndMean[i], uGndMean[int(uGndFar[i] + 0.5)], gndFarK(L)); }
+    // What people have made of the ground (the land-use tiles: crops in their rows, paving) has a size too, and it is the size the
+    // game draws a village at, some twenty times life: a plot takes one repeat of its crop, a cobble is as wide as a doorway there.
+    // n: cells to a repeat (a power of two); swap: the other way round.
+    vec3 ltex(float L, float n, float swap) {
+      vec2 p = (mod(uLadN, n) + uLadF + gLoc) / n, ddx = gDx / n, ddy = gDy / n; if (swap > 0.5) { p = p.yx; ddx = ddx.yx; ddy = ddy.yx; }
+      return textureGrad(uLanduse, vec3(p, L), ddx, ddy).rgb;
+    }
     // which way its surface leans (east, north; the maps have green up the picture, and the picture's top is the south)
     vec2 gndN(float L) {
       vec2 a = textureGrad(uGndN, vec3(gUa, L), gAx, gAy).rg - 0.5; a = gSwA > 0.5 ? vec2(-a.y, a.x) : vec2(a.x, -a.y);
@@ -311,7 +318,10 @@
       float dl = 0.45, dl2 = 0.45, forestFar = 1.0; vec2 gRel = vec2(0.0); float gRelK = 0.0;
       vec3 land = base * 0.98;
       if (gOn > 0.002) {
-        ladder(); gFarOn = 1.0 - smoothstep(0.03, 0.2, cult);      // (a wood in settled country is open and grazed: its floor is seen, with the great trees the game draws there, and no canopy)
+        ladder();
+        // settled country is cleared country: most of what would be wood there is pasture with trees standing in it (the game draws
+        // those), and what wood is left is open and grazed, with no closed canopy over it
+        { float settled = smoothstep(0.03, 0.22, cult); gFarOn = 1.0 - settled; float cleared = wForest * settled * 0.85; wForest -= cleared; wGrass += cleared; }
         float dith = (nMic.r - 0.5) * 0.35 + (nFin.g - 0.5) * 0.15;
         float tropic = 1.0 - smoothstep(0.27, 0.31, latN0 + dith * 0.1);
         float savK = (clim + dith * 0.3 > 0.22 && tropic > 0.5 && warm > 0.3) ? 1.0 : 0.0;
@@ -328,19 +338,20 @@
         float LA = mix(1.0, mix(4.0, 15.0, salt), isDesert), LB = mix(mix(1.0, 2.0, isSteppe), 2.0, isDesert);
         float wB = patchN * (isDesert * (1.0 - salt) * (1.0 - sandW) + isSteppe * 0.8 + isSav * 0.45);
         float redK = savK * smoothstep(0.5, 0.8, nMac.g * 0.45 + nMid.b * 0.4 + nMic.r * 0.15) * 0.5 * (1.0 - desertK) * (1.0 - steppeK);      // savanna: in stretches the red earth shows between the tufts
-        // the two that count most here, and how far the regional colour of the photograph may tint each (a rock stays the colour of rock)
-        float L1 = gL, w1 = wGrass * (1.0 - redK), h1 = 0.5, L2 = fL, w2 = wForest, h2 = 0.5;
-        if (w2 > w1) { float t; t = L1; L1 = L2; L2 = t; t = w1; w1 = w2; w2 = t; }
+        // the two that count most here; how far the regional colour of the photograph may tint each (a rock stays the colour of rock),
+        // and how bright each may be at most (where the photograph is bright with snow or haze, grass under it is still grass)
+        float L1 = gL, w1 = wGrass * (1.0 - redK), L2 = fL, w2 = wForest; vec2 h1 = vec2(0.75, 0.42), h2 = vec2(0.8, 0.32);
+        if (w2 > w1) { float t; t = L1; L1 = L2; L2 = t; t = w1; w1 = w2; w2 = t; vec2 th = h1; h1 = h2; h2 = th; }
         #define CAND(L, w, h) { float wc = w; if (wc > w1) { L2 = L1; w2 = w1; h2 = h1; L1 = L; w1 = wc; h1 = h; } else if (wc > w2) { L2 = L; w2 = wc; h2 = h; } }
-        CAND(rL, wRock, 0.12)
-        CAND(LA, wDesert * (1.0 - wB - sandW) * (1.0 - redK), 0.6)
-        CAND(LB, wDesert * wB * (1.0 - redK), 0.5)
-        CAND(3.0, wDesert * sandW, 0.7)
-        CAND(9.0, (wGrass + wDesert) * redK, 0.3)
+        CAND(rL, wRock, vec2(0.2, 0.62))
+        CAND(LA, wDesert * (1.0 - wB - sandW) * (1.0 - redK), vec2(0.85, 2.0))
+        CAND(LB, wDesert * wB * (1.0 - redK), vec2(0.85, 2.0))
+        CAND(3.0, wDesert * sandW, vec2(0.9, 2.0))
+        CAND(9.0, (wGrass + wDesert) * redK, vec2(0.3, 0.5))
         #undef CAND
         if (uGndShow >= 0.0) { L1 = uGndShow; w1 = 1.0; w2 = 0.0; }
         float chromaOn = max(lum, 0.03), hueOn = 1.0 - white;      // (where the photograph shows snow or cloud its colour says nothing of the ground's)
-        #define TONE(c, L, h) { vec3 m = gndMean(L); float lm = dot(m, vec3(0.299, 0.587, 0.114)); c *= m * pow(chromaOn / lm, 0.6) * mix(vec3(1.0), clamp((base / chromaOn) / (m / lm), 0.4, 2.5), h * hueOn); }
+        #define TONE(c, L, h) { vec3 m = gndMean(L); float lm = dot(m, vec3(0.299, 0.587, 0.114)), lt = chromaOn / pow(1.0 + pow(chromaOn / h.y, 4.0), 0.25); c *= m * pow(lt / lm, uGndT.x) * mix(vec3(1.0), clamp((base / chromaOn) / (m / lm), 0.4, 2.5), min(h.x * hueOn * uGndT.y, 1.0)); }
         vec4 A = gnd(L1); vec3 ca = A.rgb; TONE(ca, L1, h1)
         float hU = A.a, t2 = w2 / max(w1 + w2, 1e-4), kB = 0.0; vec3 tex = ca; dl = 0.45 * dot(A.rgb, vec3(0.299, 0.587, 0.114));
         if (t2 > 0.04 && L2 != L1) {
@@ -351,6 +362,7 @@
         }
         #undef TONE
         gRel = gndN(L1); if (kB > 0.03) gRel = mix(gRel, gndN(L2), kB);
+        tex *= 1.0 + 0.18 * wDesert;      // (dry ground is bright ground: the photograph of the Earth has the deserts darker than they stand in the sun)
         dl = clamp(dl, 0.12, 0.9); dl2 = dl;
         forestFar = 1.0 - gndFarK(7.0);      // (how much of a wood's floor is seen, and not its canopy: only the floor lies in the trees' shade)
         land = mix(land, tex, gOn * uGndK.y);
@@ -490,12 +502,18 @@
           float wet = step(0.45, green) * step(warm, 0.35) * step(latN0, 0.45);
           float hcB = hash21(bigId + 5.3), hsB = hash21(bigId + 9.1);
           float flB = (wet > 0.5 && hcB < 0.6) ? 3.0 : hcB < 0.35 ? 0.0 : hcB < 0.55 ? 1.0 : hcB < 0.68 ? 2.0 : hcB < 0.84 ? 6.0 : (latN0 > 0.3 && latN0 < 0.55 && hcB < 0.92) ? 4.0 : 5.0;
-          vec3 ft = gtexS(uLanduse, flB, flB == 5.0 ? 16.0 : 8.0, step(0.5, hsB)) * (0.9 + 0.2 * hash21(bigId + 7.7));
+          #ifdef USE_GROUND
+          #define FT(L, sw) ltex(L, L == 5.0 ? 256.0 : 128.0, sw)
+          #else
+          #define FT(L, sw) gtexS(uLanduse, L, L == 5.0 ? 16.0 : 8.0, sw)
+          #endif
+          vec3 ft = FT(flB, step(0.5, hsB)) * (0.9 + 0.2 * hash21(bigId + 7.7));
           if (own > 0.01) {
             float hc = hash21(smallId + 5.3), hs = hash21(smallId + 9.1);
             float fl = (wet > 0.5 && hc < 0.6) ? 3.0 : hc < 0.35 ? 0.0 : hc < 0.55 ? 1.0 : hc < 0.68 ? 2.0 : hc < 0.84 ? 6.0 : (latN0 > 0.3 && latN0 < 0.55 && hc < 0.92) ? 4.0 : 5.0;
-            ft = mix(ft, gtexS(uLanduse, fl, fl == 5.0 ? 16.0 : 8.0, step(0.5, hs)) * (0.9 + 0.2 * hash21(smallId + 7.7)), own);
+            ft = mix(ft, FT(fl, step(0.5, hs)) * (0.9 + 0.2 * hash21(smallId + 7.7)), own);
           }
+          #undef FT
           fieldCol = mix(fieldCol, ft * (1.0 + (hash21(smallId + 4.4) - 0.5) * 0.14 * fine), gOn); fieldA = mix(0.7, 0.92, gOn);
         }
         #endif
@@ -533,7 +551,11 @@
       vec3 urbanCol = mix(mix(vec3(0.40, 0.35, 0.29), vec3(0.60, 0.52, 0.40), arid), mix(vec3(0.47, 0.45, 0.41), vec3(0.43, 0.43, 0.43), modernGround), paved);
       #ifdef USE_TEXARR
       if (gOn > 0.002 && dec.b > 0.04) {
+        #ifdef USE_GROUND
+        vec3 flags = mix(ltex(9.0, 32.0, 0.0), ltex(12.0, 32.0, 0.0), modernGround);
+        #else
         vec3 flags = mix(gtex(uLanduse, 9.0, 4.0), gtex(uLanduse, 12.0, 2.0), modernGround);
+        #endif
         // (trodden earth: paler where the land is dry, and sand only in true desert)
         #ifdef USE_GROUND
         // (trodden earth has the relief of trodden earth, whatever grew there before; paving has none)
@@ -553,7 +575,7 @@
       #ifdef USE_TEXARR
       if (gOn > 0.002 && dec.b > 0.4) {   // dirt tracks, then cobbles, then asphalt; railway lines run on ballast
         #ifdef USE_GROUND
-        vec3 rt = dec.b > 0.95 ? gnd(11.0).rgb * vec3(0.36, 0.34, 0.31) : dec.b > 0.8 ? gtex(uLanduse, 10.0, 4.0) : dec.b > 0.62 ? gtex(uLanduse, 8.0, 2.0) : mix(gnd(14.0).rgb * vec3(0.40, 0.33, 0.25), gnd(3.0).rgb * vec3(0.62, 0.54, 0.39), arid * 0.75);   // a track through dry country is beaten dust
+        vec3 rt = dec.b > 0.95 ? gnd(11.0).rgb * vec3(0.36, 0.34, 0.31) : dec.b > 0.8 ? ltex(10.0, 32.0, 0.0) : dec.b > 0.62 ? ltex(8.0, 32.0, 0.0) : mix(gnd(14.0).rgb * vec3(0.40, 0.33, 0.25), gnd(3.0).rgb * vec3(0.62, 0.54, 0.39), arid * 0.75);   // a track through dry country is beaten dust
         gRelK *= 1.0 - 0.7 * smoothstep(0.55, 0.75, dec.b);
         #else
         vec3 rt = dec.b > 0.95 ? gtex(uGround, 11.0, 4.0) * 0.8 : dec.b > 0.8 ? gtex(uLanduse, 10.0, 4.0) : dec.b > 0.62 ? gtex(uLanduse, 8.0, 2.0) : mix(gtex(uGround, 14.0, 4.0) * 0.9, gtex(uGround, 3.0, 4.0) * 0.8, arid * 0.75);   // a track through dry country is beaten dust
@@ -1197,5 +1219,5 @@
       return null;
     }
   }
-  window.TERRAIN = { Terrain, TILE };
+  window.TERRAIN = { Terrain, TILE, VERT, FRAG };      // (the shaders too: a tool can read this file again and hand a running page its new ones)
 })();

@@ -5,7 +5,7 @@
   "layers": [
     { "id": "meadow",      "from": "polyhaven", "asset": "rocky_terrain_02" },
     { "id": "steppe",      "from": "polyhaven", "asset": "aerial_grass_rock" },
-    { "id": "scrub",       "from": "polyhaven", "asset": "coast_sand_rocks_02" },
+    { "id": "scrub",       "from": "polyhaven", "asset": "aerial_ground_rock" },
     { "id": "sand",        "from": "polyhaven", "asset": "aerial_beach_01" },
     { "id": "hamada",      "from": "polyhaven", "asset": "dirt_aerial_02" },
     { "id": "rock",        "from": "polyhaven", "asset": "aerial_rocks_02" },
