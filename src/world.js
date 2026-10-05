@@ -399,34 +399,56 @@
       // behind the same air as everything else
       const cl = new THREE.TextureLoader().load('data/clouds.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; this.cloudTex = t; });
       this.cloudTex = null; this.cloudShift = 0; this.cloudVis = 0;
+      const AIR_V = window.AIR ? AIR.VERT : '\n varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }';
       this.cloudUniforms = Object.assign({ uMap: { value: cl }, uSun: { value: new THREE.Vector3(1, 0, 0) }, uOpacity: { value: 0.6 } }, window.AIR ? AIR.uniforms : {});
       this.cloudMat = new THREE.ShaderMaterial({ uniforms: this.cloudUniforms, transparent: true, depthWrite: false,
-        vertexShader: `varying vec2 vUv; varying vec3 vWn, vView; void main(){ vUv = uv; vWn = normalize((modelMatrix * vec4(position, 0.0)).xyz); vec4 mv = modelViewMatrix * vec4(position, 1.0); vView = mv.xyz; gl_Position = projectionMatrix * mv; }`,
-        fragmentShader: `uniform sampler2D uMap; uniform vec3 uSun; uniform float uOpacity; varying vec2 vUv; varying vec3 vWn, vView;
-          ${window.AIR ? AIR.GLSL : 'void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); } vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }'}
+        vertexShader: `varying vec2 vUv; varying vec3 vWn; ${AIR_V}
+          void main(){ vUv = uv; vWn = normalize((modelMatrix * vec4(position, 0.0)).xyz); vec4 mv = modelViewMatrix * vec4(position, 1.0); air(mv.xyz, 5.0, vAirT, vAirL); gl_Position = projectionMatrix * mv; }`,
+        fragmentShader: `uniform sampler2D uMap; uniform vec3 uSun; uniform float uOpacity; varying vec2 vUv; varying vec3 vWn; ${AIR_F}
           void main(){
             float a = texture2D(uMap, vUv).g * uOpacity; if (a < 0.004) discard;
             float sunUp = dot(normalize(vWn), uSun);
             vec3 col = mix(vec3(0.03, 0.04, 0.065), mix(vec3(1.0, 0.5, 0.3), vec3(1.0), smoothstep(0.0, 0.32, sunUp)), smoothstep(-0.1, 0.22, sunUp));
-            vec3 T, L; air(vView, 6.0, T, L);
-            gl_FragColor = vec4(airOver(col, T, L), a); }`,
+            gl_FragColor = vec4(airOver(col, vAirT, vAirL), a); }`,
       });
-      this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.004, 128, 80), this.cloudMat); this.clouds.rotation.y = Math.PI; scene.add(this.clouds);
+      this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.004, 192, 96), this.cloudMat); this.clouds.rotation.y = Math.PI; scene.add(this.clouds);
       this.cloudsOn = true;
-      // The sky: a sphere round the camera, drawn last and only where nothing else was (at the far plane). Each pixel of it is a
-      // line of sight out through the air (air.js): blue by day, the colours of dusk, the planet's glowing rim from outside, black
-      // in space. On it the sun's own disc, the moon, and near the ground the stars, the northern lights and a comet when there is one.
+      // The sky: every line of sight that ends on nothing, out through the air (air.js): blue by day, the colours of dusk, the
+      // planet's glowing rim from outside, black in space. It is a mesh of directions round the camera, drawn last and only where
+      // nothing else was (at the far plane), and the air is worked out at its corners, which are set where the sky changes
+      // fastest: a fan of rings by how high above the ground a line of sight passes (from under the horizon up to the camera's own
+      // height or the top of the air: the horizon's haze from the ground, the whole thin rim from orbit), then rings by angle on up
+      // to straight overhead. What turns with the angle to the sun is done per pixel (the haze's bright ring round the sun), and
+      // so are the sun's own disc, the moon, the northern lights and a comet when there is one.
       this.skyUniforms = Object.assign({ uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamPos: { value: new THREE.Vector3() }, uAlpha: { value: 0 }, uMoon: { value: new THREE.Vector3(0, 1, 0) }, uTime: { value: 0 }, uComet: { value: 0 }, uLat: { value: 0 } }, window.AIR ? AIR.uniforms : {});
-      this.sky = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.ShaderMaterial({
-        uniforms: this.skyUniforms, side: THREE.BackSide, transparent: false, depthWrite: false, depthTest: true,
-        vertexShader: `varying vec3 vW, vV; void main(){ vW = (modelMatrix*vec4(position,1.0)).xyz; vec4 mv = modelViewMatrix*vec4(position,1.0); vV = mv.xyz; vec4 p = projectionMatrix*mv; p.z = p.w * 0.9999998; gl_Position = p; }`,
-        fragmentShader: `uniform vec3 uSun, uCamPos, uMoon; uniform float uAlpha, uTime, uComet, uLat; varying vec3 vW, vV;
-          ${window.AIR ? AIR.GLSL : 'const vec4 uAirE = vec4(0.0); const vec3 uAirS = vec3(0.0, 1.0, 0.0); void airMarch(vec3 rd, float tMax, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }'}
+      const NP = 24, NA = 40, NS = 96, skyGeo = new THREE.BufferGeometry();
+      { const rings = NP + NA + 2, sky = new Float32Array(rings * (NS + 1) * 2), idx = [];
+        for (let r = 0; r < rings; r++) for (let k = 0; k <= NS; k++) { sky[(r * (NS + 1) + k) * 2] = r; sky[(r * (NS + 1) + k) * 2 + 1] = k / NS * Math.PI * 2; }
+        for (let r = 0; r < rings - 1; r++) for (let k = 0; k < NS; k++) { const a = r * (NS + 1) + k, b = a + NS + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
+        skyGeo.setAttribute('aSky', new THREE.BufferAttribute(sky, 2)); skyGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(rings * (NS + 1) * 3), 3)); skyGeo.setIndex(idx); }
+      this.sky = new THREE.Mesh(skyGeo, new THREE.ShaderMaterial({
+        uniforms: this.skyUniforms, side: THREE.DoubleSide, transparent: false, depthWrite: false, depthTest: true,
+        vertexShader: `attribute vec2 aSky; varying vec3 vW, vV, vT, vLR, vLM, vLS;
+          ${window.AIR ? AIR.GLSL : 'const float A_RG = 1.0, A_RT = 1.03; const vec3 uAirC = vec3(0.0, 0.0, -3.0); void airParts(vec3 rd, float tMax, float n, out vec3 T, out vec3 LR, out vec3 LM, out vec3 LS) { T = vec3(1.0); LR = vec3(0.0); LM = vec3(0.0); LS = vec3(0.0); }'}
+          void main(){
+            vec3 nad = normalize(uAirC); float rc = length(uAirC), hc = rc - A_RG, under = 0.0022, hEnd = clamp(hc, 0.0, A_RT - A_RG);
+            // (sine and cosine of the angle from straight down: for a line that passes hp above the ground they come without an arcsine, which is blind near the horizontal)
+            float j = clamp(aSky.x - 1.0, 0.0, ${NP}.0) / ${NP}.0, hp = (hEnd + under) * pow(j, 1.5) - under;
+            float sn = clamp((A_RG + hp) / rc, 0.0, 1.0), cs = sqrt(max((hc - hp) * (rc + A_RG + hp), 0.0)) / rc;
+            if (aSky.x > ${NP + 1}.5) { float hE = hEnd, s0 = clamp((A_RG + hE) / rc, 0.0, 1.0), c0 = sqrt(max((hc - hE) * (rc + A_RG + hE), 0.0)) / rc; float p0 = atan(s0, c0), psi = p0 + (3.14159265 - p0) * pow((aSky.x - ${NP + 1}.0) / ${NA}.0, 2.4); sn = sin(psi); cs = cos(psi); }
+            if (aSky.x < 0.5) { sn = 0.0; cs = 1.0; }
+            vec3 ax = abs(nad.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), e1 = normalize(cross(nad, ax)), e2 = cross(nad, e1);
+            vec3 d = nad * cs + (e1 * cos(aSky.y) + e2 * sin(aSky.y)) * sn;
+            vV = d; vW = transpose(mat3(viewMatrix)) * d;
+            airParts(d, 1e9, ${window.AIR ? AIR.SKY : '16.0'}, vT, vLR, vLM, vLS);
+            vec4 p = projectionMatrix * vec4(d, 1.0); p.z = p.w * 0.9999998; gl_Position = p; }`,
+        fragmentShader: `uniform vec3 uSun, uCamPos, uMoon, uAirS; uniform vec4 uAirE; uniform float uAlpha, uTime, uComet, uLat; varying vec3 vW, vV, vT, vLR, vLM, vLS;
+          ${window.AIR ? AIR.PHASE : 'float airPhR(float c) { return 0.0; } float airPhM(float c) { return 0.0; }'}
           float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
           void main(){
-            vec3 dir = normalize(vW - uCamPos); vec3 up = normalize(uCamPos); vec3 sun = normalize(uSun); vec3 rd = normalize(vV);
-            vec3 T, L; airMarch(rd, 1e9, ${window.AIR ? AIR.SKY : '16.0'}, T, L);
+            vec3 dir = normalize(vW); vec3 up = normalize(uCamPos); vec3 sun = normalize(uSun); vec3 rd = normalize(vV);
+            float cSun = dot(rd, uAirS); vec3 T = vT, L = vLR * airPhR(cSun) + vLM * airPhM(cSun) + vLS;
             float el = dot(dir, up); float sunEl = dot(sun, up);
             float night = (1.0 - smoothstep(-0.17, -0.05, sunEl)) * uAlpha; vec3 add = vec3(0.0);      // (what belongs to a sky seen from the ground fades as the camera leaves it: uAlpha)
             // the moon: a lit disc with a soft halo, phase from its angle to the sun
@@ -462,7 +484,7 @@
       this.skyUniforms.uAlpha.value = skyA; this.skyUniforms.uSun.value.copy(sun);
       // the moon circles the sky once a game-month, offset from the sun so phases run their course
       { const a = time * 0.0025; const ax = new THREE.Vector3(0.06, 1, 0.04).normalize(); this.skyUniforms.uMoon.value.copy(sun).applyAxisAngle(ax, 2.6 + a).normalize(); this.skyUniforms.uTime.value = time; this.skyUniforms.uLat.value = cam.lat; this.skyUniforms.uComet.value = this.cometOn ? 1 : 0; }
-      this.sky.position.copy(cam.camera.position); this.sky.scale.setScalar(Math.max(cam.camera.near * 50, cam.camera.far * 0.4)); this.skyUniforms.uCamPos.value.copy(cam.camera.position); this.sky.updateMatrixWorld();
+      this.skyUniforms.uCamPos.value.copy(cam.camera.position);
       const camUp0 = cam.camera.position.clone().normalize(); const dayHere = Math.min(1, Math.max(0, (camUp0.dot(sun) + 0.12) / 0.32));
       // (from the ground the stars come out as the sky darkens; from high up the field is only dimmed on the day side, where the lit ground fills the eye)
       { const su = this.starUniforms, dark = 1 - Math.min(1, Math.max(0, (camUp0.dot(sun) + 0.17) / 0.12)); su.uAlpha.value = (1 - skyA) * (1 - 0.55 * dayHere) + skyA * dark * dark * (3 - 2 * dark); su.uLow.value = skyA; su.uTime.value = time; su.uUp.value.copy(camUp0);

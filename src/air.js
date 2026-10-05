@@ -112,6 +112,10 @@
   // the uniforms and what is done with what the air leaves and adds (a colour as the screen shows it, in and out): for every shader that draws something in the air
   A.MIX = `
     vec3 airOver(vec3 c, vec3 T, vec3 L) { return pow(pow(max(c, 0.0), vec3(2.2)) * T + L, vec3(0.4545)); }`;
+  // how much of the light the gas, and the haze, turn by an angle (its cosine): the gas evenly fore and aft, the haze mostly onward
+  A.PHASE = `
+    float airPhR(float c) { return 0.0596831 * (1.0 + c * c); }
+    float airPhM(float c) { return 0.1193662 * ${f(1 - G * G)} * (1.0 + c * c) / (${f(2 + G * G)} * pow(${f(1 + G * G)} - ${f(2 * G)} * c, 1.5)); }`;
   A.GLSL = `
     uniform vec3 uAirC, uAirS, uAirN; uniform vec4 uAirE; uniform vec3 uAirK; uniform vec3 uAirPsi[${PSI_N}];      // the planet's centre and the way to the sun, as the camera sees them; the night's own glow; x: how strongly the sun lights the air (0: no air), y: the haze, z: the sun's disc, w: the share of the steps to take
     const float A_RG = ${f(RG)}, A_RT = ${f(RT)}, A_HR = ${f(HR)}, A_HM = ${f(HM)}, A_MS = ${f(MS)}, A_ME = ${f(ME)}, A_OC = ${f(OC)}, A_OW = ${f(OW)};
@@ -132,20 +136,26 @@
     vec3 airPsi(float mu) { float x = clamp((mu / (abs(mu) + 0.25) + 0.55) / 1.35, 0.0, 1.0) * ${f(PSI_N - 1)}; float i = min(floor(x), ${f(PSI_N - 2)}); int k = int(i); return mix(uAirPsi[k], uAirPsi[k + 1], x - i); }
     float airMean(float e0, float e1, float d) { return abs(d) < 1e-3 ? 0.5 * (e0 + e1) : (e0 - e1) / d; }      // the mean of an exponential between two points of it, d scale heights apart
     float airWarp(float u, float tA, float tq, float tB, float us) { float a = (us - u) / us, b = (u - us) / (1.0 - us); return u < us ? tq - (tq - tA) * a * a : tq + (tB - tq) * b * b; }
-    // the line of sight from the eye along rd (unit, the camera's space) as far as tMax, in so many steps (fewer where the game
-    // says so: uAirE.w): T what the air lets through, L what it adds
-    void airMarch(vec3 rd, float tMax, float steps, out vec3 T, out vec3 L) {
-      T = vec3(1.0); L = vec3(0.0); if (uAirE.x <= 0.0) return;
+    ${A.PHASE}
+    // The line of sight from the eye along rd (unit, the camera's space) as far as tMax, in so many steps (fewer where the game
+    // says so: uAirE.w, and where there is little air on it). T: what the air lets through. What it adds, in three parts, so that
+    // whoever works this out at a few points only (the sky does, at the corners of its mesh) can still turn the sun's light by the
+    // true angle at every pixel: LR the gas's share and LM the haze's, each still to be multiplied by its phase, LS what needs none.
+    void airParts(vec3 rd, float tMax, float steps, out vec3 T, out vec3 LR, out vec3 LM, out vec3 LS) {
+      T = vec3(1.0); LR = vec3(0.0); LM = vec3(0.0); LS = vec3(0.0); if (uAirE.x <= 0.0) return;
       float q = dot(rd, uAirC), c2 = dot(uAirC, uAirC), dT = A_RT * A_RT - (c2 - q * q); if (dT <= 0.0) return;
       float sT = sqrt(dT), tA = max(q - sT, 0.0), tB = min(q + sT, tMax); if (tB <= tA) return;
       float tq = clamp(q, tA, tB), s1 = sqrt(tq - tA), s2 = sqrt(tB - tq), us = clamp(s1 / max(s1 + s2, 1e-20), 0.0001, 0.9999);      // (never 0 or 1: the steps are laid out by dividing by it and by what is left of it)
-      float rdS = dot(rd, uAirS), cS = dot(uAirC, uAirS), fn = max(2.0, floor(steps * uAirE.w + 0.5)); int n = int(fn);
+      float rdS = dot(rd, uAirS), cS = dot(uAirC, uAirS);
       // (looked down through, the air is shown thinner than it is: uAirK.z. How steeply the line comes down on what it ends at: 1 straight down, 0 along the ground or out to the sky)
-      float steep = mix(1.0, uAirK.z, smoothstep(0.04, 0.5, (q - tB) / sqrt(max(tB * tB - 2.0 * q * tB + c2, 1e-12))));
-      float phR = 0.0596831 * (1.0 + rdS * rdS), phM = 0.1193662 * ${f(1 - G * G)} * (1.0 + rdS * rdS) / (${f(2 + G * G)} * pow(${f(1 + G * G)} - ${f(2 * G)} * rdS, 1.5));
+      float rB = sqrt(max(tB * tB - 2.0 * q * tB + c2, 1e-12)), steep = mix(1.0, uAirK.z, smoothstep(0.04, 0.5, (q - tB) / rB));
+      // (where there is little air on the line - a house across the square, the ground under a low camera - two steps tell as much as six)
+      float hA = sqrt(max(tA * tA - 2.0 * q * tA + c2, 1e-12)) - A_RG, hB = rB - A_RG, hLow = min(hA, hB);
+      float most = (A_BR.b * exp(min(-hLow / A_HR, 60.0)) + A_ME * uAirE.y * exp(min(-hLow / A_HM, 60.0))) * (tB - tA) * steep * mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, tB));
+      float fn = max(2.0, floor(steps * uAirE.w * (most < 0.05 ? 0.34 : most < 0.25 ? 0.67 : 1.0) + 0.5)); int n = int(fn);
       // (each step takes the air it passes as it really thins along it - two straight pieces of an exponential, from the heights at
       // its ends and its middle - so a few long steps come out as many short ones would, and a house stands in the same air as its street)
-      float t0 = tA, h0 = sqrt(max(t0 * t0 - 2.0 * q * t0 + c2, 1e-12)) - A_RG, eR0 = exp(min(-h0 / A_HR, 60.0)), eM0 = exp(min(-h0 / A_HM, 60.0));
+      float t0 = tA, h0 = hA, eR0 = exp(min(-h0 / A_HR, 60.0)), eM0 = exp(min(-h0 / A_HM, 60.0));
       for (int i = 0; i < n; i++) {
         float fi = float(i), t1 = airWarp((fi + 1.0) / fn, tA, tq, tB, us), t = airWarp((fi + 0.5) / fn, tA, tq, tB, us), dt = t1 - t0;
         float r = sqrt(max(t * t - 2.0 * q * t + c2, 1e-12)), h = r - A_RG, mus = (t * rdS - cS) / r, h1 = sqrt(max(t1 * t1 - 2.0 * q * t1 + c2, 1e-12)) - A_RG;
@@ -153,19 +163,22 @@
         float dM = (airMean(eM0, eMm, (h - h0) / A_HM) * wa + airMean(eMm, eM1, (h1 - h) / A_HM) * (1.0 - wa)) * uAirE.y;
         vec3 sR = A_BR * (airMean(eR0, eRm, (h - h0) / A_HR) * wa + airMean(eRm, eR1, (h1 - h) / A_HR) * (1.0 - wa)); float sM = A_MS * dM;
         vec3 ext = sR + A_ME * dM + A_BO * max(0.0, 1.0 - abs(h - A_OC) / A_OW);
-        vec3 src = (sR * phR + sM * phM) * airSun(r, mus) + (sR + sM) * airPsi(mus);
+        vec3 sun = airSun(r, mus);
         vec3 tr = exp(-ext * dt * steep * mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, t)));      // (thinner about the eye, too, when it is down among things drawn larger than life: uAirK.x as far as uAirK.y)
-        L += T * src * (1.0 - tr) / max(ext, vec3(1e-9)); T *= tr;
+        vec3 w = T * (1.0 - tr) / max(ext, vec3(1e-9));
+        LR += w * sR * sun; LM += w * sM * sun; LS += w * (sR + sM) * airPsi(mus); T *= tr;
         t0 = t1; h0 = h1; eR0 = eR1; eM0 = eM1;
       }
-      L = L * uAirE.x + uAirN * (1.0 - T);
+      LR *= uAirE.x; LM *= uAirE.x; LS = LS * uAirE.x + uAirN * (1.0 - T);
     }
+    void airMarch(vec3 rd, float tMax, float steps, out vec3 T, out vec3 L) { vec3 LR, LM, LS; airParts(rd, tMax, steps, T, LR, LM, LS); float c = dot(rd, uAirS); L = LR * airPhR(c) + LM * airPhM(c) + LS; }
     // what lies between the eye and a point (the camera's space)
     void air(vec3 pv, float steps, out vec3 T, out vec3 L) { float d = length(pv); airMarch(pv / max(d, 1e-12), d, steps, T, L); }
     ${A.MIX}`;
 
-  // how many steps a line of sight is given: the sky (it is all air), the ground (per pixel), a thing standing on it (per corner)
-  A.SKY = '16.0'; A.LAND = '6.0'; A.THING = '3.0';
+  // how many steps a line of sight is given: the sky (it is all air), the ground, a thing standing on it. All of them work the air
+  // out at the corners of their meshes, not at every pixel: it changes slowly, and a march at every pixel of a large screen is dear.
+  A.SKY = '16.0'; A.LAND = '5.0'; A.THING = '3.0';
   // A thing that stands on the ground is small against the air: it works the air out at its corners (vertex shader: A.VERT, then
   // air(viewPos, steps, vAirT, vAirL)) and lays it over its colour (fragment shader: A.FRAG, then airOver(colour, vAirT, vAirL)).
   A.VERT = A.GLSL + '\n    varying vec3 vAirT, vAirL;';

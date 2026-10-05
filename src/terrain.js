@@ -27,11 +27,14 @@
     return g;
   }
 
+  // the air between the eye and the ground (air.js), worked out at the corners of the mesh: it changes slowly, and the mesh is fine where the eye is near
+  const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.LAND : '5.0';
   const VERT = `
     uniform float uLon0, uDLon, uLat0, uDLat, uLatC, uLonC; uniform vec2 uGeoC, uPhaseB;
     uniform float uDLon0, uDLat0, uMercA, uTanA, uCosA;   // tile-centre-relative offsets and the Mercator terms for the fine (metre-scale) texture frame
     uniform sampler2D uElev, uNoise; uniform vec4 uElevRect; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag, uSkirt, uCamAlt, uQuality;
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
+    ${AIR_V}
     const float R_MV = ${R_M.toFixed(1)};
     float hAtV(vec2 uv) { return max(uElevMin + texture2D(uElev, uElevRect.xy + uv * uElevRect.zw).r * 255.0 * uElevScale, 0.0); }
     void main() {
@@ -73,6 +76,7 @@
       { float dl = uDLon0 + u * uDLon, dla = uDLat0 + v * uDLat; float dd = dla * 0.5; float td = sin(dd) / max(cos(uMercA + dd) * uCosA, 1e-4); vGLf = vec2(dl, log(max(1.0 + td / uTanA, 1e-4))); }
       vec4 mv = modelViewMatrix * vec4(local, 1.0);
       vViewPos = mv.xyz;
+      air(mv.xyz, ${AIR_N}, vAirT, vAirL);
       gl_Position = projectionMatrix * mv;
     }`;
 
@@ -97,7 +101,7 @@
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     const float PI = 3.14159265;
     ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
-    ${window.AIR ? AIR.GLSL : 'void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); } vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }'}
+    ${AIR_F}
     #ifdef USE_TEXARR
     // generated ground and land-use tiles (textures.js), sampled in a metric Mercator frame: a phase computed in double precision
     // at the tile centre (uPhN whole cells mod 16, uPhF the fraction) plus the precise local offset vGLf, in base cells of 1.5 m
@@ -607,8 +611,7 @@
         lit = mix(lit, fc * (0.35 + 0.65 * day), uFertView * landW * 0.6);
       }
       // ---------- the air between (air.js): what it takes from the ground's light on the way to the eye, and the light of its own it adds ----------
-      vec3 airT, airL; air(vViewPos, ${window.AIR ? AIR.LAND : '6.0'}, airT, airL);
-      gl_FragColor = vec4(airOver(lit, airT, airL), 1.0);
+      gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0);
     }`;
 
   // ---------- pack loading ----------
