@@ -13,6 +13,6 @@ for i in $(seq 1 ${WAIT:-150}); do
   sleep 6
 done
 mkdir -p shots/peek
-for f in ground_sheet.jpg ground_build.log; do curl -fsSL -o "shots/peek/$f" "https://github.com/$repo/releases/download/$tag/$f" || echo "no $f"; done
+for f in ground_sheet.jpg ground_try.jpg ground_build.log; do curl -fsSL -o "shots/peek/$f" "https://github.com/$repo/releases/download/$tag/$f" || echo "no $f"; done
 cat shots/peek/ground_build.log 2>/dev/null | cut -c1-200
 TAG="$tag" FRESH=1 node tools/ground/fetch.mjs

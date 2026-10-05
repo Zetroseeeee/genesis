@@ -8,8 +8,9 @@ into two atlases of cols x rows cells:
     out/ground_albedo.jpg    the colours, with a share of the material's own shade (ambient occlusion) in them
     out/ground_normal.jpg    red and green: the normal map as the libraries give it (OpenGL: green is up the picture);
                              blue: the heights, stretched to the full range (for blending one material into another)
-    out/ground.json          what the game needs to know: the cells, each layer's two sizes in the world, its mean colour
+    out/ground.json          what the game needs to know: the cells, each layer's mean colour, the far picture that goes with it
     out/ground_sheet.jpg     a sheet to look at: every layer's colours, relief and heights side by side
+    out/ground_try.jpg       the same for the materials listed under "try" (not packed: candidates to look at)
 
 Run by the Ground workflow (the workspace cannot reach the libraries; GitHub can), which keeps the four files in the
 "ground" release; tools/ground/fetch.mjs brings them into data/tex/.  LOCAL=<dir> packs from files already on disk
@@ -134,23 +135,32 @@ def main():
             print(f"{k:2d} {spec['id']:<12} {spec.get('from', 'polyhaven')}/{spec['asset']:<28} mean {info['mean']} relief {info['rough']} maps {','.join(info['maps'])}")
         except Exception as e:
             info = {'mean': [0.5, 0.5, 0.5], 'failed': repr(e)[:300]}; failed.append(spec['id']); A[y:y + cell, x:x + cell] = 128; print(f"{k:2d} {spec['id']:<12} FAILED {e!r}"[:400])
-        layers.append({'id': spec['id'], 'near': spec.get('near', 12), 'far': spec.get('far', 96), 'from': spec.get('from', 'polyhaven'), 'asset': spec['asset'], **info})
+        layers.append({'id': spec['id'], 'far': spec.get('far'), 'from': spec.get('from', 'polyhaven'), 'asset': spec['asset'], **info})
     Image.fromarray(A).save('out/ground_albedo.jpg', quality=90, subsampling=0, optimize=True)
     Image.fromarray(N).save('out/ground_normal.jpg', quality=93, subsampling=0, optimize=True)
     made = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     json.dump({'_doc': 'The ground\'s materials, packed by tools/ground/build.py from assets/ground/materials.json. Public domain (CC0): polyhaven.com, ambientcg.com.', 'made': made, 'cell': cell, 'cols': cols, 'rows': rows,
                'albedo': 'ground_albedo.jpg', 'normal': 'ground_normal.jpg', 'layers': layers}, open('out/ground.json', 'w'), indent=1)
-    # the sheet: colours, relief, heights of each layer, small
+    # the sheets: colours, relief, heights of each layer, small (and the colours tiled two by two at a quarter size, to see how it repeats)
     t = 240; gap = 8; lab = 22
     try: font = ImageFont.load_default(size=15)
     except TypeError: font = ImageFont.load_default()
-    sheet = Image.new('RGB', (4 * (3 * t + gap) + gap, 4 * (t + lab + gap) + gap), (26, 26, 26)); dr = ImageDraw.Draw(sheet)
-    for k, L in enumerate(layers):
-        y, x = (k // cols) * cell, (k % cols) * cell; sx = gap + (k % 4) * (3 * t + gap); sy = gap + (k // 4) * (t + lab + gap)
-        a = Image.fromarray(A[y:y + cell, x:x + cell]).resize((t, t), Image.LANCZOS); n = Image.fromarray(np.dstack([N[y:y + cell, x:x + cell, 0:2], np.full((cell, cell, 1), 255, np.uint8)])).resize((t, t), Image.LANCZOS); h = Image.fromarray(N[y:y + cell, x:x + cell, 2]).resize((t, t), Image.LANCZOS).convert('RGB')
-        sheet.paste(a, (sx, sy)); sheet.paste(n, (sx + t, sy)); sheet.paste(h, (sx + 2 * t, sy))
-        dr.text((sx + 2, sy + t + 2), f"{k} {L['id']}: {L['asset']}  {L['near']}/{L['far']} m" + ('  FAILED' if 'failed' in L else ''), fill=(235, 235, 235), font=font)
-    sheet.save('out/ground_sheet.jpg', quality=86)
+    def lay(tiles, name, per=4):
+        rws = (len(tiles) + per - 1) // per; sheet = Image.new('RGB', (per * (4 * t + gap) + gap, max(1, rws) * (t + lab + gap) + gap), (26, 26, 26)); dr = ImageDraw.Draw(sheet)
+        for k, (label, a, nn) in enumerate(tiles):
+            sx = gap + (k % per) * (4 * t + gap); sy = gap + (k // per) * (t + lab + gap)
+            if a is not None:
+                ai = Image.fromarray(a); half = ai.resize((t // 2, t // 2), Image.LANCZOS); rep4 = Image.new('RGB', (t, t)); [rep4.paste(half, (dx * (t // 2), dy * (t // 2))) for dx in (0, 1) for dy in (0, 1)]
+                sheet.paste(ai.resize((t, t), Image.LANCZOS), (sx, sy)); sheet.paste(rep4, (sx + t, sy))
+                sheet.paste(Image.fromarray(np.dstack([nn[..., 0:2], np.full(nn.shape[:2] + (1,), 255, np.uint8)])).resize((t, t), Image.LANCZOS), (sx + 2 * t, sy)); sheet.paste(Image.fromarray(nn[..., 2]).resize((t, t), Image.LANCZOS).convert('RGB'), (sx + 3 * t, sy))
+            dr.text((sx + 2, sy + t + 2), label, fill=(235, 235, 235), font=font)
+        sheet.save(name, quality=86)
+    lay([(f"{k} {L['id']}: {L['asset']}" + (f"  far: {L['far']}" if L.get('far') else '') + ('  FAILED' if 'failed' in L else ''), A[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell], N[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell]) for k, L in enumerate(layers)], 'out/ground_sheet.jpg')
+    tries = []
+    for spec in man.get('try', []) if not os.environ.get('NO_TRY') else []:
+        try: a, nn, info = layer(dict(spec, id=spec['asset']), 512); tries.append((f"{spec['asset']}  mean {info['mean']}", a, nn)); print('  try', spec['asset'], info['mean'])
+        except Exception as e: tries.append((f"{spec['asset']}  FAILED {e!r}"[:60], None, None)); print('  try', spec['asset'], 'FAILED', repr(e)[:200])
+    if tries: lay(tries, 'out/ground_try.jpg')
     for f in sorted(os.listdir('out')): print(' ', f, os.path.getsize(os.path.join('out', f)))
     if failed: print('FAILED:', ', '.join(failed)); sys.exit(0 if os.environ.get('KEEP_GOING') else 1)
 

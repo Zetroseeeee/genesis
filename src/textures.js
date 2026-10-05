@@ -5,7 +5,7 @@
 // DataTexture2DArray so each material repeats and mipmaps cleanly (no atlas bleeding). Without WebGL2 (or if the
 // atlases fail to load) nothing is set up and the shaders keep their procedural look.
 (function () {
-  const TEX = { ready: false, unsupported: false, failed: false, ui: {}, arrays: {}, scale: {}, mean: {}, layers: {}, misc: {}, manifest: null, loading: null };
+  const TEX = { ready: false, unsupported: false, failed: false, ui: {}, arrays: {}, scale: {}, mean: {}, layers: {}, misc: {}, manifest: null, loading: null, ground: null };
 
   function loadImg(url) {
     return new Promise((res) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => { console.warn('texture atlas failed', url); res(null); }; im.src = url; });
@@ -27,6 +27,33 @@
     tex.format = THREE.RGBAFormat; tex.type = THREE.UnsignedByteType; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = true; tex.anisotropy = anisotropy || 4; tex.needsUpdate = true;
     return { tex, mean, n: layers, size: C };
+  }
+  // an atlas of cols x rows cells as a texture array, at 1 / shrink of its size; `more` (canvases or images) are added as further
+  // layers, each drawn to the size of a cell
+  function toGrid(img, cell, cols, rows, anisotropy, shrink, more) {
+    const k = 1 / (shrink || 1), W = Math.round(img.width * k), H = Math.round(img.height * k), C = Math.round(W / cols), extra = more || [], layers = cols * rows + extra.length;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0, W, H);
+    const data = new Uint8Array(C * C * 4 * layers);
+    for (let l = 0; l < cols * rows; l++) data.set(ctx.getImageData((l % cols) * C, Math.floor(l / cols) * C, C, C).data, l * C * C * 4);
+    extra.forEach((e, i) => { const c2 = document.createElement('canvas'); c2.width = c2.height = C; const x2 = c2.getContext('2d', { willReadFrequently: true }); x2.drawImage(e, 0, 0, C, C); data.set(x2.getImageData(0, 0, C, C).data, (cols * rows + i) * C * C * 4); });
+    const tex = new THREE.DataTexture2DArray(data, C, C, layers);
+    tex.format = THREE.RGBAFormat; tex.type = THREE.UnsignedByteType; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = true; tex.anisotropy = anisotropy || 4; tex.needsUpdate = true;
+    return { tex, n: layers, size: C };
+  }
+  // The ground's own materials (the manifest's "ground": a list packed by tools/ground/build.py, with two atlases beside it): the
+  // colours, and in a second array the relief (red and green: the normal map) and the heights (blue). The shallows' caustics ride
+  // along as one more layer of the colours, so that the ground's shader needs no texture of its own for them. Where the pack is
+  // not there, TEX.ground stays null and the ground is drawn as it was.
+  async function loadGround(url, aniso, shrink, shallows) {
+    let man; try { const r = await fetch(url); if (!r.ok) return null; man = await r.json(); } catch (e) { return null; }
+    const base = url.replace(/[^/]*$/, ''); const [a, nm] = await Promise.all([loadImg(base + man.albedo), loadImg(base + man.normal)]); if (!a || !nm) return null;
+    const cols = man.cols || 4, rows = man.rows || 4, A = toGrid(a, man.cell, cols, rows, aniso, shrink, shallows ? [shallows] : []), N = toGrid(nm, man.cell, cols, rows, aniso, shrink);
+    const L = man.layers || [], count = cols * rows, cells = new Float32Array(count * 2), mean = new Float32Array(count * 3);
+    // (a layer's two sizes, in the ground's cells of a metre and a half: powers of two, so that they repeat across the tiles' edges)
+    const pow2 = (m) => Math.min(1024, Math.max(1, Math.pow(2, Math.round(Math.log2(Math.max(1.5, m) / 1.5)))));
+    for (let i = 0; i < count; i++) { const l = L[i] || {}; cells[i * 2] = pow2(l.near || 12); cells[i * 2 + 1] = pow2(l.far || 96); const m = l.mean || [0.5, 0.5, 0.5]; mean[i * 3] = m[0]; mean[i * 3 + 1] = m[1]; mean[i * 3 + 2] = m[2]; }
+    return { albedo: A.tex, relief: N.tex, size: A.size, count, cells, mean, shallows: shallows ? count : -1, layers: L, made: man.made };
   }
   // one cell of an atlas as a plain repeating 2D texture (water, clouds)
   function cellTexture(img, cell, n, idx, anisotropy) {
@@ -82,6 +109,10 @@
           TEX.arrays[nm] = arr.tex; TEX.mean[nm] = arr.mean;
           const sc = new Float32Array(16); for (let i = 0; i < 16; i++) sc[i] = (A.layers[i] && A.layers[i].m) || 3; TEX.scale[nm] = sc;
         }
+        // (the ground's materials, where the manifest names them: a software renderer takes them at half size)
+        if (man.ground && TEX.groundOn !== false) { try { const mi = names.indexOf('misc'), sh = mi >= 0 && imgs[mi] ? man.atlases.misc.layers.findIndex((L) => L.id === 'shallows') : -1; let cvS = null;
+          if (sh >= 0) { const im = imgs[mi], C = Math.round(cell * im.width / (n * cell)); cvS = document.createElement('canvas'); cvS.width = cvS.height = C; cvS.getContext('2d').drawImage(im, (sh % n) * C, Math.floor(sh / n) * C, C, C, 0, 0, C, C); }
+          TEX.ground = await loadGround(man.ground, aniso, TEX.groundShrink || (half ? 2 : 1), cvS); } catch (e) { console.warn('ground materials unavailable', e); TEX.ground = null; } }
         TEX.ready = !!(TEX.arrays.wall && TEX.arrays.roof);
         if (!TEX.ready) TEX.failed = true;
       } catch (e) { console.warn('textures unavailable', e); TEX.failed = true; }
