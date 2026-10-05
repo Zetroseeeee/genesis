@@ -574,6 +574,30 @@
       }
       #endif
       #endif
+      #ifdef GND_PROBE
+      // (a measuring probe, never in the game: eight more lookups of one kind, to learn what a lookup of that kind costs on a card.
+      //  1 plain, 2 the layer changing from pixel to pixel, 3 each inside a branch that is always taken, 4 told how large a pixel
+      //  is (textureGrad), 5 told which level (textureLod), 6 inside a branch half the pixels take. tools/testcam.js: __T.probe)
+      { vec2 pu = vGLf * (uLadK / 600.0); vec3 acc = vec3(0.0);
+        #if GND_PROBE == 1
+        #define PR(k) acc += texture(uGnd, vec3(pu + 0.13 * k, k)).rgb;
+        #elif GND_PROBE == 2
+        float pl = floor(fract(pu.x * 0.37 + pu.y * 0.11) * 8.0);
+        #define PR(k) acc += texture(uGnd, vec3(pu + 0.13 * k, mod(pl + k, 8.0))).rgb;
+        #elif GND_PROBE == 3
+        #define PR(k) if (vUV.x > -1.0 - k) acc += texture(uGnd, vec3(pu + 0.13 * k, k)).rgb;
+        #elif GND_PROBE == 4
+        vec2 pdx = dFdx(pu), pdy = dFdy(pu);
+        #define PR(k) acc += textureGrad(uGnd, vec3(pu + 0.13 * k, k), pdx, pdy).rgb;
+        #elif GND_PROBE == 5
+        #define PR(k) acc += textureLod(uGnd, vec3(pu + 0.13 * k, k), 1.0).rgb;
+        #else
+        #define PR(k) if (nMic.r > 0.5 + 0.001 * k) acc += texture(uGnd, vec3(pu + 0.13 * k, k)).rgb;
+        #endif
+        PR(0.0) PR(1.0) PR(2.0) PR(3.0) PR(4.0) PR(5.0) PR(6.0) PR(7.0)
+        #undef PR
+        land += acc * 0.00002; }
+      #endif
       // cultivation patchwork near settlements (sim channel b)
       // under the trees it is dim: where the forest stands the ground lies in the canopy's shade, dappled with light
       // (from the height at which single trees are drawn; farmland has cleared its share)
@@ -1152,7 +1176,7 @@
       for (const t of this.tiles.values()) { const m = t.mesh.material; m.defines = this.defines(); m.needsUpdate = true; }
     }
     // shader switches for every tile material: the detail array when the globals carry one, the generated ground when it has loaded
-    defines() { const d = this.globals.uDet && this.globals.uDet.value; return Object.assign(d ? (d.image.depth >= 5 ? { USE_DETARR: 1, DET_SHALLOWS: 1 } : { USE_DETARR: 1 }) : {}, this.texDefines || {}); }
+    defines() { const d = this.globals.uDet && this.globals.uDet.value; return Object.assign(d ? (d.image.depth >= 5 ? { USE_DETARR: 1, DET_SHALLOWS: 1 } : { USE_DETARR: 1 }) : {}, this.texDefines || {}, this.probe && this.grounded ? { GND_PROBE: this.probe } : {}); }      // (probe: a measuring tool, see GND_PROBE in the shader)
     // ----- per frame -----
     update(camera, viewportH) {
       this.frame++; this.queue = [];

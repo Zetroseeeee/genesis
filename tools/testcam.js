@@ -49,17 +49,20 @@ window.__T.costs = function () {
     ['a quarter of the pixels', () => { T.quadPx = q; R.setPixelRatio(r0 / 2); }], ['all pixels, no ground', () => { R.setPixelRatio(r0); T.group.visible = false; }],
     ['ground, no houses', () => { T.group.visible = true; __G.world.buildingGroup.visible = false; MODELS.group.visible = false; }], ['all again', () => { __G.world.buildingGroup.visible = true; MODELS.group.visible = true; POST.off = false; }]]);
 };
-// what the ground's own materials cost: filtered fewer ways; then part by part, each left out on top of the one before (uGndDbg in terrain.js): the relief,
-// the second material, every colour looked up, the noise that bends the ladder, all of it; then the ground drawn the old way, and
-// the materials at half their size (two and a half seconds before each: a new shader has to be made, a pack read again)
+// what the ground's own materials cost, part by part, each left out on top of the one before (uGndDbg in terrain.js): the relief,
+// the second material, every colour looked up, the noise that bends the ladder, all of it; then the ground drawn the old way
+// (two and a half seconds before each: a new shader may have to be made)
 window.__T.costsGround = function () {
-  const T = __G.terrain, g = window.TEX && TEX.ground, U = __G.globals; if (!g) return 'no materials'; const sh = TEX.groundArgs[2];
-  const back = () => { TEX.ground = TEX.ground || g; T.setTextures(TEX, true); };
-  const full = window.GENESIS_ANISO || 16;
-  __T.cost([['all', () => {}], ['materials 8 ways', () => { __T.aniso(8, g.albedo, g.relief); }], ['materials 4 ways', () => { __T.aniso(4, g.albedo, g.relief); }], ['all ways, no relief', () => { __T.aniso(full, g.albedo, g.relief); U.uGndDbg.value = 1; }], ['and no second material', () => { U.uGndDbg.value = 2; }], ['and no colours looked up', () => { U.uGndDbg.value = 3; }],
+  const T = __G.terrain, g = window.TEX && TEX.ground, U = __G.globals; if (!g) return 'no materials';
+  __T.cost([['all', () => {}], ['no relief', () => { U.uGndDbg.value = 1; }], ['and no second material', () => { U.uGndDbg.value = 2; }], ['and no colours looked up', () => { U.uGndDbg.value = 3; }],
     ['and no bending noise', () => { U.uGndDbg.value = 4; }], ['none of it', () => { U.uGndDbg.value = 5; }], ['the old ground', () => { U.uGndDbg.value = 0; TEX.ground = null; T.setTextures(TEX, true); }],
-    ['(half-size materials coming)', () => { TEX.ground = g; TEX.groundArgs[2] = sh * 2; TEX.reloadGround().then(back); }], ['materials at half size', () => {}],
-    ['(whole again)', () => { TEX.groundArgs[2] = sh; TEX.reloadGround().then(back); }], ['all again', () => {}]], 3, 2500);
+    ['all again', () => { TEX.ground = g; T.setTextures(TEX, true); }]], 3, 2500);
+};
+// what a lookup costs on this card, by kind: eight more of them in the ground's shader (GND_PROBE in terrain.js), of each kind in turn
+window.__T.probe = function (n) { const T = __G.terrain; T.probe = n || 0; for (const t of T.tiles.values()) { const m = t.mesh.material; m.defines = T.defines(); m.needsUpdate = true; } return T.probe; };
+window.__T.costsProbe = function () {
+  __T.cost([['all', () => {}], ['+8 lookups, plain', () => { __T.probe(1); }], ['+8, the layer changing', () => { __T.probe(2); }], ['+8, each in a branch', () => { __T.probe(3); }],
+    ['+8, told the pixel (Grad)', () => { __T.probe(4); }], ['+8, told the level (Lod)', () => { __T.probe(5); }], ['+8, in a branch half take', () => { __T.probe(6); }], ['all again', () => { __T.probe(0); }]], 3, 2500);
 };
 // how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
 window.__T.aniso = function (n, ...texs) {
