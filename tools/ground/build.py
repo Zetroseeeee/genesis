@@ -181,7 +181,7 @@ def main():
             print(f"{k:2d} {spec['id']:<12} {spec.get('from', 'polyhaven')}/{spec['asset']:<28} mean {info['mean']} relief {info['rough']} maps {','.join(info['maps'])}")
         except Exception as e:
             info = {'mean': [0.5, 0.5, 0.5], 'failed': repr(e)[:300]}; failed.append(spec['id']); A[y:y + cell, x:x + cell] = 128; print(f"{k:2d} {spec['id']:<12} FAILED {e!r}"[:400])
-        layers.append({'id': spec['id'], 'far': spec.get('far'), 'farFrom': spec.get('farFrom'), 'from': spec.get('from', 'polyhaven'), 'asset': spec['asset'], **info})
+        layers.append({'id': spec['id'], 'far': spec.get('far'), 'farFrom': spec.get('farFrom'), 'farTo': spec.get('farTo'), 'farSize': spec.get('farSize'), 'from': spec.get('from', 'polyhaven'), 'asset': spec['asset'], **info})
     Image.fromarray(A).save('out/ground_albedo.jpg', quality=90, subsampling=0, optimize=True)
     Image.fromarray(N).save('out/ground_normal.jpg', quality=93, subsampling=0, optimize=True)
     made = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
@@ -201,7 +201,7 @@ def main():
                 sheet.paste(Image.fromarray(np.dstack([nn[..., 0:2], np.full(nn.shape[:2] + (1,), 255, np.uint8)])).resize((t, t), Image.LANCZOS), (sx + 2 * t, sy)); sheet.paste(Image.fromarray(nn[..., 2]).resize((t, t), Image.LANCZOS).convert('RGB'), (sx + 3 * t, sy))
             dr.text((sx + 2, sy + t + 2), label, fill=(235, 235, 235), font=font)
         sheet.save(name, quality=86)
-    lay([(f"{k} {L['id']}: {L['asset']}" + (f"  far: {L['far']} from {L.get('farFrom')} m" if L.get('far') else '') + ('  FAILED' if 'failed' in L else ''), A[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell], N[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell]) for k, L in enumerate(layers)], 'out/ground_sheet.jpg')
+    lay([(f"{k} {L['id']}: {L['asset']}" + (f"  far: {L['far']} from {L.get('farFrom')} m, {L.get('farSize')} m a repeat" if L.get('far') else '') + ('  FAILED' if 'failed' in L else ''), A[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell], N[(k // cols) * cell:(k // cols + 1) * cell, (k % cols) * cell:(k % cols + 1) * cell]) for k, L in enumerate(layers)], 'out/ground_sheet.jpg')
     tries = []
     for spec in man.get('try', []) if not os.environ.get('NO_TRY') else []:
         try: a, nn, info = layer(dict(spec, id=spec['asset']), 512); tries.append((f"{spec['asset']}  mean {info['mean']}", a, nn)); print('  try', spec['asset'], info['mean'])

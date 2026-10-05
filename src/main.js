@@ -79,7 +79,7 @@
     uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
     // the ground's materials (textures.js: TEX.ground), laid at a ladder of sizes in a frame of cells a metre and a half across at the equator
-    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 16 }, uGndFar: { value: new Float32Array(16) }, uGndFarJ: { value: new Float32Array(16).fill(99) }, uGndMean: { value: new Float32Array(51).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.3, 600) }, uGndShow: { value: -1 },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndShow: one layer everywhere (to look at it), or -1
+    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 16 }, uGndFar: { value: new Float32Array(16) }, uGndFarD: { value: new Float32Array(32) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(51).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.3, 600) }, uGndShow: { value: -1 },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndShow: one layer everywhere (to look at it), or -1
     uGlow: { value: 0 },      // 1 while the picture goes through post.js, which can hold light brighter than white and lets it bleed
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
@@ -145,7 +145,7 @@
       setTimeout(() => { setLoad(100); const L = $('loading'); L.classList.add('gone'); if (mode === 'intro') $('intro').classList.add('enter'); setTimeout(() => { L.hidden = true; afterUpdate(); }, 750); }, 900);
       // generated materials and art arrive after first light; the world recompiles its shaders when they are in
       if (window.MODELS && settings.models !== false) MODELS.load(window.GENESIS_MODELS_URL).then((M) => { if (M.ready) { world.lastBuild.t = -1e9; console.log('models: ' + Object.keys(M.defs).length + ' in the library'); } });
-      if (window.TEX && softGL) TEX.groundShrink = window.GENESIS_GROUND || 4;      // (a software renderer takes the ground's materials at a quarter of their size unless told otherwise)
+      if (window.TEX && softGL) { TEX.groundShrink = window.GENESIS_GROUND || 4; TEX.groundAniso = 2; }      // (a software renderer takes the ground's materials at a quarter of their size unless told otherwise, and looks at them two ways, not sixteen)
       if (window.TEX) TEX.load(renderer, TEX_URL).then((T) => { applyArt(); applyTextures(); if (T.unsupported) console.warn('textures need WebGL2'); });
       try { sampleFn = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { sampleFn = null; }
       if (!sampleFn) $('btn-chronicle').textContent = 'Show the record';

@@ -52,11 +52,13 @@
     const col = new Uint8Array(px * 4 * (count + (shallows ? 1 : 0))), rel = new Uint8Array(px * 2 * count);
     for (let l = 0; l < count; l++) { const c = A.at(l), r = N.at(l), o = l * px * 4, q = l * px * 2; for (let p = 0; p < px; p++) { col[o + p * 4] = c[p * 4]; col[o + p * 4 + 1] = c[p * 4 + 1]; col[o + p * 4 + 2] = c[p * 4 + 2]; col[o + p * 4 + 3] = r[p * 4 + 2]; rel[q + p * 2] = r[p * 4]; rel[q + p * 2 + 1] = r[p * 4 + 1]; } }
     if (shallows) { const cv = document.createElement('canvas'); cv.width = cv.height = C; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(shallows, 0, 0, C, C); col.set(ctx.getImageData(0, 0, C, C).data, count * px * 4); }
-    // what the shader is told of each layer: how bright it is on the whole, which layer takes its place far off, and from which
-    // step of the ladder of sizes (a step is twice the one before; the first is twelve metres a repeat)
-    const mean = new Float32Array((count + 1) * 3).fill(0.5), far = new Float32Array(count), farJ = new Float32Array(count), id = {}; L.forEach((l, i) => { id[l.id] = i; });
-    for (let i = 0; i < count; i++) { const l = L[i] || {}, m = l.mean || [0.5, 0.5, 0.5]; for (let k = 0; k < 3; k++) mean[i * 3 + k] = Math.max(0.03, m[k]); const f = id[l.far]; far[i] = f === undefined ? i : f; farJ[i] = f === undefined ? 99 : Math.max(0, Math.round(Math.log2(Math.max(12, l.farFrom || 3000) / 12))); }
-    return { albedo: arrayOf(col, C, count + (shallows ? 1 : 0), THREE.RGBAFormat, aniso), relief: arrayOf(rel, C, count, THREE.RGFormat, aniso), size: C, count, mean, far, farJ, shallows: shallows ? count : -1, layers: L, id, made: man.made };
+    // what the shader is told of each layer: its colour on the whole, and which layer takes its place away from the eye, from how
+    // many metres to how many (0, 0: none does). The far layers are laid at one size (farSize: cells of a metre and a half to a
+    // repeat, a power of two so that it fits the frame), whatever the distance: what they show has a size of its own.
+    const mean = new Float32Array((count + 1) * 3).fill(0.5), far = new Float32Array(count), farD = new Float32Array(count * 2), id = {}; L.forEach((l, i) => { id[l.id] = i; }); let farSize = 512;
+    for (let i = 0; i < count; i++) { const l = L[i] || {}, m = l.mean || [0.5, 0.5, 0.5]; for (let k = 0; k < 3; k++) mean[i * 3 + k] = Math.max(0.03, m[k]); const f = id[l.far]; far[i] = f === undefined ? i : f;
+      if (f !== undefined) { farD[i * 2] = l.farFrom || 2200; farD[i * 2 + 1] = Math.max(farD[i * 2] + 1, l.farTo || 4200); if (l.farSize) farSize = Math.pow(2, Math.round(Math.log2(l.farSize / 1.5))); } }
+    return { albedo: arrayOf(col, C, count + (shallows ? 1 : 0), THREE.RGBAFormat, aniso), relief: arrayOf(rel, C, count, THREE.RGFormat, aniso), size: C, count, mean, far, farD, farSize, shallows: shallows ? count : -1, layers: L, id, made: man.made };
   }
   // one cell of an atlas as a plain repeating 2D texture (water, clouds)
   function cellTexture(img, cell, n, idx, anisotropy) {
@@ -115,8 +117,8 @@
         // (the ground's materials, where the manifest names them: a software renderer takes them at half size)
         if (man.pack && TEX.groundOn !== false) { try { const mi = names.indexOf('misc'), sh = mi >= 0 && imgs[mi] ? man.atlases.misc.layers.findIndex((L) => L.id === 'shallows') : -1; let cvS = null;
           if (sh >= 0) { const im = imgs[mi], C = Math.round(cell * im.width / (n * cell)); cvS = document.createElement('canvas'); cvS.width = cvS.height = C; cvS.getContext('2d').drawImage(im, (sh % n) * C, Math.floor(sh / n) * C, C, C, 0, 0, C, C); }
-          TEX.groundArgs = [man.pack, aniso, TEX.groundShrink || (half ? 2 : 1), cvS];
-          TEX.ground = await loadGround(man.pack, aniso, TEX.groundShrink || (half ? 2 : 1), cvS); } catch (e) { console.warn('ground materials unavailable', e); TEX.ground = null; } }
+          TEX.groundArgs = [man.pack, TEX.groundAniso || aniso, TEX.groundShrink || (half ? 2 : 1), cvS];
+          TEX.ground = await loadGround(...TEX.groundArgs); } catch (e) { console.warn('ground materials unavailable', e); TEX.ground = null; } }
         TEX.ready = !!(TEX.arrays.wall && TEX.arrays.roof);
         if (!TEX.ready) TEX.failed = true;
       } catch (e) { console.warn('textures unavailable', e); TEX.failed = true; }

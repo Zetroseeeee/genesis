@@ -112,7 +112,7 @@
     precision highp sampler2DArray;
     uniform sampler2DArray uLanduse; uniform float uTexMix;
     #ifdef USE_GROUND
-    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[16], uGndFarJ[16]; uniform vec3 uGndMean[17]; uniform vec4 uGndK; uniform float uGndShow;
+    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[16], uGndFarN; uniform vec2 uGndFarD[16]; uniform vec3 uGndMean[17]; uniform vec4 uGndK; uniform float uGndShow;
     #else
     uniform sampler2DArray uGround;
     #ifndef DET_SHALLOWS
@@ -136,7 +136,7 @@
     // of the land-use tiles without their bands: whole cells at the tile's centre (uLadN, exact) plus the fraction plus the precise
     // offset from the centre. Every lookup is given its own derivatives (the step of the ladder changes from pixel to pixel, and
     // what the card would work out across such a seam is nonsense), which also lets a lookup stand inside a branch.
-    float gJ, gMix, gSwA, gSwB; vec2 gUa, gUb, gAx, gAy, gBx, gBy;
+    float gJ, gMix, gSwA, gSwB, gFarOn, gDistM; vec2 gUa, gUb, gAx, gAy, gBx, gBy, gUf, gFx, gFy;
     void ladStep(float j, vec2 loc, vec2 dx, vec2 dy, out vec2 uv, out vec2 ddx, out vec2 ddy, out float sw) {
       float n = 8.0 * exp2(j), nw = n * 16.0;
       // (a slow bend from the noise, a few repeats long, so that the repeats do not stand in rows; each step is moved and every
@@ -149,7 +149,7 @@
       uv = p;
     }
     // which two steps, and how much of the upper one: from how many cells a pixel covers across its narrow way (the card's own
-    // filtering has the long way, where the ground runs away from the eye)
+    // filtering has the long way, where the ground runs away from the eye). And the one size at which the far layers are laid.
     void ladder() {
       vec2 loc = vGLf * uLadK, dx = dFdx(vGLf) * uLadK, dy = dFdy(vGLf) * uLadK;
       float a = dot(dx, dx), d = dot(dy, dy), b = dot(dx, dy), disc = sqrt(max((a - d) * (a - d) + 4.0 * b * b, 0.0));
@@ -157,22 +157,30 @@
       float l = clamp(log2(max(rho, 1e-7) * uGndK.w / 8.0), 0.0, 14.0);
       gJ = min(floor(l), 13.0); gMix = smoothstep(0.25, 1.0, l - gJ);
       ladStep(gJ, loc, dx, dy, gUa, gAx, gAy, gSwA); ladStep(gJ + 1.0, loc, dx, dy, gUb, gBx, gBy, gSwB);
+      float nf = uGndFarN, nw = nf * 16.0; vec2 w = textureGrad(uNoise, (mod(uLadN, nw) + uLadF + loc) / nw + 0.17, dx / nw, dy / nw).rg - 0.5;
+      gUf = (mod(uLadN, nf) + uLadF + loc) / nf + w * (2.0 * uGndK.z); gFx = dx / nf; gFy = dy / nf;
+      gDistM = length(vViewPos) * ${R_M.toFixed(1)};
     }
-    // a material as the ladder shows it: what it adds to its own mean colour (rgb, about 1) and its height (a). Far off another
-    // layer may stand for it (a wood's canopy for its floor): gndMean says what colour the layer has on the whole at this distance.
+    // A material as the ladder shows it: what it adds to its own mean colour (rgb, about 1) and its height (a). Away from the eye
+    // another layer may stand for it, at a size of its own (a wood's canopy for its floor; the floor still lends it its light and
+    // dark, which is what a wood from high up has of pattern). gndFarK: how much of what is shown is that other layer; gndMean:
+    // the colour the layer has on the whole, as it is shown here.
+    float gndFarK(float L) { vec2 d = uGndFarD[int(L + 0.5)]; return d.y > 0.0 ? gFarOn * smoothstep(d.x, d.y, gDistM) : 0.0; }
     vec4 gnd(float L) {
-      int i = int(L + 0.5); float f = uGndFar[i], fj = uGndFarJ[i], La = gJ >= fj ? f : L, Lb = gJ + 1.0 >= fj ? f : L;
-      vec4 c = textureGrad(uGnd, vec3(gUa, La), gAx, gAy); c.rgb /= uGndMean[int(La + 0.5)];
-      if (gMix > 0.004) { vec4 c2 = textureGrad(uGnd, vec3(gUb, Lb), gBx, gBy); c2.rgb /= uGndMean[int(Lb + 0.5)]; c = mix(c, c2, gMix); }
+      vec4 c = textureGrad(uGnd, vec3(gUa, L), gAx, gAy);
+      if (gMix > 0.004) c = mix(c, textureGrad(uGnd, vec3(gUb, L), gBx, gBy), gMix);
+      c.rgb /= uGndMean[int(L + 0.5)];
+      float fk = gndFarK(L);
+      if (fk > 0.003) { float Lf = uGndFar[int(L + 0.5)]; vec4 f = textureGrad(uGnd, vec3(gUf, Lf), gFx, gFy); f.rgb *= mix(1.0, dot(c.rgb, vec3(0.299, 0.587, 0.114)), 0.5) / uGndMean[int(Lf + 0.5)]; c = mix(c, f, fk); }
       return c;
     }
-    vec3 gndMean(float L) { int i = int(L + 0.5); float f = uGndFar[i], fj = uGndFarJ[i]; return mix(uGndMean[int((gJ >= fj ? f : L) + 0.5)], uGndMean[int((gJ + 1.0 >= fj ? f : L) + 0.5)], gMix); }
-    float gndFarK(float L) { float fj = uGndFarJ[int(L + 0.5)]; return mix(step(fj, gJ), step(fj, gJ + 1.0), gMix); }      // how much of what is shown is the far layer
+    vec3 gndMean(float L) { int i = int(L + 0.5); return mix(uGndMean[i], uGndMean[int(uGndFar[i] + 0.5)], gndFarK(L)); }
     // which way its surface leans (east, north; the maps have green up the picture, and the picture's top is the south)
     vec2 gndN(float L) {
-      int i = int(L + 0.5); float f = uGndFar[i], fj = uGndFarJ[i], La = gJ >= fj ? f : L, Lb = gJ + 1.0 >= fj ? f : L;
-      vec2 a = textureGrad(uGndN, vec3(gUa, La), gAx, gAy).rg - 0.5; a = gSwA > 0.5 ? vec2(-a.y, a.x) : vec2(a.x, -a.y);
-      if (gMix > 0.004) { vec2 c = textureGrad(uGndN, vec3(gUb, Lb), gBx, gBy).rg - 0.5; c = gSwB > 0.5 ? vec2(-c.y, c.x) : vec2(c.x, -c.y); a = mix(a, c, gMix); }
+      vec2 a = textureGrad(uGndN, vec3(gUa, L), gAx, gAy).rg - 0.5; a = gSwA > 0.5 ? vec2(-a.y, a.x) : vec2(a.x, -a.y);
+      if (gMix > 0.004) { vec2 c = textureGrad(uGndN, vec3(gUb, L), gBx, gBy).rg - 0.5; c = gSwB > 0.5 ? vec2(-c.y, c.x) : vec2(c.x, -c.y); a = mix(a, c, gMix); }
+      float fk = gndFarK(L);
+      if (fk > 0.003) { vec2 f = textureGrad(uGndN, vec3(gUf, uGndFar[int(L + 0.5)]), gFx, gFy).rg - 0.5; a = mix(a, vec2(f.x, -f.y) + a * 0.35, fk); }
       return a * 2.0;
     }
     #endif
@@ -303,7 +311,7 @@
       float dl = 0.45, dl2 = 0.45, forestFar = 1.0; vec2 gRel = vec2(0.0); float gRelK = 0.0;
       vec3 land = base * 0.98;
       if (gOn > 0.002) {
-        ladder();
+        ladder(); gFarOn = 1.0 - smoothstep(0.03, 0.2, cult);      // (a wood in settled country is open and grazed: its floor is seen, with the great trees the game draws there, and no canopy)
         float dith = (nMic.r - 0.5) * 0.35 + (nFin.g - 0.5) * 0.15;
         float tropic = 1.0 - smoothstep(0.27, 0.31, latN0 + dith * 0.1);
         float savK = (clim + dith * 0.3 > 0.22 && tropic > 0.5 && warm > 0.3) ? 1.0 : 0.0;
@@ -344,7 +352,7 @@
         #undef TONE
         gRel = gndN(L1); if (kB > 0.03) gRel = mix(gRel, gndN(L2), kB);
         dl = clamp(dl, 0.12, 0.9); dl2 = dl;
-        forestFar = L1 == 7.0 ? mix(1.0 - gndFarK(7.0), 1.0, kB) : L2 == 7.0 ? mix(1.0, 1.0 - gndFarK(7.0), kB) : 1.0;      // (how much of a wood's floor is seen, and not its canopy: only the floor lies in the trees' shade)
+        forestFar = 1.0 - gndFarK(7.0);      // (how much of a wood's floor is seen, and not its canopy: only the floor lies in the trees' shade)
         land = mix(land, tex, gOn * uGndK.y);
         // autumn and winter colours for the deciduous belt; grass dries off in winter
         land = mix(land, land * vec3(1.38, 0.96, 0.5), fall * (wForest * 0.8 + wGrass * 0.12));
@@ -975,7 +983,7 @@
       else if (g.uTexMix) g.uTexMix.value = 0;
       // the ground's own materials, where the pack is there (textures.js): the shader then takes its ground from them, and has no use for the photographs of detail
       const gnd = ok && T.ground && g.uGnd ? T.ground : null;
-      if (gnd) { g.uGnd.value = gnd.albedo; g.uGndN.value = gnd.relief; g.uGndShal.value = gnd.shallows; g.uGndFar.value = gnd.far; g.uGndFarJ.value = gnd.farJ; g.uGndMean.value = gnd.mean; }
+      if (gnd) { g.uGnd.value = gnd.albedo; g.uGndN.value = gnd.relief; g.uGndShal.value = gnd.shallows; g.uGndFar.value = gnd.far; g.uGndFarD.value = gnd.farD; g.uGndFarN.value = gnd.farSize; g.uGndMean.value = gnd.mean; }
       this.texDefines = ok ? (gnd ? { USE_TEXARR: 1, USE_GROUND: 1 } : { USE_TEXARR: 1 }) : {}; this.textured = ok; this.grounded = !!gnd;
       for (const t of this.tiles.values()) { const m = t.mesh.material; m.defines = this.defines(); m.needsUpdate = true; }
     }
