@@ -61,7 +61,7 @@
         TEX.manifest = man; TEX.ui = man.ui || {};
         const webgl2 = !!(renderer && renderer.capabilities && renderer.capabilities.isWebGL2);
         if (!webgl2) { TEX.unsupported = true; return TEX; }
-        const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4);
+        const aniso = Math.min(window.GENESIS_ANISO || 8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4);      // (main.js says how fine: all the card can do, unless it is a software renderer)
         // phones and small GPUs get 256px cells (a quarter of the memory); desktops the full 512
         const half = (renderer.capabilities.maxTextureSize || 4096) < 8192 || (window.matchMedia && matchMedia('(pointer: coarse)').matches) || !!TEX.forceHalf;
         TEX.half = half;

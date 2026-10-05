@@ -120,7 +120,7 @@
   M.init = function (scene, shared, opts) {
     M.group = new THREE.Group(); M.group.name = 'models'; scene.add(M.group); M.shared = shared;
     M.units = (opts && opts.units) || 6371.0;            // scene units -> km for the haze (1 scene unit = Earth radius on the globe)
-    if (opts && opts.anisotropy) M.anisotropy = opts.anisotropy;
+    if (opts && opts.anisotropy) M.anisotropy = opts.anisotropy; else if (window.GENESIS_ANISO) M.anisotropy = window.GENESIS_ANISO;      // (as fine as main.js found the card can filter)
     if (THREE.GLTFLoader) { M.loader = new THREE.GLTFLoader(); if (window.MeshoptDecoder) M.loader.setMeshoptDecoder(window.MeshoptDecoder); }
   };
   M.load = async function (url) {
