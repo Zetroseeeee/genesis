@@ -470,9 +470,9 @@
             // the sun's own disc (drawn half as large again as it is), darker toward its edge, as red as the air it is seen through makes it, and
             // thousands of times brighter than white: post.js spreads that into the glare round it
             vec3 ds = rd - uAirS; float u = dot(ds, ds) / 5.6e-5;
-            vec3 disc = vec3(2600.0 * uAirE.z) * (1.0 - smoothstep(0.82, 1.0, u)) * (0.45 + 0.55 * sqrt(max(1.0 - u, 0.0)));
-            vec3 lin = L + (pow(add, vec3(2.2)) + disc) * T;
-            gl_FragColor = vec4(pow(max(lin, 0.0), vec3(0.4545)), 1.0); }`,
+            vec3 disc = vec3(1300.0 * uAirE.z) * (1.0 - smoothstep(0.82, 1.0, u)) * (0.45 + 0.55 * sqrt(max(1.0 - u, 0.0)));
+            vec3 lin = L + (add * add + disc) * T;
+            gl_FragColor = vec4(sqrt(max(lin, 0.0)), 1.0); }`,      // (light to the colours of the screen as airOver does it: a root)
       }));
       this.sky.renderOrder = 40; this.sky.frustumCulled = false; scene.add(this.sky);
     }

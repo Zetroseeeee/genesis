@@ -24,26 +24,29 @@
   const G = 0.8;                                               // how forward the haze scatters
   const PSI_N = 16, GROUND = 0.3;
   const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const A = { THICK, RG, RT, HR, HM, BR, MS, ME, BO, OC, OW, G, haze: 1, expose: 7.5, exposeHigh: 6, down: 0.12, downHigh: 0.3, night: [0.007, 0.012, 0.032], disc: 1, steps: 1, psi: [], uniforms: null, on: true };
+  const A = { THICK, RG, RT, HR, HM, BR, MS, ME, BO, OC, OW, G, haze: 1, expose: 8.6, exposeHigh: 6.9, down: 0.12, downHigh: 0.3, night: [0.0095, 0.016, 0.042], disc: 1, steps: 1, psi: [], uniforms: null, on: true };
 
   // ---------- the sums, in JavaScript ----------
   // how much air a ray passes on its way out to space, from radius r, at mu = the cosine of its angle from straight up, for a
   // layer that thins out over H (the Chapman function, by its closed form for a large planet; below the horizon the ray first goes down to
   // its lowest point, where the air is thicker: under the ground that grows without end, which is the planet's shadow)
-  const col = (r, mu, H) => {
-    const x = r / H, c = Math.sqrt(1.5707963 * x), e = Math.exp(Math.min(-(r - RG) / H, 60)), y = Math.sqrt(0.5 * x) * Math.abs(mu);
+  const CR = Math.sqrt(1.5707963 / HR), CM = Math.sqrt(1.5707963 / HM);
+  // (e: how thin the layer is at the point against sea level, which whoever asks has at hand; cH: the root of the planet's size in
+  // the layer's heights. The root of the radius itself is taken as 1 + half of what it is over 1: right to a part in ten thousand.)
+  const col = (r, mu, e, H, cH) => {
+    const c = cH * (0.5 + 0.5 * r), y = c * 0.5641896 * Math.abs(mu);
     const up = H * e * c * 2.911 / (3.3871094 * y + Math.sqrt(3.1415927 * y * y + 8.473921));      // straight up: H e; level: H e c; between: c erfcx(y), to a part in two hundred
     if (mu >= 0) return up;
-    const r0 = r * Math.sqrt(Math.max(1 - mu * mu, 0)), c0 = Math.sqrt(1.5707963 * r0 / H);
-    return H * 2 * c0 * Math.exp(Math.min(-(r0 - RG) / H, 60)) - up;
+    const r0 = r * Math.sqrt(Math.max(1 - mu * mu, 0));
+    return H * 2 * cH * (0.5 + 0.5 * r0) * Math.exp(Math.min(-(r0 - RG) / H, 60)) - up;
   };
-  A.col = col;
+  A.col = (r, mu, H) => col(r, mu, Math.exp(Math.min(-(r - RG) / H, 60)), H, Math.sqrt(1.5707963 / H));
   const ozUp = (h) => { const x = Math.min(1, Math.max(-1, (h - OC) / OW)); return x < 0 ? 1 - 0.5 * (x + 1) * (x + 1) : 0.5 * (1 - x) * (1 - x); };      // the share of the ozone that lies above h
   // what is left of the sun's light at a point (radius r, the sun at mu from straight up), red green blue
   A.sun = (r, mu, haze, out) => {
     const r0 = r * Math.sqrt(Math.max(1 - mu * mu, 0)), k = r0 / (RG + OC), f = ozUp(r - RG);
     const oz = OW / Math.sqrt(Math.max(1 - k * k, 0.004)) * (mu >= 0 ? f : 2 * ozUp(r0 - RG) - f);
-    const cr = col(r, mu, HR), cm = col(r, mu, HM) * ME * (haze === undefined ? A.haze : haze); out = out || [0, 0, 0];
+    const cr = col(r, mu, Math.exp(Math.min(-(r - RG) / HR, 60)), HR, CR), cm = col(r, mu, Math.exp(Math.min(-(r - RG) / HM, 60)), HM, CM) * ME * (haze === undefined ? A.haze : haze); out = out || [0, 0, 0];
     for (let i = 0; i < 3; i++) out[i] = Math.exp(-(BR[i] * cr + cm + BO[i] * oz));
     return out;
   };
@@ -111,7 +114,7 @@
   const f = (v) => { const s = (+v).toPrecision(9); return /[.e]/.test(s) ? s : s + '.0'; }, v3 = (a) => `vec3(${a.map(f).join(', ')})`;
   // the uniforms and what is done with what the air leaves and adds (a colour as the screen shows it, in and out): for every shader that draws something in the air
   A.MIX = `
-    vec3 airOver(vec3 c, vec3 T, vec3 L) { return pow(pow(max(c, 0.0), vec3(2.2)) * T + L, vec3(0.4545)); }`;
+    vec3 airOver(vec3 c, vec3 T, vec3 L) { return sqrt(c * c * T + L); }`;      // (a colour of the screen is taken as the root of the light: near enough to the screen's own curve, and a square and a root cost a fraction of two powers at every pixel)
   // how much of the light the gas, and the haze, turn by an angle (its cosine): the gas evenly fore and aft, the haze mostly onward
   A.PHASE = `
     float airPhR(float c) { return 0.0596831 * (1.0 + c * c); }
@@ -120,18 +123,18 @@
     uniform vec3 uAirC, uAirS, uAirN; uniform vec4 uAirE; uniform vec3 uAirK, uAirSunC, uAirPsiC; uniform float uAirQ; uniform vec3 uAirPsi[${PSI_N}];      // the planet's centre and the way to the sun, as the camera sees them; the night's own glow; x: how strongly the sun lights the air (0: no air), y: the haze, z: the sun's disc, w: the share of the steps to take
     const float A_RG = ${f(RG)}, A_RT = ${f(RT)}, A_HR = ${f(HR)}, A_HM = ${f(HM)}, A_MS = ${f(MS)}, A_ME = ${f(ME)}, A_OC = ${f(OC)}, A_OW = ${f(OW)};
     const vec3 A_BR = ${v3(BR)}, A_BO = ${v3(BO)};
-    float airCol(float r, float mu, float H) {
-      float x = r / H, c = sqrt(1.5707963 * x), e = exp(min(-(r - A_RG) / H, 60.0)), y = sqrt(0.5 * x) * abs(mu);
+    float airCol(float r, float mu, float e, float H, float cH) {      // e: how thin the layer is at the point against sea level; cH: the root of the planet's size in the layer's heights
+      float c = cH * (0.5 + 0.5 * r), y = c * 0.5641896 * abs(mu);
       float up = H * e * c * 2.911 / (3.3871094 * y + sqrt(3.1415927 * y * y + 8.473921));
       if (mu >= 0.0) return up;
-      float r0 = r * sqrt(max(1.0 - mu * mu, 0.0)), c0 = sqrt(1.5707963 * r0 / H);
-      return H * 2.0 * c0 * exp(min(-(r0 - A_RG) / H, 60.0)) - up;
+      float r0 = r * sqrt(max(1.0 - mu * mu, 0.0));
+      return H * 2.0 * cH * (0.5 + 0.5 * r0) * exp(min(-(r0 - A_RG) / H, 60.0)) - up;
     }
     float airOzUp(float h) { float x = clamp((h - A_OC) / A_OW, -1.0, 1.0); return x < 0.0 ? 1.0 - 0.5 * (x + 1.0) * (x + 1.0) : 0.5 * (1.0 - x) * (1.0 - x); }
-    vec3 airSun(float r, float mu) {
+    vec3 airSun(float r, float mu, float eR, float eM) {      // (eR, eM: how thin the gas and the haze are at the point, which the caller has worked out already)
       float r0 = r * sqrt(max(1.0 - mu * mu, 0.0)), k = r0 / (A_RG + A_OC), f = airOzUp(r - A_RG);
       float oz = A_OW / sqrt(max(1.0 - k * k, 0.004)) * (mu >= 0.0 ? f : 2.0 * airOzUp(r0 - A_RG) - f);
-      return exp(-(A_BR * airCol(r, mu, A_HR) + A_ME * uAirE.y * airCol(r, mu, A_HM) + A_BO * oz));
+      return exp(-(A_BR * airCol(r, mu, eR, A_HR, ${f(CR)}) + A_ME * uAirE.y * airCol(r, mu, eM, A_HM, ${f(CM)}) + A_BO * oz));
     }
     vec3 airPsi(float mu) { float x = clamp((mu / (abs(mu) + 0.25) + 0.55) / 1.35, 0.0, 1.0) * ${f(PSI_N - 1)}; float i = min(floor(x), ${f(PSI_N - 2)}); int k = int(i); return mix(uAirPsi[k], uAirPsi[k + 1], x - i); }
     float airMean(float e0, float e1, float d) { return abs(d) < 1e-3 ? 0.5 * (e0 + e1) : (e0 - e1) / d; }      // the mean of an exponential between two points of it, d scale heights apart
@@ -174,7 +177,7 @@
         float dM = (airMean(eM0, eMm, (h - h0) / A_HM) * wa + airMean(eMm, eM1, (h1 - h) / A_HM) * (1.0 - wa)) * uAirE.y;
         vec3 sR = A_BR * (airMean(eR0, eRm, (h - h0) / A_HR) * wa + airMean(eRm, eR1, (h1 - h) / A_HR) * (1.0 - wa)); float sM = A_MS * dM;
         vec3 ext = sR + A_ME * dM + A_BO * max(0.0, 1.0 - abs(h - A_OC) / A_OW);
-        vec3 sun = airSun(r, mus);
+        vec3 sun = airSun(r, mus, eRm, eMm);
         vec3 tr = exp(-ext * dt * steep * mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, t)));      // (thinner about the eye, too, when it is down among things drawn larger than life: uAirK.x as far as uAirK.y)
         vec3 w = T * (1.0 - tr) / max(ext, vec3(1e-9));
         LR += w * sR * sun; LM += w * sM * sun; LS += w * (sR + sM) * airPsi(mus); T *= tr;

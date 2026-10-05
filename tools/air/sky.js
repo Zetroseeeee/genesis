@@ -11,7 +11,7 @@ const NS = +(process.env.N || 16), NG = +(process.env.NG || 8);
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; };
 const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 // the picture's last step, as post.js does it: the screen's curve, then the shoulder
-const show = (lin) => lin.map((v) => { let g = Math.pow(Math.max(v, 0), 0.4545); const a = 0.8, l = 1.035; if (g > a) g = a + (l - a) * (1 - Math.exp(-(g - a) / (l - a))); return Math.min(1, g); });
+const show = (lin) => lin.map((v) => { let g = Math.sqrt(Math.max(v, 0)); const a = 0.8, l = 1.035; if (g > a) g = a + (l - a) * (1 - Math.exp(-(g - a) / (l - a))); return Math.min(1, g); });
 // the ground as terrain.js lights it: a colour of the screen, by the sun's height there and how the ground faces it
 const ground = (col, sunUp, diff) => { const kW = sm(0.02, 0.42, sunUp), k = sm(-0.03, 0.05, sunUp) * (1 + 1.1 * (1 - sm(0.04, 0.5, sunUp))), sun = [k, k * (0.56 + 0.44 * kW), k * (0.30 + 0.70 * kW)], day = sm(-0.1, 0.16, sunUp), dusk = sm(-0.12, 0.02, sunUp) * (1 - sm(0.08, 0.4, sunUp));
   const amb = [0.24 + (0.26 - 0.24) * day + 0.24 * dusk, 0.30 + (0.26 - 0.30) * day + 0.17 * dusk, 0.48 + (0.26 - 0.48) * day + 0.18 * dusk]; return col.map((c, i) => c * (amb[i] + diff * 1.05 * sun[i])); };
@@ -53,7 +53,7 @@ function view(alt, pitchDeg, headDeg, fovDeg, W, H, sunDeg, opt) {
       const t = q - Math.sqrt(1 - rp2), P = [rd[0] * t - C[0], rd[1] * t - C[1], rd[2] * t - C[2]], sunUp = dot(P, S);
       const tile = ((Math.floor(Math.atan2(P[2], P[0]) * 400) + Math.floor(Math.asin(P[1]) * 400)) & 1) ? 1 : 0.86; const sea = o.sea ? 1 : 0;
       const col = sea ? [0.05, 0.13, 0.24] : [0.30 * tile, 0.36 * tile, 0.19 * tile]; const g = ground(col, sunUp, Math.max(sunUp, 0));
-      const m = o.noair ? { T: [1, 1, 1], L: [0, 0, 0] } : A.march(C, rd, t, NG, S, { near }); lin = g.map((c, i) => Math.pow(c, 2.2) * m.T[i] + m.L[i] * E + NIGHT[i] * (1 - m.T[i]));
+      const m = o.noair ? { T: [1, 1, 1], L: [0, 0, 0] } : A.march(C, rd, t, NG, S, { near }); lin = g.map((c, i) => c * c * m.T[i] + m.L[i] * E + NIGHT[i] * (1 - m.T[i]));
     } else {
       const m = A.march(C, rd, Infinity, NS, S, { near }); lin = m.L.map((l, i) => l * E + NIGHT[i] * (1 - m.T[i]));
       const ang = Math.acos(Math.min(1, dot(rd, S))); if (ang < 0.0093) lin = lin.map((l, i) => l + 60 * m.T[i]);
