@@ -144,8 +144,8 @@ window.GOV = (function () {
         <div class="gv-why">${why.map(([t, v]) => `<span class="${v > 0 ? 'up' : 'dn'}">${v > 0 ? '+' : '−'} ${esc(t)}</span>`).join('') || '<span class="mk-dim">Nothing moves them</span>'}</div>
         <div class="gv-lever"><span class="${idle ? 'mk-dim' : lever > 0 ? 'pos' : 'neg'}">${idle ? 'They neither help nor hinder' : 'Now: ' + lv}</span>${wish ? `<span class="mk-dim">would like</span> <button class="linkish" data-ggo="${wish.key}">${esc(wish.name)}</button>` : ''}</div></div>`;
     }).join('');
-    // the realm's rule against its age
-    const srows = R.KEYS.map((key, q) => { if (!NAME[key] || !R.NORMED[q]) return null; const v = k.f[o + q]; const d = R.ADDED[key] ? v : v - 1; if (Math.abs(d) < 0.004) return null; const good = WORSE[key] ? d < 0 : d > 0; return { key, d, good }; }).filter(Boolean).sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+    // the realm's rule against its age (a row that would be written as nothing is left out)
+    const srows = R.KEYS.map((key, q) => { if (!NAME[key] || !R.NORMED[q]) return null; const v = k.f[o + q]; const d = R.ADDED[key] ? v : v - 1; if (Math.abs(d) < 0.005) return null; const good = WORSE[key] ? d < 0 : d > 0; return { key, d, good }; }).filter(Boolean).sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
     const stand = srows.map((r) => `<div class="kn-srow"><span>${esc(NAME[r.key])}</span><span class="kn-sbar"><i class="${r.good ? 'up' : 'dn'}" style="${r.d >= 0 ? 'left:50%' : 'right:50%'};width:${Math.min(50, Math.abs(r.d) * 200).toFixed(1)}%"></i></span><span class="num ${r.good ? 'pos' : 'neg'}">${r.key === 'stab' ? (r.d >= 0 ? '+' : '−') + Math.round(Math.abs(r.d) * 100) : pc(r.d)}</span></div>`).join('');
     $('gv-estates').innerHTML = `<div class="gv-ecols"><div class="gv-elist">${rows}</div><div class="kn-sect"><div class="micro">Your rule against your age</div>
       <p class="kn-note">Every age has its usual laws. What yours give is set against what realms of your age mostly get from theirs: keep the ways of your forebears and you fall behind, reform well and you are ahead.</p>

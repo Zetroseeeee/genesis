@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));

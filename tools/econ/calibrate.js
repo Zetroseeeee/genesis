@@ -15,7 +15,7 @@
 // nobody ate rice in Gaul, so Gaul's bread must come from grain alone.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const path = require('path'); const PNG = require('pngjs').PNG; const root = path.join(__dirname, '..', '..');
-(0, eval)(fs.readFileSync(path.join(root, 'src/econ.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/know.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/rule.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/sim.js'), 'utf8'));
+(0, eval)(fs.readFileSync(path.join(root, 'src/econ.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/know.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/rule.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/diplo.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/sim.js'), 'utf8'));
 const E = window.ECON; const W = 720, H = 360, N = W * H; const png = PNG.sync.read(fs.readFileSync(path.join(root, 'data/world.png')));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
 for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.data[i * 4 + 1] / 255; wd.flags[i] = png.data[i * 4 + 2]; wd.land[i] = png.data[i * 4 + 2] & 1; }

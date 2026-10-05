@@ -72,8 +72,11 @@
         sd[j] = light * 255; sd[j + 1] = (c ? (TOWN.styleEra(c.era, TOWN.civCulture(sim, c)) < c.era ? Math.min(c.tech, 0.25) : c.tech) : 0) * 255; sd[j + 2] = c ? Math.round(sim.cultivation(i) * 255 * (sim.level[i] ? 1 : 0.6)) : 0;
       }
       // (each realm in its own colour; or, under the lens of government, in the colour of the kind of rule it lives under)
-      const byForm = this.palMode === 'form' && sim.rule && window.RULE;
-      for (const c of civs) if (c) { const rgb = byForm ? RULE.FORM[sim.rule.ruleOf(c).gov].rgb : c.rgb; this.palData[c.id * 4] = rgb[0] * 255; this.palData[c.id * 4 + 1] = rgb[1] * 255; this.palData[c.id * 4 + 2] = rgb[2] * 255; this.palData[c.id * 4 + 3] = 255; }
+      // (or, under the lens of relations, in the colour of how it stands with the player's realm: diplo.js STAND)
+      const byForm = this.palMode === 'form' && sim.rule && window.RULE; const me = this.palMode === 'rel' && sim.diplo && window.DIPLO ? sim.playerCiv() : null; let stand = null;
+      if (me) { if (!this.relRgb) { this.relRgb = {}; for (const k in DIPLO.STAND) { const h = DIPLO.STAND[k][1]; this.relRgb[k] = [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]; } }
+        const within = new Uint8Array(sim.MAXC); for (const b of sim.diplo.reach(me.id)) within[b] = 1; within[me.id] = 1; stand = (c) => this.relRgb[within[c.id] ? sim.diplo.standing(me, c) : 'far']; }
+      for (const c of civs) if (c) { const rgb = byForm ? RULE.FORM[sim.rule.ruleOf(c).gov].rgb : stand ? stand(c) : c.rgb; this.palData[c.id * 4] = rgb[0] * 255; this.palData[c.id * 4 + 1] = rgb[1] * 255; this.palData[c.id * 4 + 2] = rgb[2] * 255; this.palData[c.id * 4 + 3] = 255; }
       this.ownerTex.needsUpdate = true; this.simTex.needsUpdate = true; this.palTex.needsUpdate = true;
       this.texVersion = (this.texVersion || 0) + 1;
     }
