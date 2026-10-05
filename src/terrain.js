@@ -629,6 +629,11 @@
       // how finely a tile of a level is meshed. A software renderer runs the vertex shader (five elevation lookups and
       // three of noise per vertex) on the CPU: it gets a quarter of the grid each way, and stands everything on that.
       this.soft = !!opts.soft; this.gridOf = (L) => this.soft ? (L >= 9 ? 32 : 16) : (L >= 9 ? 128 : L >= 7 ? 64 : 32);
+      // That is the finest a tile is meshed. Where it is drawn small it gets a coarser mesh, so that a quad of it is not much under
+      // quadPx pixels across (gridFor): in a view to the horizon most of the ground's tiles are far ones, and at full fineness their
+      // triangles were a pixel or two across. That cost the vertex shader (elevation, relief, the air: millions of corners a frame)
+      // and, with four samples a pixel, the fragment shader several times over for the same pixel.
+      this.quadPx = 4;
       this.tiles = new Map(); this.packs = new Map(); this.loading = 0; this.maxLoading = 6;
       this.exag = opts.exag || 2.0;
       this.frame = 0; this.visible = [];
@@ -752,13 +757,22 @@
       };
       Object.assign(uniforms, this.globals);
       const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, extensions: { derivatives: true }, defines: this.defines() });
-      const mesh = new THREE.Mesh(this.geoms[this.gridOf(L)], mat);
+      const grid = this.gridOf(L); const mesh = new THREE.Mesh(this.geoms[grid], mat);
       mesh.position.copy(center); mesh.quaternion.copy(q); mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
       // world-space extent
       const corners = [GEO.toVec(b.lon0, b.lat0), GEO.toVec(b.lon1, b.lat0), GEO.toVec(b.lon0, b.lat1), GEO.toVec(b.lon1, b.lat1)];
       let rad = 0; for (const c of corners) rad = Math.max(rad, c.distanceTo(center));
-      const t = { key: this.tileKey(L, tx, ty), L, tx, ty, b, lonC, latC, center, mesh, uniforms, radius: rad, extent: Math.max(b.w * GEO.D2R * Math.max(Math.cos(Math.min(Math.abs(b.lat0), Math.abs(b.lat1)) * GEO.D2R), 0.02), b.h * GEO.D2R), lastUsed: 0, minH: 0, maxH: 9000, ePack: null, iPack: null, inScene: false };
+      const t = { key: this.tileKey(L, tx, ty), L, tx, ty, b, lonC, latC, center, mesh, uniforms, radius: rad, extent: Math.max(b.w * GEO.D2R * Math.max(Math.cos(Math.min(Math.abs(b.lat0), Math.abs(b.lat1)) * GEO.D2R), 0.02), b.h * GEO.D2R), lastUsed: 0, minH: 0, maxH: 9000, ePack: null, iPack: null, inScene: false, grid };
       return t;
+    }
+    // how finely a tile is meshed this frame: the finest its level has whose quads are quadPx pixels or more across as it is drawn now
+    // (t.sse: how many pixels the tile is across). A tile keeps the mesh it has until it has grown or shrunk an eighth past the step
+    // between two, so that it does not go back and forth as the camera drifts.
+    gridFor(t) {
+      const max = this.gridOf(t.L); if (this.soft || !this.quadPx) return max;
+      let g = max; while (g > 32 && t.sse < g * this.quadPx) g >>= 1;
+      const was = t.grid; if (was !== g && was <= max && (was === g * 2 || g === was * 2)) { const step = Math.max(g, was) * this.quadPx; if (t.sse > step * 0.88 && t.sse < step * 1.12) return was; }
+      return g;
     }
     getTile(L, tx, ty) { const k = this.tileKey(L, tx, ty); let t = this.tiles.get(k); if (!t) { t = this.makeTile(L, tx, ty); this.tiles.set(k, t); } return t; }
     // generated ground textures (textures.js): every tile material recompiles with the texture arrays; new tiles get them from the start
@@ -815,6 +829,7 @@
           t.ePack = eb;
         }
         if (ib) { const p = ib.pack; if (!ib.absent) { p.users++; u.uImg.value = p.texture; u.uImgRect.value.set(ib.rect[0], ib.rect[1], ib.rect[2], ib.rect[3]); } t.iPack = ib; }
+        const g = this.gridFor(t); if (g !== t.grid) { t.grid = g; t.mesh.geometry = this.geoms[g]; }
         if (!t.inScene) { this.group.add(t.mesh); t.inScene = true; }
       }
       // remove tiles not visible; dispose stale
@@ -825,12 +840,13 @@
         }
       }
       this.visible = visible;
-      // a version for everything that stands on the drawn surface: bumps when the set of drawn tiles or their elevation packs change
-      { let sig = ''; for (const t of visible) sig += t.key + (t.ePack ? (t.ePack.absent ? 'a' : t.ePack.level) : '-') + ';'; if (sig !== this.meshSig) { this.meshSig = sig; this.meshVersion = (this.meshVersion || 0) + 1; } }
+      // a version for everything that stands on the drawn surface: bumps when the set of drawn tiles, their meshes or their elevation packs change
+      { let sig = ''; for (const t of visible) sig += t.key + (t.ePack ? (t.ePack.absent ? 'a' : t.ePack.level) : '-') + (t.grid === 128 ? ';' : t.grid === 64 ? ',' : '.'); if (sig !== this.meshSig) { this.meshSig = sig; this.meshVersion = (this.meshVersion || 0) + 1; } }
       const hist = {}; for (const t of visible) { const l = t.ePack ? (t.ePack.absent ? 'sea' : t.ePack.level) : '-'; hist[l] = (hist[l] || 0) + 1; } this.stats.elevLevels = hist;
       this.pumpQueue();
       if (now % 30 === 0) this.evictPacks();
       let pi = 0, pe = 0; for (const p of this.packs.values()) if (p.state === 'ready') { if (p.kind === 'i') pi++; else pe++; }
+      { let q = 0; for (const t of visible) q += t.grid * t.grid; this.stats.quads = q; }
       this.stats.tiles = visible.length; this.stats.packsI = pi; this.stats.packsE = pe; this.stats.loading = this.loading; this.stats.sse = this.sseThreshold;
     }
     // ----- height queries (CPU) -----
@@ -915,9 +931,9 @@
     }
     gpuHeightAt(lon, lat, vcache) {
       const t = this.tileAtPoint(lon, lat); if (!t) return this.meshHeightAt0(lon, lat, vcache);
-      const b = GEO.tileBounds(t.L, t.tx, t.ty); const G = this.gridOf(t.L);
+      const b = GEO.tileBounds(t.L, t.tx, t.ty); const G = t.grid;
       const fx = (lon - b.lon0) / b.w * G, fy = (b.lat0 - lat) / b.h * G; const i = Math.min(G - 1, Math.max(0, Math.floor(fx))), j = Math.min(G - 1, Math.max(0, Math.floor(fy))); const fu = fx - i, fv = fy - j;
-      const vh = (ii, jj) => { const key = t.key + ':' + ii + ':' + jj; if (vcache && vcache.has(key)) return vcache.get(key); const h = this.gpuVertexH(t, ii / G, jj / G); if (vcache) vcache.set(key, h); return h; };
+      const vh = (ii, jj) => { const key = t.key + ':' + G + ':' + ii + ':' + jj; if (vcache && vcache.has(key)) return vcache.get(key); const h = this.gpuVertexH(t, ii / G, jj / G); if (vcache) vcache.set(key, h); return h; };
       const ha = vh(i, j), hb = vh(i + 1, j), hc = vh(i, j + 1), hd = vh(i + 1, j + 1);
       return fu + fv <= 1 ? ha + (hb - ha) * fu + (hc - ha) * fv : hd + (hc - hd) * (1 - fu) + (hb - hd) * (1 - fv);
     }

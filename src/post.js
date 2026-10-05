@@ -19,8 +19,8 @@ window.POST = (function () {
   const P = { ready: false, hdr: false, w: 0, h: 0, drawn: 0,
     // what can be turned: each 0 = off, 1 = as designed
     shade: 1, glow: 1, develop: 1, reach: null, far: 60,      // (reach: [share of the distance, near, wide] to try other shades by hand; far: the shade is down to a third at 1 / far Earth radii: 106 km)
-    wide: 1.0,
-    samples: 4 };      // samples a pixel in the scene's own picture (to try others: set it, then POST.w = 0 for new targets)      // how much more each wider ring of the glow counts than the one inside it: 0 = a tight glow, more = a broad glare round the sun
+    wide: 1.0,         // how much more each wider ring of the glow counts than the one inside it: 0 = a tight glow, more = a broad glare round the sun
+    samples: 4 };      // samples a pixel in the scene's own picture (to try others: set it, then POST.w = 0 for new targets)
   let rtScene = null, rtA = null, rtB = null; const down = [], up = []; let LEVELS = 5;
   const qScene = new THREE.Scene(), qCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const tri = new THREE.BufferGeometry(); tri.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
