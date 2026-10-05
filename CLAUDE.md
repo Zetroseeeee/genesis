@@ -36,7 +36,8 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `node tools/dbg3.js "<script>" "<probe>" <wait>` — run a script in the page and print a probe object.
 - `tools/macshots.sh [scene names]` — the real thing: pictures of this commit taken on an Apple GPU by the Scenes
   workflow (`tools/scenes/tour.txt` lists the scenes: towns of every people and age, forests, seasons, dusk and night,
-  dry countries, rivers). Look at these before believing anything about how the game looks.
+  dry countries, rivers). Look at these before believing anything about how the game looks. `REF=<branch>` takes
+  them of a pushed branch before it is on `main` (nothing is given out to players by it).
 - `npm start` — desktop window (Electron).
 - `node tools/test_update.js` — the updater under plain Node: small games in folders, the publishing step writing a
   feed, a web server that misbehaves on demand (270 checks, a few seconds). Run it after touching `desktop/updater.js`
@@ -49,9 +50,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   checkout of the version before it, from a copy of the real feed (`tools/update/mirror.mjs`).
 - `node tools/econ/probe.js [seed] [last year] [goods]` — the world's economy through the ages in numbers: prices
   against the usual, output against need, who is short, how much crosses borders, what the workshops make, and how
-  long the market takes a year. `node tools/econ/calibrate.js [seed] --write` measures how much each raw good's land
+  long the market takes a year. `node tools/econ/calibrate.js [seed,seed] --write` measures how much each raw good's land
   must yield and writes the table into `src/econ.js` (between its CAL marks): run it after changing where goods lie
   (`PLACES`), what people want (`CATS`) or how things are made (`RECIPES`), or a good will be far too scarce or too plenty.
+  Measure over two seeds (12345,777: the table is their mean): the goods few places yield are sized by a handful of realms.
 - `node tools/know/pace.js [seed,seed] [--fit N] [--write]` — the pace of history: when the realms in front enter each
   age, how far behind the middle realm is, how many people there are. With `--fit` it moves each age's yearly gain of
   knowledge (`RATE` in `src/sim.js`, between its marks) toward the dates history kept (bronze 3300 BC, iron 1200 BC,
