@@ -6,11 +6,14 @@
 // eras it belongs to, and its LOD files (l0 finest). Files load on demand, coarsest first, so a town appears at once
 // and sharpens as its files arrive.
 (function () {
+  // the air between the eye and the thing (air.js), worked out at its corners
+  const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.THING : '3.0';
   const VERT = `
     attribute vec4 aInfo;                 // era, seed, flags (1 ruin), progress (1 = finished)
     uniform mat4 uGeo;                    // mesh node transform (undoes the file's quantisation): to model metres
     uniform float uH, uSkirt;             // model height (m); how far the footing is pushed into the ground (m)
     varying vec3 vN, vView, vLocal; varying vec2 vUv; varying vec4 vInfo;
+    ${AIR_V}
     void main() {
       vec4 p = uGeo * vec4(position, 1.0);
       vLocal = p.xyz;
@@ -19,12 +22,14 @@
       vec4 mv = modelViewMatrix * instanceMatrix * p; vView = mv.xyz;
       vN = normalize(normalMatrix * (mat3(instanceMatrix) * (mat3(uGeo) * normal)));
       vUv = uv; vInfo = aInfo;
+      air(mv.xyz, ${AIR_N}, vAirT, vAirL);
       gl_Position = projectionMatrix * mv;
     }`;
   const FRAG = `
     precision highp float;
+    ${AIR_F}
     uniform sampler2D uMap, uNormalMap, uOrmMap; uniform float uHasN, uHasOrm, uH, uUnits, uFoliage;
-    uniform vec3 uSunV, uUpV, uGround, uSunCol; uniform float uDay, uCamAlt, uTime, uSnow, uDusk, uHome;
+    uniform vec3 uSunV, uUpV, uGround, uSunCol; uniform float uDay, uCamAlt, uTime, uSnow, uDusk, uHome, uGlow;
     varying vec3 vN, vView, vLocal; varying vec2 vUv; varying vec4 vInfo;
     ${window.SHADOWS ? SHADOWS.GLSL : 'const vec4 uShadowP = vec4(0.0); float sunHidden(vec3 p) { return 0.0; }'}
     float h21(vec2 p) { p = mod(p, 512.0); vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
@@ -89,12 +94,9 @@
       vec3 lamp = era >= 6.0 ? vec3(1.0, 0.86, 0.62) : vec3(1.0, 0.56, 0.24);
       float wallish = 1.0 - smoothstep(0.2, 0.5, dot(ng, uUpV)), lowW = smoothstep(0.62 * uH, 0.12 * uH, vLocal.y);
       float opening = smoothstep(0.2, 0.06, lum0) * wallish * lowW;
-      lit += lamp * night * home * (opening * 1.3 + col * 0.22 * lowW * wallish) * (0.85 + 0.15 * sin(uTime * 7.0 + seed * 50.0));
-      // aerial perspective shared with the terrain and the kit
-      float distKm = length(vView) * uUnits; float low = smoothstep(0.035, 0.002, uCamAlt);
-      float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;
-      vec3 skyCol = mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), uDay);
-      gl_FragColor = vec4(mix(lit, skyCol, fog), 1.0);
+      lit += lamp * night * home * (opening * 1.3 * (1.0 + 1.6 * uGlow) + col * 0.22 * lowW * wallish) * (0.85 + 0.15 * sin(uTime * 7.0 + seed * 50.0));      // (the fire in the doorway is brighter than white where the picture can hold it: uGlow)
+      // the air between (air.js): the same that veils the ground behind it
+      gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0);
     }`;
 
   // the same shape drawn into the sun's depth map: same placement and footing, nothing above the build line
@@ -163,12 +165,13 @@
     const map = tex(src.map), nrm = tex(src.normalMap), orm = tex(src.roughnessMap || src.metalnessMap);
     const sh = M.shared;
     const uniforms = {
-      uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uTime: sh.uTime, uGround: sh.uGround || { value: new THREE.Vector3(0.42, 0.4, 0.26) }, uSnow: sh.uSnow || { value: 0 }, uSunCol: sh.uSunCol || { value: new THREE.Vector3(1, 1, 1) }, uDusk: sh.uDusk || { value: 0 },
+      uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uTime: sh.uTime, uGround: sh.uGround || { value: new THREE.Vector3(0.42, 0.4, 0.26) }, uSnow: sh.uSnow || { value: 0 }, uSunCol: sh.uSunCol || { value: new THREE.Vector3(1, 1, 1) }, uDusk: sh.uDusk || { value: 0 }, uGlow: sh.uGlow || { value: 0 },
       uHome: { value: def.tree || def.fit || def.open || (def.kinds || []).some((k) => NOFIRE.has(k)) ? 0 : 1 },      // does anybody keep a fire in it at night
       uMap: { value: map }, uNormalMap: { value: nrm }, uOrmMap: { value: orm }, uHasN: { value: nrm ? 1 : 0 }, uHasOrm: { value: orm ? 1 : 0 },
       uGeo: { value: mesh.matrixWorld.clone() }, uH: { value: def.h }, uSkirt: { value: def.tree ? 0.4 : Math.max(1.5, def.h * 0.18) }, uUnits: { value: M.units }, uFoliage: { value: def.tree ? 1 : 0 },
     };
     if (window.SHADOWS) Object.assign(uniforms, SHADOWS.uniforms);
+    if (window.AIR && M.units > 6000) Object.assign(uniforms, AIR.uniforms);      // (on the globe; a model looked at by itself stands in no air)
     L.mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, extensions: { derivatives: true } });
     L.depth = new THREE.ShaderMaterial({ uniforms: { uGeo: uniforms.uGeo, uH: uniforms.uH, uSkirt: uniforms.uSkirt }, vertexShader: DEPTH_VERT, fragmentShader: DEPTH_FRAG, side: THREE.DoubleSide }); L.depth.colorWrite = false;
     L.geo = mesh.geometry; L.tris = L.geo.index ? L.geo.index.count / 3 : L.geo.attributes.position.count / 3;

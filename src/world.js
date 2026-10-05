@@ -17,8 +17,9 @@
       this.arche = BKIT.makeKit();
       this.buildingGroup = new THREE.Group(); this.scene.add(this.buildingGroup);
       this.inst = {}; const MAXI = BKIT.MAXI;
-      this.bUniforms = { uSunV: { value: new THREE.Vector3(0, 1, 0) }, uUpV: { value: new THREE.Vector3(0, 1, 0) }, uDay: { value: 1 }, uCamAlt: { value: 1 }, uTime: { value: 0 }, uMetres: { value: R_M }, uTexMix: { value: 0 }, uGround: { value: new THREE.Vector3(0.42, 0.4, 0.26) }, uSnow: { value: 0 }, uSunCol: { value: new THREE.Vector3(1, 1, 1) }, uDusk: { value: 0 } };      // uGround: the colour of the land around, for bounced light; uSnow: how much snow lies here now
+      this.bUniforms = { uSunV: { value: new THREE.Vector3(0, 1, 0) }, uUpV: { value: new THREE.Vector3(0, 1, 0) }, uDay: { value: 1 }, uCamAlt: { value: 1 }, uTime: { value: 0 }, uMetres: { value: R_M }, uTexMix: { value: 0 }, uGround: { value: new THREE.Vector3(0.42, 0.4, 0.26) }, uSnow: { value: 0 }, uSunCol: { value: new THREE.Vector3(1, 1, 1) }, uDusk: { value: 0 }, uGlow: { value: 0 } };      // uGround: the colour of the land around, for bounced light; uSnow: how much snow lies here now; uGlow: 1 where lights may be brighter than white
       if (window.SHADOWS) Object.assign(this.bUniforms, SHADOWS.uniforms);      // the kit takes the sun's depth map as the models do
+      if (window.AIR) Object.assign(this.bUniforms, AIR.uniforms);              // and stands in the same air as everything else (air.js)
       this.bMat = new THREE.ShaderMaterial({ uniforms: this.bUniforms, vertexShader: BKIT.VERT, fragmentShader: BKIT.FRAG });
       this.textured = false;
       this.info = {};
@@ -37,7 +38,7 @@
       this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._s = new THREE.Vector3(); this._p = new THREE.Vector3(); this._c = new THREE.Color();
       this.buildingCount = 0;
       // real 3D models (models.js) share the kit's light uniforms and replace kit archetypes where a model exists
-      if (window.MODELS) MODELS.init(this.scene, { uSunV: this.bUniforms.uSunV, uUpV: this.bUniforms.uUpV, uDay: this.bUniforms.uDay, uCamAlt: this.bUniforms.uCamAlt, uTime: this.bUniforms.uTime, uGround: this.bUniforms.uGround, uSnow: this.bUniforms.uSnow, uSunCol: this.bUniforms.uSunCol, uDusk: this.bUniforms.uDusk }, { units: 6371.0 });
+      if (window.MODELS) MODELS.init(this.scene, { uSunV: this.bUniforms.uSunV, uUpV: this.bUniforms.uUpV, uDay: this.bUniforms.uDay, uCamAlt: this.bUniforms.uCamAlt, uTime: this.bUniforms.uTime, uGround: this.bUniforms.uGround, uSnow: this.bUniforms.uSnow, uSunCol: this.bUniforms.uSunCol, uDusk: this.bUniforms.uDusk, uGlow: this.bUniforms.uGlow }, { units: 6371.0 });
       this.modelsOn = true; this._pv = new THREE.Vector3();
       this.initSky();
     }
@@ -384,58 +385,50 @@
           const m = Math.pow(rnd(), 5.0); mag[i * 2] = 0.16 + 0.84 * m; mag[i * 2 + 1] = rnd();      // brightness (few are bright), colour (blue-white to amber)
         }
         const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aMag', new THREE.BufferAttribute(mag, 2));
-        this.starUniforms = { uAlpha: { value: 1 }, uPx: { value: 1 } };
+        this.starUniforms = { uAlpha: { value: 1 }, uPx: { value: 1 }, uLow: { value: 0 }, uTime: { value: 0 }, uUp: { value: new THREE.Vector3(0, 1, 0) } };
         this.stars = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: this.starUniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-          vertexShader: `attribute vec2 aMag; uniform float uPx; varying vec3 vCol; void main(){ vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); p.z = p.w * 0.9999995; gl_Position = p; float b = aMag.x; gl_PointSize = (1.5 + 2.4 * b * b) * uPx; vCol = mix(vec3(0.74, 0.83, 1.0), vec3(1.0, 0.86, 0.68), smoothstep(0.55, 1.0, aMag.y)) * (0.42 + 0.9 * b); }`,
+          vertexShader: `attribute vec2 aMag; uniform float uPx, uLow, uTime; uniform vec3 uUp; varying vec3 vCol;
+            void main(){ vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); p.z = p.w * 0.9999995; gl_Position = p; float b = aMag.x; gl_PointSize = (1.5 + 2.4 * b * b) * uPx;
+              // from the ground (uLow): none in the thick air along the horizon, and they twinkle
+              float seen = mix(1.0, smoothstep(0.02, 0.24, dot(normalize(position), uUp)) * (0.78 + 0.22 * sin(uTime * 2.3 + aMag.y * 97.0)), uLow);
+              vCol = mix(vec3(0.74, 0.83, 1.0), vec3(1.0, 0.86, 0.68), smoothstep(0.55, 1.0, aMag.y)) * (0.42 + 0.9 * b + 1.4 * b * b * b) * seen; }`,      // (the few brightest are brighter than white: post.js gives them a little glow)
           fragmentShader: `uniform float uAlpha; varying vec3 vCol; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.08, d); gl_FragColor = vec4(vCol * a * uAlpha, 1.0); }`,
         })); this.stars.frustumCulled = false; this.stars.renderOrder = -4; scene.add(this.stars);
       }
-      // the air, seen from outside: a shell a little larger than the planet that glows where it is looked through
-      // edge-on - a blue veil over the rim of the day side and a thin halo beyond it, reddening along the edge of night
-      this.atmoUniforms = { uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamAlt: { value: 1 } };
-      this.atmo = new THREE.Mesh(new THREE.SphereGeometry(1.028, 128, 80), new THREE.ShaderMaterial({
-        uniforms: this.atmoUniforms, side: THREE.FrontSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-        vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = normalize(w.xyz); vec4 mv = viewMatrix * w; vN = normalize(normalMatrix * normal); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
-        fragmentShader: `uniform vec3 uSun; uniform float uCamAlt; varying vec3 vN; varying vec3 vV; varying vec3 vW;
-          void main(){
-            float mu = clamp(dot(normalize(vN), normalize(vV)), 0.0, 1.0);
-            float rim = pow(1.0 - mu, 4.2) * smoothstep(0.0, 0.2, mu);       // most where the path through the air is longest; nothing at the shell's own edge
-            float sunUp = dot(normalize(vW), normalize(uSun));
-            float day = smoothstep(-0.2, 0.3, sunUp);
-            vec3 col = mix(vec3(1.0, 0.42, 0.16), vec3(0.28, 0.54, 1.0), smoothstep(-0.12, 0.22, sunUp));
-            float k = smoothstep(0.03, 0.14, uCamAlt);                       // (from inside the air the sky dome takes over)
-            gl_FragColor = vec4(col * rim * (0.03 + 0.97 * day) * 2.2 * k, 1.0); }`,
-      })); this.atmo.renderOrder = 3; scene.add(this.atmo);
-      // clouds
+      // clouds: a shell a little above the highest ground, white in the sun, warm along the edge of night and dark after it, and
+      // behind the same air as everything else
       const cl = new THREE.TextureLoader().load('data/clouds.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; this.cloudTex = t; });
       this.cloudTex = null; this.cloudShift = 0; this.cloudVis = 0;
-      this.cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaMap: cl, transparent: true, opacity: 0.55, depthWrite: false });
+      this.cloudUniforms = Object.assign({ uMap: { value: cl }, uSun: { value: new THREE.Vector3(1, 0, 0) }, uOpacity: { value: 0.6 } }, window.AIR ? AIR.uniforms : {});
+      this.cloudMat = new THREE.ShaderMaterial({ uniforms: this.cloudUniforms, transparent: true, depthWrite: false,
+        vertexShader: `varying vec2 vUv; varying vec3 vWn, vView; void main(){ vUv = uv; vWn = normalize((modelMatrix * vec4(position, 0.0)).xyz); vec4 mv = modelViewMatrix * vec4(position, 1.0); vView = mv.xyz; gl_Position = projectionMatrix * mv; }`,
+        fragmentShader: `uniform sampler2D uMap; uniform vec3 uSun; uniform float uOpacity; varying vec2 vUv; varying vec3 vWn, vView;
+          ${window.AIR ? AIR.GLSL : 'void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); } vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }'}
+          void main(){
+            float a = texture2D(uMap, vUv).g * uOpacity; if (a < 0.004) discard;
+            float sunUp = dot(normalize(vWn), uSun);
+            vec3 col = mix(vec3(0.03, 0.04, 0.065), mix(vec3(1.0, 0.5, 0.3), vec3(1.0), smoothstep(0.0, 0.32, sunUp)), smoothstep(-0.1, 0.22, sunUp));
+            vec3 T, L; air(vView, 6.0, T, L);
+            gl_FragColor = vec4(airOver(col, T, L), a); }`,
+      });
       this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.004, 128, 80), this.cloudMat); this.clouds.rotation.y = Math.PI; scene.add(this.clouds);
       this.cloudsOn = true;
-      // sky dome for low altitudes (camera-centred, drawn behind everything)
-      this.skyUniforms = { uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamPos: { value: new THREE.Vector3() }, uAlpha: { value: 0 }, uMoon: { value: new THREE.Vector3(0, 1, 0) }, uTime: { value: 0 }, uComet: { value: 0 }, uLat: { value: 0 } };
+      // The sky: a sphere round the camera, drawn last and only where nothing else was (at the far plane). Each pixel of it is a
+      // line of sight out through the air (air.js): blue by day, the colours of dusk, the planet's glowing rim from outside, black
+      // in space. On it the sun's own disc, the moon, and near the ground the stars, the northern lights and a comet when there is one.
+      this.skyUniforms = Object.assign({ uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamPos: { value: new THREE.Vector3() }, uAlpha: { value: 0 }, uMoon: { value: new THREE.Vector3(0, 1, 0) }, uTime: { value: 0 }, uComet: { value: 0 }, uLat: { value: 0 } }, window.AIR ? AIR.uniforms : {});
       this.sky = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.ShaderMaterial({
-        uniforms: this.skyUniforms, side: THREE.BackSide, transparent: false, depthWrite: false, depthTest: false, blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation,
-        vertexShader: `varying vec3 vW; void main(){ vW = (modelMatrix*vec4(position,1.0)).xyz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-        fragmentShader: `uniform vec3 uSun, uCamPos, uMoon; uniform float uAlpha, uTime, uComet, uLat; varying vec3 vW;
+        uniforms: this.skyUniforms, side: THREE.BackSide, transparent: false, depthWrite: false, depthTest: true,
+        vertexShader: `varying vec3 vW, vV; void main(){ vW = (modelMatrix*vec4(position,1.0)).xyz; vec4 mv = modelViewMatrix*vec4(position,1.0); vV = mv.xyz; vec4 p = projectionMatrix*mv; p.z = p.w * 0.9999998; gl_Position = p; }`,
+        fragmentShader: `uniform vec3 uSun, uCamPos, uMoon; uniform float uAlpha, uTime, uComet, uLat; varying vec3 vW, vV;
+          ${window.AIR ? AIR.GLSL : 'const vec4 uAirE = vec4(0.0); const vec3 uAirS = vec3(0.0, 1.0, 0.0); void airMarch(vec3 rd, float tMax, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }'}
           float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
           void main(){
-            vec3 dir = normalize(vW - uCamPos); vec3 up = normalize(uCamPos); vec3 sun = normalize(uSun);
-            float el = dot(dir, up); float t = clamp(el, 0.0, 1.0);
-            vec3 zenith = vec3(0.16, 0.36, 0.78), horizon = vec3(0.70, 0.80, 0.92);
-            vec3 sky = mix(horizon, zenith, pow(t, 0.55));
-            sky = mix(sky, horizon * 0.92, smoothstep(0.0, -0.12, el));
-            float sd = max(dot(dir, sun), 0.0);
-            sky += vec3(1.0, 0.86, 0.62) * (pow(sd, 400.0) * 2.2 + pow(sd, 10.0) * 0.14);
-            float sunEl = dot(sun, up);
-            float dusk = smoothstep(0.35, 0.0, sunEl) * smoothstep(-0.2, 0.02, sunEl);
-            sky = mix(sky, vec3(0.96, 0.56, 0.3), dusk * pow(sd, 3.0) * (1.0 - t) * 0.85);
-            float day = smoothstep(-0.12, 0.2, sunEl);
-            vec3 col = mix(vec3(0.01, 0.015, 0.035), sky, day);
-            float night = 1.0 - day; vec3 add = vec3(0.0);
-            // stars: a hashed field fixed to the world, fading out in daylight and near the horizon haze
-            { vec2 sc = vec2(atan(dir.z, dir.x) * 38.0, asin(clamp(dir.y, -1.0, 1.0)) * 38.0); vec2 cell = floor(sc); vec2 f = fract(sc) - 0.5; float hs = h21(cell); vec2 o = vec2(h21(cell + 3.1), h21(cell + 7.7)) - 0.5; float dd = length(f - o * 0.8); float mag = smoothstep(0.962, 1.0, hs); float st = smoothstep(0.16, 0.0, dd) * mag * mag * (0.7 + 0.3 * sin(uTime * 2.0 + hs * 60.0)); add += mix(vec3(1.0, 0.9, 0.8), vec3(0.8, 0.88, 1.0), h21(cell + 1.3)) * st * night * smoothstep(0.0, 0.12, el) * 3.0; }
+            vec3 dir = normalize(vW - uCamPos); vec3 up = normalize(uCamPos); vec3 sun = normalize(uSun); vec3 rd = normalize(vV);
+            vec3 T, L; airMarch(rd, 1e9, ${window.AIR ? AIR.SKY : '16.0'}, T, L);
+            float el = dot(dir, up); float sunEl = dot(sun, up);
+            float night = (1.0 - smoothstep(-0.17, -0.05, sunEl)) * uAlpha; vec3 add = vec3(0.0);      // (what belongs to a sky seen from the ground fades as the camera leaves it: uAlpha)
             // the moon: a lit disc with a soft halo, phase from its angle to the sun
             vec3 moon = normalize(uMoon); float md = dot(dir, moon);
             if (md > 0.99975) { vec3 e = normalize(cross(moon, up)); vec3 n2 = normalize(cross(e, moon)); vec3 off = dir - moon * md; vec2 uv = vec2(dot(off, e), dot(off, n2)) / 0.022; float r2 = dot(uv, uv); if (r2 < 1.0) { vec3 nrm = vec3(uv, sqrt(1.0 - r2)); vec3 toSun = normalize(vec3(dot(sun, e), dot(sun, n2), dot(sun, moon))); float lit = max(dot(nrm, toSun), 0.0); float mare = 0.75 + 0.25 * vn(uv * 4.0 + 7.0); add += vec3(0.93, 0.93, 0.9) * mare * (0.22 + 1.1 * lit) * (1.0 - smoothstep(0.92, 1.0, r2)) * (0.22 + 0.78 * night); } }      // (two and a half degrees across: five times life, as a painter would have it; by day a pale ghost)
@@ -452,24 +445,27 @@
             }
             // a comet, when the chronicle says one hangs in the sky
             if (uComet > 0.0) { vec3 eastW = normalize(cross(vec3(0.0, 1.0, 0.0), up)); vec3 northW = cross(up, eastW); vec3 cdir = normalize(up * 0.55 + eastW * 0.6 - northW * 0.5); float cd = dot(dir, cdir); vec3 tail = normalize(-sun - cdir * dot(-sun, cdir)); vec3 perp = dir - cdir * cd; float along = dot(perp, tail); float side = length(perp - tail * along); float tl = smoothstep(0.0, 0.02, along) * (1.0 - smoothstep(0.05, 0.34, along)); float width = 0.006 + along * 0.12; float coma = pow(max(cd, 0.0), 4000.0) * 3.0 + pow(max(cd, 0.0), 300.0) * 0.5; float tailG = exp(-pow(side / width, 2.0)) * tl * (0.55 + 0.45 * vn(vec2(along * 40.0, side * 80.0 + uTime * 0.1))); add += vec3(0.85, 0.95, 1.0) * (coma + tailG) * uComet * (0.25 + 0.75 * night); }
-            col += add; float lumAdd = dot(add, vec3(0.33));
-            gl_FragColor = vec4(col, uAlpha * clamp(0.2 + 0.8 * day + lumAdd * 3.0, 0.0, 1.0)); }`,
+            // the sun's own disc (drawn half as large again as it is), darker toward its edge, and as red as the air it is seen through makes it
+            vec3 ds = rd - uAirS; float u = dot(ds, ds) / 5.6e-5;
+            vec3 disc = vec3(260.0 * uAirE.z) * (1.0 - smoothstep(0.82, 1.0, u)) * (0.45 + 0.55 * sqrt(max(1.0 - u, 0.0)));
+            vec3 lin = L + (pow(add, vec3(2.2)) + disc) * T;
+            gl_FragColor = vec4(pow(max(lin, 0.0), vec3(0.4545)), 1.0); }`,
       }));
-      this.sky.renderOrder = -5; this.sky.frustumCulled = false; this.sky.visible = false; scene.add(this.sky);
+      this.sky.renderOrder = 40; this.sky.frustumCulled = false; scene.add(this.sky);
     }
     updateSky(cam, sun, time) {
-      this.atmoUniforms.uSun.value.copy(sun); this.atmoUniforms.uCamAlt.value = cam.alt || 1;
       this.clouds.rotation.y = Math.PI + time * 0.0012; this.cloudShift = time * 0.0012;
       const fade = Math.min(1, Math.max(0, (cam.alt - 0.006) / 0.02));
-      this.cloudMat.opacity = 0.55 * fade; this.clouds.visible = this.cloudsOn && fade > 0.01; this.cloudVis = this.cloudsOn ? 1 : 0;
+      this.cloudUniforms.uOpacity.value = 0.6 * fade; this.cloudUniforms.uSun.value.copy(sun); this.clouds.visible = this.cloudsOn && fade > 0.01; this.cloudVis = this.cloudsOn ? 1 : 0;
       const skyA = Math.min(1, Math.max(0, (0.06 - cam.alt) / 0.04));
-      this.sky.visible = skyA > 0.01; this.skyUniforms.uAlpha.value = skyA; this.skyUniforms.uSun.value.copy(sun);
+      this.skyUniforms.uAlpha.value = skyA; this.skyUniforms.uSun.value.copy(sun);
       // the moon circles the sky once a game-month, offset from the sun so phases run their course
       { const a = time * 0.0025; const ax = new THREE.Vector3(0.06, 1, 0.04).normalize(); this.skyUniforms.uMoon.value.copy(sun).applyAxisAngle(ax, 2.6 + a).normalize(); this.skyUniforms.uTime.value = time; this.skyUniforms.uLat.value = cam.lat; this.skyUniforms.uComet.value = this.cometOn ? 1 : 0; }
       this.sky.position.copy(cam.camera.position); this.sky.scale.setScalar(Math.max(cam.camera.near * 50, cam.camera.far * 0.4)); this.skyUniforms.uCamPos.value.copy(cam.camera.position); this.sky.updateMatrixWorld();
       const camUp0 = cam.camera.position.clone().normalize(); const dayHere = Math.min(1, Math.max(0, (camUp0.dot(sun) + 0.12) / 0.32));
-      // (near the ground the sky dome has its own stars; from high up the field is dimmed on the day side, where the lit ground fills the eye)
-      this.stars.position.copy(cam.camera.position); this.stars.updateMatrixWorld(); this.starUniforms.uAlpha.value = (1 - skyA) * (1 - 0.55 * dayHere); this.stars.visible = skyA < 0.99;
+      // (from the ground the stars come out as the sky darkens; from high up the field is only dimmed on the day side, where the lit ground fills the eye)
+      { const su = this.starUniforms, dark = 1 - Math.min(1, Math.max(0, (camUp0.dot(sun) + 0.17) / 0.12)); su.uAlpha.value = (1 - skyA) * (1 - 0.55 * dayHere) + skyA * dark * dark * (3 - 2 * dark); su.uLow.value = skyA; su.uTime.value = time; su.uUp.value.copy(camUp0);
+        this.stars.position.copy(cam.camera.position); this.stars.updateMatrixWorld(); this.stars.visible = su.uAlpha.value > 0.004; }
       // lights follow the sun; hemisphere dims at night for the camera's local sun elevation
       this.sunLight.position.copy(sun).multiplyScalar(10); this.sunLight.target.position.set(0, 0, 0);
       const camUp = cam.camera.position.clone().normalize(); const sunUp = camUp.dot(sun);

@@ -93,10 +93,11 @@
     #endif
     uniform vec2 uSimRes, uSel, uHover; uniform float uFertView, uPolitical, uLens, uLabelsOn;
     uniform sampler2D uClouds; uniform float uCloudShift, uCloudVis; uniform vec2 uPhaseB, uPhaseRot;
-    uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality;
+    uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality, uGlow;      // uGlow: 1 where the picture can hold light brighter than white (post.js lets it bleed), else 0
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     const float PI = 3.14159265;
     ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
+    ${window.AIR ? AIR.GLSL : 'void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); } vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }'}
     #ifdef USE_TEXARR
     // generated ground and land-use tiles (textures.js), sampled in a metric Mercator frame: a phase computed in double precision
     // at the tile centre (uPhN whole cells mod 16, uPhF the fraction) plus the precise local offset vGLf, in base cells of 1.5 m
@@ -522,9 +523,11 @@
       diff *= shadow * cloudShadow;
       // the light of the hour (models.js, buildings.js and the trees take the same from the world's uniforms): a low sun
       // is warm and, the eye opening to it, strong; night is blue and enough to see by; dusk lends a rose glow
-      float kW = smoothstep(0.02, 0.42, sunUp);
-      vec3 sunCol = vec3(1.0, 0.56 + 0.44 * kW, 0.30 + 0.70 * kW) * (smoothstep(-0.03, 0.05, sunUp) * (1.0 + 1.1 * (1.0 - smoothstep(0.04, 0.5, sunUp))));
-      float dusk = smoothstep(-0.12, 0.02, sunUp) * (1.0 - smoothstep(0.08, 0.4, sunUp));
+      // (from far out day and night are seen together: the eye is not opened to the low sun there, and the edge of night is a narrow band)
+      float downHere = 1.0 - smoothstep(0.02, 0.25, uCamAlt);
+      float kW = smoothstep(0.02, mix(0.22, 0.42, downHere), sunUp);
+      vec3 sunCol = vec3(1.0, 0.56 + 0.44 * kW, 0.30 + 0.70 * kW) * (smoothstep(-0.03, 0.05, sunUp) * (1.0 + 1.1 * downHere * (1.0 - smoothstep(0.04, 0.5, sunUp))));
+      float dusk = smoothstep(-0.12, 0.02, sunUp) * (1.0 - smoothstep(0.08, 0.4, sunUp)) * (0.35 + 0.65 * downHere);
       vec3 ambC = (mix(mix(vec3(0.24, 0.30, 0.48), vec3(0.10, 0.12, 0.19), smoothstep(0.02, 0.2, uCamAlt)), vec3(0.26), day)      /* (from orbit the night side stays dark under its lights) */ + vec3(0.24, 0.17, 0.18) * dusk) * mix(vec3(1.0), vec3(0.9, 0.95, 1.1), 1.0 - shadow * 0.7);
       vec3 lit = col * (ambC + diff * 1.05 * sunCol * mix(1.0, 0.5, seaW * 0.3));
       // specular on water
@@ -532,7 +535,9 @@
       vec3 refl = reflect(-sunV, nV);
       float specD = max(dot(refl, viewDir), 0.0); float highK = smoothstep(0.02, 0.4, uCamAlt);
       float spec = mix(pow(specD, 90.0), pow(specD, 34.0) * 0.5, highK) * (seaW + inlandW * 0.14) * day * (1.0 - frozen * 0.85);   // a river glints; it is not a mirror. From orbit the sun on the sea is a wide soft patch
-      lit += mix(vec3(0.9, 0.95, 1.0), vec3(1.0, 0.93, 0.8), highK) * spec * 0.9;
+      // (the sun's own image on the water is far brighter than the sheen round it: where the picture can hold that, it is given)
+      float glint = pow(specD, 900.0) * (seaW + inlandW * 0.6) * day * (1.0 - frozen) * (1.0 - highK) * uGlow;
+      lit += mix(vec3(0.9, 0.95, 1.0), vec3(1.0, 0.93, 0.8), highK) * (spec * 0.9 + glint * 5.0);
       // night side: keep a little moonlight and city lights
       float night = 1.0 - smoothstep(-0.22, 0.02, sunUp);
       float light = sim.r; float highUp = smoothstep(0.003, 0.014, uCamAlt);   // orbital city lights fade out as real windows take over
@@ -552,7 +557,7 @@
       lit += col * night * 0.045;
       // fresh fire glows through the night
       float front = smoothstep(0.08, 0.5, dec2.g) * (1.0 - smoothstep(0.7, 0.97, dec2.g));    // the fire front: the fringe of what is burning now
-      lit += vec3(1.0, 0.42, 0.1) * (night * 0.9 + 0.15) * front * (0.3 + 0.7 * nMic.r) * (0.6 + 0.4 * nFin.g);
+      lit += vec3(1.0, 0.42, 0.1) * (night * 0.9 + 0.15) * front * (0.3 + 0.7 * nMic.r) * (0.6 + 0.4 * nFin.g) * (1.0 + 1.6 * uGlow);
       // ---------- political overlay (smoothed, coast-clipped) ----------
       if (uPolitical > 0.0) {
         vec2 sc = geo * uSimRes;                  // cell coords
@@ -601,13 +606,9 @@
         vec3 fc = mix(vec3(0.6, 0.18, 0.1), vec3(0.25, 0.95, 0.4), fert);
         lit = mix(lit, fc * (0.35 + 0.65 * day), uFertView * landW * 0.6);
       }
-      // ---------- aerial perspective ----------
-      float distKm = length(vViewPos) * 6371.0;
-      float low = smoothstep(0.035, 0.002, uCamAlt);
-      float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.75;
-      vec3 sky = mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), day);
-      lit = mix(lit, sky, fog);
-      gl_FragColor = vec4(lit, 1.0);
+      // ---------- the air between (air.js): what it takes from the ground's light on the way to the eye, and the light of its own it adds ----------
+      vec3 airT, airL; air(vViewPos, ${window.AIR ? AIR.LAND : '8.0'}, airT, airL);
+      gl_FragColor = vec4(airOver(lit, airT, airL), 1.0);
     }`;
 
   // ---------- pack loading ----------

@@ -34,9 +34,12 @@
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('aPart', new THREE.Float32BufferAttribute(part, 3));
     return g;
   }
+  // the air between the eye and the thing (air.js), worked out at its corners
+  const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.THING : '3.0';
   const P_VERT = `
     attribute vec3 aPart; attribute float aPhase;      // instanceColor is declared by three.js for an instanced mesh that has colours
     uniform float uTime; varying vec3 vN, vCol, vView; varying float vSkin, vY;
+    ${AIR_V}
     void main() {
       vec3 p = position, n = normal;
       float swing = sin(uTime * 7.0 + aPhase * 6.2832);
@@ -46,11 +49,13 @@
       vSkin = aPart.z; vY = position.y; vCol = instanceColor;
       vec4 mv = modelViewMatrix * instanceMatrix * vec4(p, 1.0); vView = mv.xyz;
       vN = normalize(normalMatrix * (mat3(instanceMatrix) * n));
+      air(mv.xyz, ${AIR_N}, vAirT, vAirL);
       gl_Position = projectionMatrix * mv;
     }`;
   const P_FRAG = `
     precision highp float; uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uCamAlt, uDusk;
     varying vec3 vN, vCol, vView; varying float vSkin, vY;
+    ${AIR_F}
     void main() {
       vec3 n = normalize(vN);
       vec3 col = mix(vCol, vec3(0.74, 0.56, 0.42), vSkin);
@@ -58,9 +63,7 @@
       float diff = max(dot(n, uSunV), 0.0), sky = 0.5 + 0.5 * dot(n, uUpV);
       vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
       vec3 lit = col * (amb + diff * 0.82 * uSunCol);
-      float distKm = length(vView) * 6371.0; float low = smoothstep(0.035, 0.002, uCamAlt);
-      float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;
-      gl_FragColor = vec4(mix(lit, mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), uDay), fog), 1.0);
+      gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0);      // the air between (air.js)
     }`;
 
   // A walker's shadow: a soft streak on the ground from its feet, away from the sun, as long as the sun is low. (The
@@ -110,7 +113,7 @@
       }
       // people: one instanced figure
       { const g = figureGeometry(); const ph = new THREE.InstancedBufferAttribute(new Float32Array(MAXPEOPLE), 1); ph.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aPhase', ph); this.pphase = ph;
-        const bu = world.bUniforms; this.puni = { uSunV: bu.uSunV, uUpV: bu.uUpV, uDay: bu.uDay, uCamAlt: bu.uCamAlt, uTime: { value: 0 }, uSunCol: bu.uSunCol, uDusk: bu.uDusk };
+        const bu = world.bUniforms; this.puni = { uSunV: bu.uSunV, uUpV: bu.uUpV, uDay: bu.uDay, uCamAlt: bu.uCamAlt, uTime: { value: 0 }, uSunCol: bu.uSunCol, uDusk: bu.uDusk }; if (window.AIR) Object.assign(this.puni, AIR.uniforms);
         const pm = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ uniforms: this.puni, vertexShader: P_VERT, fragmentShader: P_FRAG }), MAXPEOPLE); pm.count = 0; pm.frustumCulled = false; pm.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         pm.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXPEOPLE * 3).fill(1), 3); pm.instanceColor.setUsage(THREE.DynamicDrawUsage);
         this.people = pm; scene.add(pm); this._pm = new THREE.Matrix4();

@@ -42,7 +42,7 @@
       }
     }`;
   const FRAG = `
-    precision mediump float; uniform float uDay; uniform highp float uTime; varying float vAge, vHeat, vSeed, vFade; varying vec2 vQ;      // (uTime as the vertex shader has it: one uniform, one precision)
+    precision mediump float; uniform float uDay, uGlow; uniform highp float uTime; varying float vAge, vHeat, vSeed, vFade; varying vec2 vQ;      // (uTime as the vertex shader has it: one uniform, one precision)
     float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
     float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
     // colours leave here already multiplied by their alpha: smoke covers what is behind it, light is added to it
@@ -62,7 +62,7 @@
         vec3 fc = mix(vec3(0.95, 0.24, 0.04), mix(vec3(1.0, 0.6, 0.13), vec3(1.0, 0.94, 0.68), smoothstep(0.45, 0.92, heat)), smoothstep(0.08, 0.45, heat));
         float a = smoothstep(0.02, 0.3, body) * lit * vFade;
         float glow = max(1.0 - r, 0.0); glow *= glow * 0.3 * lit * vFade;
-        gl_FragColor = vec4(fc * a + vec3(1.0, 0.5, 0.18) * glow * (1.0 - a), a * 0.8); return;
+        gl_FragColor = vec4(fc * a * (1.0 + 1.8 * uGlow * smoothstep(0.2, 0.9, heat)) + vec3(1.0, 0.5, 0.18) * glow * (1.0 - a), a * 0.8); return;      // (a flame's heart is brighter than white where the picture can hold it)
       }
       if (r > 1.25) discard;
       float ca = cos(vSeed), sa = sin(vSeed); vec2 q = vec2(ca * d.x - sa * d.y, sa * d.x + ca * d.y);
@@ -89,7 +89,7 @@
       g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(this.seed, 4).setUsage(THREE.DynamicDrawUsage));
       this.hq = new Float32Array(MAXP * 4); g.setAttribute('aH', new THREE.InstancedBufferAttribute(this.hq, 4).setUsage(THREE.DynamicDrawUsage));
       g.instanceCount = 0;
-      this.uniforms = { uTime: { value: 0 }, uFovK: { value: 1000 }, uWind: { value: 1 }, uDay: { value: 1 } };
+      this.uniforms = { uTime: { value: 0 }, uFovK: { value: 1000 }, uWind: { value: 1 }, uDay: { value: 1 }, uGlow: { value: 0 } };
       this.mat = new THREE.ShaderMaterial({ uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, premultipliedAlpha: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide });
       this.points = new THREE.Mesh(g, this.mat); this.points.frustumCulled = false; this.points.renderOrder = 5; scene.add(this.points);
       this.last = { lon: 999, lat: 999, t: -1e9 }; this.count = 0; this.enabled = true; this.budget = 1;
