@@ -114,7 +114,7 @@
   const f = (v) => { const s = (+v).toPrecision(9); return /[.e]/.test(s) ? s : s + '.0'; }, v3 = (a) => `vec3(${a.map(f).join(', ')})`;
   // the uniforms and what is done with what the air leaves and adds (a colour as the screen shows it, in and out): for every shader that draws something in the air
   A.MIX = `
-    vec3 airOver(vec3 c, vec3 T, vec3 L) { return sqrt(c * c * T + L); }`;      // (a colour of the screen is taken as the root of the light: near enough to the screen's own curve, and a square and a root cost a fraction of two powers at every pixel)
+    vec3 airOver(vec3 c, vec3 T, vec3 L) { return sqrt(max(c * c * T + L, 0.0)); }`;      // (a colour of the screen is taken as the root of the light: near enough to the screen's own curve, and a square and a root cost a fraction of two powers at every pixel)
   // how much of the light the gas, and the haze, turn by an angle (its cosine): the gas evenly fore and aft, the haze mostly onward
   A.PHASE = `
     float airPhR(float c) { return 0.0596831 * (1.0 + c * c); }
@@ -203,8 +203,11 @@
   A.SKY = '16.0'; A.LAND = '4.0'; A.THING = '3.0';
   // A thing that stands on the ground is small against the air: it works the air out at its corners (vertex shader: A.VERT, then
   // air(viewPos, steps, vAirT, vAirL)) and lays it over its colour (fragment shader: A.FRAG, then airOver(colour, vAirT, vAirL)).
-  A.VERT = A.GLSL + '\n    varying vec3 vAirT, vAirL;';
-  A.FRAG = '\n    varying vec3 vAirT, vAirL;' + A.MIX;
+  // (Both are taken where the pixel is really covered ("centroid"), not at its middle: with four samples a pixel, the middle of a pixel on
+  // the edge of a triangle can lie outside it, and along the planet's rim, where a triangle is seen edge-on and holds a hundred
+  // kilometres of air in a pixel's width, what was reckoned on from there came out as single pixels of pure blue.)
+  A.VERT = A.GLSL + '\n    centroid varying vec3 vAirT, vAirL;';
+  A.FRAG = '\n    centroid varying vec3 vAirT, vAirL;' + A.MIX;
 
   // ---------- what the game sets each frame ----------
   if (typeof THREE !== 'undefined') {

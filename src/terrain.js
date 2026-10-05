@@ -4,6 +4,7 @@
   const TILE = 512, GRID = 32;
   const R_M = 6371000;
 
+  const GRID_CH = { 8: '!', 16: ':', 32: '.', 64: ',', 128: ';' };      // (a tile's mesh, in the signature of the drawn surface)
   // ---------- shared tile geometry (u, v, skirt) ----------
   function buildTileGeometry(GRID) {
     const n = GRID + 1; const pos = []; const idx = [];
@@ -70,13 +71,14 @@
       float up = -2.0 * sdl * sdl - cl * clc * s2;
       vec3 unitv = vec3(east, north, up + 1.0);
       vec3 local = vec3(east, north, up) + unitv * hh;
+      vec4 mvTop = modelViewMatrix * vec4(local, 1.0);      // (where the ground itself is: a skirt's lower edge hangs far below it, and has the ground's air, not that of the deep)
       if (position.z > 0.5) local -= unitv * uSkirt;
       vUV = vec2(u, v); vLon = lon; vLat = lat; vUnit = unitv; vGL = vec2(lon * cl - uGeoC.x, lat - uGeoC.y);
       // precise Mercator offset from the tile centre (everything here is small, so float32 keeps centimetres): x = dlon, y = ln(tan(a+d)/tan(a))
       { float dl = uDLon0 + u * uDLon, dla = uDLat0 + v * uDLat; float dd = dla * 0.5; float td = sin(dd) / max(cos(uMercA + dd) * uCosA, 1e-4); vGLf = vec2(dl, log(max(1.0 + td / uTanA, 1e-4))); }
-      vec4 mv = modelViewMatrix * vec4(local, 1.0);
+      vec4 mv = position.z > 0.5 ? modelViewMatrix * vec4(local, 1.0) : mvTop;
       vViewPos = mv.xyz;
-      air(mv.xyz, ${AIR_N}, vAirT, vAirL);
+      air(mvTop.xyz, ${AIR_N}, vAirT, vAirL);
       gl_Position = projectionMatrix * mv;
     }`;
 
@@ -625,14 +627,17 @@
       this.opts = opts; this.index = opts.index; this.base = opts.base || 'data/';
       this.scene = opts.scene; this.group = new THREE.Group(); this.scene.add(this.group);
       // denser meshes for the close tiles, so the finer regional elevation and the micro-relief actually show as geometry
-      this.geoms = { 16: buildTileGeometry(16), 32: buildTileGeometry(32), 64: buildTileGeometry(64), 128: buildTileGeometry(128) };
+      this.geoms = { 8: buildTileGeometry(8), 16: buildTileGeometry(16), 32: buildTileGeometry(32), 64: buildTileGeometry(64), 128: buildTileGeometry(128) };
       // how finely a tile of a level is meshed. A software renderer runs the vertex shader (five elevation lookups and
       // three of noise per vertex) on the CPU: it gets a quarter of the grid each way, and stands everything on that.
       this.soft = !!opts.soft; this.gridOf = (L) => this.soft ? (L >= 9 ? 32 : 16) : (L >= 9 ? 128 : L >= 7 ? 64 : 32);
-      // That is the finest a tile is meshed. Where it is drawn small it gets a coarser mesh, so that a quad of it is not much under
-      // quadPx pixels across (gridFor): in a view to the horizon most of the ground's tiles are far ones, and at full fineness their
-      // triangles were a pixel or two across. That cost the vertex shader (elevation, relief, the air: millions of corners a frame)
-      // and, with four samples a pixel, the fragment shader several times over for the same pixel.
+      // That is the finest a tile is meshed. Where it is drawn small it gets a coarser mesh, so that a quad of it is quadPx pixels
+      // or more each way (gridFor). In a view to the horizon most of the ground's tiles lie almost edge-on to the eye: at full
+      // fineness their triangles were slivers a tenth of a pixel deep, dozens to a pixel. That cost the vertex shader (elevation,
+      // relief, the air: a million and a half corners a frame) and, far more, the fragment shader: with four samples a pixel it
+      // runs for every triangle that touches the pixel, and for the three pixels beside it each time. Flat country seen from the
+      // side needs next to no corners; what stands up in a tile (its own relief, from the elevation it is drawn with) keeps it
+      // nearly as fine as it is wide, so the line of the hills against the sky stays as it was.
       this.quadPx = 4;
       this.tiles = new Map(); this.packs = new Map(); this.loading = 0; this.maxLoading = 6;
       this.exag = opts.exag || 2.0;
@@ -762,17 +767,35 @@
       // world-space extent
       const corners = [GEO.toVec(b.lon0, b.lat0), GEO.toVec(b.lon1, b.lat0), GEO.toVec(b.lon0, b.lat1), GEO.toVec(b.lon1, b.lat1)];
       let rad = 0; for (const c of corners) rad = Math.max(rad, c.distanceTo(center));
-      const t = { key: this.tileKey(L, tx, ty), L, tx, ty, b, lonC, latC, center, mesh, uniforms, radius: rad, extent: Math.max(b.w * GEO.D2R * Math.max(Math.cos(Math.min(Math.abs(b.lat0), Math.abs(b.lat1)) * GEO.D2R), 0.02), b.h * GEO.D2R), lastUsed: 0, minH: 0, maxH: 9000, ePack: null, iPack: null, inScene: false, grid };
+      const t = { key: this.tileKey(L, tx, ty), L, tx, ty, b, lonC, latC, center, mesh, uniforms, radius: rad, extent: Math.max(b.w * GEO.D2R * Math.max(Math.cos(Math.min(Math.abs(b.lat0), Math.abs(b.lat1)) * GEO.D2R), 0.02), b.h * GEO.D2R), lastUsed: 0, minH: 0, maxH: 9000, ePack: null, iPack: null, inScene: false, grid, relief: 0, midH: 0, reliefOf: null, lie: 1, standPx: 0, dist: 1 };
       return t;
     }
-    // how finely a tile is meshed this frame: the finest its level has whose quads are quadPx pixels or more across as it is drawn now
-    // (t.sse: how many pixels the tile is across). A tile keeps the mesh it has until it has grown or shrunk an eighth past the step
-    // between two, so that it does not go back and forth as the camera drifts.
+    // How finely a tile is meshed this frame. t.sse: how many pixels it is across; t.lie: how its ground lies to the eye (the sine
+    // of the angle it is seen at: 1 from above, next to 0 far off and seen from near the ground); t.standPx: how many pixels tall
+    // what stands up in it is. Flat ground gets quads quadPx pixels deep as it lies (seen from the side that is very few of them);
+    // a tile with something standing in it (three pixels tall and more) keeps quads quadPx pixels wide however shallow it
+    // lies, for the line it draws against the sky. A tile keeps the mesh it has until it has passed the step between
+    // two by an eighth, so that it does not go back and forth as the camera drifts. The fewest: eight a side, more for the great
+    // tiles seen from far out, which carry the planet's curve.
     gridFor(t) {
       const max = this.gridOf(t.L); if (this.soft || !this.quadPx) return max;
-      let g = max; while (g > 32 && t.sse < g * this.quadPx) g >>= 1;
-      const was = t.grid; if (was !== g && was <= max && (was === g * 2 || g === was * 2)) { const step = Math.max(g, was) * this.quadPx; if (t.sse > step * 0.88 && t.sse < step * 1.12) return was; }
+      const wide = t.sse, deep = Math.min(wide, wide * t.lie + t.standPx);
+      const want = Math.max(deep, wide * Math.min(1, Math.max(0, (t.standPx - 3) / 5))) / this.quadPx;
+      const min = Math.min(max, t.L <= 1 ? 32 : t.L === 2 ? 16 : 8);
+      let g = max; while (g > min && want < g) g >>= 1;
+      const was = t.grid; if (was !== g && was <= max && was >= min && (was === g * 2 || g === was * 2)) { const step = Math.max(g, was); if (want > step * 0.88 && want < step * 1.12) return was; }
       return g;
+    }
+    // how much a tile's own ground rises and falls (t.relief, metres) and its middle height (t.midH), from the elevation it is drawn
+    // with: looked up once for each pack it is bound to, at up to twenty-four places a side
+    measure(t, eb) {
+      if (t.reliefOf === eb.pack) return; t.reliefOf = eb.pack; t.relief = 0; t.midH = 0;
+      const p = eb.pack; if (eb.absent || !p.data) return;
+      const R = eb.rect, x0 = Math.max(0, Math.floor(R[0] * p.w)), y0 = Math.max(0, Math.floor(R[1] * p.h)), x1 = Math.min(p.w - 1, Math.ceil((R[0] + R[2]) * p.w)), y1 = Math.min(p.h - 1, Math.ceil((R[1] + R[3]) * p.h));
+      const sx = Math.max(1, ((x1 - x0) / 24) | 0), sy = Math.max(1, ((y1 - y0) / 24) | 0), d = p.data, w = p.w; let lo = 255, hi = 0;
+      for (let y = y0; y <= y1; y += sy) for (let x = x0; x <= x1; x += sx) { const v = d[y * w + x]; if (v < lo) lo = v; if (v > hi) hi = v; }
+      const hLo = Math.max(0, p.min + lo * p.scale), hHi = Math.max(0, p.min + hi * p.scale);
+      t.relief = (hHi - hLo) * 1.3; t.midH = (hHi + hLo) / 2;      // (a third more: a peak can stand between two of the places looked at)
     }
     getTile(L, tx, ty) { const k = this.tileKey(L, tx, ty); let t = this.tiles.get(k); if (!t) { t = this.makeTile(L, tx, ty); this.tiles.set(k, t); } return t; }
     // generated ground textures (textures.js): every tile material recompiles with the texture arrays; new tiles get them from the start
@@ -806,7 +829,7 @@
         if (ang - angRad > horizonAng + Math.acos(1 / (1 + hMax)) + 0.01) continue;
         const dist = Math.max(this._sphere.center.distanceTo(cam) - this._sphere.radius, 1e-5);
         const sse = t.extent / dist * K;
-        t.sse = sse;
+        t.sse = sse; t.dist = dist;
         if (sse > this.sseThreshold && t.L < this.maxLevel) {
           const L = t.L + 1; stack.push(this.getTile(L, t.tx * 2, t.ty * 2), this.getTile(L, t.tx * 2 + 1, t.ty * 2), this.getTile(L, t.tx * 2, t.ty * 2 + 1), this.getTile(L, t.tx * 2 + 1, t.ty * 2 + 1));
         } else visible.push(t);
@@ -817,6 +840,7 @@
       for (const p of this.packs.values()) p.users = 0;
       // bind packs + scene membership
       const now = this.frame; const seen = new Set();
+      const low = 1 - Math.min(1, Math.max(0, (camLen - 1 - 0.02) / 0.04));      // 1 below 130 km, 0 from 380 km up
       for (const t of visible) {
         seen.add(t.key); t.lastUsed = now;
         const pri = t.sse;
@@ -829,6 +853,10 @@
           t.ePack = eb;
         }
         if (ib) { const p = ib.pack; if (!ib.absent) { p.users++; u.uImg.value = p.texture; u.uImgRect.value.set(ib.rect[0], ib.rect[1], ib.rect[2], ib.rect[3]); } t.iPack = ib; }
+        // how the tile lies to the eye, for its mesh (gridFor). From far out the planet's rim is where the air changes fastest, and the
+        // air is worked out at the mesh's corners: there every tile counts as seen from above.
+        if (eb) this.measure(t, eb);
+        { const dC = Math.max(t.center.distanceTo(cam), 1e-6), over = t.center.dot(cam) - 1 - t.midH * this.exag / R_M; t.lie = 1 - low + low * Math.min(1, Math.max(0, over / dC)); t.standPx = t.relief * this.exag / R_M / t.dist * K; }
         const g = this.gridFor(t); if (g !== t.grid) { t.grid = g; t.mesh.geometry = this.geoms[g]; }
         if (!t.inScene) { this.group.add(t.mesh); t.inScene = true; }
       }
@@ -841,7 +869,7 @@
       }
       this.visible = visible;
       // a version for everything that stands on the drawn surface: bumps when the set of drawn tiles, their meshes or their elevation packs change
-      { let sig = ''; for (const t of visible) sig += t.key + (t.ePack ? (t.ePack.absent ? 'a' : t.ePack.level) : '-') + (t.grid === 128 ? ';' : t.grid === 64 ? ',' : '.'); if (sig !== this.meshSig) { this.meshSig = sig; this.meshVersion = (this.meshVersion || 0) + 1; } }
+      { let sig = ''; for (const t of visible) sig += t.key + (t.ePack ? (t.ePack.absent ? 'a' : t.ePack.level) : '-') + GRID_CH[t.grid]; if (sig !== this.meshSig) { this.meshSig = sig; this.meshVersion = (this.meshVersion || 0) + 1; } }
       const hist = {}; for (const t of visible) { const l = t.ePack ? (t.ePack.absent ? 'sea' : t.ePack.level) : '-'; hist[l] = (hist[l] || 0) + 1; } this.stats.elevLevels = hist;
       this.pumpQueue();
       if (now % 30 === 0) this.evictPacks();

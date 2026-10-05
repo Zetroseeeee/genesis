@@ -408,7 +408,7 @@
           void main(){
             float a = texture2D(uMap, vUv).g * uOpacity; if (a < 0.004) discard;
             float sunUp = dot(normalize(vWn), uSun);
-            vec3 col = mix(vec3(0.03, 0.04, 0.065), mix(vec3(1.0, 0.5, 0.3), vec3(1.0), smoothstep(0.0, 0.32, sunUp)), smoothstep(-0.1, 0.22, sunUp));
+            vec3 col = mix(vec3(0.07, 0.08, 0.115), mix(vec3(1.0, 0.6, 0.42), vec3(1.0), smoothstep(0.0, 0.3, sunUp)), smoothstep(-0.04, 0.2, sunUp));      // (a little moonlight on them at night: the dark side has a shape)
             gl_FragColor = vec4(airOver(col, vAirT, vAirL), a); }`,
       });
       this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.004, 192, 96), this.cloudMat); this.clouds.rotation.y = Math.PI; scene.add(this.clouds);

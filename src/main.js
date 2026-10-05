@@ -28,7 +28,7 @@
   const speed = () => settings.continuous ? (paused ? 0 : SPEEDS[speedIdx]) : (turnRun.active ? 600 : 0);
   // The home screen: the Earth stands large and runs off the right and the bottom of the picture, the edge of night
   // keeps its place while the planet turns under it (the way it really turns: dusk travels west), and the list has the left.
-  const HOME = { dist: 1.02, cx: 0.8, cy: 0.76, lat: 10, spin: -0.3, sun: [-0.9, 0.36, -0.22] };
+  const HOME = { dist: 1.02, cx: 0.8, cy: 0.76, lat: 10, spin: -0.3, sun: [-0.9, 0.36, 0.0] };
   let homeK = 1, sunEase = 0;      // how far the picture is shifted for the home screen (1) or centred (0); seconds of easing left for the sun
   function frameHome() {
     const w = stage.clientWidth, h = stage.clientHeight; const wide = w > 900;

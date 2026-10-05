@@ -283,7 +283,7 @@ Conventions that matter:
   and the red edge of night are the same sum along the line of sight (sunlight dimmed on its way in, the share the gas
   and the haze turn toward the eye, light scattered before from a table by the sun's height, what the air between takes
   away). It has no textures (the ground's shader has no sampler to spare): the column of air to space is a closed form,
-  and each step takes the air as it really thins along it, so four steps do for the ground and two for a house, and a
+  and each step takes the air as it really thins along it, so four steps do for the ground and three for a house, and a
   house stands in the same air as its street. Where next to no air is on a short line (most of what is seen from
   down among things) nothing is worked out at all, and a short line with a little air is one piece. **It is worked out at the corners of meshes, never per pixel** (a march
   at every pixel of a large screen cost two thirds of the frame rate): the ground and the things on it in their vertex
@@ -293,6 +293,9 @@ Conventions that matter:
   plane, with the sun's disc and the moon on it). Only what turns with the angle to the sun is per pixel there
   (`airParts` gives the gas's and the haze's shares apart, the phases are applied in the fragment shader: the bright
   ring round the sun is sharp). Shaders still write the colours of the screen; `airOver` takes them to light and back.
+  `vAirT` and `vAirL` are `centroid` varyings: with four samples a pixel, a pixel on a triangle's edge is otherwise
+  reckoned from outside the triangle, and along the planet's rim (triangles seen edge-on, a hundred kilometres of air
+  to a pixel) that came out as single pixels of pure blue. A tile's skirt takes the air of the ground above it.
   Three things are not as in nature, each for the game's sake: the air is twice as tall and half as dense (the ground
   is drawn twice as tall: `THICK`); it is thinned about the eye when the camera is down among towns drawn many times
   larger than life (`AIR.near`: a town stands clear, the hills behind it in haze); and it is thinned where it is
@@ -309,6 +312,17 @@ Conventions that matter:
   shaders made it; only what they write above 1 is "more than white", and they write it where `uGlow` is 1 (the sun's
   image on water, flames, lit windows, a fire front; the sun's disc is thousands). Depth here is ordinary perspective
   depth: the game's own shaders never took the renderer's logarithmic depth.
+- **A ground tile's mesh** follows how the tile is drawn (`gridFor` in `terrain.js`), up to the finest its level has
+  (`gridOf`: 128 a side at the deepest level). What costs is not corners but slivers: with four samples a pixel the
+  fragment shader runs for every triangle that touches a pixel (and for its three neighbours each time), so country
+  seen from the side at full fineness, triangles a tenth of a pixel deep, cost more than the rest of the frame. A
+  tile's quads are therefore `quadPx` (4) pixels or more each way as it lies to the eye (`t.lie`); only where
+  something stands up in it (`t.relief`, measured from the elevation it is drawn with; three pixels tall and more)
+  does it keep quads `quadPx` wide however shallow it lies, for the line it draws against the sky. From far out every tile
+  counts as seen from above (the air is worked out at the corners, and changes fastest along the rim). Whatever
+  stands on the ground asks `gpuHeightAt`, which uses the mesh a tile has at the moment (`t.grid`), and
+  `meshVersion` follows the meshes as it follows the tiles. A software renderer keeps its two fixed grids.
+  `terrain.stats.quads` counts what is drawn; `terrain.quadPx = 0` is the old way (to compare).
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.
