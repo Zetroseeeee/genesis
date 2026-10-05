@@ -21,10 +21,10 @@
   // turn system: the world stands still between presses of the big button
   const turnRun = { active: false, start: 0, target: 0, evIdx: 0, capital: -1, wars: '', era: 0, towns: 0, townSet: null, reason: '' };
   const seen = { wars: new Set(), era: -1, ack: new Set(), turns: 0 };
-  const view = { political: true, soil: false, clouds: true, labels: true, trade: false };
+  const view = { political: true, soil: false, clouds: true, labels: true, trade: false, gov: false };
   const settings = { uiScale: 1, tipDelay: 300, glass: false, autoTilt: true, quality: 'high', continuous: false, textures: true };
   const worldData = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
-  const TURN_YEARS = [200, 100, 50, 50, 40, 20, 10, 5, 5];      // a turn, by age: about a discovery to a turn at history's pace (a hundred and seventy turns from the first fields to the present)
+  const TURN_YEARS = RULE.PACE;      // a turn, by age (200 years in the Stone Age down to 5): about a discovery, or a reform, to a turn at history's pace; a hundred and seventy turns from the first fields to the present
   const speed = () => settings.continuous ? (paused ? 0 : SPEEDS[speedIdx]) : (turnRun.active ? 600 : 0);
   // The home screen: the Earth stands large and runs off the right and the bottom of the picture, the edge of night
   // keeps its place while the planet turns under it (the way it really turns: dusk travels west), and the list has the left.
@@ -38,7 +38,7 @@
   function setMode(m) {
     const was = mode; mode = m; document.body.dataset.mode = m;
     frameHome(); camera.updateProjectionMatrix();
-    globals.uPolitical.value = m === 'intro' ? 0 : (view.political ? 1 : 0);
+    globals.uPolitical.value = m === 'intro' ? 0 : (view.political ? 1 : 0); globals.uLens.value = m === 'intro' ? 0 : (view.gov ? 1 : 0);
     if ((was === 'intro') !== (m === 'intro')) { sunEase = 2.5; if (m !== 'intro' && mapcam) sunFor(mapcam.tLon); }      // leaving the home screen: morning where the camera is
     renderUpdate();
   }
@@ -65,7 +65,7 @@
     uOwner: { value: null }, uPal: { value: null }, uSim: { value: null }, uInfo: { value: null }, uNoise: { value: null },
     uDetA: { value: null }, uDetB: { value: null }, uDetC: { value: null }, uDetD: { value: null }, uDet: { value: null },
     uSimRes: { value: new THREE.Vector2(W, H) }, uSel: { value: new THREE.Vector2(-9, -9) }, uHover: { value: new THREE.Vector2(-9, -9) },
-    uFertView: { value: 0 }, uPolitical: { value: 1 }, uLabelsOn: { value: 1 },
+    uFertView: { value: 0 }, uPolitical: { value: 1 }, uLens: { value: 0 }, uLabelsOn: { value: 1 },
     uClouds: { value: null }, uCloudShift: { value: 0 }, uCloudVis: { value: 0 },
     uDecal: { value: null }, uDecalRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uDecalOn: { value: 0 }, uQuality: { value: 1 }, uDecal2: { value: null }, uWaterN: { value: null },
     uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
@@ -275,6 +275,7 @@
     { id: 'land', cls: 'land', icon: '<path d="M3 18l5-9 4 6 3-4 6 7z"/>', tip: 'Territory' },
     { id: 'stab', cls: 'stab', icon: '<path d="M12 3v18M5 9l7-3 7 3M5 9l-2 6h4zM19 9l-2 6h4z"/><path d="M8 21h8" stroke="#101318" stroke-width="1.5"/>', tip: 'Stability' },
     { id: 'live', cls: 'live', icon: '<path d="M4 10h16l-2 9H6zM8 10l4-6 4 6"/>', tip: 'How your people live' },
+    { id: 'rule', cls: 'cul', icon: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', tip: 'Laws and authority' },
     { id: 'know', cls: 'sci', icon: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2z"/><path d="M12 6v14" stroke="#101318" stroke-width="1.5"/>', tip: 'What your people study' },
   ];
   const ecoEls = {};
@@ -285,6 +286,7 @@
       host.appendChild(d); ecoEls[e.id] = d; attachTip(d, () => ecoTip(e.id));
       if (e.id === 'live' || e.id === 'coin') { d.style.cursor = 'pointer'; d.addEventListener('click', () => { if (sim && sim.playerCiv()) MARKET.open('ledger'); }); }
       if (e.id === 'know') { d.style.cursor = 'pointer'; d.addEventListener('click', () => { if (sim && sim.playerCiv()) TREE.open(); }); }
+      if (e.id === 'rule') { d.style.cursor = 'pointer'; d.addEventListener('click', () => { if (sim && sim.playerCiv()) GOV.open(); }); }
     }
   }
   const lastSample = { pop: 0, cells: 0, year: -1e9, dPop: 0, dCells: 0 };
@@ -293,12 +295,15 @@
     const P = c.policy; const pop = sim.popOf[c.id];
     const row = (k, v) => `<div class="row"><span>${k}</span><span class="num">${v}</span></div>`;
     switch (id) {
-      case 'coin': { const ip = sim.incomeParts(c); return `<b>Treasury ${fmtInt(c.wealth)}</b>${row('Taxes', fmtSigned(ip.taxes))}${row('Harbours ×' + sim.ports[c.id], fmtSigned(ip.ports))}${row('Markets ×' + sim.markets[c.id], fmtSigned(ip.markets))}${ip.mines ? row('Mines and estates', fmtSigned(ip.mines)) : ''}${row('Prosperity', fmtSigned(ip.living))}${row('Customs', fmtSigned(ip.customs))}${ip.upkeep ? row('Army upkeep', fmtSigned(-ip.upkeep)) : ''}${ip.scholars ? row('Scholars', fmtSigned(-ip.scholars)) : ''}${row('Net per year', fmtSigned(c.income || 0))}<div class="hint">Taxes at ${P.tax.toFixed(1)}×, military at ${P.military.toFixed(1)}×. Change both in Realm › Policy. Click for the ledger.</div>`; }
+      case 'coin': { const ip = sim.incomeParts(c); return `<b>Treasury ${fmtInt(c.wealth)}</b>${row('Taxes', fmtSigned(ip.taxes))}${row('Harbours ×' + sim.ports[c.id], fmtSigned(ip.ports))}${row('Markets ×' + sim.markets[c.id], fmtSigned(ip.markets))}${ip.mines ? row('Mines and estates', fmtSigned(ip.mines)) : ''}${row('Prosperity', fmtSigned(ip.living))}${row('Customs', fmtSigned(ip.customs))}${ip.upkeep ? row('Army upkeep', fmtSigned(-ip.upkeep)) : ''}${ip.scholars ? row('Scholars', fmtSigned(-ip.scholars)) : ''}${Math.abs(ip.state) >= 0.05 ? row('What the laws spend', fmtSigned(-ip.state)) : ''}${row('Net per year', fmtSigned(c.income || 0))}<div class="hint">Taxes at ${P.tax.toFixed(1)}×, military at ${P.military.toFixed(1)}×. Change both in Realm › Policy. Click for the ledger.</div>`; }
       case 'live': { const M = sim.market, NC = M.NC, CATS = ECON.CATS; const rows = CATS.filter((C) => M.Bk[c.id * NC + C.id] > 0).map((C) => { const v = M.sat[c.id * NC + C.id]; return `<div class="row"><span>${C.name}${C.state ? ' (the state)' : ''}</span><span class="num ${v < 0.5 ? 'neg' : v < 0.8 ? 'warn' : ''}">${Math.round(v * 100)}%</span></div>`; }).join(''); return `<b>Your people have ${Math.round(M.LS[c.id] * 100)}% of what they want</b>${rows}<div class="hint">What the land yields, what your towns make and what merchants bring. Well-supplied people pay more tax; hungry ones grow restless. Click for the ledger; M opens the market.</div>`; }
       case 'pop': { const fed = sim.settlementsOf(c.id).length; return `<b>${fmtPop(pop)} people</b>${row('Settlements', fed)}${row('Change / 20 yrs', fmtSigned(lastSample.dPop, 1) + ' k')}<div class="hint">People grow towards what the land feeds. Develop cells and advance knowledge to feed more.</div>`; }
       case 'land': return `<b>${fmtInt(sim.cellsOf[c.id])} regions</b>${row('Reach from capital', Math.round(sim.reachFor(c)) + ' cells')}${row('Peak', fmtInt(c.peakCells))}<div class="hint">Regions beyond your reach may break away when stability is low.</div>`;
       case 'mil': return `<b>Strength ${fmtInt(sim.strength(c))}</b>${row('People', fmtPop(pop))}${row('Knowledge factor', (0.25 + c.tech * 1.6).toFixed(2) + '×')}${row('Military spending', P.military.toFixed(1) + '×')}${row('Army', sim.year < c.army ? `raised, ${c.army - sim.year} yrs` : 'none')}<div class="hint">Wars are won cell by cell by the stronger side. Walls double a cell's defence.</div>`;
-      case 'stab': { const wars = Object.keys(c.wars).length; const over = Math.max(0, sim.cellsOf[c.id] / (40 + c.tech * 3000) - 1); return `<b>Stability ${Math.round(c.stability * 100)}%</b>${row('Wars', wars ? `−${(wars * 12)}%` : '0')}${row('Overreach', over > 0 ? `−${Math.round(over * 50)}%` : '0')}${row('Taxes', P.tax > 1 ? `−${Math.round((P.tax - 1) * 30)}%` : P.tax < 1 ? `+${Math.round((1 - P.tax) * 30)}%` : '0')}${row('Temples ×' + sim.temples[c.id], '+' + Math.min(15, sim.temples[c.id] * 3) + '%')}${row('Wonders ×' + sim.wonders[c.id], '+' + Math.min(15, sim.wonders[c.id] * 5) + '%')}<div class="hint">Below 30% the realm may fracture.</div>`; }
+      case 'stab': { const sp = sim.stabilityParts(c); const pt = (v) => Math.abs(v) < 0.005 ? '0' : (v > 0 ? '+' : '−') + Math.round(Math.abs(v) * 100); const r = (k, v) => Math.abs(v) >= 0.005 ? row(k, pt(v)) : '';
+        return `<b>Stability ${Math.round(c.stability * 100)}%</b>${row('It is heading for', Math.round(Math.max(0, Math.min(1, sp.target)) * 100) + '%')}${r('Wars', sp.wars)}${r('More land than can be held', sp.overreach)}${r('Taxes', sp.taxes)}${r('A warlike stance', sp.stance)}${r('Temples ×' + sim.temples[c.id], sp.temples)}${r('Wonders ×' + sim.wonders[c.id], sp.wonders)}${r('Luxuries', sp.luxuries)}${r('Hunger', sp.hunger)}${r('The ruler', sp.ruler)}${r('What your people know', sp.knowledge)}${r('Laws, government and the estates', sp.rule)}<div class="hint">Below 30% the realm may fracture. V opens the laws and the estates.</div>`; }
+      case 'rule': { const g = GOV.tile(); if (!g) return ''; const k = sim.rule, Q = k.ruleOf(c), ES = RULE.ESTATES.map((E, e) => e).sort((a, b) => k.power[c.id * RULE.NE + b] - k.power[c.id * RULE.NE + a]).slice(0, 4);
+        return `<b>Authority ${Math.floor(g.auth)} of ${g.max}</b>${row('Gathers', '+' + g.perTurn.toFixed(g.perTurn < 10 ? 1 : 0) + ' a turn')}${row('Government', esc(g.form.name))}${g.reform ? row('Reform', esc(g.reform.x.name) + ' · ' + g.reform.left + ' yrs') : row('Reform', 'none under way')}${g.demand ? row(esc(g.demand.who) + ' demand', esc(g.demand.law.name)) : ''}${ES.map((e) => row(esc(RULE.estateName(e, c.era)) + ' · ' + Math.round(k.power[c.id * RULE.NE + e] * 100) + '% of power', GOV.moodWord(Q.mood[e]))).join('')}<div class="hint">Authority is what your word can change: a law, or the form of government. Click, or press V.</div>`; }
       case 'know': { const t = TREE.tile(); if (!t) return ''; const ip = sim.insightParts(c); const U = KNOW.UNIT; const next = sim.ERAS[c.era + 1]; const from = c.era ? sim.ERAS[c.era][1] : KNOW.T0;
         return `<b>${t.d ? esc(t.d.name) + ' · ' + Math.round(t.prog * 100) + '%' : t.waiting ? 'Your scholars await your word' : 'Nothing left to study in this age'}</b>${t.d ? row('Learned in', TREE.yrs(t.years)) : ''}${row('Insight a year', '+' + t.perYear.toFixed(t.perYear < 10 ? 2 : 1))}${row('For its age', (ip.base * U).toFixed(2))}${row('People', '×' + ip.people.toFixed(2))}${row('Scholars\' pay ' + P.research.toFixed(1) + '×', '×' + ip.spend.toFixed(2))}${row('Academies ' + sim.acad[c.id] + ' in ' + sim.townsOf[c.id] + ' towns', '×' + ip.acads.toFixed(2))}${row('Peace at home', '×' + ip.calm.toFixed(2))}${ip.ruler !== 1 ? row('Ruler', '×' + ip.ruler.toFixed(2)) : ''}${row('What you know of learning', '×' + ip.known.toFixed(2))}${Math.abs(ip.time - 1) >= 0.005 ? row(ip.time < 1 ? 'Ahead of your time' : 'First in a world behind its time', '×' + ip.time.toFixed(2)) : ''}${ip.taught * U >= 0.005 ? row('Taught by neighbours', '+' + (ip.taught * U).toFixed(2)) : ''}${row('Discoveries', t.known + ' of ' + t.total)}${next ? row('To the ' + next[0], Math.round(100 * clamp((c.tech - from) / (next[1] - from), 0, 1)) + '%') : ''}${t.queue ? row('In the queue', t.queue) : ''}<div class="hint">What your neighbours know is learned half again as fast. Click for the tree; K opens it.</div>`; }
     }
@@ -317,11 +322,12 @@
     set('stab', Math.round(c.stability * 100) + '%', '', c.stability < 0.3 ? 'neg' : c.stability < 0.5 ? 'warn' : '');
     { const ls = sim.market.LS[c.id]; const sh = MARKET.shortages(); set('live', Math.round(ls * 100) + '%', sh.length ? sh.length + ' short' : '', sh.length ? 'neg' : ''); }
     { const t = TREE.tile(); if (t) set('know', t.d ? Math.round(t.prog * 100) + '%' : '—', t.d ? TREE.yrs(t.years) : t.waiting ? 'choose' : '', t.waiting ? 'neg' : ''); }
-    $('id-name').textContent = sim.fullName(c); $('id-era').textContent = sim.ERAS[c.era][0] + ' · ' + c.gov; $('id-sw').style.background = c.color;
+    { const g = GOV.tile(); if (g) set('rule', String(Math.floor(g.auth)), g.demand ? 'demand' : g.reform ? g.reform.left + ' yrs' : g.angry ? 'unrest' : g.army ? 'the army' : '', g.demand || g.angry || g.army ? 'neg' : ''); }
+    $('id-name').textContent = sim.fullName(c); $('id-era').textContent = sim.ERAS[c.era][0] + ' · ' + sim.govName(c); $('id-sw').style.background = c.color;
   }
 
   // ---------- attention queue + the turn button ----------
-  const T_ICON = { study: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', capital: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', split: '<path d="M6 6l6 6-6 6M12 6l6 6-6 6"/>', stab: '<path d="M12 4v9M12 17v2"/>', debt: '<path d="M12 5v14M8 9h5a2 2 0 0 1 0 4H9a2 2 0 0 0 0 4h6"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', grow: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', gone: '<path d="M5 5l14 14M19 5L5 19"/>', play: '<path d="M6 4l14 8-14 8z"/>', stop: '<path d="M6 6h12v12H6z"/>', pause: '<path d="M8 5v14M16 5v14"/>' };
+  const T_ICON = { demand: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', rising: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', study: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', capital: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', split: '<path d="M6 6l6 6-6 6M12 6l6 6-6 6"/>', stab: '<path d="M12 4v9M12 17v2"/>', debt: '<path d="M12 5v14M8 9h5a2 2 0 0 1 0 4H9a2 2 0 0 0 0 4h6"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', grow: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', gone: '<path d="M5 5l14 14M19 5L5 19"/>', play: '<path d="M6 4l14 8-14 8z"/>', stop: '<path d="M6 6h12v12H6z"/>', pause: '<path d="M8 5v14M16 5v14"/>' };
   function computeAttention() {
     const c = sim && sim.playerCiv(); if (!c) return [];
     const out = []; const yb = Math.floor(sim.year / 20);
@@ -336,6 +342,9 @@
     { const food = sim.satOf(c.id, 'food'); if (food >= 0.65) seen.ack.delete('food'); if (food < 0.55 && sim.market.steps > 30 && !seen.ack.has('food')) out.push({ id: 'food', kind: 'stab', cls: 'warn', t1: 'Hunger', t2: `Your people get ${Math.round(food * 100)}% of the food they want`, body: 'Buy food for the reserve and release it, raise a granary, or settle land that feeds.', act: () => { seen.ack.add('food'); MARKET.open('board', sim.GOOD_ID.grain); } }); }
     if (c.wealth < 0 && !seen.ack.has('debt' + yb)) out.push({ id: 'debt', kind: 'debt', cls: 'warn', t1: 'Empty treasury', t2: `Losing ${Math.abs(c.income || 0).toFixed(1)} a year`, body: 'Raise taxes or cut military spending.', act: () => { seen.ack.add('debt' + yb); openRealm(); } });
     { const t = TREE.tile(); if (t && !t.waiting) seen.ack.delete('study'); if (t && t.waiting && !seen.ack.has('study')) out.push({ id: 'study', kind: 'study', cls: 'good', t1: 'Knowledge', t2: t.pool >= 250 ? `Your people can learn something at once: choose what` : 'Your scholars await your word: choose what to study', body: 'Open the tree and choose a discovery. Left alone for a generation, the scholars choose for themselves.', act: () => { seen.ack.add('study'); TREE.open('tree'); } }); }
+    { const g = GOV.tile(); if (g && g.demand && !seen.ack.has('demand' + g.demand.since)) out.push({ id: 'demand', kind: 'demand', cls: 'warn', t1: 'A demand', t2: `${g.demand.who} demand a new law: ${g.demand.law.name}`, body: 'Grant it and they are content for a while; refuse and they remember. Unanswered, it lapses as a refusal.', act: () => { seen.ack.add('demand' + g.demand.since); GOV.open('estates'); } });
+      if (g && g.rose > -1e8 && sim.year - g.rose <= TURN_YEARS[c.era] && !seen.ack.has('rose' + g.rose)) out.push({ id: 'rising', kind: 'rising', cls: 'war', t1: 'A rising', t2: (c.events.slice().reverse().find(e => e.type === 'law' && e.year === g.rose) || { text: 'An estate has risen against you' }).text, body: 'See who is angry, and why: open the estates.', act: () => { seen.ack.add('rose' + g.rose); GOV.open('estates'); } });
+      const yb = Math.floor(sim.year / (TURN_YEARS[c.era] * 3)); if (g && g.army && !seen.ack.has('army' + yb)) out.push({ id: 'army', kind: 'rising', cls: 'warn', t1: 'The army is watching', t2: `Stability ${Math.round(c.stability * 100)}: where a government cannot hold, ${g.army.who.toLowerCase()} march on the capital`, body: 'Steady the realm (lower taxes, end a war, content the estates) before someone else offers to.', act: () => { seen.ack.add('army' + yb); GOV.open('estates'); } }); }
     if (seen.era >= 0 && c.era > seen.era) out.push({ id: 'era', kind: 'era', cls: 'good', t1: 'New era', t2: `Your people enter the ${sim.ERAS[c.era][0]}`, act: () => { seen.era = c.era; bigBanner(sim.ERAS[c.era][0], sim.fullName(c) + ' · ' + sim.fmtYear(sim.year), eraArt(c.era)); } });
     const dis = c.events.slice(-12).filter(e => e.type === 'disaster' && sim.year - e.year <= 6 && !seen.ack.has('dis' + e.year + e.loc));
     for (const e of dis.slice(0, 2)) out.push({ id: 'dis' + e.year, kind: 'disaster', cls: 'warn', t1: 'Disaster', t2: e.text, body: 'Fly there to see the damage. Treasuries rebuild walls and works.', act: () => { seen.ack.add('dis' + e.year + e.loc); if (e.loc >= 0) { const [lon, lat] = placeOf(e.loc); mapcam.flyTo(lon, lat, Math.max(viewDist(e.loc), 0.0012)); select(e.loc); } } });
@@ -356,13 +365,14 @@
     { const short = MARKET.shortages(); const fix = { cloth: ['weaver', 'Your people lack clothing: raise a Weaving house'], wares: ['workshop', 'Your people lack wares: raise Workshops'], comfort: ['brewery', 'Your people have little to drink: raise a Brewery'], arms: ['smithy', 'Your army lacks arms: raise a Smithy'], ships: ['shipyard', 'Your harbours lack ships: raise a Shipyard'], food: ['granary', 'Food runs short in bad years: raise a Granary'] };
       for (const [C] of short) { const f = fix[C.key]; if (!f) continue; const need = sim.needFor(f[0], c.capital); if (need && need.era <= c.era && !seen.ack.has('learn' + need.key)) return { text: `${C.name}: your people go short. ${need.name} would mend it`, know: need.key, ack: 'learn' + need.key }; if (can(f[0]) && towns.concat(sim.settlementsOf(c.id)).some(i => !sim.cannot(f[0], i))) return { text: f[1], tool: f[0] }; }
       if (short.length && !seen.ack.has('short' + short[0][0].key + Math.floor(sim.year / 40))) return { text: `${short[0][0].name}: your people have ${Math.round(short[0][1] * 100)}% of what they want. See the market`, market: short[0][0].key }; }
+    { const g = GOV.tile(); const yb3 = Math.floor(sim.year / (TURN_YEARS[c.era] * 3)); if (g && !g.reform && g.auth >= 60 && !seen.ack.has('auth' + yb3)) { const b = sim.rule.best(c.id, c, false); if (b) return { text: `Your word carries: ${b.x.name} is within your authority`, gov: b.x.key, ack: 'auth' + yb3 }; } }
     if (can('farm') && c.wealth > sim.costOf('farm') * 4 && sim.settlementsOf(c.id).some(i => !sim.cannot('farm', i))) return { text: 'Treasury is full: lay out Farms around a town', tool: 'farm' };
     if (c.policy.stance !== 'aggressive' && can('settle') && c.wealth > sim.costOf('settle') * 3) return { text: 'You could Expand: settle new land', tool: 'settle' };
     return null;
   }
   function turnLength() { const c = sim && sim.playerCiv(); return TURN_YEARS[c ? c.era : 0]; }
   function snapshotTurn() {
-    const c = sim.playerCiv(); turnRun.start = sim.year; turnRun.seq = sim.evSeq; turnRun.evIdx = sim.worldEvents.length;
+    const c = sim.playerCiv(); turnRun.start = sim.year; turnRun.seq = sim.evSeq; turnRun.evIdx = sim.worldEvents.length; turnRun.rose = c ? sim.rule.ruleOf(c).rose : -1e9;
     turnRun.capital = c ? c.capital : -1; turnRun.era = c ? c.era : 0; turnRun.wars = c ? Object.keys(c.wars).sort().join(',') : '';
     turnRun.townSet = c ? new Set(sim.settlementsOf(c.id).filter(i => sim.level[i] >= 2)) : null; turnRun.towns = turnRun.townSet ? turnRun.townSet.size : 0;
     turnRun.pop0 = c ? sim.popOf[c.id] : 0; turnRun.cells0 = c ? sim.cellsOf[c.id] : 0; turnRun.wealth0 = c ? c.wealth : 0; turnRun.live0 = c ? sim.market.LS[c.id] : 0;
@@ -389,6 +399,7 @@
     // everything logged since the last look (several years can pass between frames)
     const since = turnRun.seq || 0; const recent = c.events.filter(e => (e.seq || 0) > since); turnRun.seq = sim.evSeq;
     if (recent.some(e => /breaks away/.test(e.text))) { endTurn('split'); return; }
+    { const Q = sim.rule.ruleOf(c); if (Q.rose > turnRun.rose) { turnRun.rose = Q.rose; endTurn('rising'); return; } if (Q.demand && Q.demand.since > turnRun.start && !seen.ack.has('demand' + Q.demand.since)) { endTurn('demand'); return; } }
     { const t = TREE.tile(); if (t && t.waiting && recent.some(e => e.type === 'know')) { seen.ack.delete('study'); endTurn('study'); return; } }
     if (recent.some(e => e.type === 'disaster' && !seen.ack.has('dis' + e.year + e.loc))) { endTurn('disaster'); return; }
   }
@@ -401,7 +412,7 @@
     if (!sim) return;
     if (!c) { setState('over', 'Gone', 'Your people are no more · menu', 'gone'); fill.style.strokeDashoffset = '295.3'; return; }
     const av = $('advisor');
-    const softAdvice = () => { av.classList.remove('att'); av.dataset.att = ''; av.dataset.tool = ''; av.dataset.go = ''; av.dataset.ack = ''; av.dataset.market = ''; av.dataset.know = ''; const adv = computeAdvice(); if (adv) { av.hidden = false; $('advisor-text').textContent = adv.text; av.dataset.tool = adv.tool || ''; av.dataset.go = adv.go >= 0 ? adv.go : ''; av.dataset.ack = adv.ack || ''; av.dataset.market = adv.market || ''; av.dataset.know = adv.know || ''; } else av.hidden = true; };
+    const softAdvice = () => { av.classList.remove('att'); av.dataset.att = ''; av.dataset.tool = ''; av.dataset.go = ''; av.dataset.ack = ''; av.dataset.market = ''; av.dataset.know = ''; av.dataset.gov = ''; const adv = computeAdvice(); if (adv) { av.hidden = false; $('advisor-text').textContent = adv.text; av.dataset.tool = adv.tool || ''; av.dataset.go = adv.go >= 0 ? adv.go : ''; av.dataset.ack = adv.ack || ''; av.dataset.market = adv.market || ''; av.dataset.know = adv.know || ''; av.dataset.gov = adv.gov || ''; } else av.hidden = true; };
     if (settings.continuous) {
       setState(paused ? 'advance' : 'running', paused ? 'Play' : 'Pause', '', paused ? 'play' : 'pause'); fill.style.strokeDashoffset = (295.3 * (1 - eraP())).toFixed(1); b.title = paused ? 'Run time (Enter)' : 'Pause (Enter)';
       const q = computeAttention();
@@ -429,7 +440,7 @@
     const c = sim.playerCiv(); const box = $('report'); if (!c) { box.hidden = true; return; }
     const ev = sim.worldEvents.slice(turnRun.evIdx); const mine = ev.filter(e => e.mine).map(e => { e._s = scoreEvent(e); return e; }).sort((a, b) => b._s - a._s).slice(0, 5).sort((a, b) => a.year - b.year); const others = ev.filter(e => !e.mine).map(e => { e._s = scoreEvent(e); return e; }).sort((a, b) => b._s - a._s).slice(0, 3).sort((a, b) => a.year - b.year);
     const list = [...mine, ...others];
-    const why = { war: 'War declared on you', capital: 'Your capital changed', era: 'A new era', stab: 'Unrest', split: 'A province broke away', stopped: 'Stopped early', gone: 'Your people are gone', disaster: 'Disaster strikes your lands', study: 'A discovery: your scholars await your word' }[turnRun.reason] || '';
+    const why = { war: 'War declared on you', capital: 'Your capital changed', era: 'A new era', stab: 'Unrest', split: 'A province broke away', stopped: 'Stopped early', gone: 'Your people are gone', disaster: 'Disaster strikes your lands', study: 'A discovery: your scholars await your word', demand: 'An estate of your realm makes a demand', rising: 'An estate of your realm has risen' }[turnRun.reason] || '';
     $('report-title').textContent = `${sim.fmtYear(turnRun.start)} → ${sim.fmtYear(sim.year)}`;
     const wy = $('report-why'); wy.hidden = !why; wy.textContent = why; wy.className = 'why ' + (turnRun.reason || '');
     // a painted strip for the moment that stopped the clock
@@ -477,14 +488,16 @@
     renderBuild(i);
     if (!c) { $('sel-civ').hidden = true; scrollHint(); return; }
     $('sel-civ').hidden = false; $('sc-name').textContent = sim.fullName(c);
-    $('sc-era').textContent = sim.ERAS[c.era][0]; $('sc-gov').textContent = c.gov + (c.player ? ' · yours' : '');
+    $('sc-era').textContent = sim.ERAS[c.era][0]; $('sc-gov').textContent = sim.govName(c) + (c.player ? ' · yours' : '');
     const wars = Object.keys(c.wars).map(k => sim.civs[+k]).filter(Boolean).map(x => sim.fullName(x)).join(', ');
+    // its laws: for the player's own realm the way to the screen; for another, those that are not the player's
+    const lawsLine = (() => { const mine = sim.playerCiv(); const q = sim.rule.ruleOf(c); if (c === mine) return `<button class="linkish" data-gopen="1">${RULE.CATS.filter(C => q.laws[C.key] !== C.laws[0].key).length} of ${RULE.CATS.length} fields reformed: open the laws</button>`; const mq = mine ? sim.rule.ruleOf(mine) : null; const other = RULE.CATS.map(C => RULE.LAW[q.laws[C.key]]).filter(L => !mq || mq.laws[L.cat] !== L.key); return other.length ? other.slice(0, 3).map(L => `<button class="linkish" data-ggo="${L.key}">${esc(L.name)}</button>`).join(', ') + (other.length > 3 ? ` and ${other.length - 3} more that are not yours` : mq ? ', unlike yours' : '') : 'the same as yours'; })();
     const kn = sim.know; const me0 = sim.playerCiv(); const ahead = []; if (me0 && c !== me0) for (const D of KNOW.LIST) if (kn.has[c.id * kn.ND + D.id] && !kn.has[me0.id * kn.ND + D.id]) ahead.push(D);      // what this realm knows that the player's does not
     $('sc-tiles').innerHTML = `<div class="tile"><span class="micro">People</span><span class="k">${fmtPop(sim.popOf[c.id])}</span><span class="d">${fmtInt(sim.cellsOf[c.id])} regions</span></div><div class="tile"><span class="micro">Strength</span><span class="k">${fmtInt(sim.strength(c))}</span><span class="d">${sim.year < c.army ? 'army raised' : 'no standing army'}${c.era >= 1 ? ` · armed ${Math.round(sim.satOf(c.id, 'arms') * 100)}%` : ''}</span></div><div class="tile"><span class="micro">Stability</span><span class="k ${c.stability < 0.3 ? 'neg' : c.stability < 0.5 ? 'warn' : ''}">${Math.round(c.stability * 100)}%</span><div class="bar"><i style="transform:scaleX(${c.stability.toFixed(2)});background:${c.stability > 0.5 ? 'var(--pos)' : c.stability > 0.3 ? 'var(--warn)' : 'var(--neg)'}"></i></div></div><div class="tile"><span class="micro">Knowledge</span><span class="k">${kn.count[c.id]}</span><span class="d">${c.player ? (kn.cur[c.id] >= 0 ? 'studying ' + esc(KNOW.LIST[kn.cur[c.id]].name) : 'discoveries') : 'discoveries'}</span></div>`;
     renderRuler(c);
     const gs = sim.market.goodsOf(c.id); const GG = sim.GOODS; const living = sim.market.LS[c.id]; const more = Math.max(0, gs.own.length - 8) + Math.max(0, gs.imp.length - 5);
     const tradeHtml = gs.own.length || gs.imp.length ? `<span class="goodchips">${gs.own.slice(0, 8).map(g => goodChip(GG[g])).join('')}${gs.imp.slice(0, 5).map(g => goodChip(GG[g], true)).join('')}${more ? `<span class="hint">+${more} more</span>` : ''}</span><div class="hint" style="margin-top:3px">Its people have ${Math.round(living * 100)}% of what they want. ${c.player ? '<button class="linkish" id="sc-market">Open the market</button>' : 'Dashed: comes from abroad.'}</div>` : '<span class="hint">nothing yet</span>';
-    $('sc-kv').innerHTML = `${c.capital !== i ? `<span class="micro">Capital</span><span>${esc(sim.cellName.get(c.capital) || '—')}</span>` : ''}<span class="micro">Faith</span><span>${esc(c.religion || 'none yet')}</span><span class="micro">Wars</span><span>${esc(wars || 'nobody')}</span><span class="micro">Trade</span><span>${tradeHtml}</span>${me0 && c !== me0 ? `<span class="micro">Knows</span><span>${ahead.length ? ahead.slice(-4).map(D => `<button class="linkish" data-kgo="${D.key}">${esc(D.name)}</button>`).join(', ') + (ahead.length > 4 ? ` and ${ahead.length - 4} more that your people do not` : ', which your people do not') : 'nothing that your people do not'}</span>` : ''}<span class="micro">Founded</span><span class="num">${sim.fmtYear(c.founded)}</span>`;
+    $('sc-kv').innerHTML = `${c.capital !== i ? `<span class="micro">Capital</span><span>${esc(sim.cellName.get(c.capital) || '—')}</span>` : ''}<span class="micro">Faith</span><span>${esc(c.religion || 'none yet')}</span><span class="micro">Wars</span><span>${esc(wars || 'nobody')}</span><span class="micro">Trade</span><span>${tradeHtml}</span>${me0 && c !== me0 ? `<span class="micro">Knows</span><span>${ahead.length ? ahead.slice(-4).map(D => `<button class="linkish" data-kgo="${D.key}">${esc(D.name)}</button>`).join(', ') + (ahead.length > 4 ? ` and ${ahead.length - 4} more that your people do not` : ', which your people do not') : 'nothing that your people do not'}</span>` : ''}<span class="micro">Laws</span><span>${lawsLine}</span><span class="micro">Founded</span><span class="num">${sim.fmtYear(c.founded)}</span>`;
     { const b = $('sc-market'); if (b) b.addEventListener('click', () => MARKET.open('board')); }
     const p = sim.playerCiv(); const acts = $('sc-actions');
     acts.innerHTML = (p && c !== p) ? `<button class="btn ${sim.isAtWar(p, c.id) ? '' : 'danger'}" id="btn-war">${sim.isAtWar(p, c.id) ? 'Offer peace' : 'Declare war'}</button>` : '';
@@ -529,8 +542,8 @@
     host.innerHTML = html;
     host.querySelectorAll('.ol').forEach(el => el.addEventListener('click', () => { const i = +el.dataset.cell; if (i >= 0) { const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, Math.min(mapcam.dist, viewDist(i))); select(i); } }));
   }
-  const FEED_ICON = { war: '<path d="M4 4l16 16M20 4L4 20"/>', ruler: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', faith: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', state: '<path d="M4 20h16M6 20V9l6-5 6 5v11"/>', city: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', know: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>' };
-  function scoreEvent(e) { const base = { war: 3, era: 3, state: 2.2, disaster: 2, know: 1.6, faith: 1.2, city: 1, ruler: 0.4 }[e.type] || 1; const c = e.civ >= 0 ? sim.civs[e.civ] : null; const size = c ? Math.min(2, sim.cellsOf[c.id] / 150) : 1; let near = 0; if (e.loc >= 0) { const [lon, lat] = cellCenter(e.loc); near = 1 - clamp(GEO.distKm(lon, lat, mapcam.lon, mapcam.lat) / 6000, 0, 1); } return base + size + near + (e.mine ? 10 : 0); }
+  const FEED_ICON = { law: '<path d="M4 20h16M5 9h14M12 4l8 5H4zM7 9v11M12 9v11M17 9v11"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', ruler: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', faith: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', state: '<path d="M4 20h16M6 20V9l6-5 6 5v11"/>', city: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', know: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>' };
+  function scoreEvent(e) { const base = { war: 3, era: 3, state: 2.2, disaster: 2, law: 1.8, know: 1.6, faith: 1.2, city: 1, ruler: 0.4 }[e.type] || 1; const c = e.civ >= 0 ? sim.civs[e.civ] : null; const size = c ? Math.min(2, sim.cellsOf[c.id] / 150) : 1; let near = 0; if (e.loc >= 0) { const [lon, lat] = cellCenter(e.loc); near = 1 - clamp(GEO.distKm(lon, lat, mapcam.lon, mapcam.lat) / 6000, 0, 1); } return base + size + near + (e.mine ? 10 : 0); }
   // continuous mode keeps a light live wire of the biggest events as toasts
   let feedIdx = 0, lastFeedAt = 0;
   function pumpFeed(now) {
@@ -589,7 +602,7 @@
   function updateDock() {
     const c = sim.playerCiv();
     for (const t of GODS) { const b = document.querySelector(`.dg[data-tool="${t.id}"]`); if (!b) continue; b.disabled = !c; }
-    if (selected >= 0 && !$('chron').open && !$('menu').open && !$('market').open && !$('know').open && !$('sel-build').hidden) renderBuild(selected);
+    if (selected >= 0 && !$('chron').open && !$('menu').open && !$('market').open && !$('know').open && !$('gov').open && !$('sel-build').hidden) renderBuild(selected);
   }
 
   // ---------- the city build panel: what a town can raise, and where ----------
@@ -792,7 +805,7 @@
   function lighten(rgb) { const m = rgb.match(/\d+/g); if (!m) return '#fff'; const [r, g, b] = m.map(Number); return `rgb(${Math.round(r * 0.5 + 255 * 0.5)},${Math.round(g * 0.5 + 255 * 0.5)},${Math.round(b * 0.5 + 255 * 0.5)})`; }
 
   // ---------- chronicle screen ----------
-  const LOGF = [['all', 'All'], ['mine', 'Mine'], ['war', 'Wars'], ['state', 'States'], ['era', 'Eras'], ['know', 'Knowledge'], ['faith', 'Faith'], ['disaster', 'Disasters'], ['ruler', 'Rulers']];
+  const LOGF = [['all', 'All'], ['mine', 'Mine'], ['war', 'Wars'], ['state', 'States'], ['law', 'Laws'], ['era', 'Eras'], ['know', 'Knowledge'], ['faith', 'Faith'], ['disaster', 'Disasters'], ['ruler', 'Rulers']];
   let logFilter = 'all';
   function openChronicle(tab) {
     const dlg = $('chron'); if (!dlg.open) dlg.showModal();
@@ -831,7 +844,7 @@
   async function writeChronicle() {
     if (!sim || selectedCiv < 0 || !sim.civs[selectedCiv]) return;
     const c = sim.civs[selectedCiv]; const out = $('chronicle');
-    const facts = [`State: ${sim.fullName(c)} (people called the ${c.name}). Founded ${sim.fmtYear(c.founded)}; it is now ${sim.fmtYear(sim.year)}.`, `Era: ${sim.ERAS[c.era][0]}. Government: ${c.gov}. Capital: ${sim.cellName.get(c.capital) || 'unknown'} at ${sim.describeCell(c.capital)}. Population ${fmtPop(sim.popOf[c.id])}, territory ${sim.cellsOf[c.id]} regions, stability ${Math.round(c.stability * 100)}%.`, `Faith: ${c.religion || 'none'}. Current ruler: ${c.ruler.title} ${c.ruler.name} (since ${sim.fmtYear(c.ruler.since)}). Earlier rulers: ${c.rulers.slice(-8, -1).map(r => r.title + ' ' + r.name).join(', ') || 'lost to memory'}.`, `At war with: ${Object.keys(c.wars).map(k => sim.civs[+k]).filter(Boolean).map(x => sim.fullName(x)).join(', ') || 'nobody'}.`, `Recorded events (oldest first):\n${c.events.slice(-40).map(e => `${sim.fmtYear(e.year)}: ${e.text}`).join('\n')}`].join('\n');
+    const facts = [`State: ${sim.fullName(c)} (people called the ${c.name}). Founded ${sim.fmtYear(c.founded)}; it is now ${sim.fmtYear(sim.year)}.`, `Era: ${sim.ERAS[c.era][0]}. Government: ${sim.govName(c)}. Capital: ${sim.cellName.get(c.capital) || 'unknown'} at ${sim.describeCell(c.capital)}. Population ${fmtPop(sim.popOf[c.id])}, territory ${sim.cellsOf[c.id]} regions, stability ${Math.round(c.stability * 100)}%.`, `Faith: ${c.religion || 'none'}. Current ruler: ${c.ruler.title} ${c.ruler.name} (since ${sim.fmtYear(c.ruler.since)}). Earlier rulers: ${c.rulers.slice(-8, -1).map(r => r.title + ' ' + r.name).join(', ') || 'lost to memory'}.`, `At war with: ${Object.keys(c.wars).map(k => sim.civs[+k]).filter(Boolean).map(x => sim.fullName(x)).join(', ') || 'nobody'}.`, `Recorded events (oldest first):\n${c.events.slice(-40).map(e => `${sim.fmtYear(e.year)}: ${e.text}`).join('\n')}`].join('\n');
     if (!sampleFn) { out.textContent = facts; return; }
     const prompt = `You are the court chronicler of a simulated world called Genesis, which runs on the real Earth from 10,000 BC. Write the history of one state in about 220 words, as a vivid, concrete chronicle: name the rulers, the wars, the faith, the era transitions, what the land is like where its capital stands (use the coordinates to place it on the real Earth and name the real region, river or mountains). Do not invent events that contradict the record, but you may colour them. Plain prose, two or three paragraphs, no headings, no bullet points, no preamble.\n\nRECORD:\n${facts}`;
     chronCtl = new AbortController(); out.textContent = 'The chronicler is thinking…'; $('btn-chronicle').disabled = true; $('btn-chronicle-stop').hidden = false;
@@ -850,16 +863,18 @@
     $('btn-slower').addEventListener('click', () => setSpeedIdx(speedIdx - 1)); $('btn-faster').addEventListener('click', () => setSpeedIdx(speedIdx + 1));
     $('turn').addEventListener('click', onTurnClick);
     attachTip($('turn'), () => { if (!sim || !sim.playerCiv()) return ''; if (turnRun.active) return '<b>Time is running</b>Click to stop early.'; const q = computeAttention(); if (q.length) return `<b>${esc(q[0].t1)}</b>${esc(q[0].body || q[0].t2)}<div class="hint">Click to deal with it${q.length > 1 ? `; ${q.length - 1} more after this` : ''}.</div>`; const c = sim.playerCiv(); const next = sim.ERAS[c.era + 1]; return `<b>Advance ${turnLength()} years</b>To ${sim.fmtYear(sim.year + turnLength())}. The world moves while you watch, and stops if war, revolt or a new era needs you.<div class="hint">${next ? `Ring: ${next[0]} at ${next[1] * 100}% knowledge (now ${(c.tech * 100).toFixed(1)}%).` : ''}</div>`; });
-    $('advisor').addEventListener('click', () => { const av = $('advisor'); const t = av.dataset.tool; if (av.dataset.ack) seen.ack.add(av.dataset.ack); if (av.dataset.att) { const q = computeAttention(); if (q.length) q[0].act(); updateTurnButton(); return; } if (av.dataset.go) { const i = +av.dataset.go; const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, viewDist(i)); select(i); updateTurnButton(); return; } if (av.dataset.know) { TREE.open('tree', av.dataset.know); updateTurnButton(); return; } if (av.dataset.market) { seen.ack.add('short' + av.dataset.market + Math.floor(sim.year / 40)); MARKET.open('ledger'); updateTurnButton(); return; } if (!t) { onTurnClick(); return; } openBuildFor(t); });
+    $('advisor').addEventListener('click', () => { const av = $('advisor'); const t = av.dataset.tool; if (av.dataset.ack) seen.ack.add(av.dataset.ack); if (av.dataset.att) { const q = computeAttention(); if (q.length) q[0].act(); updateTurnButton(); return; } if (av.dataset.go) { const i = +av.dataset.go; const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, viewDist(i)); select(i); updateTurnButton(); return; } if (av.dataset.know) { TREE.open('tree', av.dataset.know); updateTurnButton(); return; } if (av.dataset.gov) { GOV.open(null, av.dataset.gov); updateTurnButton(); return; } if (av.dataset.market) { seen.ack.add('short' + av.dataset.market + Math.floor(sim.year / 40)); MARKET.open('ledger'); updateTurnButton(); return; } if (!t) { onTurnClick(); return; } openBuildFor(t); });
     $('report-close').addEventListener('click', () => { $('report').hidden = true; }); $('report-open').addEventListener('click', () => openChronicle('log'));
     $('l-build').addEventListener('click', () => { const on = document.body.classList.toggle('dockopen'); $('l-build').classList.toggle('on', on); if (!on) deselectTool(); });
     $('l-expand').addEventListener('click', () => setTool('settle'));
     $('l-city').addEventListener('click', () => openCity());
     MARKET.init({ sim: () => sim, fmtInt, fmtPop, toast, turnYears: () => turnLength(), cellDist: (a, b) => sim.cellDist(a, b), afterAct: () => refreshAll(true), flyTo: (i, d) => { const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, d || viewDist(i), { duration: 1.8 }); select(i); } });
     $('l-market').addEventListener('click', () => { if (sim && mode === 'play') MARKET.open(); });
-    TREE.init({ sim: () => sim, toast, afterAct: () => refreshAll(true), openGood: (g) => MARKET.open('board', g) });
+    TREE.init({ sim: () => sim, toast, afterAct: () => refreshAll(true), openGood: (g) => MARKET.open('board', g), openLaw: (key) => GOV.open(null, key) });
     $('l-know').addEventListener('click', () => { if (sim && mode === 'play') TREE.open(); });
-    $('left').addEventListener('click', (e) => { const ch = e.target.closest('.goodchip[data-good]'); if (ch && mode === 'play') MARKET.open('board', +ch.dataset.good); const kg = e.target.closest('[data-kgo]'); if (kg && mode === 'play') TREE.open('tree', kg.dataset.kgo); });
+    GOV.init({ sim: () => sim, toast, afterAct: () => refreshAll(true), openTree: (key) => TREE.open('tree', key) });
+    $('l-gov').addEventListener('click', () => { if (sim && mode === 'play' && sim.playerCiv()) GOV.open(); });
+    $('left').addEventListener('click', (e) => { const ch = e.target.closest('.goodchip[data-good]'); if (ch && mode === 'play') MARKET.open('board', +ch.dataset.good); const kg = e.target.closest('[data-kgo]'); if (kg && mode === 'play') TREE.open('tree', kg.dataset.kgo); const go = e.target.closest('[data-gopen]'); if (go && mode === 'play') GOV.open('laws'); const gg = e.target.closest('[data-ggo]'); if (gg && mode === 'play' && sim.playerCiv()) GOV.open(null, gg.dataset.ggo); });
     $('lensbtn').addEventListener('click', () => { $('lensmenu').hidden = !$('lensmenu').hidden; });
     $('opt-continuous').checked = settings.continuous; $('opt-continuous').addEventListener('change', (e) => { settings.continuous = e.target.checked; if (turnRun.active) endTurn('stopped'); paused = true; applySettings(); updateTurnButton(); updateClock(); });
     attachTip($('date'), () => `<b>${sim.fmtYear(sim.year)}</b>${fmtInt(sim.year + 10000)} years since the first spring.`);
@@ -889,6 +904,8 @@
     document.querySelectorAll('#chron .tabs button').forEach(b => b.addEventListener('click', () => setCTab(b.dataset.ctab)));
     $('v-pol').addEventListener('click', () => { view.political = !view.political; globals.uPolitical.value = view.political ? 1 : 0; $('v-pol').classList.toggle('on', view.political); });
     $('v-soil').addEventListener('click', () => setSoil(!view.soil));
+    // the lens of government: every realm in the colour of the kind of rule it lives under, with a key to the colours
+    $('v-gov').addEventListener('click', () => { view.gov = !view.gov; $('v-gov').classList.toggle('on', view.gov); world.palMode = view.gov ? 'form' : 'realm'; globals.uLens.value = view.gov ? 1 : 0; if (view.gov && !view.political) $('v-pol').click(); world.refreshTextures(); renderGovKey(); });
     $('v-clouds').addEventListener('click', () => { view.clouds = !view.clouds; world.cloudsOn = view.clouds; $('v-clouds').classList.toggle('on', view.clouds); });
     $('v-labels').addEventListener('click', () => { view.labels = !view.labels; $('v-labels').classList.toggle('on', view.labels); });
     $('v-trade').addEventListener('click', () => { view.trade = !view.trade; $('v-trade').classList.toggle('on', view.trade); if (view.trade && sim && sim.playerCiv() && !sim.market.partners(sim.playerCiv().id).some(p => p.v > 0)) toast('No merchants reach you yet: touch another realm, or build a harbour'); });
@@ -899,12 +916,13 @@
       if (mode === 'intro') { homeKey(e); return; }
       if ($('market').open) { if (e.key === 'm' || e.key === 'M') MARKET.close(); return; }      // (the market has the keyboard while it is open; Esc closes it, as it does any dialog)
       if ($('know').open) { if (e.key === 'k' || e.key === 'K') TREE.close(); return; }
+      if ($('gov').open) { if (e.key === 'v' || e.key === 'V') GOV.close(); return; }
       if (e.code === 'Space' || e.key === 'Enter') { if ($('chron').open || $('menu').open) return; e.preventDefault(); onTurnClick(); }
       else if (e.key === '+' || e.key === '=') { if (settings.continuous) setSpeedIdx(speedIdx + 1); } else if (e.key === '-' || e.key === '_') { if (settings.continuous) setSpeedIdx(speedIdx - 1); }
-      else if (e.key === 'b' || e.key === 'B') { if (mode === 'play') openCity(); } else if (e.key === 'g' || e.key === 'G') $('l-build').click(); else if (e.key === 'r' || e.key === 'R') { if (mode === 'play') openRealm(); } else if (e.key === 'c' || e.key === 'C') { if (mode === 'play') openChronicle('log'); } else if (e.key === 'm' || e.key === 'M') { if (mode === 'play') MARKET.open(); } else if (e.key === 'k' || e.key === 'K') { if (mode === 'play') TREE.open(); }
+      else if (e.key === 'b' || e.key === 'B') { if (mode === 'play') openCity(); } else if (e.key === 'g' || e.key === 'G') $('l-build').click(); else if (e.key === 'r' || e.key === 'R') { if (mode === 'play') openRealm(); } else if (e.key === 'c' || e.key === 'C') { if (mode === 'play') openChronicle('log'); } else if (e.key === 'm' || e.key === 'M') { if (mode === 'play') MARKET.open(); } else if (e.key === 'k' || e.key === 'K') { if (mode === 'play') TREE.open(); } else if (e.key === 'v' || e.key === 'V') { if (mode === 'play' && sim.playerCiv()) GOV.open(); }
       else if (e.key === 'Escape') { if (mapcam.fly) mapcam.fly = null; else if (placing) cancelPlacing(); else if (tool) setTool(null); else if (!$('found').hidden) { $('found').hidden = true; pendingFound = null; } else if ($('chron').open) $('chron').close(); else if ($('menu').open) $('menu').close(); else if (!$('lensmenu').hidden) $('lensmenu').hidden = true; else if (document.body.classList.contains('dockopen')) $('l-build').click(); else if (selected >= 0) deselect(); else if (mode === 'play') openMenu(); }
       else if (e.key === '`') { const d = $('debug'); d.style.display = d.style.display === 'block' ? 'none' : 'block'; }
-      else if (e.key === 'p' || e.key === 'P') $('v-pol').click(); else if (e.key === 'l' || e.key === 'L') $('v-labels').click(); else if (e.key === 't' || e.key === 'T') $('v-trade').click();
+      else if (e.key === 'p' || e.key === 'P') $('v-pol').click(); else if (e.key === 'l' || e.key === 'L') $('v-labels').click(); else if (e.key === 't' || e.key === 'T') $('v-trade').click(); else if (e.key === 'o' || e.key === 'O') $('v-gov').click();
       else if (e.key === 'n' || e.key === 'N') mapcam.tHeading = 0; else if (e.key === 'u' || e.key === 'U') { mapcam.tTilt = 0; mapcam.autoTilt = false; }
       else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
     });
@@ -915,7 +933,12 @@
   }
   function goHome() { const c = sim.playerCiv(); if (!c || c.capital < 0) { toast('No capital yet'); return; } const [lon, lat] = placeOf(c.capital); mapcam.flyTo(lon, lat, viewDist(c.capital), { duration: 2 }); select(c.capital); }
   function openMenu() { $('m-title').textContent = mode === 'intro' ? 'Settings' : 'Menu'; $('m-info').textContent = `Tiles ${terrain.stats.tiles} · imagery packs ${terrain.stats.packsI} · elevation packs ${terrain.stats.packsE} · buildings ${world.buildingCount}`; $('menu').showModal(); }
-  function refreshAll(force) { updateEconomy(); updateTurnButton(); updateClock(); updateDock(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); }
+  function renderGovKey() {
+    const el = $('govkey'); el.hidden = !(view.gov && sim && mode === 'play'); if (el.hidden) return;
+    const n = {}, pp = {}; let pop = 0; for (const c of sim.civs) { if (!c) continue; const k = RULE.FORM[sim.rule.ruleOf(c).gov].kind; n[k] = (n[k] || 0) + 1; pp[k] = (pp[k] || 0) + sim.popOf[c.id]; pop += sim.popOf[c.id]; }
+    el.innerHTML = '<span class="micro">How the world is governed</span>' + Object.keys(RULE.KINDS).map((k) => `<i class="${n[k] ? '' : 'off'}" style="background:${RULE.KINDS[k][1]}"></i><span class="${n[k] ? '' : 'none'}">${RULE.KINDS[k][0]}</span><b>${n[k] ? Math.round(100 * pp[k] / Math.max(1e-9, pop)) + '%' : ''}</b>`).join('');
+  }
+  function refreshAll(force) { updateEconomy(); updateTurnButton(); updateClock(); updateDock(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); if (view.gov) renderGovKey(); }
 
   // ---------- home screen, version, updates ----------
   // version.json is written by the build: what this game is and what changed lately. window.desktop is the app's
@@ -1081,7 +1104,7 @@
     // auto graphics: if the first seconds of play run slowly, drop to Balanced once (the menu can put it back)
     frameEMA += (dt * 1000 - frameEMA) * 0.05;
     if (mode === 'play' && !autoQualityDone) { if (!playSince) playSince = now; else if (now - playSince > 5000) { autoQualityDone = true; if (frameEMA > 34 && settings.quality === 'high' && !settings.qualityPinned) { settings.quality = 'balanced'; $('opt-quality').value = 'balanced'; applySettings(); toast('Graphics set to Balanced for smoother flying (Menu › Graphics to change)'); } } }
-    const modalOpen = $('chron').open || $('menu').open || $('news').open || $('market').open || $('know').open;
+    const modalOpen = $('chron').open || $('menu').open || $('news').open || $('market').open || $('know').open || $('gov').open;
     mapcam.update(dt);
     camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();      // everything this frame (sun in view space, shadow lookup) works from the camera where it now is
     // seasons: one year every four minutes of real time; the sun's declination swings with it and the ground follows
@@ -1108,7 +1131,7 @@
       while (acc >= 1 && performance.now() - t0 < (turnRun.active ? 22 : 12)) { sim.tick(); acc -= 1; n++; tpsCount++; }
       if (acc > 5) acc = 5; texAge += n; uiAge += n;
       if (texAge >= 3 && n > 0) { world.refreshTextures(); texAge = 0; }
-      if (uiAge >= 4) { updateEconomy(); updateClock(); updateDock(); updateTurnButton(); if (selected >= 0 && !modalOpen) updateInspector(false); uiAge = 0; if ($('know').open) TREE.refresh(); if ($('market').open) MARKET.refresh(); }
+      if (uiAge >= 4) { updateEconomy(); updateClock(); updateDock(); updateTurnButton(); if (selected >= 0 && !modalOpen) updateInspector(false); uiAge = 0; if ($('know').open) TREE.refresh(); if ($('gov').open) GOV.refresh(); if ($('market').open) MARKET.refresh(); }
       if (turnRun.active) { checkInterrupts(); if (turnRun.active && sim.year >= turnRun.target) endTurn(''); }
     }
     if (sim && mode === 'play') pumpFeed(now);

@@ -91,7 +91,7 @@
     #else
     uniform sampler2D uDetA, uDetB, uDetC, uDetD;
     #endif
-    uniform vec2 uSimRes, uSel, uHover; uniform float uFertView, uPolitical, uLabelsOn;
+    uniform vec2 uSimRes, uSel, uHover; uniform float uFertView, uPolitical, uLens, uLabelsOn;
     uniform sampler2D uClouds; uniform float uCloudShift, uCloudVis; uniform vec2 uPhaseB, uPhaseRot;
     uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality;
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
@@ -578,8 +578,9 @@
           float band = 1.0 - smoothstep(0.5, 0.98, w);            // inner glow along the frontier
           float polClose = max(closeFade, smoothstep(0.06, 0.006, uCamAlt));   // altitude-driven so far hills do not flip to full tint
           float fillA = (mix(0.18, 0.03, polClose) + mix(0.16, 0.05, polClose) * band) * uPolitical;
+          fillA = mix(fillA, mix(0.7, 0.22, polClose) + 0.12 * band, uLens);      // under a lens the colour is what is being read: the land shows through, no more
           float clip = smoothstep(0.45, 0.65, a) + ice * 0.0;
-          vec3 tinted = lit * 0.55 + pc * 0.5;
+          vec3 tinted = mix(lit * 0.55 + pc * 0.5, lit * 0.42 + pc * 0.66, uLens);
           lit = mix(lit, tinted, inside * fillA * clip);
           vec3 bc = pc * 1.6 + 0.2; bc = mix(bc, vec3(1.0, 0.86, 0.5), isPlayer * (0.55 + 0.45 * sin(uTime * 2.5)));
           bc = mix(bc, vec3(1.0, 0.35, 0.3), atWar * (0.5 + 0.5 * sin(uTime * 6.0)));

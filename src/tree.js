@@ -85,7 +85,8 @@ window.TREE = (function () {
     $('know').addEventListener('click', (e) => {
       const a = e.target.closest('[data-kact]'); if (a) { act(a.dataset.kact, a.dataset.k); return; }
       const j = e.target.closest('[data-kgo]'); if (j) { pick(j.dataset.kgo, true); return; }
-      const g = e.target.closest('[data-good]'); if (g && ctx.openGood) { close(); ctx.openGood(+g.dataset.good); }
+      const g = e.target.closest('[data-good]'); if (g && ctx.openGood) { close(); ctx.openGood(+g.dataset.good); return; }
+      const l = e.target.closest('[data-ggo]'); if (l && ctx.openLaw) { close(); ctx.openLaw(l.dataset.ggo); }
     });
   }
   const isOpen = () => $('know').open;
@@ -165,6 +166,7 @@ window.TREE = (function () {
     if (G.goods) out.push(`Your land can be worked for ${G.goods.map((g) => MARKET.chip(E.GOODS[E.ID[g]])).join(' ')}`);
     if (G.recipes) { const by = new Map(); for (const r of G.recipes) { const R = E.RECIPES.find((x) => x.key === r); const a = by.get(R.out) || []; a.push(R.name); by.set(R.out, a); } for (const [g, names] of by) out.push(`${esc(names.join(', '))} can set to work, making ${MARKET.chip(E.GOODS[g])}`); }
     if (G.can) for (const a of G.can) out.push(CAN[a] || a);
+    if (window.GOV) for (const line of GOV.opensLines(D.key)) out.push(line);
     for (const k of KN().KEYS) if (G[k]) out.push(edgeLine(k, G[k]));
     return out;
   }

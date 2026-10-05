@@ -110,3 +110,9 @@ know         | tools/scenes/know.js | {} | | 16
 know_queue   | tools/scenes/know.js | {learn:['farming','pottery','weaving'],queue:['megaliths','quarrying'],key:'bronze'} | | 16
 know_iron    | tools/scenes/know.js | {years:9000,age:2,key:'iron'} | | 22
 know_stand   | tools/scenes/know.js | {years:9000,tab:'stand'} | | 22
+# --- laws and government: a band's first laws, a medieval realm's, the forms of government, the estates and a demand ---
+laws         | tools/scenes/gov.js | {auth:60,key:'clanland'} | | 16
+laws_medieval | tools/scenes/gov.js | {age:4,years:60,auth:90,key:'standing'} | | 22
+laws_forms   | tools/scenes/gov.js | {age:5,years:40,tab:'form',auth:120,key:'absolute'} | | 22
+laws_estates | tools/scenes/gov.js | {age:4,years:60,tab:'estates',demand:['nobles','fiefs']} | | 22
+laws_lens    | tools/scenes/gov.js | {years:9500,lens:true} | | 26

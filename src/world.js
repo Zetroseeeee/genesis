@@ -71,7 +71,9 @@
         // (green: how far along a people is, for the look of its ground - paving comes with the Classical age, but not where the old ways last)
         sd[j] = light * 255; sd[j + 1] = (c ? (TOWN.styleEra(c.era, TOWN.civCulture(sim, c)) < c.era ? Math.min(c.tech, 0.25) : c.tech) : 0) * 255; sd[j + 2] = c ? Math.round(sim.cultivation(i) * 255 * (sim.level[i] ? 1 : 0.6)) : 0;
       }
-      for (const c of civs) if (c) { const rgb = c.rgb; this.palData[c.id * 4] = rgb[0] * 255; this.palData[c.id * 4 + 1] = rgb[1] * 255; this.palData[c.id * 4 + 2] = rgb[2] * 255; this.palData[c.id * 4 + 3] = 255; }
+      // (each realm in its own colour; or, under the lens of government, in the colour of the kind of rule it lives under)
+      const byForm = this.palMode === 'form' && sim.rule && window.RULE;
+      for (const c of civs) if (c) { const rgb = byForm ? RULE.FORM[sim.rule.ruleOf(c).gov].rgb : c.rgb; this.palData[c.id * 4] = rgb[0] * 255; this.palData[c.id * 4 + 1] = rgb[1] * 255; this.palData[c.id * 4 + 2] = rgb[2] * 255; this.palData[c.id * 4 + 3] = 255; }
       this.ownerTex.needsUpdate = true; this.simTex.needsUpdate = true; this.palTex.needsUpdate = true;
       this.texVersion = (this.texVersion || 0) + 1;
     }

@@ -61,7 +61,16 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   `node tools/know/people.js [seed,seed] [--fit N] [--write]` does the same for how many people there are: the world's
   count against history's (4 million in 10,000 BC, 220 in the year 1, 970 in 1800, 6,140 in 2000), and with `--fit`
   the table of how many a unit of land feeds at each stage of knowledge (`FOOD` in `src/sim.js`, between its marks).
-  Fit the pace first, then the people, then the market's yields (`calibrate.js`): each stands on the one before.
+  One fit moves the world a long way (fewer people learn more slowly, and feed fewer still): take the fit that
+  measures best, not the last. A world keeps the table it was saved under when a refit lowers it (`FOOD_015`,
+  `save().food`): an update must not starve anyone's people.
+  Fit the pace first, then what the ages expect of rule (`tools/rule/norm.js`), then the people, then the market's
+  yields (`calibrate.js`): each stands on the one before.
+- `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
+  government and which laws its people live under, how much power each estate holds and how content it is, how many
+  laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
+  realms of each age get from their rule and writes the table into `src/rule.js` (between its NORM marks): run it
+  twice over two seeds after changing what forms and laws give, who likes them, or how the autopilot chooses.
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
 - `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
@@ -79,6 +88,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | --- | --- | --- |
 | `src/econ.js` | `ECON` | Goods, recipes, wants; where the Earth keeps things; one world's market: prices, workshops, trade between realms |
 | `src/know.js` | `KNOW` | The discoveries (174, in nine ages and six branches), what each opens and gives; one world's knowledge: who knows what, who studies what |
+| `src/rule.js` | `RULE` | Forms of government (24), laws (100 in twelve fields), the seven estates, authority; one world's rule: what every realm has chosen, who holds power in it, reforms, demands, risings |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, biome shader, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
@@ -90,6 +100,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
 | `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
+| `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
 | `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
 | `desktop/updater.js` | | Keeps the game's files current without replacing the app (plain Node, no Electron inside) |
@@ -164,6 +175,48 @@ Conventions that matter:
   can be added; a world saved before knowledge is given what its `tech` is worth, the way the autopilot would have
   learned it. Tests and scenes that set `tech` by hand must teach as well (`teach` in `tools/test_sim.js`,
   `__T.teach` in `tools/testcam.js`).
+- **Rule** (`rule.js`; `sim.rule`). A realm has a form of government and one law in force in each of twelve fields
+  (land, labour, taxes, arms, justice, provinces, standing, faith, trade, learning, speech, care), all on the realm
+  as `civ.rule` (form, laws, authority, the estates' content, the reform under way, a demand) and saved with it.
+  Each form and law stands on discoveries (the knowledge tree's page lists what a discovery opens here), gives
+  factors (`RULE.KEYS`: taxes, customs, an army's cost, what the state spends, stability, food, growth, health,
+  strength, a levy's cost, insight, works' cost, reach, trade, workshops, yields, expansion, breakaway, unrest,
+  hunger) and is liked or hated by some of the seven estates (nobles, priests, merchants, artisans, farmers,
+  soldiers, scholars: their names change with the ages). An estate's power is what the realm is made of (towns,
+  temples, markets, academies, the army's pay) times who holds office under the form, times whose hand each law
+  in force strengthens (`SWAY`: a standing army the soldiers', intendants nobody's but the crown's; so a ruler can
+  cut an estate down law by law before he takes its government away, `rule.sways` says where a share comes from).
+  Its content drifts to what the form, the laws and the times add up to: taxes, hunger, war, luxuries; from the
+  Industrial age the mills (`FACTORY`: workers are hard to content until laws protect them); and, once there are
+  presses anywhere, agitation where the land is other people's and workers have no say (`abroad`, saved as
+  `save().heard`). Content estates give (farmers food, artisans work, merchants trade, scholars insight, nobles and
+  soldiers strength, priests stability), angry ones withhold, demand a law (grant or refuse) and rise; a rising
+  that carries the day changes the government (nobles to what suits them, towns and country to a republic, or to a
+  people's republic once any realm knows how one is run, even where nobody at home does: `civ.rule.brought`), and
+  where a realm is coming apart the army marches on the capital. Every form has **its own ways** (`WAYS`): laws
+  that cost a quarter less under it and that its rulers reach for first.
+  **Authority** is what change costs: it gathers by the turn (`AUTH_TURN`), a law costs 15 to 90 by how much those
+  with power lose by it, a form 40 to 150, and a reform takes about a turn (`RULE.PACE`, which is also the length of
+  a turn: `main.js` takes it from there; everything in rule that happens "now and then" is paced by it). **Rule is
+  measured against the age**, as knowledge is: the simulation reads `rule.f` = what a realm's rule gives (`rule.own`)
+  over what realms of its age usually get (`NORM`, measured by `tools/rule/norm.js`), so the world's numbers stay
+  where they were whatever realms choose, a realm under the laws of its forebears falls behind, and one that
+  reforms well gets ahead; after changing what forms or laws give, measure again. The autopilot reforms by weight
+  (`lawWeight`, `formWeight`: what a later age offers, what those in power want, what the realm is short of, its
+  ruler's leaning, a leaning of the people's own, the form's ways; a ruler who answers to nobody also wants a
+  freer hand and cuts down whichever estate holds a third of the power) and saves up for a change of form. Power is
+  open, inherited or closed (`RULE.kindOf`), and those who hold it one way seldom reform themselves into another
+  unless the ground is giving way (`trouble` in `formWeight`); what was seized seldom outlives the one who seized
+  it (`rule.passes`, at a ruler's death: his heirs make a crown of it, or the old order returns). The player's
+  realm changes its form only by his reform, a rising or the army. `tools/rule/probe.js` prints which forms turn
+  into which: look at it after touching any of this, then measure the norms again. A people begins as a band of
+  kin under the first law of every field; a breakaway keeps its parent's laws, and its form unless that is too
+  grand for a province; a world saved before this is given the form its old name says and the laws of its age
+  (`rule.settle`). Realm names and rulers' titles come from the form, in the
+  people's tongue (`TONGUE`). Tests and scenes that set `tech` by hand give other realms the laws of their age
+  through `__T.teach` (the player's own only when asked). The screen is `gov.js` (V); the lens of government (O)
+  paints realms in the colour of the kind of rule they live under (`RULE.KINDS`; `world.palMode = 'form'`, and
+  `uLens` makes the ground shader's fill strong enough to read), with a key above the minimap.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

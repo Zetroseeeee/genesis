@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -60,7 +60,7 @@ for (const [seed, YEARS] of [[7, 12000], [1234, 4000], [99991, 4000]]) {
   for (let y = 0; y < YEARS; y++) { const a = Date.now(); sim.tick(); worst = Math.max(worst, Date.now() - a); if (y % 2000 === 1999) invariants(sim, `seed ${seed} year ${sim.year}`); }
   const dt = Date.now() - t1; const last = sim.history[sim.history.length - 1];
   log(`   seed ${seed}: ${dt} ms (${(dt / YEARS).toFixed(2)} ms/yr, worst ${worst} ms) · ${sim.year} · civs ${sim.st.civCount} · people ${last ? Math.round(last.pop + last.wild) : '?'}k · ruins ${sim.ruins.size} · events ${sim.worldEvents.length}`);
-  check(dt / YEARS < 12, `seed ${seed}: too slow (${(dt / YEARS).toFixed(2)} ms/yr)`);
+  check(dt / YEARS < 13, `seed ${seed}: too slow (${(dt / YEARS).toFixed(2)} ms/yr)`);      // (11.5 to 12 here since every realm has laws and estates; the same run measures a part in twenty apart from one time to the next)
   check(sim.st.civCount > 5, `seed ${seed}: world died out (${sim.st.civCount} civs)`);
   const best = Math.max(...sim.civs.filter(c => c).map(c => c.tech));
   if (YEARS >= 12000) check(best > 0.5, `seed ${seed}: nobody past the Renaissance by 2000 AD (best tech ${best.toFixed(2)})`);
@@ -416,6 +416,114 @@ log('9. knowledge');
   // speed
   { const sim4 = createSim(wd, 12); for (let n = 0; n < 40; n++) sim4.spawnTribe(sim4.LI[Math.floor(sim4.rnd() * sim4.LI.length)], {}); for (const cv of sim4.civs) if (cv) { cv.tech = 0.5; cv.era = sim4.eraOf(0.5); } for (let y = 0; y < 300; y++) sim4.tick(); const k4 = sim4.know; const st0 = k4.step; let tk = 0, nk = 0; k4.step = (a, b, g) => { const t = process.hrtime.bigint(); st0(a, b, g); tk += Number(process.hrtime.bigint() - t) / 1e6; nk++; };
     for (let y = 0; y < 200; y++) sim4.tick(); log(`   knowledge takes ${(tk / 200).toFixed(3)} ms a year for ${sim4.st.civCount} realms`); check(tk / 200 < 1.5, `knowledge is quick enough (${(tk / 200).toFixed(3)} ms a year)`); }
+}
+}
+if (want(10)) {
+// ---------- 10. rule: forms of government, laws, estates, authority ----------
+log('10. laws and government');
+{
+  const R = window.RULE, KN = window.KNOW; R.age();
+  // the tables hang together
+  check(R.FORMS.length >= 20 && R.LAWS.length >= 90 && R.CATS.length === 12 && R.ESTATES.length === 7, `${R.FORMS.length} forms of government, ${R.LAWS.length} laws in ${R.CATS.length} fields, ${R.ESTATES.length} estates`);
+  check(R.CATS.every(C => C.laws.length >= 5 && C.laws[0].need.length === 0 && !C.laws[0].minEra && C.laws[0].first), 'every field has at least five laws, and the first asks nothing');
+  check(R.FORMS[0].key === 'band' && R.FORMS[0].need.length === 0, 'a people begins as a band');
+  { const all = R.FORMS.concat(R.LAWS); check(new Set(all.map(x => x.key)).size === all.length && new Set(all.map(x => x.name)).size === all.length, 'every form and law has a key and a name of its own');
+    check(all.every(x => x.text && x.text.length > 20 && x.text.length < 200), 'and a line about it');
+    check(all.every(x => x.need.every(k => KN.ID[k] !== undefined) && x.era >= 0 && x.era <= 8), 'each stands on real discoveries, and belongs to an age');
+    const idle = R.LAWS.filter(L => !L.first && !Object.keys(L.gives).length).map(L => L.key); check(idle.length === 0, `every law but the first of its field changes something (${idle.join(', ') || 'none idle'})`);
+    const perEra = new Array(9).fill(0); for (const x of all) perEra[x.era]++; check(perEra.every(n => n >= 6), `every age opens forms and laws (${perEra.join(', ')} by age)`);
+    check(R.ESTATES.every(E => E.names.length === 9 && R.K[E.lever] !== undefined), 'every estate has a name in every age and something it gives');
+    const swayed = R.LAWS.filter(L => L.swayed).length, wayless = R.FORMS.filter(F => !F.ways.length).map(F => F.key); check(swayed > 50 && R.LAWS.every(L => L.sway.length === R.NE && L.sway.every(v => v > 0.2 && v < 2)) && R.CATS.every(C => !C.laws[0].swayed), `${swayed} laws put power in some hands and take it from others (the first of each field in nobody's)`);
+    check(wayless.join() === 'band' && R.FORMS.every(F => F.ways.every(L => F.way[L.id] === 1 && L.wayOf.includes(F))), 'every form but the band of kin has ways of its own');
+    check(R.NORM && R.KEYS.every(key => R.NORM[key] && R.NORM[key].length === 9 && R.NORM[key].every(v => isFinite(v))), 'what each age expects of rule has been measured for every key');
+    const st = KN.LIST.filter(D => KN.BRANCHES[D.branch].key === 'state' && !R.opens(D.key).length).map(D => D.key); log(`   discoveries of the state that open no form or law yet: ${st.join(', ') || 'none'}`); check(st.length <= 2, 'nearly every discovery of the state opens a form or a law'); }
+  // a new people
+  const sim = createSim(wd, 11); const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Lawgivers', null); for (let n = 0; n < 25; n++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {}); sim.recount();
+  const k = sim.rule, Q = k.ruleOf(c), NE = R.NE;
+  check(Q.gov === 'band' && c.gov === 'band' && R.CATS.every(C => Q.laws[C.key] === C.laws[0].key) && Q.auth === 20 && Q.mood.length === NE && !Q.reform && !Q.demand, 'a new people is a band of kin under its first laws, with a little authority');
+  check(sim.fullName(c) === 'the Lawgivers people' && c.ruler.title === 'Elder', `it is called ${sim.fullName(c)}, under ${c.ruler.title} ${c.ruler.name}`);
+  { sim.tick(); let sum = 0; for (let e = 0; e < NE; e++) sum += k.power[c.id * NE + e]; check(Math.abs(sum - 1) < 1e-5, `the estates' power is shared out whole (${sum.toFixed(4)})`); check(k.power[c.id * NE + R.EK.farmers] > 0.35, `and a band is mostly its farmers (${Math.round(k.power[c.id * NE + R.EK.farmers] * 100)}% of power)`); }
+  // what it cannot have yet, and why
+  { const w = k.lacks(c.id, c, R.FORM.chiefdom); check(w && w.know === 'chiefs', 'a chiefdom needs chieftains'); const why = k.begin(c.id, c, 'chiefdom'); check(/Needs Chieftains/.test(why || ''), 'and says so: ' + why);
+    check(k.lacks(c.id, c, R.FORM.empire) !== null && k.lacks(c.id, c, R.LAW.income) !== null && k.begin(c.id, c, 'nonsense') !== null, 'empires and income tax are a long way off'); }
+  // a law: authority, years, then in force
+  teach(sim, c, 0);
+  { const L = R.LAW.clanland; check(k.lacks(c.id, c, L) === null, 'with chieftains known, clan land can be had');
+    const cost = k.costOf(c.id, c, L), n = k.yearsOf(c, L); check(cost >= 15 && cost <= 90 && n === 120, `it would cost ${cost} authority and take ${n} years`);
+    Q.auth = cost - 1; check(/authority/.test(k.begin(c.id, c, 'clanland') || ''), 'not without the authority'); Q.auth = cost + 5; check(k.begin(c.id, c, 'clanland') === null && Math.abs(Q.auth - 5) < 1e-9 && Q.reform && Q.reform.key === 'clanland', 'with it, the reform begins and the authority is spent');
+    check(/already under way/.test(k.begin(c.id, c, 'bloodprice') || ''), 'one reform at a time'); check(/Already in force/.test(k.begin(c.id, c, 'commons') || '') || /under way/.test(k.begin(c.id, c, 'commons') || ''), 'and not what is in force already');
+    const y0 = sim.year; for (let y = 0; y <= n; y++) sim.tick(); check(Q.laws.land === 'clanland' && !Q.reform && Q.at.land > y0, `after its years it is in force (${sim.fmtYear(Q.at.land)})`);
+    check(c.events.some(e => e.type === 'law' && /Land of the clans/.test(e.text)), 'and the chronicle says so');
+    const again = k.costOf(c.id, c, R.LAW.commons); for (let y = 0; y < 2 * R.PACE[0] + 5; y++) sim.tick(); const later = k.costOf(c.id, c, R.LAW.commons); check(again > later, `a field changed again at once costs more (${again} authority against ${later} later)`);
+    Q.auth = 100; check(k.begin(c.id, c, 'bloodprice') === null, 'another reform can follow'); k.cancel(c); check(!Q.reform && Q.auth > 100 - k.costOf(c.id, c, R.LAW.bloodprice), 'and can be given up (a part of the authority comes back)'); }
+  // a form of government
+  { Q.auth = R.AUTH_MAX; const before = sim.fullName(c); check(k.begin(c.id, c, 'chiefdom') === null, 'a chiefdom is proclaimed'); const n = k.yearsOf(c, R.FORM.chiefdom); for (let y = 0; y <= n; y++) sim.tick();
+    check(Q.gov === 'chiefdom' && c.gov === 'chiefdom' && sim.fullName(c) !== before && /Chief|Jarl|Sheikh|Ariki/.test(c.ruler.title) && sim.govName(c) === 'Chiefdom', `after ${n} years ${before} is ${sim.fullName(c)}, under ${c.ruler.title} ${c.ruler.name}`);
+    check(c.events.some(e => e.type === 'state' && /become a chiefdom/.test(e.text)), 'and the chronicle says so: ' + (c.events.filter(e => e.type === 'state').map(e => e.text).pop() || '')); check(k.succession(c) === 'blood', 'its rulers now follow by blood'); }
+  // names in a people's own tongue
+  check(k.fullName({ name: 'Altai', style: 6 }, 'kingdom') === 'Altai Khanate' && k.fullName({ name: 'Han', style: 3 }, 'empire') === 'Great Han' && k.fullName({ name: 'Roma', style: 0 }, 'republic') === 'Republic of Roma' && k.naming({ name: 'x', style: 9 }, 'kingdom').titles[0] === 'Raja', 'realms and rulers are named in their own tongue (Altai Khanate, Great Han, a Raja)');
+  // laws put power in some hands; a form's own ways come easier
+  { const e = R.EK.nobles, at = (L) => { k.setLaw(c.id, c, L, 'quiet'); k.powers(c.id, c, Q); return k.power[c.id * NE + e]; }; const was = Q.laws.land; const p0 = at(R.LAW.commons), p1 = at(R.LAW.clanland); const src = k.sways(c, e);
+    let sum = 0; for (let x = 0; x < NE; x++) sum += k.power[c.id * NE + x]; check(p1 > p0 * 1.08 && Math.abs(sum - 1) < 1e-5, `clan land puts power in the hands of the clan heads (${Math.round(p0 * 100)}% of it on common land, ${Math.round(p1 * 100)}% under clan land)`);
+    check(src.some(r => r[0] === 'Land of the clans' && Math.abs(r[1] - 1.15) < 1e-3) && src.some(r => r[0] === 'Chiefdom' && r[1] > 1), 'and the page can say where an estate\'s power comes from: ' + src.map(r => r[0] + ' x' + (+r[1].toFixed(2))).join(', ')); at(R.LAW[was]);
+    const L = R.LAW.ancestors; k.setForm(c.id, c, R.FORM.band, 'quiet'); k.powers(c.id, c, Q); const dear = k.costOf(c.id, c, L); k.setForm(c.id, c, R.FORM.chiefdom, 'quiet'); k.powers(c.id, c, Q); const cheap = k.costOf(c.id, c, L);
+    check(R.FORM.chiefdom.way[L.id] === 1 && cheap < dear && cheap <= Math.ceil(dear * 0.9), `a chiefdom's own ways come easier to it (${L.name}: ${cheap} authority, ${dear} for a band)`); }
+  // the estates: a law they hate, a demand, a rising
+  { const e = R.EK.farmers; k.setLaw(c.id, c, R.LAW.commons, 'quiet'); const h1 = k.heading(c.id, c, e); k.setLaw(c.id, c, R.LAW.clanland, 'quiet'); const h2 = k.heading(c.id, c, e); check(h2 < h1 - 0.05, `farmers are less content under clan land than on common land (heading for ${h2.toFixed(2)}, not ${h1.toFixed(2)})`);
+    for (let y = 0; y < 600; y++) sim.tick(); check(Math.abs(Q.mood[e] - k.heading(c.id, c, e)) < 0.06, `and in time that is how content they are (${Q.mood[e].toFixed(2)})`);
+    const why = k.reasons(c.id, c, e); check(why.some(r => r[0] === 'Land of the clans' && r[1] < 0), 'the reasons name the law');
+    const a0 = Q.auth = 50; Q.demand = { e: R.EK.nobles, key: 'bloodprice', since: sim.year, until: sim.year + 400 }; k.refuse(c.id, c, false); check(!Q.demand && Q.bump[R.EK.nobles] < -0.05 && Q.auth > a0, 'a demand refused is remembered, and the ruler stands the taller for it');
+    Q.demand = { e: R.EK.nobles, key: 'bloodprice', since: sim.year, until: sim.year + 400 }; k.grant(c.id, c); check(!Q.demand && Q.laws.justice === 'bloodprice' && Q.bump[R.EK.nobles] > 0, 'a demand granted is law at once, and they are glad of it');
+    Q.demand = { e: R.EK.nobles, key: 'tribute', since: sim.year, until: sim.year + 2 }; for (let y = 0; y < 4; y++) sim.tick(); check(!Q.demand && Q.laws.tax !== 'tribute', 'a demand left unanswered lapses as a refusal');
+    c.stability = 0.9; const n0 = k.stats.risings[R.EK.artisans]; k.rising(c.id, c, R.EK.artisans); check(c.stability < 0.8 && k.stats.risings[R.EK.artisans] === n0 + 1 && c.events.some(ev => ev.type === 'law' && /Riots|down their tools/.test(ev.text)) && Q.rose === sim.year, `a rising shakes the realm (stability ${c.stability.toFixed(2)})`);
+    const w = k.wish(c.id, c, R.EK.farmers); check(w && w.likes[R.EK.farmers] > R.LAW[Q.laws[w.cat]].likes[R.EK.farmers], `an estate knows what it would like (farmers: ${w && w.name})`); }
+  // what the page reads
+  { const sp = sim.stabilityParts(c); let sum = 1; for (const key in sp) if (key !== 'target') sum += sp[key]; check(Math.abs(sum - sp.target) < 1e-9 && isFinite(sp.rule), `stability's parts add up to where it is heading (${sp.target.toFixed(2)})`);
+    const ip = sim.incomeParts(c); check(isFinite(ip.state) && Math.abs(ip.taxes + ip.ports + ip.markets + ip.mines + ip.living + ip.customs - ip.upkeep - ip.scholars - ip.state - ip.net) < 1e-9, 'and the ledger has what the laws spend'); const inc = c.income; sim.tick(); check(Math.abs(sim.incomeParts(c).net - c.income) < Math.max(0.02, Math.abs(c.income) * 0.02), `the ledger's sum is the year's income (${sim.incomeParts(c).net.toFixed(2)} and ${c.income.toFixed(2)})`); }
+  // the autopilot's world
+  while (sim.year < -2500) sim.tick();
+  { let n = 0, changed = 0, bad = 0, badF = 0, badP = 0, unknown = 0; const forms = new Set();
+    for (const cv of sim.civs) { if (!cv) continue; n++; const q = k.ruleOf(cv); forms.add(q.gov); let d = 0; for (const C of R.CATS) if (q.laws[C.key] !== C.laws[0].key) d++; if (d && !cv.player) changed++;
+      if (!R.FORM[q.gov] || cv.gov !== q.gov || R.CATS.some(C => !R.LAW[q.laws[C.key]] || R.LAW[q.laws[C.key]].cat !== C.key) || !(q.auth >= 0 && q.auth <= R.AUTH_MAX) || q.mood.some(m => !(m >= 0 && m <= 1))) bad++;
+      if (!k.known(cv.id, R.FORM[q.gov]) || R.CATS.some(C => !k.known(cv.id, R.LAW[q.laws[C.key]]))) unknown++;
+      for (let q2 = 0; q2 < R.NK; q2++) { const v = k.f[cv.id * R.NK + q2]; if (!isFinite(v) || (R.ADDED[R.KEYS[q2]] ? Math.abs(v) > 0.8 : v < 0.15 || v > 4)) badF++; }
+      let ps = 0; for (let e = 0; e < NE; e++) ps += k.power[cv.id * NE + e]; if (Math.abs(ps - 1) > 1e-4) badP++; }
+    check(bad === 0 && badF === 0 && badP === 0, `every realm's rule is sound in ${sim.fmtYear(sim.year)} (${bad} with a bad form, law, authority or mood; ${badF} factors out of bounds; ${badP} with power not shared out whole)`);
+    check(unknown === 0, `nobody holds a form or a law it does not know how to have (${unknown})`);
+    check(forms.size >= 4 && changed > n * 0.5 && k.stats.laws > 100, `the autopilot has reformed: ${forms.size} forms in use (${[...forms].join(', ')}), ${changed} of ${n} realms with laws of their own making, ${k.stats.laws} laws passed and ${k.stats.forms} changes of form`);
+    check(k.stats.demands > 0 && k.stats.granted + k.stats.refused > 0, `estates have made demands (${k.stats.demands}: ${k.stats.granted} granted, ${k.stats.refused} refused)`); log(`   risings so far: ${k.stats.risings.map((v, e) => v ? R.ESTATES[e].key + ' ' + v : '').filter(Boolean).join(', ') || 'none'}`);
+    // rule is measured against the age: the world as a whole is level with it (what feeds people by people, what holds a realm together by the usual realm)
+    const byP = ['food', 'work', 'trade', 'grow'], byR = ['tax', 'strength', 'research', 'reach'], m = {}; let pw = 0, rw = 0, st = 0; for (const key of byP.concat(byR)) m[key] = 0;
+    for (const cv of sim.civs) { if (!cv || cv.player) continue; const P = sim.popOf[cv.id], q = Math.sqrt(P); pw += P; rw += q; st += q * k.f[cv.id * R.NK + R.K.stab]; for (const key of byP) m[key] += P * k.f[cv.id * R.NK + R.K[key]]; for (const key of byR) m[key] += q * k.f[cv.id * R.NK + R.K[key]]; }
+    for (const key of byP) m[key] /= pw; for (const key of byR) m[key] /= rw; st /= rw;
+    check(byP.concat(byR).every(key => m[key] > 0.85 && m[key] < 1.18) && Math.abs(st) < 0.08, `the world's rule is level with its age (${byP.concat(byR).map(key => key + ' ' + m[key].toFixed(2)).join(', ')}, stability ${(st >= 0 ? '+' : '') + st.toFixed(2)}): measure again with tools/rule/norm.js if not`); }
+  // the mills; what was seized passes at a death; a doctrine from abroad
+  { const big = sim.civs.filter(cv => cv && !cv.player && sim.cellsOf[cv.id] > 20).sort((a, b) => sim.urban[b.id] / sim.popOf[b.id] - sim.urban[a.id] / sim.popOf[a.id]);
+    const cv = big[0], era0 = cv.era; cv.era = 6; const mills = k.times(cv.id, cv, R.EK.artisans).find(r => /mills/.test(r[0])); const h6 = k.heading(cv.id, cv, R.EK.artisans); cv.era = era0; const h0 = k.heading(cv.id, cv, R.EK.artisans);
+    check(R.FACTORY[6] > 0.2 && mills && mills[1] < -0.05 && h6 < h0 - 0.03, `in the age of the mills those who work them are harder to content (${R.estateName(R.EK.artisans, 6)} of ${cv.name}: heading for ${h6.toFixed(2)}, not ${h0.toFixed(2)})`);
+    let passed = null; for (const t of big.slice(1, 9)) { if (!k.known(t.id, R.FORM.kingdom)) continue; const q = k.ruleOf(t); q.reform = null; k.setForm(t.id, t, R.FORM.tyranny, 'quiet'); for (let n = 0; n < 60 && q.gov === 'tyranny'; n++) k.passes(t.id, t); if (q.gov !== 'tyranny') { passed = t; break; } }
+    check(passed && R.kindOf(R.FORM[k.ruleOf(passed).gov]) !== 2 && passed.gov === k.ruleOf(passed).gov && !k.lacks(passed.id, passed, R.FORM[passed.gov]), `what was seized seldom outlives the one who seized it (a tyranny of the ${passed && passed.name} becomes a ${passed && R.FORM[passed.gov].name.toLowerCase()} at his death)`);
+    const p = sim.playerCiv(); k.setForm(p.id, p, R.FORM.tyranny, 'quiet'); let own = false; for (let n = 0; n < 40; n++) own = own || k.passes(p.id, p); check(!own && k.ruleOf(p).gov === 'tyranny', 'but the player\'s realm is his own to change'); k.setForm(p.id, p, R.FORM.chiefdom, 'quiet');
+    const t = big[9] || big[big.length - 1], q = k.ruleOf(t), e0 = t.era, heard = k.abroad.peoples; check(!!k.lacks(t.id, t, R.FORM.peoples), 'nobody in this age knows how a people\'s republic is run'); k.abroad.peoples = true; t.era = 6;
+    for (let n = 0; n < 80 && q.gov !== 'peoples'; n++) { t.stability = 0.3; k.rising(t.id, t, R.EK.artisans); } t.era = e0; t.stability = 0.8;
+    check(q.gov === 'peoples' && q.brought === 'peoples' && !k.lacks(t.id, t, R.FORM.peoples) && k.known(t.id, R.FORM.peoples) && !!k.lacks(t.id, t, R.LAW.planned), `once the world has heard of it, those who rise can proclaim one (${sim.fullName(t)}): the doctrine travels ahead of the knowledge, its laws do not`); k.abroad.peoples = heard; }
+  // save and load
+  { for (const cv of sim.civs) if (cv) { k.powers(cv.id, cv, k.ruleOf(cv)); k.refresh(cv.id, cv); }      // (as a loaded world reckons them: from the realm as it stands, not as it stood when its year was stepped)
+    const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, s.seed || 1); sim2.load(s); const k2 = sim2.rule; let diff = 0, df = 0, dfAll = 0, same = 0, all = 0;
+    // (a save keeps each region's people to a part in a hundred, and a loaded world counts its towns afresh from them: a town here and there has crossed a line. Where the towns are the same, so must the factors be, to that grain)
+    for (const cv of sim.civs) { if (!cv) continue; const c = cv.id, a = k.ruleOf(cv), b = k2.ruleOf(sim2.civs[c]); if (a.gov !== b.gov || JSON.stringify(a.laws) !== JSON.stringify(b.laws) || Math.abs(a.auth - b.auth) > 1e-9 || JSON.stringify(a.mood) !== JSON.stringify(b.mood) || JSON.stringify(a.reform) !== JSON.stringify(b.reform) || JSON.stringify(a.demand) !== JSON.stringify(b.demand)) diff++;
+      let d = 0; for (let q = 0; q < R.NK; q++) d = Math.max(d, Math.abs(k.f[c * R.NK + q] - k2.f[c * R.NK + q])); all++; dfAll = Math.max(dfAll, d); if (sim.townsOf[c] === sim2.townsOf[c]) { same++; df = Math.max(df, d); } }
+    check(diff === 0, `every realm's form, laws, authority, estates and reform survive save and load (${diff} differ)`); check(same > all * 0.4 && df < 3e-3 && dfAll < 0.03, `and the factors come out the same (${df.toExponential(1)} apart at most in the ${same} of ${all} realms whose towns are counted the same, ${dfAll.toExponential(1)} in the rest)`);
+    check(sim2.fullName(sim2.playerCiv()) === sim.fullName(c), 'and what the realm is called');
+    // a world saved before there were laws
+    for (const cv of s.civs) if (cv) { delete cv.rule; cv.gov = cv.tech < 0.08 ? 'tribe' : 'kingdom'; } const sim3 = createSim(wd, 1); sim3.load(s); const k3 = sim3.rule; let n3 = 0, with3 = 0, bands = 0; for (const cv of sim3.civs) { if (!cv) continue; n3++; const q = k3.ruleOf(cv); if (R.CATS.some(C => q.laws[C.key] !== C.laws[0].key)) with3++; if (!R.FORM[q.gov]) bands++; }
+    check(with3 > n3 * 0.5 && bands === 0, `a world from before laws is given the laws of its age (${with3} of ${n3} realms have some)`);
+    // (such a world was fed by the table of its day, and keeps it: the first load after the update must not starve its people)
+    { const old = JSON.parse(JSON.stringify(s)); delete old.heard; delete old.food; const sim4 = createSim(wd, 1); sim4.load(old); const kept = JSON.parse(JSON.stringify(sim4.save())); const sim5 = createSim(wd, 1); sim5.load(kept);
+      check(!sim.foodOld && !sim2.foodOld && sim4.foodOld && sim5.foodOld && kept.food === 15 && sim4.foodMult(0.6) > sim.foodMult(0.6) * 1.15, `and keeps the yield of the land it was saved under (${sim4.foodMult(0.6).toFixed(3)} at the Renaissance, not ${sim.foodMult(0.6).toFixed(3)}), through further saves`); } for (let y = 0; y < 50; y++) sim3.tick(); invariants(sim3, 'an old world with new laws, 50 years on'); }
+  // speed
+  { const st0 = k.step; let tk = 0; k.step = (a, b) => { const t = process.hrtime.bigint(); st0(a, b); tk += Number(process.hrtime.bigint() - t) / 1e6; }; for (let y = 0; y < 200; y++) sim.tick(); k.step = st0;
+    log(`   rule takes ${(tk / 200).toFixed(3)} ms a year for ${sim.st.civCount} realms`); check(tk / 200 < 2.5, `rule is quick enough (${(tk / 200).toFixed(3)} ms a year)`); invariants(sim, 'the world of laws in ' + sim.fmtYear(sim.year)); }
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);
