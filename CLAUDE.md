@@ -50,6 +50,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   workflow (`tools/scenes/tour.txt` lists the scenes: towns of every people and age, forests, seasons, dusk and night,
   dry countries, rivers). Look at these before believing anything about how the game looks. `REF=<branch>` takes
   them of a pushed branch before it is on `main` (nothing is given out to players by it).
+  `tools/macshots.sh cost_town cost_far cost_alps` writes frame rates into the pictures: one page, the parts of the
+  picture turned off in turn (`__T.costs` in `tools/testcam.js`; `__T.cost([[name, set], ...])` for other questions).
+  The build Mac is a virtual GPU, 1680 by 1050 with one pixel to a point: its numbers hold one build against another
+  (two starts of the app differ too much: compare inside one page), they do not say how fast a real Mac is.
 - `npm start` — desktop window (Electron).
 - `node tools/test_update.js` — the updater under plain Node: small games in folders, the publishing step writing a
   feed, a web server that misbehaves on demand (270 checks, a few seconds). Run it after touching `desktop/updater.js`
@@ -323,6 +327,14 @@ Conventions that matter:
   stands on the ground asks `gpuHeightAt`, which uses the mesh a tile has at the moment (`t.grid`), and
   `meshVersion` follows the meshes as it follows the tiles. A software renderer keeps its two fixed grids.
   `terrain.stats.quads` counts what is drawn; `terrain.quadPx = 0` is the old way (to compare).
+- **The ground's shader is the frame.** It looks into its textures some forty times a pixel, and it is what a view
+  costs: by pixels, not by corners (on the build Mac a view to the horizon took 46 ms, of which the ground 27).
+  Two things were found to count far more than they show, and both are per texture and per tile, not per shader
+  line: slivers (above), and how many ways a texture is looked at where it runs away from the eye (`anisotropy`).
+  The noise (fifteen lookups) has 2 ways and the photographs of detail (sixteen) 4 (`ANISO_NOISE`, `ANISO_SMALL` in
+  `main.js`); at 16 each they cost a fifth of the frame for nothing the eye finds. The ground's own pictures (the
+  generated arrays, the imagery) and the models keep 16: at 8 the grass near a town goes soft. Measure before
+  adding a lookup, and after (`cost_far`).
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.

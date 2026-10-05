@@ -55,7 +55,11 @@
   // what a frame goes through after the scene is drawn: shade, glow, the developing (post.js). A software renderer goes without unless asked.
   const postOk = !!window.POST && (window.GENESIS_POST || !softGL) && POST.init(renderer); if (postOk && window.GENESIS_POST && typeof window.GENESIS_POST === 'object') Object.assign(POST, window.GENESIS_POST);
   // how finely textures are filtered where the ground runs away from the eye: all the card can do (16 taps on an Apple GPU); a software renderer pays for every tap and keeps what it had
-  const maxAniso = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4; const ANISO = softGL ? Math.min(8, maxAniso) : maxAniso, ANISO_SMALL = softGL ? 4 : maxAniso; window.GENESIS_ANISO = ANISO;      // (models.js and textures.js read it)
+  const maxAniso = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4; const ANISO = softGL ? Math.min(8, maxAniso) : maxAniso; window.GENESIS_ANISO = ANISO;      // (models.js and textures.js read it)
+  // The ground's shader looks into the noise fifteen times a pixel and into the photographs of detail sixteen, and at sixteen ways each
+  // that was a fifth of the frame in a view to the horizon, for a difference nobody can find in the picture (they only vary what the
+  // ground's own pictures show): they get by with two ways and four. The ground's own pictures and the roads keep all the card can do.
+  const ANISO_NOISE = softGL ? 4 : Math.min(2, maxAniso), ANISO_SMALL = softGL ? 4 : Math.min(4, maxAniso);
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.setClearColor(0x05070c, 1);
   stage.appendChild(renderer.domElement);
@@ -82,7 +86,7 @@
   // ---------- loading ----------
   function setLoad(pct, step) { $('loadbar').style.transform = `scaleX(${pct / 100})`; if (step) $('loadstep').textContent = step; }
   function loadTex(url, opts = {}) {
-    return new Promise((res) => { new THREE.TextureLoader().load(url, (t) => { t.wrapS = t.wrapT = opts.mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.anisotropy = ANISO_SMALL; if (opts.flipY === false) t.flipY = false; res(t); }, undefined, () => { console.warn('texture missing', url); res(null); }); });
+    return new Promise((res) => { new THREE.TextureLoader().load(url, (t) => { t.wrapS = t.wrapT = opts.mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.anisotropy = opts.aniso || ANISO_SMALL; if (opts.flipY === false) t.flipY = false; res(t); }, undefined, () => { console.warn('texture missing', url); res(null); }); });
   }
   // The terrain's photographic detail (forest, dunes, rock, grass), and the shallows once the generated art has loaded,
   // as layers of one array texture: one texture unit instead of five.
@@ -107,7 +111,7 @@
       setLoad(6, 'terrain index');
       const index = await (await fetch('data/index.json')).json();
       setLoad(14, 'surface data');
-      const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([loadTex('data/info.png', { flipY: false }), loadTex('data/noise.png'), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
+      const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([loadTex('data/info.png', { flipY: false }), loadTex('data/noise.png', { aniso: ANISO_NOISE }), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
       info.wrapS = THREE.RepeatWrapping; info.wrapT = THREE.ClampToEdgeWrapping; info.minFilter = THREE.LinearFilter; info.generateMipmaps = false;
       globals.uInfo.value = info; globals.uNoise.value = noise; globals.uClouds.value = noise; globals.uWaterN.value = waterN || noise; globals.uDetA.value = detA || noise; globals.uDetB.value = detB || noise; globals.uDetC.value = detC || noise; globals.uDetD.value = detD || noise;
       // one array texture for the four detail photographs (WebGL2): the terrain shader then fits the 16 textures an Apple GPU allows

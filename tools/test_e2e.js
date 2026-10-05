@@ -423,7 +423,13 @@ server.listen(0, async () => {
     await page.keyboard.press('h'); check(await ev(() => !!__G.mapcam.fly), 'H flies home');
   });
   await scenario('labels: realms from orbit, cities from region height, ruins near', async (check) => {
-    await ev(() => { __G.mapcam.fly = null; const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.16, 0, 0); }); await wait(600); await frames(8); // ~1000 km up: realms of a few regions get names, towns do not
+    // ~1000 km up: realms of a few regions get names, towns do not. (The camera stands over the place the player's own realm is
+    // named at, the middle of its land or else its capital, with no panel open: where a grown realm's name falls, and what covers
+    // it, is otherwise up to what the scenarios before left behind.)
+    await page.keyboard.press('Escape'); await frames(1);
+    await ev(() => { __G.mapcam.fly = null; const S = __G.sim, c = S.playerCiv(), ct = __G.world.centroids.get(c.id); let [lon, lat] = __T.capital();
+      if (ct && ct.n >= 4) { const l = Math.hypot(ct.x, ct.y, ct.z) || 1, p = GEO.fromVec(new THREE.Vector3(ct.x / l, ct.y / l, ct.z / l)); if (S.owner[__G.cellOf(p[0], p[1])] === c.id) { lon = p[0]; lat = p[1]; } }
+      __T.cam(lon, lat, 0.16, 0, 0); }); await wait(600); await frames(8);
     try { await page.waitForFunction(() => document.querySelectorAll('.lbl.realm').length > 0, null, { timeout: 60000 }); } catch (e) {}
     let n = await ev(() => ({ realm: document.querySelectorAll('.lbl.realm').length, city: document.querySelectorAll('.lbl.city:not(.cap)').length, dbg: __G.labelDbg, cells: __G.sim.cellsOf[__G.sim.player] })); check(n.realm > 0, `realm labels from high up (${n.realm}; player has ${n.cells} regions; ${JSON.stringify(n.dbg)})`); check(n.city === 0, 'no town labels from high up (only your capital)');
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.03, 0.4, 0); }); await wait(600); await frames(8);
@@ -449,7 +455,9 @@ server.listen(0, async () => {
     // (a market needs somebody to trade with: if no realm lies against the player's land, one is set down there with a few regions of its own)
     await ev(() => { const S = __G.sim, c = S.playerCiv(), W = S.W; const free = (i) => i >= 0 && i < S.N && S.land[i] && !(S.flags[i] & 8) && S.owner[i] < 0 && S.fert[i] > 0.05;
       if (!(S.diplo.reach(c.id).some((id) => S.diplo.touches(c, id)))) { for (const i of S.LI) { if (!free(i) || ![i - 1, i + 1, i - W, i + W].some((j) => S.owner[j] === c.id)) continue; const t = S.spawnTribe(i, {}); if (!t) continue; S.pop[i] = 3; for (const j of [i - 1, i + 1, i - W, i + W, i - W - 1, i - W + 1, i + W - 1, i + W + 1]) if (free(j)) { S.owner[j] = t.id; S.pop[j] = 2; } break; } S.recount(); S.touchAll(); }
-      for (const x of S.civs) if (x && x.tech < 0.2) { x.tech = 0.2; x.era = S.eraOf(x.tech); __T.teach(x); } c.wealth = 1e6; __G.run(60); });
+      // (and it needs peace: a realm at war with the player sells it nothing. Whoever is at war with it makes peace, and the others keep still for the years that follow.)
+      const calm = () => { for (const x of S.civs) if (x && x !== c && x.dip) { x.aggression = 0; x.dip.think = 1e12; if (c.dip.ban[x.id]) S.diplo.embargo(c, x, false); if (x.dip.ban[c.id]) S.diplo.embargo(x, c, false); if (c.wars[x.id] !== undefined) S.diplo.conclude(c, x, 'white'); } };
+      for (const x of S.civs) if (x && x.tech < 0.2) { x.tech = 0.2; x.era = S.eraOf(x.tech); __T.teach(x); } c.wealth = 1e6; calm(); __G.run(60); calm(); });
     await page.keyboard.press('m'); await frames(3);
     let r = await ev(() => ({ open: document.getElementById('market').open, rows: document.querySelectorAll('#mk-table button.mk-row').length, groups: document.querySelectorAll('#mk-table .mk-group').length, tape: document.querySelectorAll('#mk-tape .mk-roll button').length, figs: document.getElementById('mk-tape').textContent, sub: document.getElementById('mk-sub').textContent, realm: __G.sim.fullName(__G.sim.playerCiv()), purse: document.getElementById('mk-purse').textContent, good: document.querySelector('#mk-good h3') ? document.querySelector('#mk-good h3').textContent : '' }));
     check(r.open, 'M opens the market'); check(r.rows >= 20 && r.groups === 4, `the board lists the goods of the age in four groups (${r.rows} rows, ${r.groups} groups)`); check(r.tape >= 6 && /World product/.test(r.figs), `the tape runs the world's prices (${r.tape} entries)`); check(r.sub.includes(r.realm) && /\d/.test(r.purse), 'the head names the realm and its treasury: ' + r.sub + ' / ' + r.purse); check(r.good.length > 2, 'a good is open: ' + r.good);
