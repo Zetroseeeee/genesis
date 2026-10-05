@@ -136,10 +136,10 @@ window.POST = (function () {
       }
       c += texture2D(tGlow, vUv).rgb * uGlow;
       // develop: contrast about a middle grey, a little more colour, the shoulder, the corners, the grain
-      vec3 g = (c - 0.44) * (1.0 + 0.09 * uDevelop) + 0.44 + 0.006 * uDevelop; g = max(g, 0.0);
+      vec3 g = (c - 0.30) * (1.0 + 0.09 * uDevelop) + 0.30 + 0.012 * uDevelop; g = max(g, 0.0);      // (about a dark grey: the shadows stay where they were, what is lit gains)
       float l = dot(g, vec3(0.2126, 0.7152, 0.0722)); g = max(mix(vec3(l), g, 1.0 + 0.10 * uDevelop), 0.0);
       const float A = 0.80, L = 1.035; vec3 hi = A + (L - A) * (1.0 - exp(-(g - A) / (L - A))); g = mix(g, hi, step(A, g));
-      vec2 q = vUv - 0.5; q.x *= uRes.x / uRes.y * 0.8; g *= 1.0 - 0.16 * uDevelop * smoothstep(0.35, 1.1, length(q));
+      vec2 q = vUv - 0.5; q.x *= uRes.x / uRes.y * 0.8; g *= 1.0 - 0.11 * uDevelop * smoothstep(0.35, 1.1, length(q));
       g += (ign(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5) / 160.0;
       gl_FragColor = vec4(clamp(g, 0.0, 1.0), 1.0);
     }`;
