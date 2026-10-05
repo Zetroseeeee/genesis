@@ -21,7 +21,7 @@
   // turn system: the world stands still between presses of the big button
   const turnRun = { active: false, start: 0, target: 0, evIdx: 0, capital: -1, wars: '', era: 0, towns: 0, townSet: null, reason: '' };
   const seen = { wars: new Set(), era: -1, ack: new Set(), turns: 0 };
-  const view = { political: true, soil: false, clouds: true, labels: true, trade: false, gov: false };
+  const view = { political: true, soil: false, clouds: true, labels: true, trade: false, gov: false, rel: false };
   const settings = { uiScale: 1, tipDelay: 300, glass: false, autoTilt: true, quality: 'high', continuous: false, textures: true };
   const worldData = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
   const TURN_YEARS = RULE.PACE;      // a turn, by age (200 years in the Stone Age down to 5): about a discovery, or a reform, to a turn at history's pace; a hundred and seventy turns from the first fields to the present
@@ -38,7 +38,7 @@
   function setMode(m) {
     const was = mode; mode = m; document.body.dataset.mode = m;
     frameHome(); camera.updateProjectionMatrix();
-    globals.uPolitical.value = m === 'intro' ? 0 : (view.political ? 1 : 0); globals.uLens.value = m === 'intro' ? 0 : (view.gov ? 1 : 0);
+    globals.uPolitical.value = m === 'intro' ? 0 : (view.political ? 1 : 0); globals.uLens.value = m === 'intro' ? 0 : (view.gov || view.rel ? 1 : 0);
     if ((was === 'intro') !== (m === 'intro')) { sunEase = 2.5; if (m !== 'intro' && mapcam) sunFor(mapcam.tLon); }      // leaving the home screen: morning where the camera is
     renderUpdate();
   }
@@ -122,7 +122,7 @@
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
       mapcam.onClick = onClick; mapcam.locked = true; mapcam.autoTilt = settings.autoTilt;
-      window.__G = { settings, loadSettings, get sim() { return sim; }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, startTurn, endTurn, turnRun, terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
+      window.__G = { settings, loadSettings, get sim() { return sim; }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, startTurn, endTurn, turnRun, attention: () => computeAttention(), terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
       buildEconomy(); buildDock(); buildMinimapBase(); bindUI();
       newWorld((Math.random() * 2 ** 31) | 0);
       previewSave(); homeAim(false);                // a saved world is shown on the home screen as it was left
@@ -297,7 +297,7 @@
     const P = c.policy; const pop = sim.popOf[c.id];
     const row = (k, v) => `<div class="row"><span>${k}</span><span class="num">${v}</span></div>`;
     switch (id) {
-      case 'coin': { const ip = sim.incomeParts(c); return `<b>Treasury ${fmtInt(c.wealth)}</b>${row('Taxes', fmtSigned(ip.taxes))}${row('Harbours ×' + sim.ports[c.id], fmtSigned(ip.ports))}${row('Markets ×' + sim.markets[c.id], fmtSigned(ip.markets))}${ip.mines ? row('Mines and estates', fmtSigned(ip.mines)) : ''}${row('Prosperity', fmtSigned(ip.living))}${row('Customs', fmtSigned(ip.customs))}${ip.upkeep ? row('Army upkeep', fmtSigned(-ip.upkeep)) : ''}${ip.scholars ? row('Scholars', fmtSigned(-ip.scholars)) : ''}${Math.abs(ip.state) >= 0.05 ? row('What the laws spend', fmtSigned(-ip.state)) : ''}${row('Net per year', fmtSigned(c.income || 0))}<div class="hint">Taxes at ${P.tax.toFixed(1)}×, military at ${P.military.toFixed(1)}×. Change both in Realm › Policy. Click for the ledger.</div>`; }
+      case 'coin': { const ip = sim.incomeParts(c); return `<b>Treasury ${fmtInt(c.wealth)}</b>${row('Taxes', fmtSigned(ip.taxes))}${row('Harbours ×' + sim.ports[c.id], fmtSigned(ip.ports))}${row('Markets ×' + sim.markets[c.id], fmtSigned(ip.markets))}${ip.mines ? row('Mines and estates', fmtSigned(ip.mines)) : ''}${row('Prosperity', fmtSigned(ip.living))}${row('Customs', fmtSigned(ip.customs))}${ip.upkeep ? row('Army upkeep', fmtSigned(-ip.upkeep)) : ''}${ip.scholars ? row('Scholars', fmtSigned(-ip.scholars)) : ''}${Math.abs(ip.state) >= 0.05 ? row('What the laws spend', fmtSigned(-ip.state)) : ''}${Math.abs(ip.tribute) >= 0.05 ? row(ip.tribute >= 0 ? 'Tribute paid to you' : 'Tribute you pay', fmtSigned(ip.tribute)) : ''}${row('Net per year', fmtSigned(c.income || 0))}<div class="hint">Taxes at ${P.tax.toFixed(1)}×, military at ${P.military.toFixed(1)}×. Change both in Realm › Policy. Click for the ledger.</div>`; }
       case 'live': { const M = sim.market, NC = M.NC, CATS = ECON.CATS; const rows = CATS.filter((C) => M.Bk[c.id * NC + C.id] > 0).map((C) => { const v = M.sat[c.id * NC + C.id]; return `<div class="row"><span>${C.name}${C.state ? ' (the state)' : ''}</span><span class="num ${v < 0.5 ? 'neg' : v < 0.8 ? 'warn' : ''}">${Math.round(v * 100)}%</span></div>`; }).join(''); return `<b>Your people have ${Math.round(M.LS[c.id] * 100)}% of what they want</b>${rows}<div class="hint">What the land yields, what your towns make and what merchants bring. Well-supplied people pay more tax; hungry ones grow restless. Click for the ledger; M opens the market.</div>`; }
       case 'pop': { const fed = sim.settlementsOf(c.id).length; return `<b>${fmtPop(pop)} people</b>${row('Settlements', fed)}${row('Change / 20 yrs', fmtSigned(lastSample.dPop, 1) + ' k')}<div class="hint">People grow towards what the land feeds. Develop cells and advance knowledge to feed more.</div>`; }
       case 'land': return `<b>${fmtInt(sim.cellsOf[c.id])} regions</b>${row('Reach from capital', Math.round(sim.reachFor(c)) + ' cells')}${row('Peak', fmtInt(c.peakCells))}<div class="hint">Regions beyond your reach may break away when stability is low.</div>`;
@@ -329,14 +329,16 @@
   }
 
   // ---------- attention queue + the turn button ----------
-  const T_ICON = { demand: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', rising: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', study: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', capital: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', split: '<path d="M6 6l6 6-6 6M12 6l6 6-6 6"/>', stab: '<path d="M12 4v9M12 17v2"/>', debt: '<path d="M12 5v14M8 9h5a2 2 0 0 1 0 4H9a2 2 0 0 0 0 4h6"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', grow: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', gone: '<path d="M5 5l14 14M19 5L5 19"/>', play: '<path d="M6 4l14 8-14 8z"/>', stop: '<path d="M6 6h12v12H6z"/>', pause: '<path d="M8 5v14M16 5v14"/>' };
+  const T_ICON = { demand: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', rising: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', study: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', capital: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', envoy: '<path d="M4 6h16v12H4zM4 7l8 6 8-6"/>', split: '<path d="M6 6l6 6-6 6M12 6l6 6-6 6"/>', stab: '<path d="M12 4v9M12 17v2"/>', debt: '<path d="M12 5v14M8 9h5a2 2 0 0 1 0 4H9a2 2 0 0 0 0 4h6"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', grow: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', gone: '<path d="M5 5l14 14M19 5L5 19"/>', play: '<path d="M6 4l14 8-14 8z"/>', stop: '<path d="M6 6h12v12H6z"/>', pause: '<path d="M8 5v14M16 5v14"/>' };
   function computeAttention() {
     const c = sim && sim.playerCiv(); if (!c) return [];
     const out = []; const yb = Math.floor(sim.year / 20);
     const wars = Object.keys(c.wars).map(k => +k).filter(k => sim.civs[k]);
     const fresh = wars.filter(k => !seen.wars.has(k));
-    for (const k of fresh) { const w = sim.civs[k]; out.push({ id: 'war' + k, kind: 'war', cls: 'war', t1: 'War', t2: `${sim.fullName(w)} · at war with you`, body: 'Fly to their capital. Offer peace from their panel, or raise a levy and fight.', act: () => { seen.wars.add(k); if (w.capital >= 0) { const [lon, lat] = placeOf(w.capital); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.02), 0.08)); select(w.capital); } } }); }
+    for (const k of fresh) { const w = sim.civs[k]; out.push({ id: 'war' + k, kind: 'war', cls: 'war', t1: 'War', t2: `${sim.fullName(w)} · at war with you`, body: 'Fly to their capital. How the war stands and what peace would take: War and peace, in their panel. Or raise a levy and fight.', act: () => { seen.wars.add(k); if (w.capital >= 0) { const [lon, lat] = placeOf(w.capital); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.02), 0.08)); select(w.capital); } } }); }
     for (const k of [...seen.wars]) if (!wars.includes(k)) seen.wars.delete(k);
+    // envoys waiting on an answer: the weightiest first (a peace offered, a call to arms, a demand), then what is merely proposed
+    { const t = ENVOYS.tile(); if (t) { const heavy = (o) => o.kind === 'peace' || o.kind === 'call' || o.kind === 'submit' ? 0 : 1; for (const o of t.offers.filter((o) => !seen.ack.has('offer' + o.id)).sort((a, b) => heavy(a) - heavy(b)).slice(0, 3)) out.push({ id: 'offer' + o.id, kind: 'envoy', cls: heavy(o) ? 'good' : 'warn', t1: 'Envoys', t2: o.text, body: `Answer them in Diplomacy. They wait until ${sim.fmtYear(o.until)}, then go home.`, act: () => { seen.ack.add('offer' + o.id); ENVOYS.open('envoys'); } }); } }
     if (turnRun.capital >= 0 && turnRun.capital !== c.capital && !seen.ack.has('cap' + c.capital)) out.push({ id: 'cap', kind: 'capital', cls: 'war', t1: 'Capital', t2: `The court now sits at ${sim.cellName.get(c.capital) || 'a new seat'}`, act: () => { seen.ack.add('cap' + c.capital); goHome(); } });
     const recent = c.events.slice(-12).filter(e => sim.year - e.year <= Math.max(60, TURN_YEARS[c.era] * 2));
     const split = recent.find(e => /breaks away/.test(e.text)); if (split && !seen.ack.has('split' + split.year)) out.push({ id: 'split', kind: 'split', cls: 'war', t1: 'Revolt', t2: split.text.replace(/ from .*$/, ''), act: () => { seen.ack.add('split' + split.year); if (split.loc >= 0) { const [lon, lat] = placeOf(split.loc); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.02), 0.08)); select(split.loc); } } });
@@ -403,6 +405,8 @@
     if (recent.some(e => /breaks away/.test(e.text))) { endTurn('split'); return; }
     { const Q = sim.rule.ruleOf(c); if (Q.rose > turnRun.rose) { turnRun.rose = Q.rose; endTurn('rising'); return; } if (Q.demand && Q.demand.since > turnRun.start && !seen.ack.has('demand' + Q.demand.since)) { endTurn('demand'); return; } }
     { const t = TREE.tile(); if (t && t.waiting && recent.some(e => e.type === 'know')) { seen.ack.delete('study'); endTurn('study'); return; } }
+    // (envoys with something that cannot wait: a peace offered, a call to arms, a demand to submit. What is merely proposed waits for the turn's end)
+    { const t = ENVOYS.tile(); if (t && t.offers.some((o) => o.since > turnRun.start && (o.kind === 'peace' || o.kind === 'call' || o.kind === 'submit') && !seen.ack.has('offer' + o.id))) { endTurn('envoy'); return; } }
     if (recent.some(e => e.type === 'disaster' && !seen.ack.has('dis' + e.year + e.loc))) { endTurn('disaster'); return; }
   }
   function updateTurnButton() {
@@ -442,7 +446,7 @@
     const c = sim.playerCiv(); const box = $('report'); if (!c) { box.hidden = true; return; }
     const ev = sim.worldEvents.slice(turnRun.evIdx); const mine = ev.filter(e => e.mine).map(e => { e._s = scoreEvent(e); return e; }).sort((a, b) => b._s - a._s).slice(0, 5).sort((a, b) => a.year - b.year); const others = ev.filter(e => !e.mine).map(e => { e._s = scoreEvent(e); return e; }).sort((a, b) => b._s - a._s).slice(0, 3).sort((a, b) => a.year - b.year);
     const list = [...mine, ...others];
-    const why = { war: 'War declared on you', capital: 'Your capital changed', era: 'A new era', stab: 'Unrest', split: 'A province broke away', stopped: 'Stopped early', gone: 'Your people are gone', disaster: 'Disaster strikes your lands', study: 'A discovery: your scholars await your word', demand: 'An estate of your realm makes a demand', rising: 'An estate of your realm has risen' }[turnRun.reason] || '';
+    const why = { war: 'War declared on you', capital: 'Your capital changed', era: 'A new era', stab: 'Unrest', split: 'A province broke away', stopped: 'Stopped early', gone: 'Your people are gone', disaster: 'Disaster strikes your lands', study: 'A discovery: your scholars await your word', demand: 'An estate of your realm makes a demand', rising: 'An estate of your realm has risen', envoy: 'Envoys wait on your answer' }[turnRun.reason] || '';
     $('report-title').textContent = `${sim.fmtYear(turnRun.start)} → ${sim.fmtYear(sim.year)}`;
     const wy = $('report-why'); wy.hidden = !why; wy.textContent = why; wy.className = 'why ' + (turnRun.reason || '');
     // a painted strip for the moment that stopped the clock
@@ -499,11 +503,10 @@
     renderRuler(c);
     const gs = sim.market.goodsOf(c.id); const GG = sim.GOODS; const living = sim.market.LS[c.id]; const more = Math.max(0, gs.own.length - 8) + Math.max(0, gs.imp.length - 5);
     const tradeHtml = gs.own.length || gs.imp.length ? `<span class="goodchips">${gs.own.slice(0, 8).map(g => goodChip(GG[g])).join('')}${gs.imp.slice(0, 5).map(g => goodChip(GG[g], true)).join('')}${more ? `<span class="hint">+${more} more</span>` : ''}</span><div class="hint" style="margin-top:3px">Its people have ${Math.round(living * 100)}% of what they want. ${c.player ? '<button class="linkish" id="sc-market">Open the market</button>' : 'Dashed: comes from abroad.'}</div>` : '<span class="hint">nothing yet</span>';
-    $('sc-kv').innerHTML = `${c.capital !== i ? `<span class="micro">Capital</span><span>${esc(sim.cellName.get(c.capital) || '—')}</span>` : ''}<span class="micro">Faith</span><span>${esc(c.religion || 'none yet')}</span><span class="micro">Wars</span><span>${esc(wars || 'nobody')}</span><span class="micro">Trade</span><span>${tradeHtml}</span>${me0 && c !== me0 ? `<span class="micro">Knows</span><span>${ahead.length ? ahead.slice(-4).map(D => `<button class="linkish" data-kgo="${D.key}">${esc(D.name)}</button>`).join(', ') + (ahead.length > 4 ? ` and ${ahead.length - 4} more that your people do not` : ', which your people do not') : 'nothing that your people do not'}</span>` : ''}<span class="micro">Laws</span><span>${lawsLine}</span><span class="micro">Founded</span><span class="num">${sim.fmtYear(c.founded)}</span>`;
+    $('sc-kv').innerHTML = `${c.capital !== i ? `<span class="micro">Capital</span><span>${esc(sim.cellName.get(c.capital) || '—')}</span>` : ''}<span class="micro">Faith</span><span>${esc(c.religion || 'none yet')}</span>${(() => { const r = me0 && c !== me0 ? ENVOYS.standing(c) : null; return r ? `<span class="micro">With you</span><span><b class="rel-${r.cls || 'none'}">${esc(r.key === 'war' ? 'at war' : r.mood)}</b> <span class="num hint">${r.o > 0 ? '+' : r.o < 0 ? '−' : ''}${Math.abs(r.o)}</span>${r.pacts.length ? ' · ' + esc(r.pacts.join(', ').toLowerCase()) : ''}</span>` : ''; })()}<span class="micro">Wars</span><span>${esc(wars || 'nobody')}</span><span class="micro">Trade</span><span>${tradeHtml}</span>${me0 && c !== me0 ? `<span class="micro">Knows</span><span>${ahead.length ? ahead.slice(-4).map(D => `<button class="linkish" data-kgo="${D.key}">${esc(D.name)}</button>`).join(', ') + (ahead.length > 4 ? ` and ${ahead.length - 4} more that your people do not` : ', which your people do not') : 'nothing that your people do not'}</span>` : ''}<span class="micro">Laws</span><span>${lawsLine}</span><span class="micro">Founded</span><span class="num">${sim.fmtYear(c.founded)}</span>`;
     { const b = $('sc-market'); if (b) b.addEventListener('click', () => MARKET.open('board')); }
-    const p = sim.playerCiv(); const acts = $('sc-actions');
-    acts.innerHTML = (p && c !== p) ? `<button class="btn ${sim.isAtWar(p, c.id) ? '' : 'danger'}" id="btn-war">${sim.isAtWar(p, c.id) ? 'Offer peace' : 'Declare war'}</button>` : '';
-    const bw = $('btn-war'); if (bw) bw.addEventListener('click', () => { sim.playerWar(c.id); if (sim.isAtWar(sim.playerCiv(), c.id)) seen.wars.add(c.id); world.refreshTextures(); refreshAll(true); });
+    const p = sim.playerCiv(); const acts = $('sc-actions'); const rel = p && c !== p ? ENVOYS.standing(c) : null;
+    acts.innerHTML = rel ? (rel.within || sim.isAtWar(p, c.id) ? `<button class="btn" id="btn-dip" data-dgo="${c.id}" title="What they think of you and why, treaties, gifts, war and peace (F)">${sim.isAtWar(p, c.id) ? 'War and peace' : 'Diplomacy'}</button>` : '<span class="hint">Your envoys cannot reach them yet: they deal with the realms you touch and those your merchants reach.</span>') : '';
     $('policy').hidden = !c.player;
     updateOutliner();
     $('sc-events').innerHTML = eventsHtml(c.events, 25);
@@ -537,15 +540,15 @@
     const wars = Object.keys(c.wars).map(k => sim.civs[+k]).filter(Boolean);
     let html = '';
     if (wars.length) html += '<div class="micro" style="padding:2px 6px 4px;color:var(--mil)">At war with</div>';
-    for (const w of wars) html += `<div class="ol war" data-cell="${w.capital}"><span class="t">⚔ ${esc(sim.fullName(w))}</span><span class="s">strength ${fmtInt(sim.strengthOf[w.id])}</span></div>`;
+    for (const w of wars) html += `<div class="ol war" data-cell="${w.capital}"><span class="t">⚔ ${esc(sim.fullName(w))}</span><span class="s">might ${fmtInt(sim.mightOf[w.id])}</span></div>`;
     if (wars.length && cells.length) html += '<div class="micro" style="padding:8px 6px 4px">Settlements</div>';
     for (const i of cells) html += `<div class="ol" data-cell="${i}"><span class="t">${i === c.capital ? '★ ' : ''}${esc(sim.cellName.get(i) || '')}</span><span class="s">${fmtPop(sim.pop[i])}</span></div>`;
     if (!cells.length) html += '<div class="hint" style="padding:4px 6px">Villages become towns as they grow; towns appear here.</div>';
     host.innerHTML = html;
     host.querySelectorAll('.ol').forEach(el => el.addEventListener('click', () => { const i = +el.dataset.cell; if (i >= 0) { const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, Math.min(mapcam.dist, viewDist(i))); select(i); } }));
   }
-  const FEED_ICON = { law: '<path d="M4 20h16M5 9h14M12 4l8 5H4zM7 9v11M12 9v11M17 9v11"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', ruler: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', faith: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', state: '<path d="M4 20h16M6 20V9l6-5 6 5v11"/>', city: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', know: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>' };
-  function scoreEvent(e) { const base = { war: 3, era: 3, state: 2.2, disaster: 2, law: 1.8, know: 1.6, faith: 1.2, city: 1, ruler: 0.4 }[e.type] || 1; const c = e.civ >= 0 ? sim.civs[e.civ] : null; const size = c ? Math.min(2, sim.cellsOf[c.id] / 150) : 1; let near = 0; if (e.loc >= 0) { const [lon, lat] = cellCenter(e.loc); near = 1 - clamp(GEO.distKm(lon, lat, mapcam.lon, mapcam.lat) / 6000, 0, 1); } return base + size + near + (e.mine ? 10 : 0); }
+  const FEED_ICON = { law: '<path d="M4 20h16M5 9h14M12 4l8 5H4zM7 9v11M12 9v11M17 9v11"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', ruler: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', faith: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', state: '<path d="M4 20h16M6 20V9l6-5 6 5v11"/>', city: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', know: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>', pact: '<path d="M4 6h16v12H4zM4 7l8 6 8-6"/>' };
+  function scoreEvent(e) { const base = { war: 3, era: 3, state: 2.2, pact: 2, disaster: 2, law: 1.8, know: 1.6, faith: 1.2, city: 1, ruler: 0.4 }[e.type] || 1; const c = e.civ >= 0 ? sim.civs[e.civ] : null; const size = c ? Math.min(2, sim.cellsOf[c.id] / 150) : 1; let near = 0; if (e.loc >= 0) { const [lon, lat] = cellCenter(e.loc); near = 1 - clamp(GEO.distKm(lon, lat, mapcam.lon, mapcam.lat) / 6000, 0, 1); } return base + size + near + (e.mine ? 10 : 0); }
   // continuous mode keeps a light live wire of the biggest events as toasts
   let feedIdx = 0, lastFeedAt = 0;
   function pumpFeed(now) {
@@ -604,7 +607,7 @@
   function updateDock() {
     const c = sim.playerCiv();
     for (const t of GODS) { const b = document.querySelector(`.dg[data-tool="${t.id}"]`); if (!b) continue; b.disabled = !c; }
-    if (selected >= 0 && !$('chron').open && !$('menu').open && !$('market').open && !$('know').open && !$('gov').open && !$('sel-build').hidden) renderBuild(selected);
+    if (selected >= 0 && !$('chron').open && !$('menu').open && !$('market').open && !$('know').open && !$('gov').open && !$('dip').open && !$('sel-build').hidden) renderBuild(selected);
   }
 
   // ---------- the city build panel: what a town can raise, and where ----------
@@ -807,7 +810,7 @@
   function lighten(rgb) { const m = rgb.match(/\d+/g); if (!m) return '#fff'; const [r, g, b] = m.map(Number); return `rgb(${Math.round(r * 0.5 + 255 * 0.5)},${Math.round(g * 0.5 + 255 * 0.5)},${Math.round(b * 0.5 + 255 * 0.5)})`; }
 
   // ---------- chronicle screen ----------
-  const LOGF = [['all', 'All'], ['mine', 'Mine'], ['war', 'Wars'], ['state', 'States'], ['law', 'Laws'], ['era', 'Eras'], ['know', 'Knowledge'], ['faith', 'Faith'], ['disaster', 'Disasters'], ['ruler', 'Rulers']];
+  const LOGF = [['all', 'All'], ['mine', 'Mine'], ['war', 'Wars'], ['pact', 'Treaties'], ['state', 'States'], ['law', 'Laws'], ['era', 'Eras'], ['know', 'Knowledge'], ['faith', 'Faith'], ['disaster', 'Disasters'], ['ruler', 'Rulers']];
   let logFilter = 'all';
   function openChronicle(tab) {
     const dlg = $('chron'); if (!dlg.open) dlg.showModal();
@@ -882,7 +885,10 @@
     $('l-know').addEventListener('click', () => { if (sim && mode === 'play') TREE.open(); });
     GOV.init({ sim: () => sim, toast, afterAct: () => refreshAll(true), openTree: (key) => TREE.open('tree', key) });
     $('l-gov').addEventListener('click', () => { if (sim && mode === 'play' && sim.playerCiv()) GOV.open(); });
-    $('left').addEventListener('click', (e) => { const ch = e.target.closest('.goodchip[data-good]'); if (ch && mode === 'play') MARKET.open('board', +ch.dataset.good); const kg = e.target.closest('[data-kgo]'); if (kg && mode === 'play') TREE.open('tree', kg.dataset.kgo); const go = e.target.closest('[data-gopen]'); if (go && mode === 'play') GOV.open('laws'); const gg = e.target.closest('[data-ggo]'); if (gg && mode === 'play' && sim.playerCiv()) GOV.open(null, gg.dataset.ggo); });
+    ENVOYS.init({ sim: () => sim, toast, fmtPop, afterAct: () => refreshAll(true), redraw: () => { world.refreshTextures(); world.updateBuildings(mapcam, true); }, openTree: (key) => TREE.open('tree', key), onWar: (id) => seen.wars.add(id),
+      flyTo: (i) => { const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.02), 0.08), { duration: 1.8 }); select(i); } });
+    $('l-dip').addEventListener('click', () => { if (sim && mode === 'play' && sim.playerCiv()) ENVOYS.open(); });
+    $('left').addEventListener('click', (e) => { const ch = e.target.closest('.goodchip[data-good]'); if (ch && mode === 'play') MARKET.open('board', +ch.dataset.good); const kg = e.target.closest('[data-kgo]'); if (kg && mode === 'play') TREE.open('tree', kg.dataset.kgo); const go = e.target.closest('[data-gopen]'); if (go && mode === 'play') GOV.open('laws'); const gg = e.target.closest('[data-ggo]'); if (gg && mode === 'play' && sim.playerCiv()) GOV.open(null, gg.dataset.ggo); const dg = e.target.closest('[data-dgo]'); if (dg && mode === 'play' && sim.playerCiv()) ENVOYS.open('realms', +dg.dataset.dgo); });
     $('lensbtn').addEventListener('click', () => { $('lensmenu').hidden = !$('lensmenu').hidden; });
     $('opt-continuous').checked = settings.continuous; $('opt-continuous').addEventListener('change', (e) => { settings.continuous = e.target.checked; if (turnRun.active) endTurn('stopped'); paused = true; applySettings(); updateTurnButton(); updateClock(); });
     attachTip($('date'), () => `<b>${sim.fmtYear(sim.year)}</b>${fmtInt(sim.year + 10000)} years since the first spring.`);
@@ -913,7 +919,9 @@
     $('v-pol').addEventListener('click', () => { view.political = !view.political; globals.uPolitical.value = view.political ? 1 : 0; $('v-pol').classList.toggle('on', view.political); });
     $('v-soil').addEventListener('click', () => setSoil(!view.soil));
     // the lens of government: every realm in the colour of the kind of rule it lives under, with a key to the colours
-    $('v-gov').addEventListener('click', () => { view.gov = !view.gov; $('v-gov').classList.toggle('on', view.gov); world.palMode = view.gov ? 'form' : 'realm'; globals.uLens.value = view.gov ? 1 : 0; if (view.gov && !view.political) $('v-pol').click(); world.refreshTextures(); renderGovKey(); });
+    $('v-gov').addEventListener('click', () => setLens(view.gov ? '' : 'gov'));
+    // the lens of relations: every realm in the colour of how it stands with you (at war, sworn to you, friendly, wary, hostile, out of reach)
+    $('v-rel').addEventListener('click', () => { if (!view.rel && !(sim && sim.playerCiv())) { toast('You have no realm for anyone to stand with yet'); return; } setLens(view.rel ? '' : 'rel'); });
     $('v-clouds').addEventListener('click', () => { view.clouds = !view.clouds; world.cloudsOn = view.clouds; $('v-clouds').classList.toggle('on', view.clouds); });
     $('v-labels').addEventListener('click', () => { view.labels = !view.labels; $('v-labels').classList.toggle('on', view.labels); });
     $('v-trade').addEventListener('click', () => { view.trade = !view.trade; $('v-trade').classList.toggle('on', view.trade); if (view.trade && sim && sim.playerCiv() && !sim.market.partners(sim.playerCiv().id).some(p => p.v > 0)) toast('No merchants reach you yet: touch another realm, or build a harbour'); });
@@ -925,12 +933,13 @@
       if ($('market').open) { if (e.key === 'm' || e.key === 'M') MARKET.close(); return; }      // (the market has the keyboard while it is open; Esc closes it, as it does any dialog)
       if ($('know').open) { if (e.key === 'k' || e.key === 'K') TREE.close(); return; }
       if ($('gov').open) { if (e.key === 'v' || e.key === 'V') GOV.close(); return; }
+      if ($('dip').open) { if (e.key === 'f' || e.key === 'F') ENVOYS.close(); return; }
       if (e.code === 'Space' || e.key === 'Enter') { if ($('chron').open || $('menu').open) return; e.preventDefault(); onTurnClick(); }
       else if (e.key === '+' || e.key === '=') { if (settings.continuous) setSpeedIdx(speedIdx + 1); } else if (e.key === '-' || e.key === '_') { if (settings.continuous) setSpeedIdx(speedIdx - 1); }
-      else if (e.key === 'b' || e.key === 'B') { if (mode === 'play') openCity(); } else if (e.key === 'g' || e.key === 'G') $('l-build').click(); else if (e.key === 'r' || e.key === 'R') { if (mode === 'play') openRealm(); } else if (e.key === 'c' || e.key === 'C') { if (mode === 'play') openChronicle('log'); } else if (e.key === 'm' || e.key === 'M') { if (mode === 'play') MARKET.open(); } else if (e.key === 'k' || e.key === 'K') { if (mode === 'play') TREE.open(); } else if (e.key === 'v' || e.key === 'V') { if (mode === 'play' && sim.playerCiv()) GOV.open(); }
+      else if (e.key === 'b' || e.key === 'B') { if (mode === 'play') openCity(); } else if (e.key === 'g' || e.key === 'G') $('l-build').click(); else if (e.key === 'r' || e.key === 'R') { if (mode === 'play') openRealm(); } else if (e.key === 'c' || e.key === 'C') { if (mode === 'play') openChronicle('log'); } else if (e.key === 'm' || e.key === 'M') { if (mode === 'play') MARKET.open(); } else if (e.key === 'k' || e.key === 'K') { if (mode === 'play') TREE.open(); } else if (e.key === 'v' || e.key === 'V') { if (mode === 'play' && sim.playerCiv()) GOV.open(); } else if (e.key === 'f' || e.key === 'F') { if (mode === 'play' && sim.playerCiv()) ENVOYS.open(); }
       else if (e.key === 'Escape') { if (mapcam.fly) mapcam.fly = null; else if (placing) cancelPlacing(); else if (tool) setTool(null); else if (!$('found').hidden) { $('found').hidden = true; pendingFound = null; } else if ($('chron').open) $('chron').close(); else if ($('menu').open) $('menu').close(); else if (!$('lensmenu').hidden) $('lensmenu').hidden = true; else if (document.body.classList.contains('dockopen')) $('l-build').click(); else if (selected >= 0) deselect(); else if (mode === 'play') openMenu(); }
       else if (e.key === '`') { const d = $('debug'); d.style.display = d.style.display === 'block' ? 'none' : 'block'; }
-      else if (e.key === 'p' || e.key === 'P') $('v-pol').click(); else if (e.key === 'l' || e.key === 'L') $('v-labels').click(); else if (e.key === 't' || e.key === 'T') $('v-trade').click(); else if (e.key === 'o' || e.key === 'O') $('v-gov').click();
+      else if (e.key === 'p' || e.key === 'P') $('v-pol').click(); else if (e.key === 'l' || e.key === 'L') $('v-labels').click(); else if (e.key === 't' || e.key === 'T') $('v-trade').click(); else if (e.key === 'o' || e.key === 'O') $('v-gov').click(); else if (e.key === 'x' || e.key === 'X') $('v-rel').click();
       else if (e.key === 'n' || e.key === 'N') mapcam.tHeading = 0; else if (e.key === 'u' || e.key === 'U') { mapcam.tTilt = 0; mapcam.autoTilt = false; }
       else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
     });
@@ -941,12 +950,21 @@
   }
   function goHome() { const c = sim.playerCiv(); if (!c || c.capital < 0) { toast('No capital yet'); return; } const [lon, lat] = placeOf(c.capital); mapcam.flyTo(lon, lat, viewDist(c.capital), { duration: 2 }); select(c.capital); }
   function openMenu() { $('m-title').textContent = mode === 'intro' ? 'Settings' : 'Menu'; $('m-info').textContent = `Tiles ${terrain.stats.tiles} · imagery packs ${terrain.stats.packsI} · elevation packs ${terrain.stats.packsE} · buildings ${world.buildingCount}`; $('menu').showModal(); }
+  // a lens paints every realm by one thing about it, in place of its own colour: how it is governed, or how it stands with you
+  function setLens(which) {
+    view.gov = which === 'gov'; view.rel = which === 'rel'; $('v-gov').classList.toggle('on', view.gov); $('v-rel').classList.toggle('on', view.rel);
+    world.palMode = view.gov ? 'form' : view.rel ? 'rel' : 'realm'; globals.uLens.value = which ? 1 : 0; if (which && !view.political) $('v-pol').click(); world.refreshTextures(); renderGovKey();
+  }
   function renderGovKey() {
-    const el = $('govkey'); el.hidden = !(view.gov && sim && mode === 'play'); if (el.hidden) return;
+    const el = $('govkey'); el.hidden = !((view.gov || view.rel) && sim && mode === 'play'); if (el.hidden) return;
+    if (view.rel) {
+      const c = sim.playerCiv(); const n = {}; if (c) { const within = new Set(sim.diplo.reach(c.id)); for (const b of sim.civs) { if (!b || b === c) continue; const k = within.has(b.id) ? sim.diplo.standing(c, b) : 'far'; n[k] = (n[k] || 0) + 1; } }
+      el.innerHTML = '<span class="micro">How the world stands with you</span>' + Object.keys(DIPLO.STAND).map((k) => { const on = n[k] || k === 'self'; return `<i class="${on ? '' : 'off'}" style="background:${DIPLO.STAND[k][1]}"></i><span class="${on ? '' : 'none'}">${DIPLO.STAND[k][0]}</span><b>${n[k] || ''}</b>`; }).join(''); return;
+    }
     const n = {}, pp = {}; let pop = 0; for (const c of sim.civs) { if (!c) continue; const k = RULE.FORM[sim.rule.ruleOf(c).gov].kind; n[k] = (n[k] || 0) + 1; pp[k] = (pp[k] || 0) + sim.popOf[c.id]; pop += sim.popOf[c.id]; }
     el.innerHTML = '<span class="micro">How the world is governed</span>' + Object.keys(RULE.KINDS).map((k) => `<i class="${n[k] ? '' : 'off'}" style="background:${RULE.KINDS[k][1]}"></i><span class="${n[k] ? '' : 'none'}">${RULE.KINDS[k][0]}</span><b>${n[k] ? Math.round(100 * pp[k] / Math.max(1e-9, pop)) + '%' : ''}</b>`).join('');
   }
-  function refreshAll(force) { updateEconomy(); updateTurnButton(); updateClock(); updateDock(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); if (view.gov) renderGovKey(); }
+  function refreshAll(force) { updateEconomy(); updateTurnButton(); updateClock(); updateDock(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); ENVOYS.refresh(); if (view.gov || view.rel) renderGovKey(); }
 
   // ---------- home screen, version, updates ----------
   // version.json is written by the build: what this game is and what changed lately. window.desktop is the app's
@@ -1136,7 +1154,7 @@
       while (acc >= 1 && performance.now() - t0 < (turnRun.active ? 22 : 12)) { sim.tick(); acc -= 1; n++; tpsCount++; }
       if (acc > 5) acc = 5; texAge += n; uiAge += n;
       if (texAge >= 3 && n > 0) { world.refreshTextures(); texAge = 0; }
-      if (uiAge >= 4) { updateEconomy(); updateClock(); updateDock(); updateTurnButton(); if (selected >= 0 && !modalOpen) updateInspector(false); uiAge = 0; if ($('know').open) TREE.refresh(); if ($('gov').open) GOV.refresh(); if ($('market').open) MARKET.refresh(); }
+      if (uiAge >= 4) { updateEconomy(); updateClock(); updateDock(); updateTurnButton(); if (selected >= 0 && !modalOpen) updateInspector(false); uiAge = 0; if ($('know').open) TREE.refresh(); if ($('gov').open) GOV.refresh(); if ($('dip').open) ENVOYS.refresh(); if ($('market').open) MARKET.refresh(); }
       if (turnRun.active) { checkInterrupts(); if (turnRun.active && sim.year >= turnRun.target) endTurn(''); }
     }
     if (sim && mode === 'play') pumpFeed(now);

@@ -167,6 +167,7 @@ window.TREE = (function () {
     if (G.recipes) { const by = new Map(); for (const r of G.recipes) { const R = E.RECIPES.find((x) => x.key === r); const a = by.get(R.out) || []; a.push(R.name); by.set(R.out, a); } for (const [g, names] of by) out.push(`${esc(names.join(', '))} can set to work, making ${MARKET.chip(E.GOODS[g])}`); }
     if (G.can) for (const a of G.can) out.push(CAN[a] || a);
     if (window.GOV) for (const line of GOV.opensLines(D.key)) out.push(line);
+    if (window.ENVOYS) for (const line of ENVOYS.opensLines(D.key)) out.push(line);
     for (const k of KN().KEYS) if (G[k]) out.push(edgeLine(k, G[k]));
     return out;
   }

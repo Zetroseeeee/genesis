@@ -187,7 +187,7 @@
   // CAL is measured, not chosen: tools/econ/calibrate.js runs the world and works out, for every raw good, how many
   // lots the world would use for each lot-per-thousand its land could give. A yield is that times the good's abund.
   /* CAL:BEGIN */
-  const CAL = {grain: 0.368, fish: 0.831, cattle: 1.09, timber: 0.509, stone: 0.534, salt: 0.342, copper: 0.0477, tin: 0.0689, iron: 0.19, horses: 0.0611, gold: 0.00288, gems: 0.0319, wine: 0.172, spices: 0.0194, silk: 0.00925, furs: 0.105, ivory: 0.00173, cotton: 0.757, coal: 31.6, oil: 3.4, rice: 0.237, maize: 0.31, wool: 1.67, olives: 6.11, sugar: 0.537, tea: 0.671, coffee: 0.563, cocoa: 0.305, tobacco: 1.25, silver: 0.282, amber: 0.312, obsidian: 6.43, incense: 0.37, dyes: 0.343, jade: 0.212, saltpetre: 0.445, rubber: 0.138, gas: 18.9, uranium: 0.193, bauxite: 1.47, rareearth: 0.463, lithium: 1.02};
+  const CAL = {grain: 0.365, fish: 0.787, cattle: 1.1, timber: 0.512, stone: 0.537, salt: 0.336, copper: 0.0522, tin: 0.0819, iron: 0.185, horses: 0.0568, gold: 0.00369, gems: 0.0277, wine: 0.16, spices: 0.0215, silk: 0.0157, furs: 0.0948, ivory: 0.00183, cotton: 0.703, coal: 25.9, oil: 2.99, rice: 0.251, maize: 0.31, wool: 1.3, olives: 4.32, sugar: 0.501, tea: 1.18, coffee: 0.545, cocoa: 0.274, tobacco: 1.24, silver: 0.37, amber: 0.286, obsidian: 6.79, incense: 0.367, dyes: 0.314, jade: 0.211, saltpetre: 0.378, rubber: 0.146, gas: 16.9, uranium: 0.198, bauxite: 1.65, rareearth: 0.537, lithium: 1.65};
   /* CAL:END */
   const yieldOf = (g) => (CAL[g.key] === undefined ? 0.5 : CAL[g.key]) * g.abund;
 
@@ -295,7 +295,7 @@
     const stock = new Float32Array(SZ), px = new Float32Array(SZ).fill(1), av = new Float32Array(SZ), need = new Float32Array(SZ), fin = new Float32Array(SZ), got = new Float32Array(SZ), out = new Float32Array(SZ), used = new Float32Array(SZ), imp = new Float32Array(SZ), exp = new Float32Array(SZ), inv = new Float32Array(SZ);
     const act = new Float32Array(MAXC * NR), mk = new Float32Array(MAXC * NR);        // each line of work: what it means to make, what it made
     const Bk = new Float32Array(MAXC * NC), sh = new Float32Array(MAXC * NM);          // what each realm spends on each want, and how it splits it between the goods
-    const sat = new Float32Array(MAXC * NC).fill(0.6), LS = new Float32Array(MAXC).fill(0.6), util = new Float32Array(MAXC), hands = new Float32Array(MAXC), gdp = new Float32Array(MAXC), rev = new Float32Array(MAXC), impV = new Float32Array(MAXC), expV = new Float32Array(MAXC), custT = new Float32Array(MAXC).fill(1), cust = new Float32Array(MAXC).fill(-1);
+    const sat = new Float32Array(MAXC * NC).fill(0.6), LS = new Float32Array(MAXC).fill(0.6), util = new Float32Array(MAXC), hands = new Float32Array(MAXC), gdp = new Float32Array(MAXC), rev = new Float32Array(MAXC), impV = new Float32Array(MAXC), expV = new Float32Array(MAXC), custT = new Float32Array(MAXC).fill(1), custH = new Float32Array(MAXC).fill(1), cust = new Float32Array(MAXC).fill(-1);
     const present = new Uint8Array(SZ), plen = new Uint8Array(MAXC);
     const nbr = new Array(MAXC).fill(null);             // the realms each one touches by land (from the simulation's border contacts)
     const base = new Float32Array(NG), ibase = new Float32Array(NG), bulk = new Float32Array(NG), rot = new Float32Array(NG), yld = new Float32Array(NG), crop = new Float32Array(NG);
@@ -316,6 +316,7 @@
     let links = [], Tl = new Float32Array(0), linksAt = -1e9;
     const radius = (c) => Math.min(25, Math.sqrt(Math.max(1, cellsOf[c]) / Math.PI) * 0.8);
     const kf = host.kf || null, NKF = host.NKF || 0, K_TRADE = host.K_TRADE || 0, K_SEA = host.K_SEA || 0;      // what each realm knows, as factors (know.js): trade, the range of ships
+    const closedTo = host.closed || null, agreedWith = host.agreed || null;                                  // what realms have sworn or shut (diplo.js): markets closed by either, a trade agreement in force
     const rm = host.rmask || null, ym = host.ymul || null;                                                   // the crafts each realm knows; what it gets from each good's land for what it knows
     const seaReach = (cv) => Math.min(400, Math.max(6, host.seaRange(cv.tech) * (host.tv ? host.tv(cv, 'sea', 1) : 1) * (kf ? kf[cv.id * NKF + K_SEA] : 1)) + 3 * ports[cv.id]);
     function buildLinks(year) {
@@ -348,7 +349,7 @@
     let pfC = -1; const pfIn = new Float32Array(SZ), pfOut = new Float32Array(SZ);
 
     function flow(os, ob, s, r, L) {      // goods go from s to r where r pays more than s plus the road; returns whether any went
-      const m = plen[s]; if (!m) return false; const ct = custT[r], tl = L.t, cr8 = cust[r]; const ps = s * NG; let any = false;
+      const m = plen[s]; if (!m) return false; const fr = L.fr, ct = fr ? custH[r] : custT[r], tl = L.t, cr8 = fr ? cust[r] * 0.5 : cust[r]; const ps = s * NG; let any = false;      // (under a trade agreement the buyer's customs are halved)
       for (let k = 0; k < m; k++) {
         const g = present[ps + k]; const ivr = inv[ob + g]; if (ivr === 0) continue;
         const as = av[os + g]; if (as <= 0) continue;
@@ -381,7 +382,7 @@
         const o = c * NG, P = popOf[c], era = cv.era; const F = 1 + 5 * cv.tech, lf = Math.log(F), sF = Math.sqrt(F), F7 = Math.exp(0.7 * lf);
         const hs = 1 + (ernd() + ernd() - 1) * 0.14;
         rev[c] = 0; impV[c] = 0; expV[c] = 0;
-        const cu = cv.econ ? clamp(+cv.econ.customs || 0, 0, 0.6) : AICUST; if (cu !== cust[c]) { cust[c] = cu; custT[c] = Math.pow(1 + cu, INV); }
+        const cu = cv.econ ? clamp(+cv.econ.customs || 0, 0, 0.6) : AICUST; if (cu !== cust[c]) { cust[c] = cu; custT[c] = Math.pow(1 + cu, INV); custH[c] = Math.pow(1 + cu * 0.5, INV); }
         fin.fill(0, o, o + NG); need.fill(0, o, o + NG); used.fill(0, o, o + NG); imp.fill(0, o, o + NG); exp.fill(0, o, o + NG); got.fill(0, o, o + NG); out.fill(0, o, o + NG);
         for (let g = 1; g < NG; g++) av[o + g] = stock[o + g];
         for (let k = 0; k < NRAW; k++) {
@@ -444,9 +445,11 @@
       }
       // 5: trade, twice round the links (so that a good can go two borders in a year; the second time only where goods moved)
       for (let k = 0; k < links.length; k++) { const L = links[k]; L.v = 0; L.tv = 0; L.top = 0; }
-      if (links.length) { const n = links.length, start = Math.abs(year) % n;
+      if (links.length) { const n = links.length, start = Math.abs(year) % n; const pver = closedTo && agreedWith && host.pactVer ? host.pactVer() : null;
         for (let round = 0; round < 2; round++) for (let q = 0; q < n; q++) {
           const L = links[(q + start) % n]; if (round && !L.hot) continue; const a = L.a, b = L.b; const ca = civs[a], cb = civs[b]; if (!ca || !cb) { L.hot = false; continue; } if (ca.wars && ca.wars[b] !== undefined) { L.hot = false; continue; }
+          if (pver && !round && (L.va !== pver[a] || L.vb !== pver[b])) { L.va = pver[a]; L.vb = pver[b]; L.shut = closedTo(a, b); L.fr = agreedWith(a, b); }      // (asked again only when either has sworn or shut something since)
+          if (L.shut) { L.hot = false; continue; }
           const x = flow(a * NG, b * NG, a, b, L), y = flow(b * NG, a * NG, b, a, L); L.hot = x || y;
         } }
       // the state's standing orders (before people take their share)

@@ -39,7 +39,7 @@
         if (e.key === 'ArrowLeft' || e.key === 'a') this.pan(s, 0); if (e.key === 'ArrowRight' || e.key === 'd') this.pan(-s, 0);
         if (e.key === 'ArrowUp' || e.key === 'w') this.pan(0, s); if (e.key === 'ArrowDown' || e.key === 's') this.pan(0, -s);
         if (e.key === 'q') this.tHeading += 0.06; if (e.key === 'e') this.tHeading -= 0.06;
-        if (e.key === 'r') { this.tTilt = clamp(this.tTilt + 0.06, 0, 1.45); this.autoTilt = false; } if (e.key === 'f') { this.tTilt = clamp(this.tTilt - 0.06, 0, 1.45); this.autoTilt = false; }
+        if (e.key === 'PageUp') { this.tTilt = clamp(this.tTilt + 0.06, 0, 1.45); this.autoTilt = false; } if (e.key === 'PageDown') { this.tTilt = clamp(this.tTilt - 0.06, 0, 1.45); this.autoTilt = false; }      // (R and F open the realm and the envoys)
         if (e.key === '=' || e.key === '+') this.tDist = clamp(this.tDist * 0.8, this.minDist, this.maxDist); if (e.key === '-') this.tDist = clamp(this.tDist * 1.25, this.minDist, this.maxDist);
       });
     }

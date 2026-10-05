@@ -28,6 +28,8 @@ async function scenario(name, fn) {
     if ((await ev(() => document.body.dataset.mode)) !== 'play') { await ev(() => __G.start(31.25, 29.9, 'Kemet')); await wait(300); await frames(3); }
   }
   if (page) await ev(() => { if (window.__toasts) window.__toasts.length = 0; });
+  // (envoys are a matter for the scenario about them: elsewhere nobody waits on the player at the start and the neighbours keep their proposals to themselves)
+  if (page && !/^(boot|intro|diplomacy)/.test(name)) await ev(() => { if (window.__T && __T.quiet && __G.sim && document.body.dataset.mode === 'play') __T.quiet(); });
   const before = errors.length; const t = Date.now(); const fails = [];
   const check = (cond, msg) => { if (!cond) fails.push(msg); };
   try { await fn(check); } catch (e) { fails.push('threw: ' + (e.message || e).toString().slice(0, 400)); }
@@ -309,24 +311,24 @@ server.listen(0, async () => {
     const ru = await ev(() => { const S = __G.sim; const c = S.playerCiv(); __G.select(c.capital); const cv = document.getElementById('sc-portrait'); const ctx = cv.getContext('2d'); const d = ctx.getImageData(0, 0, cv.width, cv.height).data; let painted = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 0) painted++; return { name: document.getElementById('sc-ruler-name').textContent, sub: document.getElementById('sc-ruler-sub').textContent, trait: document.getElementById('sc-ruler-trait').textContent, painted: painted / (d.length / 4), trade: document.getElementById('sc-kv').textContent.includes('Trade') }; });
     check(ru.name.length > 3 && /throne/.test(ru.sub) && ru.trait.length > 10, `ruler card: ${ru.name} · ${ru.sub} · ${ru.trait.slice(0, 40)}`); check(ru.painted > 0.9, `portrait painted (${(ru.painted * 100).toFixed(0)}% of pixels)`); check(ru.trade, 'trade row in the realm panel');
     check(/capital of/.test(r.sub), 'own capital subtitle: ' + r.sub); check(r.policy, 'policy shown for own realm'); check(r.towns, 'settlement list for own realm'); check(r.actions === '', 'no war button on yourself');
-    check(!r.ePolicy && /Declare war|Offer peace/.test(r.eActions), 'foreign realm: no policy, war button: ' + r.eActions);
+    check(!r.ePolicy && /Diplomacy|War and peace|envoys cannot reach/.test(r.eActions), 'foreign realm: no policy, and the way to its envoys: ' + r.eActions);
     check(r.wTitle === 'Unclaimed land' && r.wCiv, 'wild land: ' + r.wTitle + ' / ' + r.wSub);
     check(r.sTitle === 'Open sea', 'sea: ' + r.sTitle);
   });
-  await scenario('inspector: policy sliders, stance, rename, declare war and peace', async (check) => {
+  await scenario('inspector: policy sliders, stance, rename, war and peace by the old door', async (check) => {
     const r = await ev(() => { const S = __G.sim; const c = S.playerCiv(); __G.select(c.capital); document.getElementById('policy').open = true; const out = {};
       const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input')); }; set('pol-tax', 1.6); set('pol-military', 0.5); set('pol-research', 2); out.policy = { ...c.policy };
       document.querySelector('.stance[data-stance="aggressive"]').click(); out.stance = c.policy.stance; out.on = document.querySelector('.stance.on').dataset.stance;
       document.getElementById('in-name').value = 'Renamed'; document.getElementById('btn-rename').click(); out.name = c.name; out.header = document.getElementById('id-name').textContent;
-      const e = S.civs.find(x => x && !x.player && x.capital >= 0 && S.owner[x.capital] === x.id); __G.select(e.capital); document.getElementById('btn-war').click(); out.war = S.isAtWar(c, e.id); out.btn = document.getElementById('btn-war').textContent; document.getElementById('btn-war').click(); out.peace = !S.isAtWar(c, e.id); return out; });
+      const e = S.civs.find(x => x && !x.player && x.capital >= 0 && S.owner[x.capital] === x.id && !S.isAtWar(c, x.id) && !((c.truce[x.id] || -1e9) > S.year) && x.dip.lord !== c.id); out.no1 = S.playerWar(e.id); out.war = S.isAtWar(c, e.id); __G.select(e.capital); out.btn = (document.getElementById('btn-dip') || { textContent: '' }).textContent; out.no2 = S.playerWar(e.id); out.peace = !S.isAtWar(c, e.id); return out; });
     check(r.policy.tax === 1.6 && r.policy.military === 0.5 && r.policy.research === 2, 'sliders write policy: ' + JSON.stringify(r.policy)); check(r.stance === 'aggressive' && r.on === 'aggressive', 'stance set'); check(r.name === 'Renamed' && /Renamed/.test(r.header), 'rename updates header: ' + r.header);
-    check(r.war && /peace/i.test(r.btn) && r.peace, 'war then peace via button');
+    check(r.no1 === null && r.war && /War and peace/.test(r.btn) && r.no2 === null && r.peace, `war, the panel's way to its terms (${r.btn}), then peace as things stand`);
     await ev(() => { document.querySelector('.stance[data-stance="steady"]').click(); });
   });
   await scenario('chronicle modal: tabs, filters, click-to-fly, close', async (check) => {
     await page.keyboard.press('c'); await frames(2);
     let r = await ev(() => ({ open: document.getElementById('chron').open, log: document.querySelectorAll('#log .fe').length, filters: document.querySelectorAll('#logfilters .btn').length }));
-    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 10, 'ten filters');
+    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 11, 'eleven filters');
     await ev(() => document.querySelector('#logfilters [data-f="mine"]').click()); const mine = await ev(() => [...document.querySelectorAll('#log .fe')].every(e => e.classList.contains('mine'))); check(mine, 'Mine filter shows only own events');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="powers"]').click()); check((await ev(() => document.querySelectorAll('#powers .pw').length)) > 3, 'powers list');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="graphs"]').click()); await frames(2); check((await ev(() => { const c = document.getElementById('g-world'); return c.width > 0 && c.height > 0; })), 'graphs drawn');
@@ -359,7 +361,10 @@ server.listen(0, async () => {
     await ev(() => document.getElementById('btn-load').click()); await wait(800); await page.waitForFunction(() => !__G.mapcam.fly, null, { timeout: 320000 }); await frames(4);      // (from the home screen the camera flies down to where the world was left)
     const after = await ev(() => { const S = __G.sim; const c = S.playerCiv(); return { mode: document.body.dataset.mode, year: S.year, name: c && c.name, cells: c && S.cellsOf[c.id], civs: S.st.civCount, lon: __G.mapcam.lon, lat: __G.mapcam.lat, ruin: S.ruins.get(S.LI[123])?.name, turn: document.getElementById('turn1').textContent, left: document.getElementById('left').classList.contains('open') }; });
     check(after.mode === 'play', 'play mode after load'); check(after.year === before.year, `year ${after.year} == ${before.year}`); check(after.name === before.name, 'player name'); check(Math.abs(after.cells - before.cells) <= 1, `cells ${after.cells} ~ ${before.cells}`); check(after.civs === before.civs, `civs ${after.civs} == ${before.civs}`);
-    check(Math.abs(after.lon - before.lon) < 1e-6 && Math.abs(after.lat - before.lat) < 1e-6, 'camera restored'); check(after.ruin === 'Testruin', 'ruins restored'); check(after.turn === 'Advance', 'turn button ready');
+    check(Math.abs(after.lon - before.lon) < 1e-6 && Math.abs(after.lat - before.lat) < 1e-6, 'camera restored'); check(after.ruin === 'Testruin', 'ruins restored');
+    // (the turn button is ready: for the next turn, or for envoys who were waiting when the world was saved and still are - they are answered first)
+    check(after.turn === 'Advance' || after.turn === 'Envoys', 'turn button ready: ' + after.turn);
+    if (after.turn === 'Envoys') { const t = await ev(() => { const S = __G.sim, c = S.playerCiv(); for (const o of [...c.dip.offers]) S.diplo.answer(c, o.id, false); ENVOYS.refresh(); return c.dip.offers.length; }); await frames(4); check(t === 0 && (await state()).t1 === 'Advance', 'envoys answered, the turn button is ready'); }
     // and a turn still runs after loading
     await ev(() => document.getElementById('turn').click()); await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 300000 }); check((await state()).year > before.year, 'time runs after load');
   });
@@ -441,7 +446,10 @@ server.listen(0, async () => {
     check(n.markers > 0, `goods markers drawn (${n.markers}; ${JSON.stringify(n.dbg)})`); check(n.withText > 0, 'markers carry the good\'s name this close');
   });
   await scenario('market: the board, a good and its book, a purchase, an order, the tabs', async (check) => {
-    await ev(() => { const S = __G.sim; for (const c of S.civs) if (c && c.tech < 0.2) { c.tech = 0.2; c.era = S.eraOf(c.tech); __T.teach(c); } S.playerCiv().wealth = 1e6; __G.run(60); });
+    // (a market needs somebody to trade with: if no realm lies against the player's land, one is set down there with a few regions of its own)
+    await ev(() => { const S = __G.sim, c = S.playerCiv(), W = S.W; const free = (i) => i >= 0 && i < S.N && S.land[i] && !(S.flags[i] & 8) && S.owner[i] < 0 && S.fert[i] > 0.05;
+      if (!(S.diplo.reach(c.id).some((id) => S.diplo.touches(c, id)))) { for (const i of S.LI) { if (!free(i) || ![i - 1, i + 1, i - W, i + W].some((j) => S.owner[j] === c.id)) continue; const t = S.spawnTribe(i, {}); if (!t) continue; S.pop[i] = 3; for (const j of [i - 1, i + 1, i - W, i + W, i - W - 1, i - W + 1, i + W - 1, i + W + 1]) if (free(j)) { S.owner[j] = t.id; S.pop[j] = 2; } break; } S.recount(); S.touchAll(); }
+      for (const x of S.civs) if (x && x.tech < 0.2) { x.tech = 0.2; x.era = S.eraOf(x.tech); __T.teach(x); } c.wealth = 1e6; __G.run(60); });
     await page.keyboard.press('m'); await frames(3);
     let r = await ev(() => ({ open: document.getElementById('market').open, rows: document.querySelectorAll('#mk-table button.mk-row').length, groups: document.querySelectorAll('#mk-table .mk-group').length, tape: document.querySelectorAll('#mk-tape .mk-roll button').length, figs: document.getElementById('mk-tape').textContent, sub: document.getElementById('mk-sub').textContent, realm: __G.sim.fullName(__G.sim.playerCiv()), purse: document.getElementById('mk-purse').textContent, good: document.querySelector('#mk-good h3') ? document.querySelector('#mk-good h3').textContent : '' }));
     check(r.open, 'M opens the market'); check(r.rows >= 20 && r.groups === 4, `the board lists the goods of the age in four groups (${r.rows} rows, ${r.groups} groups)`); check(r.tape >= 6 && /World product/.test(r.figs), `the tape runs the world's prices (${r.tape} entries)`); check(r.sub.includes(r.realm) && /\d/.test(r.purse), 'the head names the realm and its treasury: ' + r.sub + ' / ' + r.purse); check(r.good.length > 2, 'a good is open: ' + r.good);
@@ -494,6 +502,76 @@ server.listen(0, async () => {
     check(r.at > 0 && r.eff > eff0 * 1.2, `the workshops stand and make the crafts cheaper (${r.eff.toFixed(2)}×, from ${eff0.toFixed(2)}×)`); check(r.item, 'the planner draws them'); check(/Already built/.test(r.card), 'the card says they are built'); check(r.taken >= 1, 'their plot is taken');
     await ev(() => MARKET.open('works')); await frames(2); const n = await ev(() => document.querySelector('#mk-works .mk-ind.has b').textContent); check(n === '1', 'the Workshops tab counts them: ' + n); await ev(() => MARKET.close());
   });
+  await scenario('diplomacy: realms and what they think, a pact, a gift, a claim, war and peace, envoys, the lens', async (check) => {
+    // two neighbours are set down beside the player's land, and everyone is given the Iron Age's knowledge (this scenario can run by itself)
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (TREE.isOpen()) TREE.close(); if (GOV.isOpen()) GOV.close(); });
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), D = S.diplo, W = S.W; const free = (i) => i >= 0 && i < S.N && S.land[i] && !(S.flags[i] & 8) && S.owner[i] < 0 && S.fert[i] > 0.05; const mine = (i) => S.owner[i] === c.id;
+      const made = []; for (const i of S.LI) { if (made.length >= 2) break; if (!free(i) || ![i - 1, i + 1, i - W, i + W].some(mine) || made.some(t => S.cellDist(t.capital, i) < 3)) continue; const t = S.spawnTribe(i, {}); if (t) made.push(t); }
+      const iron = S.ERAS[2][1] + 0.01; for (const x of made) { x.tech = iron; x.era = S.eraOf(iron); __T.teach(x, 2, true); x.aggression = 0; x.dip.think = 1e12; x.ruler.trait = 'steward'; }
+      for (const k of ['laws', 'markets', 'envoys', 'kingship']) S.know.learn(c.id, c, KNOW.ID[k], true);      // (the player's people are taught only what treaties stand on: the scenarios after this one find them as they were)
+      for (const k of Object.keys(c.wars)) { const e = S.civs[+k]; if (e) D.conclude(c, e, 'white'); } c.truce = {}; for (const t of made) t.truce = {};
+      S.recount(); S.touchAll(); c.wealth = 5000; window.__dip = made.map(t => t.id); D.remember(made[0], c.id, 40); __G.run(1); S.touchAll();
+      return { made: made.length, reach: D.reach(c.id).filter(id => made.some(t => t.id === id)).length, touch: made.every(t => D.touches(c, t.id)), btn: !!document.getElementById('l-dip') }; });
+    check(r.made === 2 && r.reach === 2 && r.touch && r.btn, `two neighbours within reach of the player's envoys (${JSON.stringify(r)})`);
+    // the screen: F opens it; the realms, what they think and why
+    await page.keyboard.press('f'); await frames(3);
+    r = await ev(() => { const rows = [...document.querySelectorAll('#dp-list .dp-row')]; return { open: document.getElementById('dip').open, rows: rows.length, mine: window.__dip.every(id => rows.some(b => +b.dataset.dsel === id)), word: document.getElementById('dp-word').textContent, tabs: [...document.querySelectorAll('#dp-tabs button')].map(b => b.textContent.trim()).join('|'), groups: [...document.querySelectorAll('#dp-list .dp-grp')].map(b => b.textContent).join('|'), filters: document.querySelectorAll('#dp-list [data-dfilter]').length }; });
+    check(r.open && r.rows >= 2 && r.mine, `F opens Diplomacy with the realms within reach (${r.rows} rows)`); check(/^50/.test(r.word) && /ordinary/.test(r.word), 'the player\'s word is shown: ' + r.word); check(r.tabs === 'Realms|Envoys|Wars|Your standing' && r.filters === 5 && /On your borders/.test(r.groups), `tabs, filters and groups (${r.tabs}; ${r.groups})`);
+    await ev(() => document.querySelector(`#dp-list .dp-row[data-dsel="${window.__dip[0]}"]`).click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[0]]; const info = document.getElementById('dp-info'); const props = [...info.querySelectorAll('.dp-prop')].map(p => ({ name: p.querySelector('b').textContent, st: p.querySelector('.st').textContent, off: p.classList.contains('off'), dis: p.querySelector('button').disabled }));
+      return { name: info.querySelector('h3').textContent, full: S.fullName(a), mood: info.querySelector('.dp-mood b').textContent, o: S.diplo.opinion(a, c), why: [...info.querySelectorAll('.gv-sect .gv-why span')].slice(0, 9).map(x => x.textContent).join('; '), props, gifts: info.querySelectorAll('[data-dact="gift"]').length, war: !!info.querySelector('[data-dact="war"]'), causes: [...info.querySelectorAll('.dp-cause b')].map(x => x.textContent).join('|'), none: /Nothing is sworn/.test(info.textContent) }; });
+    check(r.name === r.full && r.mood === (await ev((o) => DIPLO.moodOf(o), r.o)), `a realm's page: ${r.name}, ${r.mood} (${Math.round(r.o)})`); check(/Old favours \+\d+/.test(r.why) && /shared border −\d/.test(r.why), 'with the reasons: ' + r.why);
+    { const nap = r.props.find(p => p.name === 'Sworn peace'), al = r.props.find(p => p.name === 'Alliance'), mar = r.props.find(p => p.name === 'Royal marriage');
+      check(nap && /They would agree/.test(nap.st) && !nap.dis, 'a sworn peace would be agreed: ' + (nap && nap.st)); check(al && /They would (agree|refuse)/.test(al.st), 'an alliance is weighed: ' + (al && al.st)); check(mar && /ruled by blood/.test(mar.st) && mar.dis, 'a marriage needs two houses: ' + (mar && mar.st)); }
+    check(r.gifts >= 2 && r.war && /No cause/.test(r.causes) && r.none, `gifts, a war with its reasons (${r.causes}), and nothing sworn yet`);
+    // a pact
+    await ev(() => document.querySelector('#dp-info .dp-prop [data-dact="propose"][data-k="nap"]').click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[0]]; const info = document.getElementById('dp-info'); return { has: S.diplo.has(c, a.id, 'nap'), line: [...info.querySelectorAll('.dp-line')].map(x => x.textContent).join(' / '), badge: !!document.querySelector(`#dp-list .dp-row[data-dsel="${a.id}"] .dp-bd.nap`), grp: document.querySelector('#dp-list .dp-grp').textContent, toast: (window.__toasts || []).slice(-1)[0] || '', again: !![...info.querySelectorAll('.dp-prop b')].find(b => b.textContent === 'Sworn peace') }; });
+    check(r.has && /Sworn peace until/.test(r.line) && r.badge && /Sworn to you/.test(r.grp) && !r.again, `proposed and agreed: ${r.line}`); check(/agrees/.test(r.toast), 'and said so: ' + r.toast);
+    // a gift
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[1]]; ENVOYS.show(a.id); const o0 = S.diplo.opinion(a, c), w0 = c.wealth; const b = document.querySelector('#dp-info [data-dact="gift"]'); const coin = +b.dataset.k; b.click(); return { coin, paid: w0 - c.wealth, up: S.diplo.opinion(a, c) - o0 }; }); await frames(2);
+    check(r.paid === r.coin && r.up > 0, `a gift of ${r.coin} coin buys ${r.up.toFixed(1)} of goodwill`);
+    // a claim, then a war with that reason, seen from the wars' list and ended as things stand
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), b = S.civs[window.__dip[1]]; const w0 = c.wealth; document.querySelector('#dp-info [data-dact="claim"]').click(); const info = document.getElementById('dp-info');
+      return { paid: w0 - c.wealth, cost: S.diplo.claimCost(c, b), causes: [...info.querySelectorAll('.dp-cause')].map(x => x.querySelector('b').textContent + (x.classList.contains('sel') ? '*' : '')).join('|'), cost0: [...info.querySelectorAll('.gv-gives li')].map(x => x.textContent).join(' / ') }; }); await frames(2);
+    check(r.paid === r.cost && /^A claim\*/.test(r.causes), `a claim costs ${r.paid} coin and is the first reason offered (${r.causes})`); check(/Nobody at home or abroad holds it against you/.test(r.cost0) && /fight alone|Beside you/.test(r.cost0), 'a war with a reason costs nothing: ' + r.cost0);
+    await ev(() => document.querySelector('#dp-info [data-dact="war"]').click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), b = S.civs[window.__dip[1]]; const info = document.getElementById('dp-info'); return { war: S.isAtWar(c, b.id), goal: c.dip.goal[b.id], score: !!info.querySelector('.dp-score'), terms: [...info.querySelectorAll('.dp-prop')].map(p => p.querySelector('b').textContent + ': ' + p.querySelector('.st').textContent).join(' / '), grp: document.querySelector('#dp-list .dp-grp').textContent, sub: document.getElementById('dp-sub').textContent }; });
+    check(r.war && r.goal === 'claim' && r.score && /At war with you/.test(r.grp) && /at war with/i.test(r.sub), 'war is declared, and the page turns to the war'); check(/Peace as things stand: They would accept/.test(r.terms), 'with the terms on which it could end: ' + r.terms);
+    await ev(() => document.querySelector('#dp-tabs [data-dtab="wars"]').click()); await frames(2);
+    r = await ev(() => ({ wars: document.querySelectorAll('#dp-wars .dp-war').length, mine: document.querySelectorAll('#dp-wars .dp-war.mine').length, text: (document.querySelector('#dp-wars .dp-war') || { textContent: '' }).textContent }));
+    check(r.wars >= 1 && r.mine === 1 && /A claim/.test(r.text) && /attacks/.test(r.text) && /defends/.test(r.text), 'the wars of the known world, the player\'s first: ' + r.text.slice(0, 120));
+    await ev(() => { ENVOYS.show(window.__dip[1]); }); await frames(2); await ev(() => document.querySelector('#dp-info [data-dact="sue"][data-k="white"]').click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), b = S.civs[window.__dip[1]]; return { war: S.isAtWar(c, b.id), line: [...document.querySelectorAll('#dp-info .dp-line')].map(x => x.textContent).join(' / '), no: document.querySelector('#dp-info .gv-sect:last-child').textContent }; });
+    check(!r.war && /A truce until/.test(r.line) && /truce holds/i.test(r.no), 'peace as things stand, and a truce: ' + r.line);
+    // envoys: what another realm proposes waits on the player: among what the turn button lays before him, and on the tab
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[0]]; ENVOYS.close(); S.diplo.remember(a, c.id, 40); const no = S.diplo.propose(a, c, 'trade'); const q = __G.attention(), it = q.find((x) => x.kind === 'envoy'); return { no, n: c.dip.offers.length, t1: it ? it.t1 : '', t2: it ? it.t2 : '', at: q.indexOf(it) + 1, len: q.length }; });
+    check(r.no === null && r.n === 1 && r.t1 === 'Envoys' && /proposes a trade agreement/.test(r.t2), `envoys wait on the player: ${r.t1} · ${r.t2} (${r.at} of ${r.len} things that wait)`);
+    await ev(() => { __G.attention().find((x) => x.kind === 'envoy').act(); }); await frames(3);      // (what a press of the turn button does when their turn comes)
+    r = await ev(() => ({ open: document.getElementById('dip').open, tab: document.querySelector('#dp-tabs button.on').textContent.trim(), n: (document.querySelector('#dp-tabs .dp-n') || { textContent: '' }).textContent, card: (document.querySelector('#dp-envoys .dp-offer') || { textContent: '' }).textContent }));
+    check(r.open && /^Envoys/.test(r.tab) && r.n === '1' && /proposes a trade agreement/.test(r.card) && /half the customs/.test(r.card), 'the turn button leads to them: ' + r.card.slice(0, 140));
+    await ev(() => document.querySelector('#dp-envoys [data-dact="answer"][data-v="yes"]').click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[0]]; return { has: S.diplo.has(c, a.id, 'trade'), left: c.dip.offers.length, empty: /No envoys wait on you/.test(document.getElementById('dp-envoys').textContent), log: document.querySelector('#dp-envoys .dp-log').textContent }; });
+    check(r.has && r.left === 0 && r.empty && /open their markets/.test(r.log), 'accepted: the agreement is in force and in the record');
+    // where the player stands
+    await ev(() => document.querySelector('#dp-tabs [data-dtab="standing"]').click()); await frames(2);
+    r = await ev(() => ({ stats: [...document.querySelectorAll('#dp-standing .dp-stat b')].map(b => b.textContent.trim()).join(' | '), sworn: document.getElementById('dp-standing').textContent }));
+    check(/ordinary/.test(r.stats) && /coin a year/i.test(r.stats) && /Sworn peace with/.test(r.sworn) && /Trade agreement with/.test(r.sworn) && /Truces/.test(r.sworn), 'the player\'s standing: ' + r.stats);
+    await page.keyboard.press('f'); await frames(2); check(!(await ev(() => document.getElementById('dip').open)), 'F closes it');
+    // the knowledge tree says what a discovery opens between realms
+    r = await ev(() => { const L = KNOW.LIST, g = (k) => TREE.givesOf(L[KNOW.ID[k]]).join(' | ').replace(/<[^>]+>/g, ''); return { envoys: g('envoys'), laws: g('laws'), kingship: g('kingship') }; });
+    check(/Your envoys can propose: Defensive pact, Alliance/.test(r.envoys) && /Sworn peace/.test(r.laws) && /a claim/.test(r.laws) && /Royal marriage/.test(r.kingship) && /bend the knee/.test(r.kingship), 'a discovery\'s page says what it opens between realms: ' + r.envoys.slice(0, 90));
+    // the realm's panel on the map, and the lens of relations
+    r = await ev(() => { const S = __G.sim, a = S.civs[window.__dip[0]]; __G.select(a.capital); return { kv: document.getElementById('sc-kv').textContent, btn: (document.getElementById('btn-dip') || { textContent: '' }).textContent }; });
+    check(/With you/.test(r.kv) && /sworn peace/.test(r.kv) && r.btn === 'Diplomacy', 'the realm\'s panel says how it stands with you: ' + r.btn);
+    await ev(() => document.getElementById('btn-dip').click()); await frames(2); r = await ev(() => ({ open: document.getElementById('dip').open, name: document.querySelector('#dp-info h3').textContent, full: __G.sim.fullName(__G.sim.civs[window.__dip[0]]) })); check(r.open && r.name === r.full, 'and leads to its page'); await ev(() => ENVOYS.close());
+    await page.keyboard.press('x'); await frames(6);
+    r = await ev(() => { const k = document.getElementById('govkey'); return { on: document.getElementById('v-rel').classList.contains('on'), mode: __G.world.palMode, lens: __G.globals.uLens.value, key: !k.hidden, text: k.textContent, gov: document.getElementById('v-gov').classList.contains('on') }; });
+    check(r.on && r.mode === 'rel' && r.lens === 1 && r.key && /How the world stands with you/.test(r.text) && /Friends/.test(r.text) && !r.gov, 'X turns on the lens of relations, with its key');
+    await page.keyboard.press('o'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, rel: document.getElementById('v-rel').classList.contains('on'), text: document.getElementById('govkey').textContent })); check(r.mode === 'form' && !r.rel && /How the world is governed/.test(r.text), 'one lens at a time: O swaps it for the lens of government');
+    await page.keyboard.press('o'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, key: document.getElementById('govkey').hidden, lens: __G.globals.uLens.value })); check(r.mode === 'realm' && r.key && r.lens === 0, 'and off again');
+    await ev(() => { __G.select(__G.sim.playerCiv().capital); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);
@@ -501,11 +579,15 @@ server.listen(0, async () => {
   });
 
   // ---------- layouts ----------
-  await scenario('layout: narrow 800x500 and wide 1920x1080 keep the HUD inside the viewport', async (check) => {
-    for (const vp of [{ width: 800, height: 500 }, { width: 1920, height: 1080 }]) {
+  await scenario('layout: from 800x500 to 1920x1080 the HUD stays inside the viewport and the launchers clear of the minimap', async (check) => {
+    for (const vp of [{ width: 800, height: 500 }, { width: 1160, height: 700 }, { width: 1920, height: 1080 }]) {      // (1160: just wide enough for the launchers' names, where they come nearest the minimap)
       await page.setViewportSize(vp); await wait(300); await frames(3); await ev(() => { document.getElementById('l-build').click(); __G.select(__G.sim.playerCiv().capital); }); await frames(2);
-      const r = await ev(() => { const ids = ['tl', 'tr', 'left', 'bl', 'bc', 'br', 'turn', 'minimapbox']; const out = []; for (const id of ids) { const el = document.getElementById(id); if (!el || getComputedStyle(el).display === 'none') continue; const b = el.getBoundingClientRect(); if (b.width === 0) continue; if (b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1) out.push(`${id} ${Math.round(b.left)},${Math.round(b.top)}-${Math.round(b.right)},${Math.round(b.bottom)}`); } const a = document.getElementById('left').getBoundingClientRect(), d = document.getElementById('bc').getBoundingClientRect(); const overlap = a.left < d.right && d.left < a.right && a.top < d.bottom && d.top < a.bottom; return { out, overlap, w: innerWidth }; });
-      check(r.out.length === 0, `${vp.width}px: elements outside viewport: ${r.out.join('; ')}`); check(!r.overlap, `${vp.width}px: inspector overlaps the dock`);
+      const r = await ev(() => { const ids = ['tl', 'tr', 'left', 'bl', 'bc', 'br', 'turn', 'minimapbox']; const out = []; for (const id of ids) { const el = document.getElementById(id); if (!el || getComputedStyle(el).display === 'none') continue; const b = el.getBoundingClientRect(); if (b.width === 0) continue; if (b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1) out.push(`${id} ${Math.round(b.left)},${Math.round(b.top)}-${Math.round(b.right)},${Math.round(b.bottom)}`); } const a = document.getElementById('left').getBoundingClientRect(), d = document.getElementById('bc').getBoundingClientRect(); const overlap = a.left < d.right && d.left < a.right && a.top < d.bottom && d.top < a.bottom;
+        // (the bar of launchers stops short of the minimap and the turn button, and none of its names is cut off)
+        const bar = document.getElementById('bl').getBoundingClientRect(); let meets = ''; for (const id of ['minimapbox', 'turn']) { const el = document.getElementById(id); if (!el || getComputedStyle(el).display === 'none') continue; const b = el.getBoundingClientRect(); if (b.width && bar.right > b.left - 4 && bar.bottom > b.top && bar.top < b.bottom) meets += `${id} at ${Math.round(b.left)}, the bar to ${Math.round(bar.right)}; `; }
+        const cut = [...document.querySelectorAll('#bl .btn')].filter((b) => b.scrollWidth > b.clientWidth + 1).length, n = document.querySelectorAll('#bl .btn').length;
+        return { out, overlap, meets, cut, n, w: innerWidth }; });
+      check(r.out.length === 0, `${vp.width}px: elements outside viewport: ${r.out.join('; ')}`); check(!r.overlap, `${vp.width}px: inspector overlaps the dock`); check(!r.meets && !r.cut && r.n >= 9, `${vp.width}px: the ${r.n} launchers stop short of the minimap, none cut off (${r.meets || 'clear'}${r.cut ? r.cut + ' cut' : ''})`);
       await ev(() => document.getElementById('l-build').click());
     }
     await page.setViewportSize({ width: 1024, height: 640 }); await wait(300);

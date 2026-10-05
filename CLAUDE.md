@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~45–60 min for all 28).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~26 min for all 35).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
@@ -36,7 +36,8 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `node tools/dbg3.js "<script>" "<probe>" <wait>` — run a script in the page and print a probe object.
 - `tools/macshots.sh [scene names]` — the real thing: pictures of this commit taken on an Apple GPU by the Scenes
   workflow (`tools/scenes/tour.txt` lists the scenes: towns of every people and age, forests, seasons, dusk and night,
-  dry countries, rivers). Look at these before believing anything about how the game looks.
+  dry countries, rivers). Look at these before believing anything about how the game looks. `REF=<branch>` takes
+  them of a pushed branch before it is on `main` (nothing is given out to players by it).
 - `npm start` — desktop window (Electron).
 - `node tools/test_update.js` — the updater under plain Node: small games in folders, the publishing step writing a
   feed, a web server that misbehaves on demand (270 checks, a few seconds). Run it after touching `desktop/updater.js`
@@ -49,9 +50,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   checkout of the version before it, from a copy of the real feed (`tools/update/mirror.mjs`).
 - `node tools/econ/probe.js [seed] [last year] [goods]` — the world's economy through the ages in numbers: prices
   against the usual, output against need, who is short, how much crosses borders, what the workshops make, and how
-  long the market takes a year. `node tools/econ/calibrate.js [seed] --write` measures how much each raw good's land
+  long the market takes a year. `node tools/econ/calibrate.js [seed,seed] --write` measures how much each raw good's land
   must yield and writes the table into `src/econ.js` (between its CAL marks): run it after changing where goods lie
   (`PLACES`), what people want (`CATS`) or how things are made (`RECIPES`), or a good will be far too scarce or too plenty.
+  Measure over two seeds (12345,777: the table is their mean): the goods few places yield are sized by a handful of realms.
 - `node tools/know/pace.js [seed,seed] [--fit N] [--write]` — the pace of history: when the realms in front enter each
   age, how far behind the middle realm is, how many people there are. With `--fit` it moves each age's yearly gain of
   knowledge (`RATE` in `src/sim.js`, between its marks) toward the dates history kept (bronze 3300 BC, iron 1200 BC,
@@ -71,6 +73,11 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
   realms of each age get from their rule and writes the table into `src/rule.js` (between its NORM marks): run it
   twice over two seeds after changing what forms and laws give, who likes them, or how the autopilot chooses.
+- `node tools/diplo/probe.js [seed] [last year]` — war and peace through the ages in numbers: how many realms there are,
+  how often they go to war and why, on what terms they stop, what they have sworn, who is whose vassal, what they
+  think of one another, how much of the old appetite for war finds somebody it may fall on. Run it over seeds 12345
+  and 777 after touching `diplo.js` or the simulation's wars, and hold it against the numbers in its header: the world
+  must go on fighting about as often as it did, and keep about as many realms.
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
 - `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
@@ -89,6 +96,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/econ.js` | `ECON` | Goods, recipes, wants; where the Earth keeps things; one world's market: prices, workshops, trade between realms |
 | `src/know.js` | `KNOW` | The discoveries (174, in nine ages and six branches), what each opens and gives; one world's knowledge: who knows what, who studies what |
 | `src/rule.js` | `RULE` | Forms of government (24), laws (100 in twelve fields), the seven estates, authority; one world's rule: what every realm has chosen, who holds power in it, reforms, demands, risings |
+| `src/diplo.js` | `DIPLO` | What two realms can swear, why they go to war and what a winner may ask; one world's diplomacy: what every realm thinks of every other and why, pacts, vassals, claims, wars with friends on both sides, offers to the player |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, biome shader, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
@@ -101,6 +109,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand |
+| `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
 | `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
 | `desktop/updater.js` | | Keeps the game's files current without replacing the app (plain Node, no Electron inside) |
@@ -217,6 +226,38 @@ Conventions that matter:
   through `__T.teach` (the player's own only when asked). The screen is `gov.js` (V); the lens of government (O)
   paints realms in the colour of the kind of rule they live under (`RULE.KINDS`; `world.palMode = 'form'`, and
   `uLens` makes the ground shader's fill strong enough to read), with a key above the minimap.
+- **Diplomacy** (`diplo.js`; `sim.diplo`). What a realm has sworn, remembers, claims and is owed is on the realm as
+  `civ.dip` and saved with it. Its keys are numbers (`claim[id * 4 + kind]`, `ask[id * 8 + what]`), and a year BC is
+  negative: "never" is not 0 (`holds`, `claimUntil` answer -Infinity; `d.next` is the year the next thing of a realm's
+  runs out, so that nothing is looked through until then). **Opinion** (-100 to 100) is a sum of reasons the page can
+  list (`reasons`): what is remembered (it halves in three turns), faith, kind of rule, speech, trade, what is sworn,
+  a border and who is the stronger across it, conquests, a realm's word, claims, enemies in common. Five things can
+  be sworn (sworn peace, trade agreement, defensive pact, alliance, royal marriage: `PACTS`), each standing on a
+  discovery and holding some turns; a **vassal** (kept on the vassal: `dip.lord`) pays a tenth and follows its lord to
+  war, and after six turns a loyal one can be joined to the crown. A proposal is weighed by `judge` (a score and its
+  reasons, which the page shows before the player asks). War needs no reason but is dearer without one (`causes`:
+  a claim, land that was one's own, another faith, goods, kin, a creed, tribute refused, a rebel vassal; without, it
+  costs quiet at home and the realm's word from the Iron Age on). Friends are called (`join`), a war is scored by
+  the land each side has lost since it began, and a winner may ask reparations, a change of government or
+  submission (`termsFor`, `wouldEnd`); one peace ends it for all who came in beside the two.
+  **A realm has two strengths** (`strength` in `sim.js`). `strengthOf` is how good its arms are, and a fight over a
+  region turns on that alone: every world's wars were fitted so, and counting heads there would let the largest realm
+  roll up the map. `mightOf` is arms and numbers together: what envoys weigh (`ratio`), what a neighbour fears, what
+  the player is told ("far weaker than you"), how large the armies are drawn. A realm that rules itself attacks whom
+  its arms can beat (the simulation's old rule), if it dares (`DARE`: never a side, friends counted, two and a half
+  times as mighty as its own) and is free to (`warWith`); and **the world keeps its appetite for war**: what a realm
+  may not fall on, it falls on its other neighbours the more (`WAR_RATE` and the loop beside it). Pacts move wars
+  about; they do not end them. The numbers to hold it to are in the header of `tools/diplo/probe.js`.
+  The autopilot (`think`) looks at a handful of realms about once a turn: asks for peace on a border, a market, a
+  marriage, a friend against whoever it dreads, a protector, a vassal (`HOLD`: it is content with three), a claim. It
+  must stay cheap (a year of diplomacy is about 3 % of a year with 300 realms): the market's links are indexed once a
+  year (`pIds`), a realm's `ver` says when the market must ask again whether two realms have opened or closed their
+  markets to one another (`L.fr` halves the customs, `L.shut` stops the link), tribute is paid from a list of those
+  who owe any. What is offered to the player waits in `dip.offers` (the HUD shows it; an offer of peace, a call to
+  arms and a demand end the turn). The screen is `envoys.js` (F); the lens of relations (X) paints realms by how they
+  stand with the player (`DIPLO.STAND`; `world.palMode = 'rel'`). A world saved before diplomacy begins with clean
+  records. Tests and scenes that need the others to keep still set their `aggression = 0` and `dip.think = 1e12`
+  (`tools/scenes/dip.js` lays a whole table by hand: a war with friends on both sides, a vassal, a claim, envoys).
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by
