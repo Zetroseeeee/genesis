@@ -607,7 +607,7 @@
         lit = mix(lit, fc * (0.35 + 0.65 * day), uFertView * landW * 0.6);
       }
       // ---------- the air between (air.js): what it takes from the ground's light on the way to the eye, and the light of its own it adds ----------
-      vec3 airT, airL; air(vViewPos, ${window.AIR ? AIR.LAND : '8.0'}, airT, airL);
+      vec3 airT, airL; air(vViewPos, ${window.AIR ? AIR.LAND : '6.0'}, airT, airL);
       gl_FragColor = vec4(airOver(lit, airT, airL), 1.0);
     }`;
 

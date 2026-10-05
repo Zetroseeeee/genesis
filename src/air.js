@@ -24,7 +24,7 @@
   const G = 0.8;                                               // how forward the haze scatters
   const PSI_N = 16, GROUND = 0.3;
   const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const A = { THICK, RG, RT, HR, HM, BR, MS, ME, BO, OC, OW, G, haze: 1, expose: 7.5, exposeHigh: 6, down: 0.35, night: [0.007, 0.012, 0.032], disc: 1, steps: 1, psi: [], uniforms: null, on: true };
+  const A = { THICK, RG, RT, HR, HM, BR, MS, ME, BO, OC, OW, G, haze: 1, expose: 7.5, exposeHigh: 6, down: 0.12, downHigh: 0.3, night: [0.007, 0.012, 0.032], disc: 1, steps: 1, psi: [], uniforms: null, on: true };
 
   // ---------- the sums, in JavaScript ----------
   // how much air a ray passes on its way out to space, from radius r, at mu = the cosine of its angle from straight up, for a
@@ -67,10 +67,16 @@
     const rdS = rd[0] * S[0] + rd[1] * S[1] + rd[2] * S[2], cS = C[0] * S[0] + C[1] * S[1] + C[2] * S[2];
     const steep = 1 + (nk[2] - 1) * sm(0.04, 0.5, (q - tB) / Math.sqrt(Math.max(tB * tB - 2 * q * tB + c2, 1e-12)));
     const phR = o.flat ? 1 / (4 * Math.PI) : 3 / (16 * Math.PI) * (1 + rdS * rdS), phM = o.flat ? 1 / (4 * Math.PI) : 3 / (8 * Math.PI) * (1 - G * G) * (1 + rdS * rdS) / ((2 + G * G) * Math.pow(1 + G * G - 2 * G * rdS, 1.5));
+    // Each step takes the air it passes as it really thins along it (two straight pieces of an exponential, from the heights at
+    // its ends and its middle), not as it is at one point of it: a few long steps then come out as many short ones would.
+    const mean = (e0, e1, d) => Math.abs(d) < 1e-3 ? 0.5 * (e0 + e1) : (e0 - e1) / d;
+    const hAt = (t) => Math.sqrt(Math.max(t * t - 2 * q * t + c2, 1e-12)) - RG, eOf = (h, H) => Math.exp(Math.min(-h / H, 60));
+    let t0 = tA, h0 = hAt(t0), eR0 = eOf(h0, HR), eM0 = eOf(h0, HM);
     for (let i = 0; i < n; i++) {
-      const t0 = warp(i / n, tA, tq, tB, us), t1 = warp((i + 1) / n, tA, tq, tB, us), t = warp((i + 0.5) / n, tA, tq, tB, us), dt = t1 - t0;
-      const r = Math.sqrt(Math.max(t * t - 2 * q * t + c2, 1e-12)), h = r - RG, mus = (t * rdS - cS) / r;
-      const dR = Math.exp(Math.min(-h / HR, 60)), dM = Math.exp(Math.min(-h / HM, 60)) * haze, dO = Math.max(0, 1 - Math.abs(h - OC) / OW);
+      const t1 = warp((i + 1) / n, tA, tq, tB, us), t = warp((i + 0.5) / n, tA, tq, tB, us), dt = t1 - t0;
+      const r = Math.sqrt(Math.max(t * t - 2 * q * t + c2, 1e-12)), h = r - RG, mus = (t * rdS - cS) / r, h1 = hAt(t1);
+      const eRm = eOf(h, HR), eMm = eOf(h, HM), eR1 = eOf(h1, HR), eM1 = eOf(h1, HM), wa = dt > 0 ? (t - t0) / dt : 0.5;
+      const dR = mean(eR0, eRm, (h - h0) / HR) * wa + mean(eRm, eR1, (h1 - h) / HR) * (1 - wa), dM = (mean(eM0, eMm, (h - h0) / HM) * wa + mean(eMm, eM1, (h1 - h) / HM) * (1 - wa)) * haze, dO = Math.max(0, 1 - Math.abs(h - OC) / OW);
       A.sun(r, mus, haze, _ts); if (!o.single) A.psiAt(mus, _ps); else _ps[0] = _ps[1] = _ps[2] = 0;
       const thin = (nk[0] + (1 - nk[0]) * sm(nk[1], nk[1] * 4, t)) * steep;
       for (let k = 0; k < 3; k++) {
@@ -78,6 +84,7 @@
         const tr = Math.exp(-ext * dt * thin), w = ext > 1e-9 ? (1 - tr) / ext : dt * thin;
         L[k] += T[k] * src * w; F[k] += T[k] * (sR + sM) * w; T[k] *= tr;
       }
+      t0 = t1; h0 = h1; eR0 = eR1; eM0 = eM1;
     }
     res.tB = tB; return res;
   };
@@ -123,6 +130,7 @@
       return exp(-(A_BR * airCol(r, mu, A_HR) + A_ME * uAirE.y * airCol(r, mu, A_HM) + A_BO * oz));
     }
     vec3 airPsi(float mu) { float x = clamp((mu / (abs(mu) + 0.25) + 0.55) / 1.35, 0.0, 1.0) * ${f(PSI_N - 1)}; float i = min(floor(x), ${f(PSI_N - 2)}); int k = int(i); return mix(uAirPsi[k], uAirPsi[k + 1], x - i); }
+    float airMean(float e0, float e1, float d) { return abs(d) < 1e-3 ? 0.5 * (e0 + e1) : (e0 - e1) / d; }      // the mean of an exponential between two points of it, d scale heights apart
     float airWarp(float u, float tA, float tq, float tB, float us) { float a = (us - u) / us, b = (u - us) / (1.0 - us); return u < us ? tq - (tq - tA) * a * a : tq + (tB - tq) * b * b; }
     // the line of sight from the eye along rd (unit, the camera's space) as far as tMax, in so many steps (fewer where the game
     // says so: uAirE.w): T what the air lets through, L what it adds
@@ -135,14 +143,20 @@
       // (looked down through, the air is shown thinner than it is: uAirK.z. How steeply the line comes down on what it ends at: 1 straight down, 0 along the ground or out to the sky)
       float steep = mix(1.0, uAirK.z, smoothstep(0.04, 0.5, (q - tB) / sqrt(max(tB * tB - 2.0 * q * tB + c2, 1e-12))));
       float phR = 0.0596831 * (1.0 + rdS * rdS), phM = 0.1193662 * ${f(1 - G * G)} * (1.0 + rdS * rdS) / (${f(2 + G * G)} * pow(${f(1 + G * G)} - ${f(2 * G)} * rdS, 1.5));
+      // (each step takes the air it passes as it really thins along it - two straight pieces of an exponential, from the heights at
+      // its ends and its middle - so a few long steps come out as many short ones would, and a house stands in the same air as its street)
+      float t0 = tA, h0 = sqrt(max(t0 * t0 - 2.0 * q * t0 + c2, 1e-12)) - A_RG, eR0 = exp(min(-h0 / A_HR, 60.0)), eM0 = exp(min(-h0 / A_HM, 60.0));
       for (int i = 0; i < n; i++) {
-        float fi = float(i), t0 = airWarp(fi / fn, tA, tq, tB, us), t1 = airWarp((fi + 1.0) / fn, tA, tq, tB, us), t = airWarp((fi + 0.5) / fn, tA, tq, tB, us), dt = t1 - t0;
-        float r = sqrt(max(t * t - 2.0 * q * t + c2, 1e-12)), h = r - A_RG, mus = (t * rdS - cS) / r;
-        float dM = exp(min(-h / A_HM, 60.0)) * uAirE.y; vec3 sR = A_BR * exp(min(-h / A_HR, 60.0)); float sM = A_MS * dM;
+        float fi = float(i), t1 = airWarp((fi + 1.0) / fn, tA, tq, tB, us), t = airWarp((fi + 0.5) / fn, tA, tq, tB, us), dt = t1 - t0;
+        float r = sqrt(max(t * t - 2.0 * q * t + c2, 1e-12)), h = r - A_RG, mus = (t * rdS - cS) / r, h1 = sqrt(max(t1 * t1 - 2.0 * q * t1 + c2, 1e-12)) - A_RG;
+        float eRm = exp(min(-h / A_HR, 60.0)), eMm = exp(min(-h / A_HM, 60.0)), eR1 = exp(min(-h1 / A_HR, 60.0)), eM1 = exp(min(-h1 / A_HM, 60.0)), wa = dt > 0.0 ? (t - t0) / dt : 0.5;
+        float dM = (airMean(eM0, eMm, (h - h0) / A_HM) * wa + airMean(eMm, eM1, (h1 - h) / A_HM) * (1.0 - wa)) * uAirE.y;
+        vec3 sR = A_BR * (airMean(eR0, eRm, (h - h0) / A_HR) * wa + airMean(eRm, eR1, (h1 - h) / A_HR) * (1.0 - wa)); float sM = A_MS * dM;
         vec3 ext = sR + A_ME * dM + A_BO * max(0.0, 1.0 - abs(h - A_OC) / A_OW);
         vec3 src = (sR * phR + sM * phM) * airSun(r, mus) + (sR + sM) * airPsi(mus);
         vec3 tr = exp(-ext * dt * steep * mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, t)));      // (thinner about the eye, too, when it is down among things drawn larger than life: uAirK.x as far as uAirK.y)
         L += T * src * (1.0 - tr) / max(ext, vec3(1e-9)); T *= tr;
+        t0 = t1; h0 = h1; eR0 = eR1; eM0 = eM1;
       }
       L = L * uAirE.x + uAirN * (1.0 - T);
     }
@@ -151,7 +165,7 @@
     ${A.MIX}`;
 
   // how many steps a line of sight is given: the sky (it is all air), the ground (per pixel), a thing standing on it (per corner)
-  A.SKY = '16.0'; A.LAND = '8.0'; A.THING = '3.0';
+  A.SKY = '16.0'; A.LAND = '6.0'; A.THING = '3.0';
   // A thing that stands on the ground is small against the air: it works the air out at its corners (vertex shader: A.VERT, then
   // air(viewPos, steps, vAirT, vAirL)) and lays it over its colour (fragment shader: A.FRAG, then airOver(colour, vAirT, vAirL)).
   A.VERT = A.GLSL + '\n    varying vec3 vAirT, vAirL;';
@@ -172,8 +186,9 @@
     return Math.pow(2, s * (1 - sm(0.004, 0.03, alt)));
   };
   // A planet under its true veil is a pale blue ball, and the game is played on its face. So the air is shown thinner than it is
-  // wherever it is looked down through (A.down: straight down a third of it, along the ground all of it: the horizon and the
-  // planet's rim keep their haze), and a little fainter from far out (A.exposeHigh, from 1,000 km).
+  // wherever it is looked down through (A.down: straight down an eighth of it, along the ground all of it, so the horizon and
+  // the planet's rim keep their haze; from far out, where it is the whole planet that is looked at, a third: A.downHigh),
+  // and a little fainter from far out (A.exposeHigh, from 1,000 km).
   A.exposure = (alt) => A.expose + (A.exposeHigh - A.expose) * sm(0.01, 0.16, alt);
   // Down among the houses the game shows things many times larger than life (town.js: a village nineteen times, a great city
   // three), and the air between the eye and the far side of a town would be the air of a day's march. So the air about the eye
@@ -190,7 +205,7 @@
     const night = (1 - sm(-0.3, -0.08, sunUp)) * (1 - sm(0.004, 0.03, a));      // (below, and only there: the night's own faint light, enough to tell the sky from the hills)
     U.uAirE.value.set(A.on ? A.exposure(a) * A.opened : 0, A.haze, A.disc, A.steps);
     U.uAirN.value.set(A.night[0] * night, A.night[1] * night, A.night[2] * night);
-    const nk = A.near(dist === undefined ? 1 : dist); U.uAirK.value.set(A.clear === false ? 1 : nk[0], nk[1], A.clear === false ? 1 : A.down);
+    const nk = A.near(dist === undefined ? 1 : dist); U.uAirK.value.set(A.clear === false ? 1 : nk[0], nk[1], A.clear === false ? 1 : A.down + (A.downHigh - A.down) * sm(0.05, 0.5, a));
   };
   // set the haze (1: a clear day) and work the table out again for it
   A.setHaze = (h) => { A.haze = h; A.psi = A.table(h); if (A.uniforms) A.psi.forEach((p, i) => A.uniforms.uAirPsi.value[i].set(p[0], p[1], p[2])); };

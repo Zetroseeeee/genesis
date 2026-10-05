@@ -45,7 +45,7 @@ function view(alt, pitchDeg, headDeg, fovDeg, W, H, sunDeg, opt) {
   const tanV = Math.tan(fovDeg * Math.PI / 360), tanH = tanV * W / H; const img = new Float32Array(W * H * 3); const C = [-r, 0, 0];      // the planet's centre from the eye
   A.opened = A.open(dot(up, S), alt / R_M); const E = A.exposure(alt / R_M) * A.opened;
   const nightK = (1 - sm(-0.3, -0.08, dot(up, S))) * (1 - sm(0.004, 0.03, alt / R_M)), NIGHT = A.night.map((v) => v * nightK);
-  const near = o.dist ? [...A.near(o.dist / R_M), A.down] : [1, 1, A.down];
+  const down = A.down + (A.downHigh - A.down) * sm(0.05, 0.5, alt / R_M), near = o.dist ? [...A.near(o.dist / R_M), down] : [1, 1, down];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const sx = ((x + 0.5) / W * 2 - 1) * tanH, sy = (1 - (y + 0.5) / H * 2) * tanV; const rd = norm([fwd[0] + right[0] * sx + upC[0] * sy, fwd[1] + right[1] * sx + upC[1] * sy, fwd[2] + right[2] * sx + upC[2] * sy]);
     const q = dot(rd, C), c2 = r * r, rp2 = c2 - q * q; let lin;

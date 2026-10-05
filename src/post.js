@@ -15,8 +15,9 @@ window.POST = (function () {
   'use strict';
   const P = { ready: false, hdr: false, w: 0, h: 0, drawn: 0,
     // what can be turned: each 0 = off, 1 = as designed
-    shade: 1, glow: 1, develop: 1, reach: null, far: 60 };      // (reach: [share of the distance, near, wide] to try other shades by hand; far: the shade is down to a third at 1 / far Earth radii: 106 km)
-  let rtScene = null, rtA = null, rtB = null; const down = [], up = []; const LEVELS = 5;
+    shade: 1, glow: 1, develop: 1, reach: null, far: 60,      // (reach: [share of the distance, near, wide] to try other shades by hand; far: the shade is down to a third at 1 / far Earth radii: 106 km)
+    wide: 1.2 };      // how much more each wider ring of the glow counts than the one inside it: 0 = a tight glow, more = a broad glare round the sun
+  let rtScene = null, rtA = null, rtB = null; const down = [], up = []; let LEVELS = 5;
   const qScene = new THREE.Scene(), qCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const tri = new THREE.BufferGeometry(); tri.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
   const quad = new THREE.Mesh(tri, null); quad.frustumCulled = false; qScene.add(quad);
@@ -93,11 +94,11 @@ window.POST = (function () {
     uniform sampler2D tSrc; uniform vec2 uPx; varying vec2 vUv;
     void main() { vec3 s = texture2D(tSrc, vUv).rgb * 4.0; s += texture2D(tSrc, vUv + uPx * vec2(-1.0, -1.0)).rgb; s += texture2D(tSrc, vUv + uPx * vec2(1.0, -1.0)).rgb; s += texture2D(tSrc, vUv + uPx * vec2(-1.0, 1.0)).rgb; s += texture2D(tSrc, vUv + uPx * vec2(1.0, 1.0)).rgb; gl_FragColor = vec4(s / 8.0, 1.0); }`;
   const UP = `
-    uniform sampler2D tSrc, tAdd; uniform vec2 uPx; uniform float uAdd; varying vec2 vUv;
+    uniform sampler2D tSrc, tAdd; uniform vec2 uPx; uniform float uAdd, uSrc; varying vec2 vUv;
     void main() {
       vec3 s = texture2D(tSrc, vUv + uPx * vec2(-2.0, 0.0)).rgb + texture2D(tSrc, vUv + uPx * vec2(2.0, 0.0)).rgb + texture2D(tSrc, vUv + uPx * vec2(0.0, -2.0)).rgb + texture2D(tSrc, vUv + uPx * vec2(0.0, 2.0)).rgb;
       s += (texture2D(tSrc, vUv + uPx * vec2(-1.0, -1.0)).rgb + texture2D(tSrc, vUv + uPx * vec2(1.0, -1.0)).rgb + texture2D(tSrc, vUv + uPx * vec2(-1.0, 1.0)).rgb + texture2D(tSrc, vUv + uPx * vec2(1.0, 1.0)).rgb) * 2.0;
-      gl_FragColor = vec4(s / 12.0 + texture2D(tAdd, vUv).rgb * uAdd, 1.0);
+      gl_FragColor = vec4(s / 12.0 * uSrc + texture2D(tAdd, vUv).rgb * uAdd, 1.0);
     }`;
 
   // ---------- develop ----------
@@ -126,7 +127,7 @@ window.POST = (function () {
     smooth: { tDepth: { value: null }, uProj: { value: null }, tShade: { value: null }, uStep: { value: new THREE.Vector2() } },
     bright: { tScene: { value: null }, uPx: { value: new THREE.Vector2() }, uKnee: { value: 1.04 } },
     down: { tSrc: { value: null }, uPx: { value: new THREE.Vector2() } },
-    up: { tSrc: { value: null }, tAdd: { value: null }, uPx: { value: new THREE.Vector2() }, uAdd: { value: 1 } },
+    up: { tSrc: { value: null }, tAdd: { value: null }, uPx: { value: new THREE.Vector2() }, uAdd: { value: 1 }, uSrc: { value: 1 } },
     fin: { tScene: { value: null }, tShade: { value: null }, tGlow: { value: null }, uShade: { value: 1 }, uGlow: { value: 1 }, uDevelop: { value: 1 }, uTime: { value: 0 }, uShow: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
   };
   U.smooth.uProj = U.shade.uProj;
@@ -152,6 +153,7 @@ window.POST = (function () {
     rtScene.depthTexture = new THREE.DepthTexture(w, h, THREE.UnsignedIntType); rtScene.depthTexture.minFilter = rtScene.depthTexture.magFilter = THREE.NearestFilter;
     const hw = Math.ceil(w / 2), hh = Math.ceil(h / 2);
     rtA = target(hw, hh, THREE.UnsignedByteType, THREE.LinearFilter); rtB = target(hw, hh, THREE.UnsignedByteType, THREE.LinearFilter);
+    LEVELS = Math.min(8, Math.max(4, Math.round(Math.log2(h / 22))));      // halvings: the smallest picture about a dozen pixels high, so the glow is as wide on a large screen as on a small one
     let dw = hw, dh = hh; for (let i = 0; i < LEVELS; i++) { down.push(target(dw, dh, half, THREE.LinearFilter)); if (i < LEVELS - 1) up.push(target(dw, dh, half, THREE.LinearFilter)); dw = Math.ceil(dw / 2); dh = Math.ceil(dh / 2); }
   }
   const _sz = new THREE.Vector2();
@@ -171,9 +173,12 @@ window.POST = (function () {
     if (P.glow > 0.01) {
       U.bright.tScene.value = rtScene.texture; U.bright.uPx.value.set(1 / w, 1 / h); run(renderer, M.bright, down[0]);
       for (let i = 1; i < LEVELS; i++) { U.down.tSrc.value = down[i - 1].texture; U.down.uPx.value.set(1 / down[i - 1].width, 1 / down[i - 1].height); run(renderer, M.down, down[i]); }
-      let src = down[LEVELS - 1]; for (let i = LEVELS - 2; i >= 0; i--) { U.up.tSrc.value = src.texture; U.up.tAdd.value = down[i].texture; U.up.uPx.value.set(0.5 / src.width, 0.5 / src.height); run(renderer, M.up, up[i]); src = up[i]; }
+      // (each size is weighed as it is added: the wider, the more, so that a small very bright thing has a broad soft glare and not only a rim)
+      const wOf = (i) => 1 + P.wide * i; let sum = wOf(LEVELS - 1);
+      let src = down[LEVELS - 1]; for (let i = LEVELS - 2; i >= 0; i--) { U.up.tSrc.value = src.texture; U.up.tAdd.value = down[i].texture; U.up.uPx.value.set(0.5 / src.width, 0.5 / src.height); U.up.uAdd.value = wOf(i); U.up.uSrc.value = i === LEVELS - 2 ? wOf(LEVELS - 1) : 1; sum += wOf(i); run(renderer, M.up, up[i]); src = up[i]; }
+      P._sum = sum;
     }
-    U.fin.tScene.value = rtScene.texture; U.fin.tShade.value = shade > 0.01 ? rtA.texture : white; U.fin.uShade.value = shade; U.fin.tGlow.value = P.glow > 0.01 ? up[0].texture : black; U.fin.uGlow.value = 0.55 * P.glow / (LEVELS - 1);
+    U.fin.tScene.value = rtScene.texture; U.fin.tShade.value = shade > 0.01 ? rtA.texture : white; U.fin.uShade.value = shade; U.fin.tGlow.value = P.glow > 0.01 ? up[0].texture : black; U.fin.uGlow.value = 0.6 * P.glow / (P._sum || LEVELS);
     U.fin.uDevelop.value = P.develop; U.fin.uShow.value = P.show || 0; U.fin.uTime.value = time || 0; U.fin.uRes.value.set(w, h);
     run(renderer, M.fin, null); P.drawn++;
   };

@@ -124,3 +124,13 @@ dip_envoys   | tools/scenes/dip.js | {tab:'envoys'} | | 16
 dip_wars     | tools/scenes/dip.js | {tab:'wars'} | | 16
 dip_standing | tools/scenes/dip.js | {tab:'standing'} | | 16
 dip_lens     | tools/scenes/dip.js | {lens:true} | | 22
+# --- light and air: the sky and the haze from the ground, the sun in the picture, dusk and the stars, the country from high up, the planet ---
+horizon      | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('town', 1.2, 1.4, 0.3), 7000); | 32
+sun_high     | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,sun:[0.22,0.3]} | setTimeout(() => __sceneLook('town', 1.2, 1.5, 0.3), 7000); | 32
+sunset       | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,sun:[0.035,0.12]} | setTimeout(() => __sceneLook('town', 1.2, 1.4, 0.3), 7000); | 32
+twilight     | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,sun:[-0.07,0.12]} | setTimeout(() => __sceneLook('town', 1.2, 1.4, 0.3), 7000); | 32
+stars        | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,sun:[-0.5,0.12]} | setTimeout(() => __sceneLook('town', 1.2, 1.4, 0.3), 7000); | 32
+alps         | tools/scenes/forest.js | null | const f = () => __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 30
+region       | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,alt:60000,tilt:0.66,out:0} | | 30
+high         | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,alt:86000,tilt:1.1,out:0,turn:0.4} | | 30
+planet       | tools/scenes/town.js | {lon:20,lat:25,tech:0.1,pop:8,walls:2,special:14,alt:8900000,tilt:0,out:0,sun:[0.35,1.6]} | | 30

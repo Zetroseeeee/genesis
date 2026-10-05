@@ -445,9 +445,10 @@
             }
             // a comet, when the chronicle says one hangs in the sky
             if (uComet > 0.0) { vec3 eastW = normalize(cross(vec3(0.0, 1.0, 0.0), up)); vec3 northW = cross(up, eastW); vec3 cdir = normalize(up * 0.55 + eastW * 0.6 - northW * 0.5); float cd = dot(dir, cdir); vec3 tail = normalize(-sun - cdir * dot(-sun, cdir)); vec3 perp = dir - cdir * cd; float along = dot(perp, tail); float side = length(perp - tail * along); float tl = smoothstep(0.0, 0.02, along) * (1.0 - smoothstep(0.05, 0.34, along)); float width = 0.006 + along * 0.12; float coma = pow(max(cd, 0.0), 4000.0) * 3.0 + pow(max(cd, 0.0), 300.0) * 0.5; float tailG = exp(-pow(side / width, 2.0)) * tl * (0.55 + 0.45 * vn(vec2(along * 40.0, side * 80.0 + uTime * 0.1))); add += vec3(0.85, 0.95, 1.0) * (coma + tailG) * uComet * (0.25 + 0.75 * night); }
-            // the sun's own disc (drawn half as large again as it is), darker toward its edge, and as red as the air it is seen through makes it
+            // the sun's own disc (drawn half as large again as it is), darker toward its edge, as red as the air it is seen through makes it, and
+            // thousands of times brighter than white: post.js spreads that into the glare round it
             vec3 ds = rd - uAirS; float u = dot(ds, ds) / 5.6e-5;
-            vec3 disc = vec3(260.0 * uAirE.z) * (1.0 - smoothstep(0.82, 1.0, u)) * (0.45 + 0.55 * sqrt(max(1.0 - u, 0.0)));
+            vec3 disc = vec3(2600.0 * uAirE.z) * (1.0 - smoothstep(0.82, 1.0, u)) * (0.45 + 0.55 * sqrt(max(1.0 - u, 0.0)));
             vec3 lin = L + (pow(add, vec3(2.2)) + disc) * T;
             gl_FragColor = vec4(pow(max(lin, 0.0), vec3(0.4545)), 1.0); }`,
       }));

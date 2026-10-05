@@ -58,6 +58,8 @@ the restart, "What's new", the spark while playing, the case where a whole new a
 ## Debug hooks
 `window.__G` (settings, sim, terrain, world, mapcam, movers, fx, turnRun, run(n), start(lon, lat, name), select(i), labelDbg, attention(): what waits on the player, in the order the turn button lays it before him) and `testcam.js` (`__T.cam/era/capital/erupt/fire/battle/quake/flood…`; `__T.teach(c, upto)` gives a realm every discovery of its ages, `__T.era` and `__T.world` do so by themselves; `__T.quiet()` sends home whoever waits on the player and stops the realms that rule themselves from proposing anything: the suite calls it before every scenario that is not about envoys, so that the turn button is the scenario's).
 `node dbg3.js "<script>" "<probe returning an object>" <wait ms>` runs a script in the page and prints the probe.
+`node tools/live.js "<setup>" [wait]` keeps one page up and answers on port 8791 (`/eval`, `/shot`, `/load`, `/logs`, `/quit`): the way to try a look twenty times without twenty starts. `window.POST` (shade, glow, develop: 0..1; `show = 1` the shade by itself, `2` the glow; `off`; `reach`, `far`, `wide`) and `window.AIR` (`expose`, `haze` through `setHaze`, `down`, `night`, `disc`, `steps`, `on`, `clear = false` for the true air about the eye) can be turned while it runs.
+`node tools/air/sky.js check` holds the air's quick sums against exact ones; `sheet` and `orbit` draw it without the game.
 `node shot2.js <name> "<script>" <t1> <t2>` takes two screenshots (`shots/<name>_a.png`, `_b.png`).
 
 ## Textures

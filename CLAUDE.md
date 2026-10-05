@@ -34,6 +34,18 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   later eras of the peoples who keep the old ways (`node tools/coverage.js 3,4,5`). `node tools/density.js` reports
   how much of a town's ground its houses cover.
 - `node tools/dbg3.js "<script>" "<probe>" <wait>` — run a script in the page and print a probe object.
+- `node tools/live.js "<setup script>" [wait ms]` — a page that stays up, to look again and again without starting the
+  game each time (run it with `nohup ... &`; it answers on 127.0.0.1:8791): `curl -s localhost:8791/eval --data-binary
+  '<js>'`, `/shot?name=x&pause=3000` (`shots/x.png`), `/load?file=post.js` (reads `src/<file>` again: good for
+  `post.js`, then `/eval "POST.init(__G.renderer)"`; a shader that lives in a material needs a new page), `/logs`,
+  `/quit`. The switches of `shotn.js`, and `POST=1` (the picture's last steps, which a software renderer goes
+  without), `AIR=1` (every step through the air). One command with one `/shot` in it: a picture takes a minute, a
+  tool call two at most.
+- `node tools/air/sky.js check | sheet [name] | orbit [name]` — the air without the game, from the same sums the
+  shaders use (`src/air.js`): `check` prints how close the quick sums are to slow exact ones (the column of air to
+  space; a line of sight in few steps: within a hundredth, or the air is wrong); `sheet` and `orbit` draw
+  `shots/air/<name>.png`, the sky over a plain country for a row of sun heights, and the planet's rim from outside.
+  Seconds, not minutes: settle a change to the air here before looking at it in the game.
 - `tools/macshots.sh [scene names]` — the real thing: pictures of this commit taken on an Apple GPU by the Scenes
   workflow (`tools/scenes/tour.txt` lists the scenes: towns of every people and age, forests, seasons, dusk and night,
   dry countries, rivers). Look at these before believing anything about how the game looks. `REF=<branch>` takes
@@ -103,6 +115,8 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/buildings.js` | `BKIT` | Procedural building kit (unit archetypes) and its material shader |
 | `src/models.js` | `MODELS` | Real 3D model library: manifest, loading, LODs, instancing (replaces kit archetypes when a model exists) |
 | `src/shadows.js` | `SHADOWS` | Sun depth map of everything standing near the camera; terrain and models read it (true shadows) |
+| `src/air.js` | `AIR` | The air: one sum along the line of sight for the sky, the haze before far hills, the planet's rim and the edge of night; as GLSL for every shader and as JavaScript |
+| `src/post.js` | `POST` | What a frame goes through between the scene and the screen: shade between things (from the depth), the glow of what is brighter than white, the developed picture |
 | `src/world.js` | `WORLD` | Turns town plans into instances near the camera; sky, clouds, atmosphere |
 | `src/textures.js` | `TEX` | Generated material atlases as texture arrays; UI art |
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
@@ -265,9 +279,31 @@ Conventions that matter:
   towns of the early ages stay fully modelled; they carry a role (`as: 'workshop'`...) for models of their own later.
 - **Style packing.** `wall + roof*8 + culture*64 + flags*1024`; flags: landmark 1, block 2, neon 4, wonder 8, ruin 16, site 32, thing 64 (a cart or a boat: no door, windows or roof).
 - Keep modules independent (pure data in `town.js` and `sim.js`, rendering elsewhere): the game will grow to tens of GB of assets.
-- **Stars and air.** The stars are points on a sphere that goes with the camera, drawn at the far plane (anything hides
-  them); the air seen from outside is a shell that glows where it is looked through edge-on (`world.js`). Both fade as
-  the camera comes down into the sky dome's range.
+- **The air** (`air.js`). There is one atmosphere, and everything drawn stands in it: sky, haze, the planet's blue rim
+  and the red edge of night are the same sum along the line of sight (sunlight dimmed on its way in, the share the gas
+  and the haze turn toward the eye, light scattered before from a table by the sun's height, what the air between takes
+  away). It has no textures (the ground's shader has no sampler to spare): the column of air to space is a closed form,
+  and each step takes the air as it really thins along it, so six steps do for the ground and two for a house, and a
+  house stands in the same air as its street. The ground works it out per pixel (`air(vViewPos, ...)`, then
+  `airOver(colour, T, L)`), things that stand on it at their corners (`AIR.VERT` / `AIR.FRAG`), the sky per pixel out
+  to space (`world.js`: a sphere round the camera drawn last, at the far plane, with the sun's disc and the moon on it).
+  Shaders still write the colours of the screen; `airOver` takes them to light and back. Three things are not as in
+  nature, each for the game's sake: the air is twice as tall and half as dense (the ground is drawn twice as tall:
+  `THICK`); it is thinned about the eye when the camera is down among towns drawn many times larger than life
+  (`AIR.near`: a town stands clear, the hills behind it in haze); and it is thinned where it is looked down through
+  (`AIR.down`: the map stays readable from high up, the horizon and the rim keep their haze). The eye opens as the
+  light goes (`AIR.OPEN`: stops by the sun's height), which is what shows dusk and a moonlit night at all. `AIR.update`
+  runs once a frame after the camera is final. Change the air in `tools/air/sky.js` first. The stars are points on a
+  sphere that goes with the camera, at every height: from the ground they come out as the sky darkens, thin out
+  toward the horizon and twinkle.
+- **The picture's last steps** (`post.js`; on a real GPU at full quality, `POST=1` in the harnesses). The scene is
+  drawn into a target that holds light brighter than white (half floats, four samples) and its depth, then: shade
+  (ambient occlusion from the depth alone, two reaches, a share of the distance wide so it reads at every height;
+  fades with the haze and with height), glow (what is above white bleeds, the wider rings weighed more: `POST.wide`),
+  develop (a little contrast and colour, a shoulder into white, darker corners, grain). 0 to 1 is the picture as the
+  shaders made it; only what they write above 1 is "more than white", and they write it where `uGlow` is 1 (the sun's
+  image on water, flames, lit windows, a fire front; the sun's disc is thousands). Depth here is ordinary perspective
+  depth: the game's own shaders never took the renderer's logarithmic depth.
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.
