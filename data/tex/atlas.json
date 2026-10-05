@@ -1,7 +1,7 @@
 {
  "_doc": "GENESIS texture atlases (2048x2048 WebP, 4x4 cells of 512) and UI art. \"m\" = metres one tile covers. Hosted on the Higgsfield CDN (CORS *) until pulled into data/tex/.",
  "cell": 512,
- "n": 4,
+ "n": 4,"pack":"data/tex/ground.json",
  "atlases": {
   "wall": {
    "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/bacdf2bf-232d-406f-b36e-361f06e021ce.webp",
