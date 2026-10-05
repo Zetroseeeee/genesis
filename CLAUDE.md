@@ -283,8 +283,9 @@ Conventions that matter:
   and the red edge of night are the same sum along the line of sight (sunlight dimmed on its way in, the share the gas
   and the haze turn toward the eye, light scattered before from a table by the sun's height, what the air between takes
   away). It has no textures (the ground's shader has no sampler to spare): the column of air to space is a closed form,
-  and each step takes the air as it really thins along it, so five steps do for the ground and two for a house, and a
-  house stands in the same air as its street. **It is worked out at the corners of meshes, never per pixel** (a march
+  and each step takes the air as it really thins along it, so four steps do for the ground and two for a house, and a
+  house stands in the same air as its street. Where next to no air is on a short line (most of what is seen from
+  down among things) nothing is worked out at all, and a short line with a little air is one piece. **It is worked out at the corners of meshes, never per pixel** (a march
   at every pixel of a large screen cost two thirds of the frame rate): the ground and the things on it in their vertex
   shaders (`AIR.VERT`: `air(viewPos, steps, vAirT, vAirL)`, then `airOver(colour, vAirT, vAirL)` from `AIR.FRAG`), the
   sky on a mesh of directions round the camera (`world.js`: rings set by how high above the ground a line of sight

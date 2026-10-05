@@ -146,7 +146,15 @@
     // true angle at every pixel: LR the gas's share and LM the haze's, each still to be multiplied by its phase, LS what needs none.
     void airParts(vec3 rd, float tMax, float steps, out vec3 T, out vec3 LR, out vec3 LM, out vec3 LS) {
       T = vec3(1.0); LR = vec3(0.0); LM = vec3(0.0); LS = vec3(0.0); if (uAirE.x <= 0.0) return;
-      float q = dot(rd, uAirC), c2 = dot(uAirC, uAirC), dT = A_RT * A_RT - (c2 - q * q); if (dT <= 0.0) return;
+      float q = dot(rd, uAirC), c2 = dot(uAirC, uAirC);
+      // (Most of what is drawn from down in the air stands with next to none of it on the line: the ground under the camera, a town
+      // looked down on. The most there could be - the length, thinned as below, in sea-level air - comes with one root; under a
+      // five-hundredth of what would show, nothing more is worked out. The ground has millions of corners, and this is nearly all of them.)
+      if (uAirQ > 0.5 && tMax < 0.02) {
+        float tightest = (A_BR.b + A_ME * uAirE.y) * 1.5 * tMax * mix(1.0, uAirK.z, smoothstep(0.04, 0.5, (q - tMax) / sqrt(max(tMax * tMax - 2.0 * q * tMax + c2, 1e-12)))) * mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, tMax));
+        if (tightest < 0.002) return;
+      }
+      float dT = A_RT * A_RT - (c2 - q * q); if (dT <= 0.0) return;
       float sT = sqrt(dT), tA = max(q - sT, 0.0), tB = min(q + sT, tMax); if (tB <= tA) return;
       float tq = clamp(q, tA, tB), s1 = sqrt(tq - tA), s2 = sqrt(tB - tq), us = clamp(s1 / max(s1 + s2, 1e-20), 0.0001, 0.9999);      // (never 0 or 1: the steps are laid out by dividing by it and by what is left of it)
       float rdS = dot(rd, uAirS), cS = dot(uAirC, uAirS);
@@ -192,7 +200,7 @@
 
   // how many steps a line of sight is given: the sky (it is all air), the ground, a thing standing on it. All of them work the air
   // out at the corners of their meshes, not at every pixel: it changes slowly, and a march at every pixel of a large screen is dear.
-  A.SKY = '16.0'; A.LAND = '5.0'; A.THING = '3.0';
+  A.SKY = '16.0'; A.LAND = '4.0'; A.THING = '3.0';
   // A thing that stands on the ground is small against the air: it works the air out at its corners (vertex shader: A.VERT, then
   // air(viewPos, steps, vAirT, vAirL)) and lays it over its colour (fragment shader: A.FRAG, then airOver(colour, vAirT, vAirL)).
   A.VERT = A.GLSL + '\n    varying vec3 vAirT, vAirL;';

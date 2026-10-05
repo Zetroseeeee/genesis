@@ -29,7 +29,7 @@ async function scenario(name, fn) {
   }
   if (page) await ev(() => { if (window.__toasts) window.__toasts.length = 0; });
   // (envoys are a matter for the scenario about them: elsewhere nobody waits on the player at the start and the neighbours keep their proposals to themselves)
-  if (page && !/^(boot|intro|diplomacy)/.test(name)) await ev(() => { if (window.__T && __T.quiet && __G.sim && document.body.dataset.mode === 'play') __T.quiet(); });
+  if (page && !/^(boot|intro)/.test(name)) await ev(() => { if (window.__T && __T.quiet && __G.sim && document.body.dataset.mode === 'play') __T.quiet(); });
   const before = errors.length; const t = Date.now(); const fails = [];
   const check = (cond, msg) => { if (!cond) fails.push(msg); };
   try { await fn(check); } catch (e) { fails.push('threw: ' + (e.message || e).toString().slice(0, 400)); }
@@ -507,6 +507,8 @@ server.listen(0, async () => {
     await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (TREE.isOpen()) TREE.close(); if (GOV.isOpen()) GOV.close(); });
     let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), D = S.diplo, W = S.W; const free = (i) => i >= 0 && i < S.N && S.land[i] && !(S.flags[i] & 8) && S.owner[i] < 0 && S.fert[i] > 0.05; const mine = (i) => S.owner[i] === c.id;
       const made = []; for (const i of S.LI) { if (made.length >= 2) break; if (!free(i) || ![i - 1, i + 1, i - W, i + W].some(mine) || made.some(t => S.cellDist(t.capital, i) < 3)) continue; const t = S.spawnTribe(i, {}); if (t) made.push(t); }
+      // (by now the world may have closed in round the player's land: then room is made on its border, at the cost of whoever holds it)
+      for (const i of S.LI) { if (made.length >= 2) break; const o = S.owner[i]; if (o < 0 || o === c.id || !S.land[i] || (S.flags[i] & 8) || S.fert[i] <= 0.05 || S.civs[o].capital === i || ![i - 1, i + 1, i - W, i + W].some(mine) || made.some(t => t.id === o || S.cellDist(t.capital, i) < 3)) continue; S.owner[i] = -1; const t = S.spawnTribe(i, {}); if (t) made.push(t); else S.owner[i] = o; }
       const iron = S.ERAS[2][1] + 0.01; for (const x of made) { x.tech = iron; x.era = S.eraOf(iron); __T.teach(x, 2, true); x.aggression = 0; x.dip.think = 1e12; x.ruler.trait = 'steward'; }
       for (const k of ['laws', 'markets', 'envoys', 'kingship']) S.know.learn(c.id, c, KNOW.ID[k], true);      // (the player's people are taught only what treaties stand on: the scenarios after this one find them as they were)
       for (const k of Object.keys(c.wars)) { const e = S.civs[+k]; if (e) D.conclude(c, e, 'white'); } c.truce = {}; for (const t of made) t.truce = {};
