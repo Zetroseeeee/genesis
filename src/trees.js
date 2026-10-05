@@ -64,6 +64,8 @@
   // above, the card leans back until it lies under the eye as the crown does. Into the sun's depth map the same card
   // is drawn facing the sun, so the shadow on the ground is the tree's own outline.
   // The card's depth along its instance z axis says whether the picture is mirrored (two trees from one photograph).
+  // the air between the eye and a tree (air.js), worked out once for each
+  const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.THING : '3.0';
   const IMP_VERT = `
     uniform float uPivot, uOrtho; uniform vec3 uSunV;
     varying vec2 vUv; varying vec3 vCol, vView, vNrm; varying float vHid;
@@ -79,6 +81,7 @@
         + step(texture2D(uShadowMap, s.xy + vec2(0.0, t)).r, z) + step(texture2D(uShadowMap, s.xy - vec2(0.0, t)).r, z)) * 0.2;
     }
     #endif
+    ${AIR_V}
     void main() {
       mat4 mvi = modelViewMatrix * instanceMatrix;
       vec4 c = mvi * vec4(0.0, 0.0, 0.0, 1.0);
@@ -92,6 +95,7 @@
       float x = (position.x + 0.5 - uPivot) * flip;                           // the card turns about the trunk, not about its middle
       vec3 p = c.xyz + rightV * x * wid + upB * (position.y - 0.5 * (1.0 - l)) * hEff + toCam * wid * 0.2;
       vUv = uv; vView = p;                                                    // a mirrored card keeps its picture and turns its geometry over: the trunk stays on the pivot
+      air(c.xyz + upV * hgt * 0.5, ${AIR_N}, vAirT, vAirL);                   // (one air for the whole tree)
       #ifdef USE_INSTANCING_COLOR
       vCol = instanceColor;
       #else
@@ -110,6 +114,7 @@
     precision highp float;
     uniform sampler2D uImp; uniform vec2 uImpSize; uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uCamAlt, uUnits, uDusk;
     varying vec2 vUv; varying vec3 vCol, vView, vNrm; varying float vHid;
+    ${AIR_F}
     void main() {
       vec4 t = texture2D(uImp, vUv);
       // a small picture of a tree averages its twigs and leaf edges thin: lower the bar as the picture shrinks, so a
@@ -122,10 +127,7 @@
       diff *= 1.0 - 0.6 * vHid;
       vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
       vec3 lit = col * (amb + diff * 0.72 * uSunCol);
-      float distKm = length(vView) * uUnits; float low = smoothstep(0.035, 0.002, uCamAlt);
-      float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;
-      vec3 skyCol = mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), uDay);
-      gl_FragColor = vec4(mix(lit, skyCol, fog), 1.0);
+      gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0);                     // the air between (air.js)
     }`;
   const IMP_DEPTH = `
     precision highp float; uniform sampler2D uImp; varying vec2 vUv;
@@ -275,6 +277,7 @@
       const sh = MODELS.shared; const g = new THREE.PlaneGeometry(1, 1); g.translate(0, 0.5, 0);
       const uniforms = { uImp: { value: card.tex }, uImpSize: { value: new THREE.Vector2(card.tex.image ? card.tex.image.width : 1024, card.tex.image ? card.tex.image.height : 1024) }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units }, uSunCol: sh.uSunCol, uDusk: sh.uDusk };
       if (window.SHADOWS) Object.assign(uniforms, SHADOWS.uniforms);
+      if (window.AIR) Object.assign(uniforms, AIR.uniforms);
       const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide, extensions: { derivatives: true }, defines: window.SHADOWS ? { CARD_SHADOW: 1 } : {} });   // a mirrored card is wound the other way
       I = new THREE.InstancedMesh(g, mat, TIERS[ti].max); I.count = 0; I.frustumCulled = false; I.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       I.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(TIERS[ti].max * 3).fill(1), 3); I.instanceColor.setUsage(THREE.DynamicDrawUsage);

@@ -4,6 +4,7 @@
   const TILE = 512, GRID = 32;
   const R_M = 6371000;
 
+  const GRID_CH = { 8: '!', 16: ':', 32: '.', 64: ',', 128: ';' };      // (a tile's mesh, in the signature of the drawn surface)
   // ---------- shared tile geometry (u, v, skirt) ----------
   function buildTileGeometry(GRID) {
     const n = GRID + 1; const pos = []; const idx = [];
@@ -27,11 +28,14 @@
     return g;
   }
 
+  // the air between the eye and the ground (air.js), worked out at the corners of the mesh: it changes slowly, and the mesh is fine where the eye is near
+  const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.LAND : '4.0';
   const VERT = `
     uniform float uLon0, uDLon, uLat0, uDLat, uLatC, uLonC; uniform vec2 uGeoC, uPhaseB;
     uniform float uDLon0, uDLat0, uMercA, uTanA, uCosA;   // tile-centre-relative offsets and the Mercator terms for the fine (metre-scale) texture frame
     uniform sampler2D uElev, uNoise; uniform vec4 uElevRect; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag, uSkirt, uCamAlt, uQuality;
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
+    ${AIR_V}
     const float R_MV = ${R_M.toFixed(1)};
     float hAtV(vec2 uv) { return max(uElevMin + texture2D(uElev, uElevRect.xy + uv * uElevRect.zw).r * 255.0 * uElevScale, 0.0); }
     void main() {
@@ -67,12 +71,14 @@
       float up = -2.0 * sdl * sdl - cl * clc * s2;
       vec3 unitv = vec3(east, north, up + 1.0);
       vec3 local = vec3(east, north, up) + unitv * hh;
+      vec4 mvTop = modelViewMatrix * vec4(local, 1.0);      // (where the ground itself is: a skirt's lower edge hangs far below it, and has the ground's air, not that of the deep)
       if (position.z > 0.5) local -= unitv * uSkirt;
       vUV = vec2(u, v); vLon = lon; vLat = lat; vUnit = unitv; vGL = vec2(lon * cl - uGeoC.x, lat - uGeoC.y);
       // precise Mercator offset from the tile centre (everything here is small, so float32 keeps centimetres): x = dlon, y = ln(tan(a+d)/tan(a))
       { float dl = uDLon0 + u * uDLon, dla = uDLat0 + v * uDLat; float dd = dla * 0.5; float td = sin(dd) / max(cos(uMercA + dd) * uCosA, 1e-4); vGLf = vec2(dl, log(max(1.0 + td / uTanA, 1e-4))); }
-      vec4 mv = modelViewMatrix * vec4(local, 1.0);
+      vec4 mv = position.z > 0.5 ? modelViewMatrix * vec4(local, 1.0) : mvTop;
       vViewPos = mv.xyz;
+      air(mvTop.xyz, ${AIR_N}, vAirT, vAirL);
       gl_Position = projectionMatrix * mv;
     }`;
 
@@ -93,10 +99,11 @@
     #endif
     uniform vec2 uSimRes, uSel, uHover; uniform float uFertView, uPolitical, uLens, uLabelsOn;
     uniform sampler2D uClouds; uniform float uCloudShift, uCloudVis; uniform vec2 uPhaseB, uPhaseRot;
-    uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality;
+    uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality, uGlow;      // uGlow: 1 where the picture can hold light brighter than white (post.js lets it bleed), else 0
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     const float PI = 3.14159265;
     ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
+    ${AIR_F}
     #ifdef USE_TEXARR
     // generated ground and land-use tiles (textures.js), sampled in a metric Mercator frame: a phase computed in double precision
     // at the tile centre (uPhN whole cells mod 16, uPhF the fraction) plus the precise local offset vGLf, in base cells of 1.5 m
@@ -522,9 +529,11 @@
       diff *= shadow * cloudShadow;
       // the light of the hour (models.js, buildings.js and the trees take the same from the world's uniforms): a low sun
       // is warm and, the eye opening to it, strong; night is blue and enough to see by; dusk lends a rose glow
-      float kW = smoothstep(0.02, 0.42, sunUp);
-      vec3 sunCol = vec3(1.0, 0.56 + 0.44 * kW, 0.30 + 0.70 * kW) * (smoothstep(-0.03, 0.05, sunUp) * (1.0 + 1.1 * (1.0 - smoothstep(0.04, 0.5, sunUp))));
-      float dusk = smoothstep(-0.12, 0.02, sunUp) * (1.0 - smoothstep(0.08, 0.4, sunUp));
+      // (from far out day and night are seen together: the eye is not opened to the low sun there, and the edge of night is a narrow band)
+      float downHere = 1.0 - smoothstep(0.02, 0.25, uCamAlt);
+      float kW = smoothstep(0.02, mix(0.22, 0.42, downHere), sunUp);
+      vec3 sunCol = vec3(1.0, 0.56 + 0.44 * kW, 0.30 + 0.70 * kW) * (smoothstep(-0.03, 0.05, sunUp) * (1.0 + 1.1 * downHere * (1.0 - smoothstep(0.04, 0.5, sunUp))));
+      float dusk = smoothstep(-0.12, 0.02, sunUp) * (1.0 - smoothstep(0.08, 0.4, sunUp)) * (0.35 + 0.65 * downHere);
       vec3 ambC = (mix(mix(vec3(0.24, 0.30, 0.48), vec3(0.10, 0.12, 0.19), smoothstep(0.02, 0.2, uCamAlt)), vec3(0.26), day)      /* (from orbit the night side stays dark under its lights) */ + vec3(0.24, 0.17, 0.18) * dusk) * mix(vec3(1.0), vec3(0.9, 0.95, 1.1), 1.0 - shadow * 0.7);
       vec3 lit = col * (ambC + diff * 1.05 * sunCol * mix(1.0, 0.5, seaW * 0.3));
       // specular on water
@@ -532,7 +541,9 @@
       vec3 refl = reflect(-sunV, nV);
       float specD = max(dot(refl, viewDir), 0.0); float highK = smoothstep(0.02, 0.4, uCamAlt);
       float spec = mix(pow(specD, 90.0), pow(specD, 34.0) * 0.5, highK) * (seaW + inlandW * 0.14) * day * (1.0 - frozen * 0.85);   // a river glints; it is not a mirror. From orbit the sun on the sea is a wide soft patch
-      lit += mix(vec3(0.9, 0.95, 1.0), vec3(1.0, 0.93, 0.8), highK) * spec * 0.9;
+      // (the sun's own image on the water is far brighter than the sheen round it: where the picture can hold that, it is given)
+      float glint = pow(specD, 900.0) * (seaW + inlandW * 0.6) * day * (1.0 - frozen) * (1.0 - highK) * uGlow;
+      lit += mix(vec3(0.9, 0.95, 1.0), vec3(1.0, 0.93, 0.8), highK) * (spec * 0.9 + glint * 5.0);
       // night side: keep a little moonlight and city lights
       float night = 1.0 - smoothstep(-0.22, 0.02, sunUp);
       float light = sim.r; float highUp = smoothstep(0.003, 0.014, uCamAlt);   // orbital city lights fade out as real windows take over
@@ -552,7 +563,7 @@
       lit += col * night * 0.045;
       // fresh fire glows through the night
       float front = smoothstep(0.08, 0.5, dec2.g) * (1.0 - smoothstep(0.7, 0.97, dec2.g));    // the fire front: the fringe of what is burning now
-      lit += vec3(1.0, 0.42, 0.1) * (night * 0.9 + 0.15) * front * (0.3 + 0.7 * nMic.r) * (0.6 + 0.4 * nFin.g);
+      lit += vec3(1.0, 0.42, 0.1) * (night * 0.9 + 0.15) * front * (0.3 + 0.7 * nMic.r) * (0.6 + 0.4 * nFin.g) * (1.0 + 1.6 * uGlow);
       // ---------- political overlay (smoothed, coast-clipped) ----------
       if (uPolitical > 0.0) {
         vec2 sc = geo * uSimRes;                  // cell coords
@@ -601,13 +612,8 @@
         vec3 fc = mix(vec3(0.6, 0.18, 0.1), vec3(0.25, 0.95, 0.4), fert);
         lit = mix(lit, fc * (0.35 + 0.65 * day), uFertView * landW * 0.6);
       }
-      // ---------- aerial perspective ----------
-      float distKm = length(vViewPos) * 6371.0;
-      float low = smoothstep(0.035, 0.002, uCamAlt);
-      float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.75;
-      vec3 sky = mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), day);
-      lit = mix(lit, sky, fog);
-      gl_FragColor = vec4(lit, 1.0);
+      // ---------- the air between (air.js): what it takes from the ground's light on the way to the eye, and the light of its own it adds ----------
+      gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0);
     }`;
 
   // ---------- pack loading ----------
@@ -621,10 +627,18 @@
       this.opts = opts; this.index = opts.index; this.base = opts.base || 'data/';
       this.scene = opts.scene; this.group = new THREE.Group(); this.scene.add(this.group);
       // denser meshes for the close tiles, so the finer regional elevation and the micro-relief actually show as geometry
-      this.geoms = { 16: buildTileGeometry(16), 32: buildTileGeometry(32), 64: buildTileGeometry(64), 128: buildTileGeometry(128) };
+      this.geoms = { 8: buildTileGeometry(8), 16: buildTileGeometry(16), 32: buildTileGeometry(32), 64: buildTileGeometry(64), 128: buildTileGeometry(128) };
       // how finely a tile of a level is meshed. A software renderer runs the vertex shader (five elevation lookups and
       // three of noise per vertex) on the CPU: it gets a quarter of the grid each way, and stands everything on that.
       this.soft = !!opts.soft; this.gridOf = (L) => this.soft ? (L >= 9 ? 32 : 16) : (L >= 9 ? 128 : L >= 7 ? 64 : 32);
+      // That is the finest a tile is meshed. Where it is drawn small it gets a coarser mesh, so that a quad of it is quadPx pixels
+      // or more each way (gridFor). In a view to the horizon most of the ground's tiles lie almost edge-on to the eye: at full
+      // fineness their triangles were slivers a tenth of a pixel deep, dozens to a pixel. That cost the vertex shader (elevation,
+      // relief, the air: a million and a half corners a frame) and, far more, the fragment shader: with four samples a pixel it
+      // runs for every triangle that touches the pixel, and for the three pixels beside it each time. Flat country seen from the
+      // side needs next to no corners; what stands up in a tile (its own relief, from the elevation it is drawn with) keeps it
+      // nearly as fine as it is wide, so the line of the hills against the sky stays as it was.
+      this.quadPx = 4;
       this.tiles = new Map(); this.packs = new Map(); this.loading = 0; this.maxLoading = 6;
       this.exag = opts.exag || 2.0;
       this.frame = 0; this.visible = [];
@@ -748,13 +762,40 @@
       };
       Object.assign(uniforms, this.globals);
       const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, extensions: { derivatives: true }, defines: this.defines() });
-      const mesh = new THREE.Mesh(this.geoms[this.gridOf(L)], mat);
+      const grid = this.gridOf(L); const mesh = new THREE.Mesh(this.geoms[grid], mat);
       mesh.position.copy(center); mesh.quaternion.copy(q); mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
       // world-space extent
       const corners = [GEO.toVec(b.lon0, b.lat0), GEO.toVec(b.lon1, b.lat0), GEO.toVec(b.lon0, b.lat1), GEO.toVec(b.lon1, b.lat1)];
       let rad = 0; for (const c of corners) rad = Math.max(rad, c.distanceTo(center));
-      const t = { key: this.tileKey(L, tx, ty), L, tx, ty, b, lonC, latC, center, mesh, uniforms, radius: rad, extent: Math.max(b.w * GEO.D2R * Math.max(Math.cos(Math.min(Math.abs(b.lat0), Math.abs(b.lat1)) * GEO.D2R), 0.02), b.h * GEO.D2R), lastUsed: 0, minH: 0, maxH: 9000, ePack: null, iPack: null, inScene: false };
+      const t = { key: this.tileKey(L, tx, ty), L, tx, ty, b, lonC, latC, center, mesh, uniforms, radius: rad, extent: Math.max(b.w * GEO.D2R * Math.max(Math.cos(Math.min(Math.abs(b.lat0), Math.abs(b.lat1)) * GEO.D2R), 0.02), b.h * GEO.D2R), lastUsed: 0, minH: 0, maxH: 9000, ePack: null, iPack: null, inScene: false, grid, relief: 0, midH: 0, reliefOf: null, lie: 1, standPx: 0, dist: 1 };
       return t;
+    }
+    // How finely a tile is meshed this frame. t.sse: how many pixels it is across; t.lie: how its ground lies to the eye (the sine
+    // of the angle it is seen at: 1 from above, next to 0 far off and seen from near the ground); t.standPx: how many pixels tall
+    // what stands up in it is. Flat ground gets quads quadPx pixels deep as it lies (seen from the side that is very few of them);
+    // a tile with something standing in it (three pixels tall and more) keeps quads quadPx pixels wide however shallow it
+    // lies, for the line it draws against the sky. A tile keeps the mesh it has until it has passed the step between
+    // two by an eighth, so that it does not go back and forth as the camera drifts. The fewest: eight a side, more for the great
+    // tiles seen from far out, which carry the planet's curve.
+    gridFor(t) {
+      const max = this.gridOf(t.L); if (this.soft || !this.quadPx) return max;
+      const wide = t.sse, deep = Math.min(wide, wide * t.lie + t.standPx);
+      const want = Math.max(deep, wide * Math.min(1, Math.max(0, (t.standPx - 3) / 5))) / this.quadPx;
+      const min = Math.min(max, t.L <= 1 ? 32 : t.L === 2 ? 16 : 8);
+      let g = max; while (g > min && want < g) g >>= 1;
+      const was = t.grid; if (was !== g && was <= max && was >= min && (was === g * 2 || g === was * 2)) { const step = Math.max(g, was); if (want > step * 0.88 && want < step * 1.12) return was; }
+      return g;
+    }
+    // how much a tile's own ground rises and falls (t.relief, metres) and its middle height (t.midH), from the elevation it is drawn
+    // with: looked up once for each pack it is bound to, at up to twenty-four places a side
+    measure(t, eb) {
+      if (t.reliefOf === eb.pack) return; t.reliefOf = eb.pack; t.relief = 0; t.midH = 0;
+      const p = eb.pack; if (eb.absent || !p.data) return;
+      const R = eb.rect, x0 = Math.max(0, Math.floor(R[0] * p.w)), y0 = Math.max(0, Math.floor(R[1] * p.h)), x1 = Math.min(p.w - 1, Math.ceil((R[0] + R[2]) * p.w)), y1 = Math.min(p.h - 1, Math.ceil((R[1] + R[3]) * p.h));
+      const sx = Math.max(1, ((x1 - x0) / 24) | 0), sy = Math.max(1, ((y1 - y0) / 24) | 0), d = p.data, w = p.w; let lo = 255, hi = 0;
+      for (let y = y0; y <= y1; y += sy) for (let x = x0; x <= x1; x += sx) { const v = d[y * w + x]; if (v < lo) lo = v; if (v > hi) hi = v; }
+      const hLo = Math.max(0, p.min + lo * p.scale), hHi = Math.max(0, p.min + hi * p.scale);
+      t.relief = (hHi - hLo) * 1.3; t.midH = (hHi + hLo) / 2;      // (a third more: a peak can stand between two of the places looked at)
     }
     getTile(L, tx, ty) { const k = this.tileKey(L, tx, ty); let t = this.tiles.get(k); if (!t) { t = this.makeTile(L, tx, ty); this.tiles.set(k, t); } return t; }
     // generated ground textures (textures.js): every tile material recompiles with the texture arrays; new tiles get them from the start
@@ -788,7 +829,7 @@
         if (ang - angRad > horizonAng + Math.acos(1 / (1 + hMax)) + 0.01) continue;
         const dist = Math.max(this._sphere.center.distanceTo(cam) - this._sphere.radius, 1e-5);
         const sse = t.extent / dist * K;
-        t.sse = sse;
+        t.sse = sse; t.dist = dist;
         if (sse > this.sseThreshold && t.L < this.maxLevel) {
           const L = t.L + 1; stack.push(this.getTile(L, t.tx * 2, t.ty * 2), this.getTile(L, t.tx * 2 + 1, t.ty * 2), this.getTile(L, t.tx * 2, t.ty * 2 + 1), this.getTile(L, t.tx * 2 + 1, t.ty * 2 + 1));
         } else visible.push(t);
@@ -799,6 +840,7 @@
       for (const p of this.packs.values()) p.users = 0;
       // bind packs + scene membership
       const now = this.frame; const seen = new Set();
+      const low = 1 - Math.min(1, Math.max(0, (camLen - 1 - 0.02) / 0.04));      // 1 below 130 km, 0 from 380 km up
       for (const t of visible) {
         seen.add(t.key); t.lastUsed = now;
         const pri = t.sse;
@@ -811,6 +853,11 @@
           t.ePack = eb;
         }
         if (ib) { const p = ib.pack; if (!ib.absent) { p.users++; u.uImg.value = p.texture; u.uImgRect.value.set(ib.rect[0], ib.rect[1], ib.rect[2], ib.rect[3]); } t.iPack = ib; }
+        // how the tile lies to the eye, for its mesh (gridFor). From far out the planet's rim is where the air changes fastest, and the
+        // air is worked out at the mesh's corners: there every tile counts as seen from above.
+        if (eb) this.measure(t, eb);
+        { const dC = Math.max(t.center.distanceTo(cam), 1e-6), over = t.center.dot(cam) - 1 - t.midH * this.exag / R_M; t.lie = 1 - low + low * Math.min(1, Math.max(0, over / dC)); t.standPx = t.relief * this.exag / R_M / t.dist * K; }
+        const g = this.gridFor(t); if (g !== t.grid) { t.grid = g; t.mesh.geometry = this.geoms[g]; }
         if (!t.inScene) { this.group.add(t.mesh); t.inScene = true; }
       }
       // remove tiles not visible; dispose stale
@@ -821,12 +868,13 @@
         }
       }
       this.visible = visible;
-      // a version for everything that stands on the drawn surface: bumps when the set of drawn tiles or their elevation packs change
-      { let sig = ''; for (const t of visible) sig += t.key + (t.ePack ? (t.ePack.absent ? 'a' : t.ePack.level) : '-') + ';'; if (sig !== this.meshSig) { this.meshSig = sig; this.meshVersion = (this.meshVersion || 0) + 1; } }
+      // a version for everything that stands on the drawn surface: bumps when the set of drawn tiles, their meshes or their elevation packs change
+      { let sig = ''; for (const t of visible) sig += t.key + (t.ePack ? (t.ePack.absent ? 'a' : t.ePack.level) : '-') + GRID_CH[t.grid]; if (sig !== this.meshSig) { this.meshSig = sig; this.meshVersion = (this.meshVersion || 0) + 1; } }
       const hist = {}; for (const t of visible) { const l = t.ePack ? (t.ePack.absent ? 'sea' : t.ePack.level) : '-'; hist[l] = (hist[l] || 0) + 1; } this.stats.elevLevels = hist;
       this.pumpQueue();
       if (now % 30 === 0) this.evictPacks();
       let pi = 0, pe = 0; for (const p of this.packs.values()) if (p.state === 'ready') { if (p.kind === 'i') pi++; else pe++; }
+      { let q = 0; for (const t of visible) q += t.grid * t.grid; this.stats.quads = q; }
       this.stats.tiles = visible.length; this.stats.packsI = pi; this.stats.packsE = pe; this.stats.loading = this.loading; this.stats.sse = this.sseThreshold;
     }
     // ----- height queries (CPU) -----
@@ -911,9 +959,9 @@
     }
     gpuHeightAt(lon, lat, vcache) {
       const t = this.tileAtPoint(lon, lat); if (!t) return this.meshHeightAt0(lon, lat, vcache);
-      const b = GEO.tileBounds(t.L, t.tx, t.ty); const G = this.gridOf(t.L);
+      const b = GEO.tileBounds(t.L, t.tx, t.ty); const G = t.grid;
       const fx = (lon - b.lon0) / b.w * G, fy = (b.lat0 - lat) / b.h * G; const i = Math.min(G - 1, Math.max(0, Math.floor(fx))), j = Math.min(G - 1, Math.max(0, Math.floor(fy))); const fu = fx - i, fv = fy - j;
-      const vh = (ii, jj) => { const key = t.key + ':' + ii + ':' + jj; if (vcache && vcache.has(key)) return vcache.get(key); const h = this.gpuVertexH(t, ii / G, jj / G); if (vcache) vcache.set(key, h); return h; };
+      const vh = (ii, jj) => { const key = t.key + ':' + G + ':' + ii + ':' + jj; if (vcache && vcache.has(key)) return vcache.get(key); const h = this.gpuVertexH(t, ii / G, jj / G); if (vcache) vcache.set(key, h); return h; };
       const ha = vh(i, j), hb = vh(i + 1, j), hc = vh(i, j + 1), hd = vh(i + 1, j + 1);
       return fu + fv <= 1 ? ha + (hb - ha) * fu + (hc - ha) * fv : hd + (hc - hd) * (1 - fu) + (hb - hd) * (1 - fv);
     }

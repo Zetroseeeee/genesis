@@ -30,3 +30,28 @@ window.__T.quake = function (lon, lat, mag) { const S = __G.sim; const x = Math.
 window.__T.flood = function () { const S = __G.sim; const c = S.playerCiv(); const cap = c.capital; const y = (cap / 720) | 0, x = cap - y * 720; const cells = []; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const j = (y + dy) * 720 + x + dx; if (S.land[j] && (S.flags[j] & 2)) cells.push(j); } S.floods.push({ i: cap, year: S.year, cells }); return cells.length; };
 // heading (rad, from north toward east as the camera uses it) toward a world direction from the camera point
 window.__T.headingTo = function (v) { const f = GEO.enu(__G.mapcam.lon, __G.mapcam.lat); return Math.atan2(f.east.dot(v), f.north.dot(v)); };
+
+// What a part of the picture costs, measured in the page itself: one start of the app is too noisy to hold against another, and the
+// build Mac's frame rates are the only ones that count. Each setting in turn (a name and what turns it on; they add up, so a later
+// one must undo an earlier one if it should not count) runs for four seconds, and the frame rates are written into the picture with
+// how many quads of ground were drawn. A tour line needs about five seconds a setting and fifteen over.
+window.__T.cost = function (list, secs) {
+  const T = __G.terrain, out = [], el = document.createElement('div'); el.style.cssText = 'position:fixed;left:24%;top:8%;z-index:99999;background:#000;color:#fff;font:21px monospace;padding:14px;white-space:pre'; document.body.appendChild(el);
+  let i = 0; const next = () => {
+    if (i >= list.length) { out.push('tiles ' + T.stats.tiles + ', quads ' + T.stats.quads + ', ratio ' + window.devicePixelRatio + ', canvas ' + __G.renderer.domElement.width + 'x' + __G.renderer.domElement.height); el.textContent = out.join('\n'); return; }
+    list[i][1](); setTimeout(() => { let n = 0; const t0 = performance.now(); const tick = () => { n++; if (performance.now() - t0 < (secs || 4) * 1000) requestAnimationFrame(tick); else { out.push(list[i][0].padEnd(28) + (n / ((performance.now() - t0) / 1000)).toFixed(1) + ' fps  ' + T.stats.quads); el.textContent = out.join('\n'); i++; next(); } }; requestAnimationFrame(tick); }, 800); };
+  next();
+};
+// the usual questions, each undone before the next: the picture's last steps, the air, the ground's meshes, the pixels, the ground itself, the houses
+window.__T.costs = function () {
+  const T = __G.terrain, q = T.quadPx, R = __G.renderer, r0 = R.getPixelRatio();
+  __T.cost([['all', () => {}], ['post off', () => { POST.off = true; }], ['and the air off', () => { AIR.on = false; }], ['air on, the old meshes', () => { AIR.on = true; T.quadPx = 0; }],
+    ['a quarter of the pixels', () => { T.quadPx = q; R.setPixelRatio(r0 / 2); }], ['all pixels, no ground', () => { R.setPixelRatio(r0); T.group.visible = false; }],
+    ['ground, no houses', () => { T.group.visible = true; __G.world.buildingGroup.visible = false; MODELS.group.visible = false; }], ['all again', () => { __G.world.buildingGroup.visible = true; MODELS.group.visible = true; POST.off = false; }]]);
+};
+// how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
+window.__T.aniso = function (n, ...texs) {
+  const R = __G.renderer, gl = R.getContext(), ext = gl.getExtension('EXT_texture_filter_anisotropic'); if (!ext) return 0; let k = 0;
+  for (const x of texs) { if (!(x && x.isTexture)) continue; const q = R.properties.get(x); if (!q.__webglTexture) continue; const tg = x.isDataTexture2DArray ? gl.TEXTURE_2D_ARRAY : gl.TEXTURE_2D; gl.bindTexture(tg, q.__webglTexture); gl.texParameterf(tg, ext.TEXTURE_MAX_ANISOTROPY_EXT, n); k++; }
+  R.state.reset(); return k;
+};

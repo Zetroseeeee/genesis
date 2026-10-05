@@ -28,7 +28,7 @@
   const speed = () => settings.continuous ? (paused ? 0 : SPEEDS[speedIdx]) : (turnRun.active ? 600 : 0);
   // The home screen: the Earth stands large and runs off the right and the bottom of the picture, the edge of night
   // keeps its place while the planet turns under it (the way it really turns: dusk travels west), and the list has the left.
-  const HOME = { dist: 1.02, cx: 0.8, cy: 0.76, lat: 10, spin: -0.3, sun: [-0.9, 0.36, -0.22] };
+  const HOME = { dist: 1.02, cx: 0.8, cy: 0.76, lat: 10, spin: -0.3, sun: [-0.9, 0.36, 0.0] };
   let homeK = 1, sunEase = 0;      // how far the picture is shifted for the home screen (1) or centred (0); seconds of easing left for the sun
   function frameHome() {
     const w = stage.clientWidth, h = stage.clientHeight; const wide = w > 900;
@@ -52,8 +52,14 @@
   let softGL = false; try { const gl = renderer.getContext(); const x = gl.getExtension('WEBGL_debug_renderer_info'); softGL = /SwiftShader|llvmpipe|Software/i.test(String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))); } catch (e) {}
   if (window.SHADOWS && (window.GENESIS_SHADOW || !softGL)) SHADOWS.init(renderer, window.GENESIS_SHADOW || 4096);      // the sun's depth map, 4096 texels across (a software renderer goes without unless asked)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // what a frame goes through after the scene is drawn: shade, glow, the developing (post.js). A software renderer goes without unless asked.
+  const postOk = !!window.POST && (window.GENESIS_POST || !softGL) && POST.init(renderer); if (postOk && window.GENESIS_POST && typeof window.GENESIS_POST === 'object') Object.assign(POST, window.GENESIS_POST);
   // how finely textures are filtered where the ground runs away from the eye: all the card can do (16 taps on an Apple GPU); a software renderer pays for every tap and keeps what it had
-  const maxAniso = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4; const ANISO = softGL ? Math.min(8, maxAniso) : maxAniso, ANISO_SMALL = softGL ? 4 : maxAniso; window.GENESIS_ANISO = ANISO;      // (models.js and textures.js read it)
+  const maxAniso = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4; const ANISO = softGL ? Math.min(8, maxAniso) : maxAniso; window.GENESIS_ANISO = ANISO;      // (models.js and textures.js read it)
+  // The ground's shader looks into the noise fifteen times a pixel and into the photographs of detail sixteen, and at sixteen ways each
+  // that was a fifth of the frame in a view to the horizon, for a difference nobody can find in the picture (they only vary what the
+  // ground's own pictures show): they get by with two ways and four. The ground's own pictures and the roads keep all the card can do.
+  const ANISO_NOISE = softGL ? 4 : Math.min(2, maxAniso), ANISO_SMALL = softGL ? 4 : Math.min(4, maxAniso);
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.setClearColor(0x05070c, 1);
   stage.appendChild(renderer.domElement);
@@ -72,13 +78,15 @@
     uDecal: { value: null }, uDecalRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uDecalOn: { value: 0 }, uQuality: { value: 1 }, uDecal2: { value: null }, uWaterN: { value: null },
     uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
+    uGlow: { value: 0 },      // 1 while the picture goes through post.js, which can hold light brighter than white and lets it bleed
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
+  if (window.AIR) { Object.assign(globals, AIR.uniforms); if (softGL) AIR.steps = window.GENESIS_AIR || 0.4; }      // the air (air.js); a software renderer takes fewer steps through it
 
   // ---------- loading ----------
   function setLoad(pct, step) { $('loadbar').style.transform = `scaleX(${pct / 100})`; if (step) $('loadstep').textContent = step; }
   function loadTex(url, opts = {}) {
-    return new Promise((res) => { new THREE.TextureLoader().load(url, (t) => { t.wrapS = t.wrapT = opts.mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.anisotropy = ANISO_SMALL; if (opts.flipY === false) t.flipY = false; res(t); }, undefined, () => { console.warn('texture missing', url); res(null); }); });
+    return new Promise((res) => { new THREE.TextureLoader().load(url, (t) => { t.wrapS = t.wrapT = opts.mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.anisotropy = opts.aniso || ANISO_SMALL; if (opts.flipY === false) t.flipY = false; res(t); }, undefined, () => { console.warn('texture missing', url); res(null); }); });
   }
   // The terrain's photographic detail (forest, dunes, rock, grass), and the shallows once the generated art has loaded,
   // as layers of one array texture: one texture unit instead of five.
@@ -103,7 +111,7 @@
       setLoad(6, 'terrain index');
       const index = await (await fetch('data/index.json')).json();
       setLoad(14, 'surface data');
-      const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([loadTex('data/info.png', { flipY: false }), loadTex('data/noise.png'), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
+      const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([loadTex('data/info.png', { flipY: false }), loadTex('data/noise.png', { aniso: ANISO_NOISE }), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
       info.wrapS = THREE.RepeatWrapping; info.wrapT = THREE.ClampToEdgeWrapping; info.minFilter = THREE.LinearFilter; info.generateMipmaps = false;
       globals.uInfo.value = info; globals.uNoise.value = noise; globals.uClouds.value = noise; globals.uWaterN.value = waterN || noise; globals.uDetA.value = detA || noise; globals.uDetB.value = detB || noise; globals.uDetC.value = detC || noise; globals.uDetD.value = detD || noise;
       // one array texture for the four detail photographs (WebGL2): the terrain shader then fits the 16 textures an Apple GPU allows
@@ -1191,12 +1199,13 @@
         SHADOWS.update(renderer, scene, camera, c, half, globals.uSun.value, f.up, world.castersVersion + ':' + (trees ? trees.castersVersion : 0) + ':' + (window.MODELS ? MODELS.stats.loaded : 0), day);
       } else SHADOWS.uniforms.uShadowP.value.x = 0;
     }
-    const low = clamp(1 - mapcam.alt / 0.05, 0, 1) * day;
-    renderer.setClearColor(new THREE.Color(0.02 + 0.5 * low, 0.027 + 0.62 * low, 0.047 + 0.85 * low), 1);
+    // the air for this frame (air.js): where the planet and the sun are from the camera, how far the eye is opened. The sky is drawn through it, so behind everything is the black of space
+    if (window.AIR) { camera.updateMatrixWorld(); AIR.update(camera, globals.uSun.value, mapcam.alt, mapcam.dist); }
+    const posted = postOk && !POST.off && !POST.broken && settings.quality === 'high'; globals.uGlow.value = world.bUniforms.uGlow.value = posted ? 1 : 0; if (life) life.uniforms.uGlow.value = posted ? 1 : 0;
     updateLabels(); updatePlots(); updateFlows();
     if (now - mmT > 700) { mmT = now; updateMinimap(false); }
     tpsT += dt; if (tpsT > 1) { $('yps').textContent = tpsCount + ' yr/s'; tpsCount = 0; tpsT = 0; const d = $('debug'); if (d.style.display === 'block') d.textContent = `elev ${JSON.stringify(terrain.stats.elevLevels)} tiles ${terrain.stats.tiles} sse ${terrain.stats.sse | 0} packs i${terrain.stats.packsI} e${terrain.stats.packsE} loading ${terrain.stats.loading} buildings ${world.buildingCount} trees ${trees ? trees.count : 0} labels ${labelEls.size} movers ${movers ? movers.stats.agents + '/' + movers.stats.walkers + '/' + movers.stats.ships : 0} alt ${(mapcam.alt * 6371).toFixed(1)}km dist ${(mapcam.dist * 6371).toFixed(1)}km tilt ${(mapcam.tilt * 57.3).toFixed(0)}`; }
-    if (!modalOpen || (now | 0) % 6 === 0) renderer.render(scene, camera);
+    if (!modalOpen || (now | 0) % 6 === 0) { if (posted) POST.render(renderer, scene, camera, mapcam.alt, now / 1000); else renderer.render(scene, camera); }
     if (++framesDrawn === 3 && desktop) desktop.ready();      // the game is up: an update put to use just now is kept
   }
   boot();

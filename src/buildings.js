@@ -145,10 +145,13 @@
   }
 
   // ---------- material shader ----------
+  // the air between the eye and the thing (air.js), worked out at its corners
+  const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.THING : '3.0';
   const VERT = `
     attribute vec4 aInfo;                 // era, seed, style (wall + roof*8 + culture*64 + flags*1024), representational scale (drawn size / true size)
     uniform float uMetres;                // scene units -> metres (R_M on the globe, 1 in the kit viewer)
     varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView; varying float vPick;
+    ${AIR_V}
     void main() {
       mat4 im = instanceMatrix;
       // one draw between 0 and 1 for this building: which of a material's variants it gets. Made here, from the instance's
@@ -160,11 +163,13 @@
       vN = normalize(normalMatrix * (mat3(im) * normal));
       vCol = instanceColor; vInfo = aInfo.xyz;
       vec4 mv = modelViewMatrix * im * vec4(position, 1.0); vView = mv.xyz;
+      air(mv.xyz, ${AIR_N}, vAirT, vAirL);
       gl_Position = projectionMatrix * mv;
     }`;
   const FRAG = `
     precision highp float;
-    uniform vec3 uSunV, uUpV, uSunCol, uGround; uniform float uDay, uCamAlt, uTime, uSnow, uDusk;
+    ${AIR_F}
+    uniform vec3 uSunV, uUpV, uSunCol, uGround; uniform float uDay, uCamAlt, uTime, uSnow, uDusk, uGlow;
     ${window.SHADOWS ? SHADOWS.GLSL : 'const vec4 uShadowP = vec4(0.0); float sunHidden(vec3 p) { return 0.0; }'}
     varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView; varying float vPick;
     const vec3 LUM = vec3(0.299, 0.587, 0.114);
@@ -300,17 +305,14 @@
       float night = 1.0 - uDay;
       float lampOn = step(era >= 6.0 ? 0.66 : 0.55, h21(gi * 3.1 + seed * 11.0 + faceId));
       vec3 lampCol = era >= 6.0 ? vec3(1.0, 0.86, 0.62) : vec3(1.0, 0.62, 0.3);
-      lit += lampCol * win * lampOn * night * (era >= 6.0 ? 0.8 : 0.45) * (1.0 - isRuin);
+      lit += lampCol * win * lampOn * night * (era >= 6.0 ? 0.8 : 0.45) * (1.0 - isRuin) * (1.0 + 1.5 * uGlow);      // (a lit window is brighter than a white wall: uGlow)
       // far away, single windows are below a pixel: let the facade glow evenly instead of sparkling
       lit += lampCol * smoothstep(0.5, 1.6, px) * density * (1.0 - roof) * (1.0 - bottom) * night * (era >= 6.0 ? 0.16 : 0.05);
       if (wallMat == 6.0) { float fl = floor(yM / 3.4); float floorLit = step(0.5, h21(vec2(fl, seed * 5.0))); float cell = step(0.5, h21(floor(vec2(fuv.x / 2.4, yM / 3.4)) + seed * 3.0)) * floorLit + step(0.9, h21(floor(vec2(fuv.x / 2.4, fl)) + seed * 7.0)) * (1.0 - floorLit); cell *= 1.0 - smoothstep(0.5, 1.6, px); float glow = smoothstep(0.5, 1.6, px) * 0.22; lit += (vec3(0.95, 0.9, 0.72) * (cell * 0.26 + glow) + vec3(0.2, 0.26, 0.36) * 0.06) * night * (1.0 - roof); }
       if (era >= 1.0 && era < 3.0) lit += vec3(1.0, 0.6, 0.3) * night * 0.1 * (1.0 - roof) * step(0.8, h21(vec2(seed, faceId)));
-      if (isNeon > 0.5) lit += vec3(1.0, 0.85, 0.55) * night * 1.4 * smoothstep(0.75, 1.0, vLocal.y);
-      // aerial perspective shared with the terrain
-      float distKm = length(vView) * 6371.0; float low = smoothstep(0.035, 0.002, uCamAlt);
-      float fog = (1.0 - exp(-distKm / 260.0)) * low * 0.92;
-      vec3 skyCol = mix(vec3(0.01, 0.015, 0.035), vec3(0.70, 0.80, 0.92), uDay);
-      gl_FragColor = vec4(mix(lit, skyCol, fog), 1.0);
+      if (isNeon > 0.5) lit += vec3(1.0, 0.85, 0.55) * night * 1.4 * smoothstep(0.75, 1.0, vLocal.y) * (1.0 + 1.2 * uGlow);
+      // the air between (air.js): the same that veils the ground behind it
+      gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0);
     }`;
 
   // instance caps: enough for the biggest city in view plus its neighbours
