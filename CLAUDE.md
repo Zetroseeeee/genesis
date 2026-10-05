@@ -315,7 +315,9 @@ Conventions that matter:
   develop (a little contrast and colour, a shoulder into white, darker corners, grain). 0 to 1 is the picture as the
   shaders made it; only what they write above 1 is "more than white", and they write it where `uGlow` is 1 (the sun's
   image on water, flames, lit windows, a fire front; the sun's disc is thousands). Depth here is ordinary perspective
-  depth: the game's own shaders never took the renderer's logarithmic depth.
+  depth: the game's own shaders never took the renderer's logarithmic depth. The developing turns about a dark grey
+  (0.30): shadows stay where the shaders put them, lit ground gains. After its first frame the stage asks the card
+  whether its targets are whole; if not (`POST.broken`) the game draws straight to the screen as it used to.
 - **A ground tile's mesh** follows how the tile is drawn (`gridFor` in `terrain.js`), up to the finest its level has
   (`gridOf`: 128 a side at the deepest level). What costs is not corners but slivers: with four samples a pixel the
   fragment shader runs for every triangle that touches a pixel (and for its three neighbours each time), so country
