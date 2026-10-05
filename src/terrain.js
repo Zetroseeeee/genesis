@@ -112,7 +112,7 @@
     precision highp sampler2DArray;
     uniform sampler2DArray uLanduse; uniform float uTexMix;
     #ifdef USE_GROUND
-    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[16], uGndFarJ[16]; uniform vec3 uGndMean[17]; uniform vec4 uGndK;
+    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[16], uGndFarJ[16]; uniform vec3 uGndMean[17]; uniform vec4 uGndK; uniform float uGndShow;
     #else
     uniform sampler2DArray uGround;
     #ifndef DET_SHALLOWS
@@ -330,8 +330,9 @@
         CAND(3.0, wDesert * sandW, 0.7)
         CAND(9.0, (wGrass + wDesert) * redK, 0.3)
         #undef CAND
-        float chromaOn = max(lum, 0.03);
-        #define TONE(c, L, h) { vec3 m = gndMean(L); float lm = dot(m, vec3(0.299, 0.587, 0.114)); c *= m * pow(chromaOn / lm, 0.6) * mix(vec3(1.0), clamp((base / chromaOn) / (m / lm), 0.4, 2.5), h); }
+        if (uGndShow >= 0.0) { L1 = uGndShow; w1 = 1.0; w2 = 0.0; }
+        float chromaOn = max(lum, 0.03), hueOn = 1.0 - white;      // (where the photograph shows snow or cloud its colour says nothing of the ground's)
+        #define TONE(c, L, h) { vec3 m = gndMean(L); float lm = dot(m, vec3(0.299, 0.587, 0.114)); c *= m * pow(chromaOn / lm, 0.6) * mix(vec3(1.0), clamp((base / chromaOn) / (m / lm), 0.4, 2.5), h * hueOn); }
         vec4 A = gnd(L1); vec3 ca = A.rgb; TONE(ca, L1, h1)
         float hU = A.a, t2 = w2 / max(w1 + w2, 1e-4), kB = 0.0; vec3 tex = ca; dl = 0.45 * dot(A.rgb, vec3(0.299, 0.587, 0.114));
         if (t2 > 0.04 && L2 != L1) {

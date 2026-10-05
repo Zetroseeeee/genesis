@@ -3,6 +3,8 @@
 data/models/
 data/tex/atlas.offline.json
 data/tex/atlas_*.webp
+data/tex/ground.json
+data/tex/ground_*.jpg
 data/tex/atlas_shot.json
 data/tex/shot_*.png
 data/tex/ui_*.webp

@@ -79,7 +79,7 @@
     uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
     // the ground's materials (textures.js: TEX.ground), laid at a ladder of sizes in a frame of cells a metre and a half across at the equator
-    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 16 }, uGndFar: { value: new Float32Array(16) }, uGndFarJ: { value: new Float32Array(16).fill(99) }, uGndMean: { value: new Float32Array(51).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.3, 600) },
+    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 16 }, uGndFar: { value: new Float32Array(16) }, uGndFarJ: { value: new Float32Array(16).fill(99) }, uGndMean: { value: new Float32Array(51).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.3, 600) }, uGndShow: { value: -1 },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndShow: one layer everywhere (to look at it), or -1
     uGlow: { value: 0 },      // 1 while the picture goes through post.js, which can hold light brighter than white and lets it bleed
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere

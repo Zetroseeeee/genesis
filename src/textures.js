@@ -45,9 +45,9 @@
     tex.onUpdate = () => { tex.image.data = null; };      // (the card has it now: a hundred megabytes need not be kept twice)
     return tex;
   }
-  async function loadGround(url, aniso, shrink, shallows) {
-    let man; try { const r = await fetch(url); if (!r.ok) return null; man = await r.json(); } catch (e) { return null; }
-    const base = url.replace(/[^/]*$/, ''); const [a, nm] = await Promise.all([loadImg(base + man.albedo), loadImg(base + man.normal)]); if (!a || !nm) return null;
+  async function loadGround(url, aniso, shrink, shallows, fresh) {
+    let man; try { const r = await fetch(url + (fresh ? '?' + fresh : ''), fresh ? { cache: 'no-store' } : undefined); if (!r.ok) return null; man = await r.json(); } catch (e) { return null; }
+    const base = url.replace(/[^/]*$/, ''), q = fresh ? '?' + fresh : ''; const [a, nm] = await Promise.all([loadImg(base + man.albedo + q), loadImg(base + man.normal + q)]); if (!a || !nm) return null;
     const cols = man.cols || 4, rows = man.rows || 4, count = cols * rows, A = cells(a, cols, rows, shrink), N = cells(nm, cols, rows, shrink), C = A.C, px = C * C, L = man.layers || [];
     const col = new Uint8Array(px * 4 * (count + (shallows ? 1 : 0))), rel = new Uint8Array(px * 2 * count);
     for (let l = 0; l < count; l++) { const c = A.at(l), r = N.at(l), o = l * px * 4, q = l * px * 2; for (let p = 0; p < px; p++) { col[o + p * 4] = c[p * 4]; col[o + p * 4 + 1] = c[p * 4 + 1]; col[o + p * 4 + 2] = c[p * 4 + 2]; col[o + p * 4 + 3] = r[p * 4 + 2]; rel[q + p * 2] = r[p * 4]; rel[q + p * 2 + 1] = r[p * 4 + 1]; } }
@@ -115,6 +115,7 @@
         // (the ground's materials, where the manifest names them: a software renderer takes them at half size)
         if (man.pack && TEX.groundOn !== false) { try { const mi = names.indexOf('misc'), sh = mi >= 0 && imgs[mi] ? man.atlases.misc.layers.findIndex((L) => L.id === 'shallows') : -1; let cvS = null;
           if (sh >= 0) { const im = imgs[mi], C = Math.round(cell * im.width / (n * cell)); cvS = document.createElement('canvas'); cvS.width = cvS.height = C; cvS.getContext('2d').drawImage(im, (sh % n) * C, Math.floor(sh / n) * C, C, C, 0, 0, C, C); }
+          TEX.groundArgs = [man.pack, aniso, TEX.groundShrink || (half ? 2 : 1), cvS];
           TEX.ground = await loadGround(man.pack, aniso, TEX.groundShrink || (half ? 2 : 1), cvS); } catch (e) { console.warn('ground materials unavailable', e); TEX.ground = null; } }
         TEX.ready = !!(TEX.arrays.wall && TEX.arrays.roof);
         if (!TEX.ready) TEX.failed = true;
@@ -123,6 +124,8 @@
     })();
     return TEX.loading;
   };
+  // the ground's materials read again from where they came (for tools: a new pack looked at without a new page); resolves to the pack or null
+  TEX.reloadGround = async function () { if (!TEX.groundArgs) return null; const g = await loadGround(TEX.groundArgs[0], TEX.groundArgs[1], TEX.groundArgs[2], TEX.groundArgs[3], Date.now()); if (g) { const old = TEX.ground; TEX.ground = g; if (old) { old.albedo.dispose(); old.relief.dispose(); } } return g; };
   // handy for the UI: url of a piece of art or ''
   TEX.art = (key) => (TEX.ui && TEX.ui[key]) || '';
   window.TEX = TEX;
