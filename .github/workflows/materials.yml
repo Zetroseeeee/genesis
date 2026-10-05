@@ -1,0 +1,48 @@
+# Looks through the free (CC0) material libraries for ground to stand on: what a library has for a search, with a sheet of
+# the previews, kept in the "peek" release. (The workspace cannot reach those hosts; GitHub can.) tools/materials.sh runs it.
+name: Materials
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Name of the sheet (file name without extension)'
+        required: true
+      source:
+        description: 'polyhaven or ambientcg'
+        required: true
+        default: 'polyhaven'
+      query:
+        description: 'Poly Haven: categories, comma separated; ambientCG: search words'
+        required: false
+        default: ''
+      limit:
+        description: 'How many at most'
+        required: false
+        default: '60'
+permissions:
+  contents: write
+jobs:
+  sheet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: List and lay out
+        env:
+          NAME: ${{ github.event.inputs.name }}
+          SOURCE: ${{ github.event.inputs.source }}
+          QUERY: ${{ github.event.inputs.query }}
+          LIMIT: ${{ github.event.inputs.limit }}
+          KEEP_GOING: '1'
+        run: |
+          set -euo pipefail
+          case "$NAME" in *[!A-Za-z0-9_-]*) echo "bad name"; exit 1;; esac
+          python3 -c 'import PIL' 2>/dev/null || python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow || python3 -m pip install --quiet --disable-pip-version-check pillow
+          python3 tools/ground/catalog.py
+          ls -la out
+      - name: Keep
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view peek -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create peek -R "$GITHUB_REPOSITORY" --title "Work in progress" --notes "Contact sheets of generated images, for review." --latest=false
+          gh release upload peek out/* -R "$GITHUB_REPOSITORY" --clobber
