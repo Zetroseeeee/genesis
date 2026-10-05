@@ -55,3 +55,9 @@ window.__T.aniso = function (n, ...texs) {
   for (const x of texs) { if (!(x && x.isTexture)) continue; const q = R.properties.get(x); if (!q.__webglTexture) continue; const tg = x.isDataTexture2DArray ? gl.TEXTURE_2D_ARRAY : gl.TEXTURE_2D; gl.bindTexture(tg, q.__webglTexture); gl.texParameterf(tg, ext.TEXTURE_MAX_ANISOTROPY_EXT, n); k++; }
   R.state.reset(); return k;
 };
+
+// The ground's shaders, taken anew from src/terrain.js into a page that is running (tools/live.js: /load?file=terrain.js, then
+// __T.reshade()): every tile is given the new ones, and tiles made from now on get them too. Seconds, where a new page takes minutes.
+window.__T.reshade = function () { const T = __G.terrain; Object.setPrototypeOf(T, TERRAIN.Terrain.prototype); let n = 0; for (const t of T.tiles.values()) { const m = t.mesh.material; m.vertexShader = TERRAIN.VERT; m.fragmentShader = TERRAIN.FRAG; m.needsUpdate = true; n++; } return n; };
+// The ground's materials read again from data/tex (a new pack: tools/ground/pack.sh) and put to use; resolves to when the pack was made.
+window.__T.reground = function () { return TEX.reloadGround().then((g) => { __G.terrain.setTextures(TEX, true); return g ? g.made : null; }); };

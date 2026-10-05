@@ -112,7 +112,7 @@
     precision highp sampler2DArray;
     uniform sampler2DArray uLanduse; uniform float uTexMix;
     #ifdef USE_GROUND
-    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[16], uGndFarN; uniform vec2 uGndFarD[16]; uniform vec3 uGndMean[17]; uniform vec4 uGndK, uGndT; uniform float uGndShow;
+    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[24], uGndFarN; uniform vec2 uGndFarD[24]; uniform vec3 uGndMean[25]; uniform vec4 uGndK, uGndT; uniform float uGndShow;
     #else
     uniform sampler2DArray uGround;
     #ifndef DET_SHALLOWS
@@ -136,15 +136,15 @@
     // of the land-use tiles without their bands: whole cells at the tile's centre (uLadN, exact) plus the fraction plus the precise
     // offset from the centre. Every lookup is given its own derivatives (the step of the ladder changes from pixel to pixel, and
     // what the card would work out across such a seam is nonsense), which also lets a lookup stand inside a branch.
-    float gJ, gMix, gSwA, gSwB, gFarOn, gDistM; vec2 gUa, gUb, gAx, gAy, gBx, gBy, gUf, gFx, gFy, gLoc, gDx, gDy;
-    void ladStep(float j, vec2 loc, vec2 dx, vec2 dy, out vec2 uv, out vec2 ddx, out vec2 ddy, out float sw) {
+    float gJ, gMix, gSwA, gSwB, gFarOn, gDistM, gFk; vec2 gUa, gUb, gAx, gAy, gBx, gBy, gUf, gUg, gFx, gFy, gLoc, gDx, gDy;
+    void ladStep(float j, vec2 loc, vec2 dx, vec2 dy, out vec2 uv, out vec2 ddx, out vec2 ddy, out float sw, out float pick) {
       float n = 8.0 * exp2(j), nw = n * 16.0;
       // (a slow bend from the noise, a few repeats long, so that the repeats do not stand in rows; each step is moved and every
       // other one laid the other way round, so that no two of them fall on top of each other)
       vec2 q = (mod(uLadN, nw) + uLadF + loc) / nw + j * vec2(0.37, 0.61);
-      vec2 w = textureGrad(uNoise, q, dx / nw, dy / nw).rg - 0.5;
-      vec2 p = (mod(uLadN, n) + uLadF + loc) / n + w * (2.0 * uGndK.z) + j * vec2(0.618, 0.382);
-      ddx = dx / n; ddy = dy / n; sw = mod(j, 2.0);
+      vec3 w = textureGrad(uNoise, q, dx / nw, dy / nw).rgb - vec3(0.5, 0.5, 0.43);
+      vec2 p = (mod(uLadN, n) + uLadF + loc) / n + w.rg * (2.0 * uGndK.z) + j * vec2(0.618, 0.382);
+      ddx = dx / n; ddy = dy / n; sw = mod(j, 2.0); pick = w.r * 2.2 + w.b * 0.9;
       if (sw > 0.5) { p = p.yx; ddx = ddx.yx; ddy = ddy.yx; }
       uv = p;
     }
@@ -155,10 +155,18 @@
       float a = dot(dx, dx), d = dot(dy, dy), b = dot(dx, dy), disc = sqrt(max((a - d) * (a - d) + 4.0 * b * b, 0.0));
       float major = sqrt(0.5 * (a + d + disc)), minor = sqrt(max(0.5 * (a + d - disc), 0.0)), rho = max(minor, major / 12.0);
       float l = clamp(log2(max(rho, 1e-7) * uGndK.w / 8.0), 0.0, 14.0);
-      gJ = min(floor(l), 13.0); gMix = smoothstep(0.25, 1.0, l - gJ);
-      ladStep(gJ, loc, dx, dy, gUa, gAx, gAy, gSwA); ladStep(gJ + 1.0, loc, dx, dy, gUb, gBx, gBy, gSwB);
-      float nf = uGndFarN, nw = nf * 16.0; vec2 w = textureGrad(uNoise, (mod(uLadN, nw) + uLadF + loc) / nw + 0.17, dx / nw, dy / nw).rg - 0.5;
-      gUf = (mod(uLadN, nf) + uLadF + loc) / nf + w * (2.0 * uGndK.z); gFx = dx / nf; gFy = dy / nf;
+      gJ = min(floor(l), 13.0); float f = l - gJ, pa, pb;
+      ladStep(gJ, loc, dx, dy, gUa, gAx, gAy, gSwA, pa); ladStep(gJ + 1.0, loc, dx, dy, gUb, gBx, gBy, gSwB, pb);
+      // Between two steps the ground is not a blend of both everywhere but a patchwork of the one and the other, patches a repeat or
+      // so across, more of the larger as the eye draws away (a blend of two sizes is a blur of both; and a row of the same stones
+      // into the distance is what gives a repeat away: here every second patch has them at another size and the other way round).
+      // At either end of the span it is all one step, so nothing jumps where the steps change.
+      gMix = smoothstep(-0.1, 0.1, f - 0.5 + pb * 6.0 * f * (1.0 - f));
+      // the far layers: one size, and two copies of it moved apart, of which the higher shows (two woods laid over each other are
+      // a wood; the copies change places slowly across the country, so the same crowns do not come round every repeat)
+      float nf = uGndFarN, nw = nf * 16.0; vec3 w = textureGrad(uNoise, (mod(uLadN, nw) + uLadF + loc) / nw + 0.17, dx / nw, dy / nw).rgb - 0.5;
+      float kf = w.g * 9.0 + 4.0, ki = floor(kf); gFk = kf - ki;
+      gUf = (mod(uLadN, nf) + uLadF + loc) / nf + w.rg * (1.2 * uGndK.z); gUg = gUf + sin(vec2(3.0, 7.0) * (ki + 1.0)); gUf += sin(vec2(3.0, 7.0) * ki); gFx = dx / nf; gFy = dy / nf;
       gDistM = length(vViewPos) * ${R_M.toFixed(1)};
     }
     // A material as the ladder shows it: what it adds to its own mean colour (rgb, about 1) and its height (a). Away from the eye
@@ -166,29 +174,38 @@
     // dark, which is what a wood from high up has of pattern). gndFarK: how much of what is shown is that other layer; gndMean:
     // the colour the layer has on the whole, as it is shown here.
     float gndFarK(float L) { vec2 d = uGndFarD[int(L + 0.5)]; return d.y > 0.0 ? gFarOn * smoothstep(d.x, d.y, gDistM) : 0.0; }
+    // (the far layer's two copies: how much of the second shows. It shows where it stands higher, and wholly where the first has had its turn)
+    float gndFar2(float ha, float hb) { return smoothstep(-0.12, 0.12, hb - ha + (gFk - 0.5) * 2.3); }
     vec4 gnd(float L) {
-      vec4 c = textureGrad(uGnd, vec3(gUa, L), gAx, gAy);
+      vec4 c = gMix < 0.996 ? textureGrad(uGnd, vec3(gUa, L), gAx, gAy) : vec4(0.0);
       if (gMix > 0.004) c = mix(c, textureGrad(uGnd, vec3(gUb, L), gBx, gBy), gMix);
       c.rgb /= uGndMean[int(L + 0.5)];
       float fk = gndFarK(L);
-      if (fk > 0.003) { float Lf = uGndFar[int(L + 0.5)]; vec4 f = textureGrad(uGnd, vec3(gUf, Lf), gFx, gFy); f.rgb *= mix(1.0, dot(c.rgb, vec3(0.299, 0.587, 0.114)), 0.5) / uGndMean[int(Lf + 0.5)]; c = mix(c, f, fk); }
+      if (fk > 0.003) {
+        float Lf = uGndFar[int(L + 0.5)]; vec4 f = textureGrad(uGnd, vec3(gUf, Lf), gFx, gFy), g = textureGrad(uGnd, vec3(gUg, Lf), gFx, gFy); f = mix(f, g, gndFar2(f.a, g.a));
+        f.rgb *= mix(1.0, dot(c.rgb, vec3(0.299, 0.587, 0.114)), 0.5) / uGndMean[int(Lf + 0.5)]; c = mix(c, f, fk);
+      }
       return c;
     }
     vec3 gndMean(float L) { int i = int(L + 0.5); return mix(uGndMean[i], uGndMean[int(uGndFar[i] + 0.5)], gndFarK(L)); }
+    // which way its surface leans (east, north; the maps have green up the picture, and the picture's top is the south)
+    vec2 gndN(float L) {
+      vec2 a = vec2(0.0);
+      if (gMix < 0.996) { a = textureGrad(uGndN, vec3(gUa, L), gAx, gAy).rg - 0.5; a = gSwA > 0.5 ? vec2(-a.y, a.x) : vec2(a.x, -a.y); }
+      if (gMix > 0.004) { vec2 c = textureGrad(uGndN, vec3(gUb, L), gBx, gBy).rg - 0.5; c = gSwB > 0.5 ? vec2(-c.y, c.x) : vec2(c.x, -c.y); a = mix(a, c, gMix); }
+      float fk = gndFarK(L);
+      if (fk > 0.003) {
+        float Lf = uGndFar[int(L + 0.5)]; float ha = textureGrad(uGnd, vec3(gUf, Lf), gFx, gFy).a, hb = textureGrad(uGnd, vec3(gUg, Lf), gFx, gFy).a;
+        vec2 f = mix(textureGrad(uGndN, vec3(gUf, Lf), gFx, gFy).rg, textureGrad(uGndN, vec3(gUg, Lf), gFx, gFy).rg, gndFar2(ha, hb)) - 0.5; a = mix(a, vec2(f.x, -f.y) + a * 0.35, fk);
+      }
+      return a * 2.0;
+    }
     // What people have made of the ground (the land-use tiles: crops in their rows, paving) has a size too, and it is the size the
     // game draws a village at, some twenty times life: a plot takes one repeat of its crop, a cobble is as wide as a doorway there.
     // n: cells to a repeat (a power of two); swap: the other way round.
     vec3 ltex(float L, float n, float swap) {
       vec2 p = (mod(uLadN, n) + uLadF + gLoc) / n, ddx = gDx / n, ddy = gDy / n; if (swap > 0.5) { p = p.yx; ddx = ddx.yx; ddy = ddy.yx; }
       return textureGrad(uLanduse, vec3(p, L), ddx, ddy).rgb;
-    }
-    // which way its surface leans (east, north; the maps have green up the picture, and the picture's top is the south)
-    vec2 gndN(float L) {
-      vec2 a = textureGrad(uGndN, vec3(gUa, L), gAx, gAy).rg - 0.5; a = gSwA > 0.5 ? vec2(-a.y, a.x) : vec2(a.x, -a.y);
-      if (gMix > 0.004) { vec2 c = textureGrad(uGndN, vec3(gUb, L), gBx, gBy).rg - 0.5; c = gSwB > 0.5 ? vec2(-c.y, c.x) : vec2(c.x, -c.y); a = mix(a, c, gMix); }
-      float fk = gndFarK(L);
-      if (fk > 0.003) { vec2 f = textureGrad(uGndN, vec3(gUf, uGndFar[int(L + 0.5)]), gFx, gFy).rg - 0.5; a = mix(a, vec2(f.x, -f.y) + a * 0.35, fk); }
-      return a * 2.0;
     }
     #endif
     // geographic texture coordinate at scale k = m*50 (per radian): tile-centre phase (double precision, CPU) + precise local offset
@@ -327,7 +344,9 @@
         float savK = (clim + dith * 0.3 > 0.22 && tropic > 0.5 && warm > 0.3) ? 1.0 : 0.0;
         float gL = (savK > 0.5 || clim + dith * 0.3 > 0.42 || (lum + dith > 0.5 && green < 0.7)) ? 1.0 : 0.0;    // savanna and steppe (dry grass), meadow
         float fL = (vH > treeLine - 600.0 || latN0 + dith > 0.62) ? 8.0 : 7.0;                                  // tundra above the trees and in the far north, else the floor of the wood (and from afar its canopy)
-        float rL = (nMid.a + dith > 0.58) ? 11.0 : 5.0;                                                           // scree, bare rock
+        float rL = (nMid.a + dith > 0.58) ? 11.0 : (green + (nMic.a - 0.5) * 0.3 > 0.4 ? 17.0 : 5.0);                 // scree, crags with moss on them where the country is green, bare rock
+        // in stretches a meadow is stony pasture, and more so where the land slopes
+        float stony = gL < 0.5 ? smoothstep(0.5, 0.66, nMac.a * 0.45 + nMid.r * 0.35 + nMic.b * 0.2 + smoothstep(0.02, 0.2, slope) * 0.25) : 0.0;
         // the dry ground of the place. True desert: dunes where the photograph is brightest, stony plain and stretches of scrub
         // elsewhere, salt flats where it is white; steppe: dry grass and scrub; savanna: straw grass, red earth in places
         float patchN = smoothstep(0.36, 0.64, nMac.g * 0.5 + nMid.b * 0.32 + nMic.r * 0.18);
@@ -335,15 +354,16 @@
         float isSav = step(0.22, clim + dith * 0.3) * step(0.5, tropic) * (1.0 - isDesert) * (1.0 - isSteppe);
         float salt = isDesert * step(0.62, lum) * step(green, 0.25) * step(warm, 0.4);
         float sandW = isDesert * (1.0 - salt) * smoothstep(0.46, 0.7, lum + (nMac.r - 0.5) * 0.26 + (nMid.g - 0.5) * 0.035 + (nMic.g - 0.5) * 0.035);
-        float LA = mix(1.0, mix(4.0, 15.0, salt), isDesert), LB = mix(mix(1.0, 2.0, isSteppe), 2.0, isDesert);
+        float LA = mix(1.0, mix(4.0, 15.0, salt), isDesert), LB = mix(mix(1.0, 18.0, isSteppe), 2.0, isDesert);      // (steppe: dry grass, and heath in stretches; desert: stony plain or salt, and dry scrubland)
         float wB = patchN * (isDesert * (1.0 - salt) * (1.0 - sandW) + isSteppe * 0.8 + isSav * 0.45);
         float redK = savK * smoothstep(0.5, 0.8, nMac.g * 0.45 + nMid.b * 0.4 + nMic.r * 0.15) * 0.5 * (1.0 - desertK) * (1.0 - steppeK);      // savanna: in stretches the red earth shows between the tufts
         // the two that count most here; how far the regional colour of the photograph may tint each (a rock stays the colour of rock),
         // and how bright each may be at most (where the photograph is bright with snow or haze, grass under it is still grass)
-        float L1 = gL, w1 = wGrass * (1.0 - redK), L2 = fL, w2 = wForest; vec2 h1 = vec2(0.75, 0.42), h2 = vec2(0.8, 0.32);
+        float L1 = gL, w1 = wGrass * (1.0 - redK) * (1.0 - stony), L2 = fL, w2 = wForest; vec2 h1 = vec2(0.75, 0.42), h2 = vec2(0.8, 0.32);
         if (w2 > w1) { float t; t = L1; L1 = L2; L2 = t; t = w1; w1 = w2; w2 = t; vec2 th = h1; h1 = h2; h2 = th; }
         #define CAND(L, w, h) { float wc = w; if (wc > w1) { L2 = L1; w2 = w1; h2 = h1; L1 = L; w1 = wc; h1 = h; } else if (wc > w2) { L2 = L; w2 = wc; h2 = h; } }
         CAND(rL, wRock, vec2(0.2, 0.62))
+        CAND(16.0, wGrass * (1.0 - redK) * stony, vec2(0.75, 0.42))
         CAND(LA, wDesert * (1.0 - wB - sandW) * (1.0 - redK), vec2(0.85, 2.0))
         CAND(LB, wDesert * wB * (1.0 - redK), vec2(0.85, 2.0))
         CAND(3.0, wDesert * sandW, vec2(0.9, 2.0))
@@ -608,7 +628,7 @@
       vec3 beachCol = vec3(0.82, 0.76, 0.6) * (0.85 + 0.3 * dl);
       #ifdef USE_TEXARR
       #ifdef USE_GROUND
-      if (gOn > 0.002 && beach > 0.01) { float pebbly = step(0.55, nMid.g); beachCol = mix(beachCol, pebbly > 0.5 ? gnd(13.0).rgb * vec3(0.60, 0.56, 0.50) : gnd(3.0).rgb * vec3(0.86, 0.79, 0.62), gOn); gRel = mix(gRel, gndN(pebbly > 0.5 ? 13.0 : 3.0), beach * 0.75); }
+      if (gOn > 0.002 && beach > 0.01) { float pebbly = step(0.55, nMid.g); beachCol = mix(beachCol, pebbly > 0.5 ? gnd(13.0).rgb * vec3(0.60, 0.56, 0.50) : gnd(19.0).rgb * vec3(0.86, 0.79, 0.62), gOn); gRel = mix(gRel, gndN(pebbly > 0.5 ? 13.0 : 19.0), beach * 0.75); }
       #else
       if (gOn > 0.002 && beach > 0.01) beachCol = mix(beachCol, gtex(uGround, nMid.g > 0.55 ? 13.0 : 3.0, 4.0) * 1.08, gOn);
       #endif
@@ -730,6 +750,9 @@
       vec3 sunCol = vec3(1.0, 0.56 + 0.44 * kW, 0.30 + 0.70 * kW) * (smoothstep(-0.03, 0.05, sunUp) * (1.0 + 1.1 * downHere * (1.0 - smoothstep(0.04, 0.5, sunUp))));
       float dusk = smoothstep(-0.12, 0.02, sunUp) * (1.0 - smoothstep(0.08, 0.4, sunUp)) * (0.35 + 0.65 * downHere);
       vec3 ambC = (mix(mix(vec3(0.24, 0.30, 0.48), vec3(0.10, 0.12, 0.19), smoothstep(0.02, 0.2, uCamAlt)), vec3(0.26), day)      /* (from orbit the night side stays dark under its lights) */ + vec3(0.24, 0.17, 0.18) * dusk) * mix(vec3(1.0), vec3(0.9, 0.95, 1.1), 1.0 - shadow * 0.7);
+      #ifdef USE_GROUND
+      ambC *= 0.7 + 0.3 * nLocal.z;      // (the light of the sky comes from above: what leans away from it, a slope or the side of a stone, has less of it)
+      #endif
       vec3 lit = col * (ambC + diff * 1.05 * sunCol * mix(1.0, 0.5, seaW * 0.3));
       // specular on water
       vec3 viewDir = normalize(-vViewPos);

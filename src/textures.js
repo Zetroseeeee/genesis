@@ -45,20 +45,28 @@
     tex.onUpdate = () => { tex.image.data = null; };      // (the card has it now: a hundred megabytes need not be kept twice)
     return tex;
   }
+  // The ground's shader knows its materials by number: this is the order. A pack is read by the names of its layers, not by
+  // where they lie in it, so one laid out otherwise still puts the right ground in the right place; a pack from before a
+  // material was added uses the one named beside it, and one that lacks any of the first sixteen is not used at all.
+  const GROUND = ['meadow', 'steppe', 'scrub', 'sand', 'hamada', 'rock', 'snow', 'forestfloor', 'tundra', 'savanna', 'marsh', 'scree', 'canopy', 'shingle', 'dirt', 'cracked', 'pasture', 'crag', 'heath', 'beach'];
+  const GROUND_ELSE = { pasture: 'meadow', crag: 'rock', heath: 'scrub', beach: 'sand' };
   async function loadGround(url, aniso, shrink, shallows, fresh) {
     let man; try { const r = await fetch(url + (fresh ? '?' + fresh : ''), fresh ? { cache: 'no-store' } : undefined); if (!r.ok) return null; man = await r.json(); } catch (e) { return null; }
+    const L = man.layers || [], at = {}; L.forEach((l, i) => { if (at[l.id] === undefined) at[l.id] = i; });
+    const from = GROUND.map((id) => at[id] !== undefined ? at[id] : at[GROUND_ELSE[id]]), lack = GROUND.filter((id, i) => from[i] === undefined);
+    if (lack.length) { console.warn('ground materials: the pack has no ' + lack.join(', ')); return null; }
     const base = url.replace(/[^/]*$/, ''), q = fresh ? '?' + fresh : ''; const [a, nm] = await Promise.all([loadImg(base + man.albedo + q), loadImg(base + man.normal + q)]); if (!a || !nm) return null;
-    const cols = man.cols || 4, rows = man.rows || 4, count = cols * rows, A = cells(a, cols, rows, shrink), N = cells(nm, cols, rows, shrink), C = A.C, px = C * C, L = man.layers || [];
+    const cols = man.cols || 4, rows = man.rows || 4, count = GROUND.length, A = cells(a, cols, rows, shrink), N = cells(nm, cols, rows, shrink), C = A.C, px = C * C;
     const col = new Uint8Array(px * 4 * (count + (shallows ? 1 : 0))), rel = new Uint8Array(px * 2 * count);
-    for (let l = 0; l < count; l++) { const c = A.at(l), r = N.at(l), o = l * px * 4, q = l * px * 2; for (let p = 0; p < px; p++) { col[o + p * 4] = c[p * 4]; col[o + p * 4 + 1] = c[p * 4 + 1]; col[o + p * 4 + 2] = c[p * 4 + 2]; col[o + p * 4 + 3] = r[p * 4 + 2]; rel[q + p * 2] = r[p * 4]; rel[q + p * 2 + 1] = r[p * 4 + 1]; } }
+    for (let l = 0; l < count; l++) { const c = A.at(from[l]), r = N.at(from[l]), o = l * px * 4, q = l * px * 2; for (let p = 0; p < px; p++) { col[o + p * 4] = c[p * 4]; col[o + p * 4 + 1] = c[p * 4 + 1]; col[o + p * 4 + 2] = c[p * 4 + 2]; col[o + p * 4 + 3] = r[p * 4 + 2]; rel[q + p * 2] = r[p * 4]; rel[q + p * 2 + 1] = r[p * 4 + 1]; } }
     if (shallows) { const cv = document.createElement('canvas'); cv.width = cv.height = C; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(shallows, 0, 0, C, C); col.set(ctx.getImageData(0, 0, C, C).data, count * px * 4); }
     // what the shader is told of each layer: its colour on the whole, and which layer takes its place away from the eye, from how
     // many metres to how many (0, 0: none does). The far layers are laid at one size (farSize: cells of a metre and a half to a
     // repeat, a power of two so that it fits the frame), whatever the distance: what they show has a size of its own.
-    const mean = new Float32Array((count + 1) * 3).fill(0.5), far = new Float32Array(count), farD = new Float32Array(count * 2), id = {}; L.forEach((l, i) => { id[l.id] = i; }); let farSize = 512;
-    for (let i = 0; i < count; i++) { const l = L[i] || {}, m = l.mean || [0.5, 0.5, 0.5]; for (let k = 0; k < 3; k++) mean[i * 3 + k] = Math.max(0.03, m[k]); const f = id[l.far]; far[i] = f === undefined ? i : f;
+    const mean = new Float32Array(75).fill(0.5), far = new Float32Array(24), farD = new Float32Array(48), id = {}; GROUND.forEach((k, i) => { id[k] = i; }); let farSize = 512;      // (as long as the shader's lists: twenty-four layers at most, and the shallows)
+    for (let i = 0; i < count; i++) { const l = L[from[i]] || {}, m = l.mean || [0.5, 0.5, 0.5]; for (let k = 0; k < 3; k++) mean[i * 3 + k] = Math.max(0.03, m[k]); const f = id[l.far]; far[i] = f === undefined ? i : f;
       if (f !== undefined) { farD[i * 2] = l.farFrom || 2200; farD[i * 2 + 1] = Math.max(farD[i * 2] + 1, l.farTo || 4200); if (l.farSize) farSize = Math.pow(2, Math.round(Math.log2(l.farSize / 1.5))); } }
-    return { albedo: arrayOf(col, C, count + (shallows ? 1 : 0), THREE.RGBAFormat, aniso), relief: arrayOf(rel, C, count, THREE.RGFormat, aniso), size: C, count, mean, far, farD, farSize, shallows: shallows ? count : -1, layers: L, id, made: man.made };
+    return { albedo: arrayOf(col, C, count + (shallows ? 1 : 0), THREE.RGBAFormat, aniso), relief: arrayOf(rel, C, count, THREE.RGFormat, aniso), size: C, count, mean, far, farD, farSize, shallows: shallows ? count : -1, layers: GROUND.map((k, i) => L[from[i]]), id, made: man.made };
   }
   // one cell of an atlas as a plain repeating 2D texture (water, clouds)
   function cellTexture(img, cell, n, idx, anisotropy) {
