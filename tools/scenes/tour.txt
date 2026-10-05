@@ -152,8 +152,8 @@ ladder_5     | tools/scenes/forest.js | null | const f = () => __forest(-1.5, 47
 cost_town    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 0.8, 1.0, 0.3); __T.costs(); }, 9000); | 64
 cost_far     | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costs(); }, 9000); | 64
 cost_alps    | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costs(); }, 9000); | 64
-# (and of the ground's materials: filtered 8 and 4 ways, one step of the ladder at a time, and the ground drawn the old way: __T.costsGround)
-costg_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 0.8, 1.0, 0.3); __T.costsGround(); }, 9000); | 64
-costg_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsGround(); }, 9000); | 64
-costg_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsGround(); }, 9000); | 64
-costg_meadow | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); __T.costsGround(); }, 9000); | 64
+# (and of the ground's materials, part by part, against the ground drawn the old way and against materials of half the size: __T.costsGround)
+costg_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 0.8, 1.0, 0.3); __T.costsGround(); }, 9000); | 84
+costg_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsGround(); }, 9000); | 84
+costg_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsGround(); }, 9000); | 84
+costg_meadow | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); __T.costsGround(); }, 9000); | 84
