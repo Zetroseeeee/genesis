@@ -14,8 +14,10 @@ Runs `src/sim.js` in node (no browser). ~4 minutes.
 | 5 edge cases | no player, sea cells, long names, player death, ruins vs rebuilt towns, overpopulation decline |
 | 6 rulers & goods | fixed goods placement, coverage, every good present, trade imports, personalities on every ruler, epithets, coveting wars, personality survives save/load, old saves still load |
 | 7 construction & planner | works start, finish and apply after their years (farms, walls, harbour, temple on a chosen plot, market, academy, wonder, mine); AI realms build through the same sites; representational scale tapers; growth rings open building sites that close; works appear in the plan with progress; era waves rebuild a town over decades; works, plots and growth survive save/load |
+| 8 market | the goods and recipes tables; a year's step conserves what it moves; prices answer to scarcity and stay in their bounds; trade follows the price gap and stops at an embargo; workshops grow while they pay and obey what the realm knows; customs, bans, the reserve and standing orders; the market's effect on income, stability and strength; save/load, and a world saved before the market |
+| 9 knowledge | the table of discoveries (every one stands on earlier ones, an age's costs sum to its length, every gated good, craft and work has its discovery); a people's start (nothing known, 1,000 insight); study, the queue, the scholars choosing for themselves after a generation; what is learned opens land, crafts and works and nothing else does; edges against the age (a realm in step is at 1); neighbours teach; who was first; save/load, a world saved before knowledge, and its speed |
 
-`ONLY=2,5 node test_sim.js` runs chosen sections. The harness must load the sim with indirect eval
+`ONLY=2,5 node test_sim.js` runs chosen sections. A test that sets a realm's `tech` by hand must teach it as well (`teach(sim, c)` in the file): an age without its discoveries can build and make almost nothing. The harness must load the sim with indirect eval
 (`(0, eval)(src)`): a direct `eval` inside a CommonJS module makes every `Math`/typed-array lookup dynamic and the sim runs 8× slower.
 
 ## 2. Browser end-to-end — `node build.js && node test_e2e.js [filter]`
@@ -52,7 +54,7 @@ checkout, which has none), `GENESIS_UPDATE_GUARD` (seconds an update is given to
 the restart, "What's new", the spark while playing, the case where a whole new app is needed - and keeps pictures.
 
 ## Debug hooks
-`window.__G` (settings, sim, terrain, world, mapcam, movers, fx, turnRun, run(n), start(lon, lat, name), select(i), labelDbg) and `testcam.js` (`__T.cam/era/capital/erupt/fire/battle/quake/flood…`).
+`window.__G` (settings, sim, terrain, world, mapcam, movers, fx, turnRun, run(n), start(lon, lat, name), select(i), labelDbg) and `testcam.js` (`__T.cam/era/capital/erupt/fire/battle/quake/flood…`; `__T.teach(c, upto)` gives a realm every discovery of its ages, `__T.era` and `__T.world` do so by themselves).
 `node dbg3.js "<script>" "<probe returning an object>" <wait ms>` runs a script in the page and prints the probe.
 `node shot2.js <name> "<script>" <t1> <t2>` takes two screenshots (`shots/<name>_a.png`, `_b.png`).
 

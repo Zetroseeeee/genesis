@@ -8,6 +8,7 @@ function createSim(world, seed) {
   const W = 720, H = 360, N = W * H;
   const MAXC = 512;
   const ECON = window.ECON;      // goods, recipes and the market (econ.js, loaded before this file)
+  const KNOW = window.KNOW;      // discoveries (know.js, loaded before this file)
   const { land, fert, elev, flags } = world;   // land Uint8, fert Float32 0..1, elev Uint8, flags Uint8 (1 land,2 river,4 coast,8 ice)
 
   // ---------- RNG ----------
@@ -27,6 +28,10 @@ function createSim(world, seed) {
   const slotA = new Uint16Array(N);      // where the player (or the AI) put each work, 4 bits each: temple | academy<<4 | market<<8 | wonder<<12 (0 = unplaced, else slot+1)
   const slotB = new Uint8Array(N);       // mine slot (+1) in the low nibble
   const gBand = new Uint8Array(N), gPrev = new Uint8Array(N); const gYear = new Int32Array(N).fill(-1e9); // a town's size band now, the band before, and when it changed: the planner builds the new ring over the years after
+  // (a band and a peak are logarithms of how many live there, asked of every settlement every year: so each cell remembers between which
+  //  numbers its band stays what it is, and above which its peak would rise, a hair inside the true bounds, and the logarithm is only
+  //  taken outside them. Whatever else writes gBand or peak must forget these: recount() does)
+  const bandLo = new Float32Array(N), bandHi = new Float32Array(N), peakAt = new Float32Array(N);
   const works = new Map();               // cell -> [{ k, slot, start, dur }]: what is under construction there
   const bonusFert = new Float32Array(N); // god bounty etc
   const siteU = new Float32Array(N).fill(-1), siteV = new Float32Array(N); // settlement position within cell (0..1), -1 unset
@@ -65,9 +70,7 @@ function createSim(world, seed) {
   };
 
   // ---------- eras & tech ----------
-  const ERAS = [
-    ['Stone Age', 0], ['Bronze Age', 0.08], ['Iron Age', 0.18], ['Classical', 0.30], ['Medieval', 0.42], ['Renaissance', 0.55], ['Industrial', 0.66], ['Modern', 0.80], ['Information Age', 0.92]
-  ];
+  const ERAS = ['Stone Age', 'Bronze Age', 'Iron Age', 'Classical', 'Medieval', 'Renaissance', 'Industrial', 'Modern', 'Information Age'].map((n, k) => [n, KNOW.ERA_AT[k]]);
   const eraOf = (t) => { let e = 0; for (let k = 0; k < ERAS.length; k++) if (t >= ERAS[k][1]) e = k; return e; };
   // keep a realm's era in step with its knowledge (called wherever tech changes); announces the new age
   function syncEra(cv, c) {
@@ -75,14 +78,39 @@ function createSim(world, seed) {
     cv.era = e; cv.eraSince = year; logEvent(cv, `${fullName(cv)} enters the ${ERAS[e][0]}`, (c >= 0 && cellsOf[c] > 30) || cv.player); evolveGov(cv);
   }
   const lerpTable = (T, t) => { if (t <= T[0][0]) return T[0][1]; for (let k = 1; k < T.length; k++) if (t <= T[k][0]) { const [a, va] = T[k - 1], [b, vb] = T[k]; return va + (vb - va) * (t - a) / (b - a); } return T[T.length - 1][1]; };
-  // how many people a unit of land feeds, by knowledge (calibrated so world population tracks real history)
-  const FOOD = [[0, 0.004], [0.08, 0.02], [0.18, 0.08], [0.3, 0.2], [0.42, 0.28], [0.55, 0.4], [0.66, 0.8], [0.8, 1.4], [0.92, 4], [1, 7]];
+  // how many people a unit of land feeds, by knowledge. Measured, not chosen: tools/know/people.js runs the world and
+  // moves the table until the people on Earth are as many as history counted, century by century (5 million in 8000 BC,
+  // 220 at the turn of the era, 970 in 1800, 6,140 in 2000).
+  /* FOOD:BEGIN */
+  const FOOD = [[0, 0.00527], [0.04, 0.0118], [0.08, 0.0277], [0.13, 0.0672], [0.18, 0.107], [0.24, 0.197], [0.3, 0.224], [0.36, 0.23], [0.42, 0.239], [0.49, 0.411], [0.55, 0.551], [0.6, 0.944], [0.66, 1.66], [0.73, 2.97], [0.8, 4.23], [0.86, 8.88], [0.92, 11.1], [1, 12.5]];
+  /* FOOD:END */
+  // how fast a people can grow where there is room: a little faster as it learns, and much faster in the last ages
+  // (the land's limit is then the only brake, as it was once children stopped dying)
+  const growOf = (t) => 0.006 + t * 0.02 + (t > 0.66 ? Math.min(0.016, (t - 0.66) / 0.24 * 0.016) : 0);
   const foodMult = (t) => lerpTable(FOOD, t);
   // per-civ food multiplier, refreshed every tick (tech only changes between ticks)
-  const fmOf = new Float32Array(MAXC).fill(lerpTable(FOOD, 0.02)); const FM0 = lerpTable(FOOD, 0);
-  // knowledge gained per year, by knowledge (Bronze ~5000 BC for the leaders, Information Age ~2000 AD)
-  const RATE = [[0, 9e-6], [0.08, 1.5e-5], [0.18, 3e-5], [0.3, 6e-5], [0.42, 1.1e-4], [0.55, 2.2e-4], [0.66, 6.7e-4], [0.8, 1.1e-3], [0.92, 1.2e-3], [1, 1.2e-3]];
-  const techRate = (t) => lerpTable(RATE, t);
+  const fmOf = new Float32Array(MAXC).fill(lerpTable(FOOD, 0.02)); const FM0 = lerpTable(FOOD, 0); const growR = new Float32Array(MAXC);      // (what a realm's land feeds, and how fast its people grow, this year)
+  // knowledge gained in a year, by age, before what a realm adds to it (towns, academies, scholars, what it knows).
+  // Set by tools/know/pace.js so that the realms in front keep history's dates: bronze about 3300 BC, iron 1200 BC,
+  // the classical world 500 BC, the middle ages AD 500, 1400, 1760, 1900, 1970.
+  /* RATE:BEGIN */
+  const RATE = [0.00000602, 0.0000348, 0.000112, 0.0000692, 0.0000705, 0.000138, 0.000458, 0.000711, 0.000556];
+  /* RATE:END */
+  const techRate = (t) => RATE[eraOf(t)];
+  // History's own dates: the knowledge the first realm had reached by each year. A realm ahead of that gropes in the dark
+  // (a quarter of an age ahead, it learns half as fast); the realms in front of a world that has fallen behind find
+  // what its time is ripe for (as much faster). So every world keeps roughly to the calendar, whoever leads it.
+  const HIST = [[-10000, 0.035], [-3300, 0.08], [-1200, 0.18], [-500, 0.30], [500, 0.42], [1400, 0.55], [1760, 0.66], [1900, 0.80], [1970, 0.92], [2030, 1]];
+  const AHEAD = 0.03; let frontTech = 0;      // (frontTech: the most learned realm's knowledge as this year began)
+  // A world that was saved before history kept a calendar may be far ahead of it. Its calendar is set forward by as many years as
+  // its first realm was ahead when it was loaded, once and for good (calShift, saved with the world): its ages go on from where they are.
+  let calShift = 0;
+  const histYearOf = (t) => { if (t <= HIST[0][1]) return HIST[0][0]; for (let k = 1; k < HIST.length; k++) if (t <= HIST[k][1]) { const [ya, ta] = HIST[k - 1], [yb, tb] = HIST[k]; return Math.round(ya + (yb - ya) * (t - ta) / (tb - ta)); } return HIST[HIST.length - 1][0]; };
+  const timeF = (t) => { const d = t - lerpTable(HIST, year + calShift); return d > 0 ? 1 / (1 + d / AHEAD) : t >= frontTech - 0.004 ? 1 + Math.min(2, -d / AHEAD) : 1; };
+  // how much of the gap to a more learned neighbour closes in ten years, by the neighbour's age: slowly while knowledge
+  // walks, faster once it is printed, wired and broadcast
+  const SPREAD = [0.024, 0.024, 0.03, 0.03, 0.035, 0.05, 0.1, 0.2, 0.3];
+  const SCHOLARS = 0.04;      // coin a thousand people pay in a year for each step of Research above 1 (and keep, below it)
   const seaRange = (t) => t < 0.22 ? 0 : 3 + Math.pow((t - 0.22) / 0.5, 2) * 85;
   const reachOf = (t) => 2.5 + t * 95; // max distance from capital, cells
 
@@ -147,7 +175,7 @@ function createSim(world, seed) {
   const freeIds = [];
   for (let c = MAXC - 1; c >= 0; c--) freeIds.push(c);
   const popOf = new Float32Array(MAXC), cellsOf = new Int32Array(MAXC), strengthOf = new Float32Array(MAXC);
-  const acad = new Int32Array(MAXC), temples = new Int32Array(MAXC), ports = new Int32Array(MAXC), markets = new Int32Array(MAXC), wonders = new Int32Array(MAXC), mines = new Int32Array(MAXC), bestCell = new Int32Array(MAXC), bestPop = new Float32Array(MAXC);
+  const acad = new Int32Array(MAXC), temples = new Int32Array(MAXC), ports = new Int32Array(MAXC), markets = new Int32Array(MAXC), wonders = new Int32Array(MAXC), mines = new Int32Array(MAXC), townsOf = new Int32Array(MAXC), bestCell = new Int32Array(MAXC), bestPop = new Float32Array(MAXC);
   const contact = new Uint16Array(MAXC * MAXC);
   // what the market needs to know of each realm: the people living on each raw good's land (mines counted over), whether
   // it holds such land at all (known to it or not), its townspeople, and up to four of its harbours
@@ -190,18 +218,20 @@ function createSim(world, seed) {
     const c = {
       id, name, style, rgb, color: `rgb(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)})`,
       tech: opts.tech ?? 0.02 + rnd() * 0.02, era: 0, gov: 'tribe', capital: home, home, founded: year,
-      aggression: 0.2 + rnd() * 0.8, expansion: 0.5 + rnd() * 0.9, stability: 1, wealth: 0,
+      aggression: 0.2 + rnd() * 0.8, expansion: 0.5 + rnd() * 0.9, stability: 1, wealth: 0, income: 0,
       wars: {}, truce: {}, religion: null, ruler: null, rulers: [], events: [], alive: true,
       player: !!opts.player, policy: { research: 1, military: 1, tax: 1, stance: 'steady' }, army: -99999,
       warStart: {}, cellsAtWar: {}, peakCells: 1, lastCapital: year, eraSince: year - 500,
     };
-    c.era = eraOf(c.tech); fmOf[id] = foodMult(c.tech);
+    c.era = eraOf(c.tech);
     civs[id] = c; civCount++; st.civCount = civCount; lastNb[id] = null;
+    know.born(id, opts.from === undefined ? -1 : opts.from, c.tech); fmOf[id] = fmNow(c);
     for (let k = 0; k < MAXC; k++) { contact[k * MAXC + id] = 0; contact[id * MAXC + k] = 0; const l = lastNb[k]; if (l) { const j = l.indexOf(id); if (j >= 0) l.splice(j, 1); } }      // (the number may have been a dead realm's: its borders are not this one's)
     market.born(id, opts.from === undefined ? -1 : opts.from, opts.share || 0);
     owner[home] = id; if (pop[home] < 0.6) pop[home] = 0.6;
     if (!cellName.has(home)) cellName.set(home, makeName(style, 2, 3));
     newRuler(c, true);
+    if (!c.player && opts.from === undefined) { know.settle(id, c); fmOf[id] = fmNow(c); }      // (what a people already knew when it settled down; the player chooses)
     return c;
   }
   // ---------- rulers: whoever sits the throne bends the realm their way ----------
@@ -223,17 +253,39 @@ function createSim(world, seed) {
   const IND_SEC = { workshop: 0, smithy: 1, weaver: 2, brewery: 3, shipyard: 4, factory: 5, refinery: 6, lab: 7 };      // the kind of work each makes cheaper (ECON.SECTORS)
   const ind = new Map(); const indN = new Int32Array(MAXC * IND.length);
   const eff = new Float32Array(MAXC * 8).fill(1), keep = new Float32Array(MAXC).fill(1), hold = new Float32Array(MAXC).fill(1);
-  const market = ECON.create({ MAXC, civs, popOf, cellsOf, ports, markets, rawPop, urban, portCells, eff, keep, hold, cellDist, seaRange, tv, seed, year: () => year, player: () => player });
+  // ---------- knowledge: what each realm has discovered (know.js), and the edges it gives ----------
+  const know = KNOW.create({ MAXC, civs, goods: GOODS, goodId: GOOD_ID, recipes: ECON.RECIPES, held, seed, start: -10000, year: () => year, nameOf: (cv) => fullName(cv),
+    coastal: (c) => ports[c] > 0 || (civs[c] && civs[c].capital >= 0 && !!(flags[civs[c].capital] & 4)), shortOf: (c, g) => market.shortOf(c, g), onLearn });
+  const KF = know.f, KK = know.K, NKF = know.NK, gmask = know.gmask;
+  const kf = (c, k) => KF[c * NKF + k];
+  const fmNow = (cv) => foodMult(cv.tech) * KF[cv.id * NKF + KK.food];      // how many a unit of land feeds: the age's table, and what the realm knows of farming against its age
+  function onLearn(cv, D, isFirst, beyond) {
+    if (!D) { if (cv.player) logEvent(cv, `Your scholars go beyond what any age knew (${beyond})`, false, 'know'); return; }
+    if (cv.player) logEvent(cv, isFirst && D.first ? `Your people are the first in the world to learn ${D.name}` : `Your people learn ${D.name}`, isFirst && D.first, 'know');
+    else if (isFirst && D.first) pushWorld({ year, text: `${cap(fullName(cv))} ${cv.gov === 'tribe' ? 'are' : 'is'} the first to learn ${D.name}`, civ: cv.id, type: 'know', loc: cv.capital, seq: ++evSeq });
+  }
+  const market = ECON.create({ MAXC, civs, popOf, cellsOf, ports, markets, rawPop, urban, portCells, eff, keep, hold, cellDist, seaRange, tv, seed, year: () => year, player: () => player,
+    rmask: know.rmask, ymul: know.ymul, kf: KF, NKF, K_TRADE: KK.trade, K_SEA: KK.sea });
+  // what a realm learns in a year, and where it comes from: its age's pace, how many it is, what it spends on scholars
+  // (twice the coin is half as much again), the share of its towns that have an academy, its peace at home, its ruler, and
+  // what it knows of learning itself against its age
+  function insightParts(cv) {
+    const c = cv.id; const base = techRate(cv.tech), people = Math.min(1.4, Math.max(0.6, 0.6 + Math.log10(popOf[c] + 1) / 4)), spend = Math.pow(Math.max(0.05, cv.policy.research), 0.6);
+    const acads = 1 + 0.5 * Math.min(1, acad[c] / Math.max(1, townsOf[c])), calm = 0.7 + cv.stability * 0.3, ruler = tv(cv, 'research', 1), known = KF[c * NKF + KK.research], time = timeF(cv.tech);
+    return { base, people, spend, acads, calm, ruler, known, time, total: base * people * spend * acads * calm * ruler * known * time, taught: cv.taught || 0 };
+  }
+  const insight = (cv) => { const c = cv.id; return techRate(cv.tech) * Math.min(1.4, Math.max(0.6, 0.6 + Math.log10(popOf[c] + 1) / 4)) * Math.pow(Math.max(0.05, cv.policy.research), 0.6) * (1 + 0.5 * Math.min(1, acad[c] / Math.max(1, townsOf[c]))) * (0.7 + cv.stability * 0.3) * tv(cv, 'research', 1) * KF[c * NKF + KK.research] * timeF(cv.tech); };
+  const reachFor = (cv) => reachOf(cv.tech) * KF[cv.id * NKF + KK.reach] + ports[cv.id] * 2;      // how far from its capital a realm holds land
   // count each realm's workshops, and what they do for it: every kind of work a third cheaper for the first of its
   // workshops (then by the square root of how many), food kept longer for its granaries, merchants holding more for its warehouses
   function countIndustry() {
     indN.fill(0); const NI = IND.length;
     for (const [i, a] of ind) { const o = owner[i]; if (o < 0 || !civs[o] || !level[i]) continue; for (let k = 0; k < NI; k++) if (a[k]) indN[o * NI + k]++; }
-    for (let c = 0; c < MAXC; c++) { if (!civs[c]) continue; const b = c * NI; for (let k = 0; k < NI; k++) { const sec = IND_SEC[IND[k]]; if (sec !== undefined) eff[c * 8 + sec] = 1 + 0.3 * Math.sqrt(indN[b + k]); } keep[c] = 1 / (1 + 0.6 * Math.sqrt(indN[b + 4])); hold[c] = 1 + 0.5 * Math.sqrt(indN[b + 5]); }
+    for (let c = 0; c < MAXC; c++) { if (!civs[c]) continue; const b = c * NI; for (let s = 0; s < 8; s++) eff[c * 8 + s] = KF[c * NKF + KK.c_crafts + s]; for (let k = 0; k < NI; k++) { const sec = IND_SEC[IND[k]]; if (sec !== undefined) eff[c * 8 + sec] *= 1 + 0.3 * Math.sqrt(indN[b + k]); } keep[c] = 1 / (1 + 0.6 * Math.sqrt(indN[b + 4])); hold[c] = 1 + 0.5 * Math.sqrt(indN[b + 5]); }
   }
   const lastNb = new Array(MAXC).fill(null);
   const satOf = (c, key) => market.sat[c * NC + CAT[key]];
-  const buildCost = (c) => 1.15 - 0.3 * satOf(c, 'build');      // timber, stone and tools to hand make every work cheaper; short of them, dearer
+  const buildCost = (c) => (1.15 - 0.3 * satOf(c, 'build')) * KF[c * NKF + KK.build];      // timber, stone and tools to hand make every work cheaper; short of them, dearer; and what the realm knows of building
   function pickTrait(c) {
     const w = { conqueror: 1 + (c.aggression > 0.6 ? 1 : 0), builder: 1, pious: c.religion ? 1.4 : 0.6, scholar: c.era >= 3 ? 1.3 : 0.4, merchant: c.era >= 2 ? 1.2 : 0.3, tyrant: 0.5, steward: 1, navigator: c.era >= 3 && ports[c.id] ? 1.4 : 0.2 };
     let sum = 0; for (const k in w) sum += w[k]; let r = rnd() * sum; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return 'steward';
@@ -276,14 +328,14 @@ function createSim(world, seed) {
   }
   function strength(c) {
     const strat = (c.era >= 1 ? 4 * satOf(c.id, 'arms') : 0) + Math.min(3, mines[c.id]) * 0.5; // an army with all the arms, horses and guns it wants is two fifths stronger than one with none; mines dig deeper
-    const s = (popOf[c.id] + 2) * (0.25 + c.tech * 1.6) * c.policy.military * (year < c.army ? 1.6 : 1) * (0.6 + c.stability * 0.5) * (1 + 0.1 * strat);
+    const s = (popOf[c.id] + 2) * (0.25 + c.tech * 1.6) * c.policy.military * (year < c.army ? 1.6 : 1) * (0.6 + c.stability * 0.5) * (1 + 0.1 * strat) * KF[c.id * NKF + KK.strength];
     return s;
   }
   // what a cell brings its realm's market: its own good, if the realm's age can work it (a mine digs more than twice as
   // much), and the wood, stone and sea salt any country has
   function yieldsOf(i, o, c, p) {
     const g = goods[i], b = o * NG;
-    if (g) { held[b + g] = 1; if (c.era >= gera[i]) rawPop[b + g] += (special[i] & 512) ? p * 2.2 : p; }
+    if (g) { held[b + g] = 1; if (c.era >= gera[i] && gmask[b + g]) rawPop[b + g] += (special[i] & 512) ? p * 2.2 : p; }
     const wd = wood[i]; if (wd) rawPop[b + G_TIMBER] += p * wd; rawPop[b + G_STONE] += p * 0.1; if (flags[i] & 4) rawPop[b + G_SALT] += p * 0.08;
   }
   const NB = [-W - 1, -W, -W + 1, -1, 1, W - 1, W, W + 1];
@@ -356,10 +408,11 @@ function createSim(world, seed) {
     tickCount++; year++;
     if (tickCount % 25 === 0) shufflePerm();
     // per-civ accumulators
-    popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); bestPop.fill(-1); rawPop.fill(0); held.fill(0); urban.fill(0); portCells.fill(-1);
+    popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); townsOf.fill(0); bestPop.fill(-1); rawPop.fill(0); held.fill(0); urban.fill(0); portCells.fill(-1);
     const budget = new Float32Array(MAXC);
     let techSum = 0, techN = 0;
-    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; strengthOf[c] = strength(cv); fmOf[c] = foodMult(cv.tech); techSum += cv.tech; techN++; }
+    frontTech = 0;
+    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; strengthOf[c] = strength(cv); fmOf[c] = fmNow(cv); growR[c] = growOf(cv.tech) * (1 - (cv.policy.tax - 1) * 0.15) * (0.7 + cv.stability * 0.3) * KF[c * NKF + KK.grow]; techSum += cv.tech; techN++; if (cv.tech > frontTech) frontTech = cv.tech; }
     meanTech = techN ? techSum / techN : 0.02;
     // pass 1: growth + accumulate (order-independent)
     for (let k = 0; k < LI.length; k++) {
@@ -367,7 +420,7 @@ function createSim(world, seed) {
       let p = pop[i];
       if (p > 0 || c) {
         const K = capacity(i, c);
-        const r = (0.006 + (c ? c.tech * 0.02 : 0)) * (c ? (1 - (c.policy.tax - 1) * 0.15) * (0.7 + c.stability * 0.3) : 1);
+        const r = c ? growR[o] : 0.006;
         p += r * p * Math.max(-10, 1 - p / Math.max(K, 0.01)); // overfull land empties by at most ~a quarter a year
         if (p < 0.001) p = 0;
         pop[i] = p;
@@ -381,14 +434,14 @@ function createSim(world, seed) {
         const fm = fmOf[o]; const s1 = 6 * fm + 0.2, s2 = 25 * fm + 1, s3 = 90 * fm + 4, s4 = 300 * fm + 15;
         const prevLvl = level[i];
         level[i] = p >= s4 ? 4 : p >= s3 ? 3 : p >= s2 ? 2 : p >= s1 ? 1 : 0;
-        if (level[i] >= 2) { urban[o] += p; const q = Math.min(255, Math.round(Math.log2(p * 20 + 1) * 16)); if (q > peak[i]) peak[i] = q; }
-        if (level[i]) { const b = Math.min(255, Math.round(Math.log2(p * 1000 + 1) * 3)); if (b > gBand[i]) { gPrev[i] = gBand[i]; gBand[i] = b; gYear[i] = year; } else if (b < gBand[i]) { gBand[i] = b; gPrev[i] = b; } }
-        else if (gBand[i]) { gBand[i] = 0; gPrev[i] = 0; gYear[i] = -1e9; }
+        if (level[i] >= 2) { urban[o] += p; townsOf[o]++; if (p >= peakAt[i]) { const q = Math.min(255, Math.round(Math.log2(p * 20 + 1) * 16)); if (q > peak[i]) peak[i] = q; peakAt[i] = peak[i] >= 255 ? 3e38 : (Math.pow(2, (peak[i] + 0.5) / 16) - 1) / 20 * 0.999999; } }
+        if (level[i]) { if (p < bandLo[i] || p >= bandHi[i]) { const b = Math.min(255, Math.round(Math.log2(p * 1000 + 1) * 3)); if (b > gBand[i]) { gPrev[i] = gBand[i]; gBand[i] = b; gYear[i] = year; } else if (b < gBand[i]) { gBand[i] = b; gPrev[i] = b; } bandLo[i] = (Math.pow(2, (b - 0.5) / 3) - 1) / 1000 * 1.000001 + 1e-9; bandHi[i] = b >= 255 ? 3e38 : (Math.pow(2, (b + 0.5) / 3) - 1) / 1000 * 0.999999; } }
+        else if (gBand[i]) { gBand[i] = 0; gPrev[i] = 0; gYear[i] = -1e9; bandHi[i] = 0; }
         // a town that shrinks to a hamlet, or dies, leaves its stones (sudden or slow); a town rebuilt over them clears them
         if (prevLvl >= 2 && level[i] < 2) markRuin(i, c.era, c.culture);
         else if (level[i] >= 2 && p >= s2 * 1.1 && ruins.has(i) && year - ruins.get(i).year > 5) { ruins.delete(i); }      // (well clear of the size of a town: a saved world's rounded numbers must not rebuild one)
         if (c.capital === i && level[i] < 1) level[i] = 1;
-        if (level[i] && !cellName.has(i)) cellName.set(i, makeName(c.style, 2, 3));
+        if (level[i] && (prevLvl !== level[i] || ((year + i) & 15) === 0) && !cellName.has(i)) cellName.set(i, makeName(c.style, 2, 3));      // (asked when a place becomes a settlement or changes rank, and of every place now and then: the map of names is slow to ask)
         if (level[i] && siteU[i] < 0) { siteU[i] = 0.25 + rnd() * 0.5; siteV[i] = 0.25 + rnd() * 0.5; }
       } else if (level[i]) level[i] = 0;
     }
@@ -399,20 +452,20 @@ function createSim(world, seed) {
       if (cv.capital < 0 || owner[cv.capital] !== c) { cv.capital = bestCell[c]; logEvent(cv, `${cellName.get(cv.capital) || 'A new city'} becomes the capital of ${fullName(cv)}`, false); }
       if (cellsOf[c] > cv.peakCells) cv.peakCells = cellsOf[c];
       // knowledge
-      const urban = Math.min(1.4, Math.max(0.6, 0.6 + Math.log10(popOf[c] + 1) / 4));
-      const dt = techRate(cv.tech) * urban * cv.policy.research * (1 + acad[c] * 0.08) * (0.7 + cv.stability * 0.3) * tv(cv, 'research', 1);
-      cv.tech = Math.min(1, cv.tech + dt);
+      // (what it learned this year, and whatever came to it since last year from its neighbours or from the gods, goes into its discoveries)
+      const t1 = cv.tech + insight(cv);
+      cv.tech = Math.min(1, t1); know.step(c, cv, Math.max(0, t1 - know.lastT[c])); know.lastT[c] = cv.tech;
       syncEra(cv, c);
       // wealth
       // (how well the people live, by last year's market: fed, clothed, housed and supplied; and what the customs took at the border)
       const living = market.LS[c], customs = market.rev[c];
       cv.trade = { living, customs, imp: market.impV[c], exp: market.expV[c] };
-      const income = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * (1 + ports[c] * 0.05 + Math.min(0.3, markets[c] * 0.04) + Math.min(0.3, mines[c] * 0.05) + 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1))) * tv(cv, 'income', 1) - popOf[c] * 0.05 * (cv.policy.military - 1) + customs;
+      const income = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * (1 + ports[c] * 0.05 + Math.min(0.3, markets[c] * 0.04) + Math.min(0.3, mines[c] * 0.05) + 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1))) * tv(cv, 'income', 1) * KF[c * NKF + KK.income] - popOf[c] * 0.05 * (cv.policy.military - 1) - popOf[c] * SCHOLARS * (cv.policy.research - 1) + customs;
       cv.income = income; cv.wealth += income;
       // stability: drifts to a target set by war, overreach, taxes and stance; crises knock it down
       const atWarN = Object.keys(cv.wars).length;
-      const overreach = Math.max(0, cellsOf[c] / (40 + cv.tech * 3000) - 1);
-      const target = 1 - atWarN * 0.12 - overreach * 0.5 - (cv.policy.tax - 1) * 0.3 - (cv.policy.stance === 'aggressive' ? 0.12 : 0) + Math.min(0.15, temples[c] * 0.03) + Math.min(0.15, wonders[c] * 0.05) + 0.12 * satOf(c, 'luxury') - 0.2 * Math.max(0, 0.75 - satOf(c, 'food')) + tv(cv, 'stab', 0);
+      const overreach = Math.max(0, cellsOf[c] / ((40 + cv.tech * 3000) * KF[c * NKF + KK.reach]) - 1);
+      const target = 1 - atWarN * 0.12 - overreach * 0.5 - (cv.policy.tax - 1) * 0.3 - (cv.policy.stance === 'aggressive' ? 0.12 : 0) + Math.min(0.15, temples[c] * 0.03) + Math.min(0.15, wonders[c] * 0.05) + 0.12 * satOf(c, 'luxury') - 0.2 * Math.max(0, 0.75 - satOf(c, 'food')) + tv(cv, 'stab', 0) + KF[c * NKF + KK.stab];
       aiBuild(cv); aiIndustry(cv);
       cv.stability += (Math.min(1, target) - cv.stability) * 0.012;
       if (cellsOf[c] > 30 && rnd() < 0.0035 * Math.min(1, cellsOf[c] / 1500) + 0.0004) {
@@ -426,7 +479,7 @@ function createSim(world, seed) {
       // ruler death
       if (rnd() < 1 / 34) newRuler(cv, false);
       // religion
-      if (!cv.religion && cv.tech > 0.14 && rnd() < 0.0025 * tv(cv, 'faith', 1)) { cv.religion = religionName(cv.style); logEvent(cv, `In ${cellName.get(cv.capital) || fullName(cv)} a prophet arises. The people take up ${cv.religion}`, cellsOf[c] > 20 || cv.player); }
+      if (!cv.religion && know.can(c, 'faith') && rnd() < 0.0025 * tv(cv, 'faith', 1)) { cv.religion = religionName(cv.style); logEvent(cv, `In ${cellName.get(cv.capital) || fullName(cv)} a prophet arises. The people take up ${cv.religion}`, cellsOf[c] > 20 || cv.player); }
       // collapse
       if (cv.stability < 0.3 && cellsOf[c] > 8 && rnd() < 0.05) {
         const parts = 1 + rint(2); let made = 0;
@@ -434,7 +487,7 @@ function createSim(world, seed) {
         if (made) cv.stability += 0.3;
       }
       // overreach split
-      const reach = reachOf(cv.tech) + ports[c] * 2;
+      const reach = reachFor(cv);
       if (cellsOf[c] > 12 && tickCount % 20 === (c % 20) && !(cv.player && cv.stability > 0.5)) {
         const far = pickFarCell(cv, reach * 1.1);
         if (far >= 0 && rnd() < 0.25) splitCiv(cv, far, Math.ceil(cellsOf[c] * 0.2), 'beyond the reach of its capital');
@@ -466,21 +519,21 @@ function createSim(world, seed) {
         // expansion into unowned or enemy land
         if (budget[o] > 0 && p > 0.3 * K && p > 0.15) {
           if (on < 0) {
-            if (fert[n] + bonusFert[n] > 0.04 && !(flags[n] & 8) && cellDist(n, c.capital) < reachOf(c.tech) + ports[o] * 2) {
+            if (fert[n] + bonusFert[n] > 0.04 && !(flags[n] & 8) && cellDist(n, c.capital) < reachFor(c)) {
               budget[o] -= 1; claim(n, c, i);
             }
           } else if (on !== o && isAtWar(c, on)) {
             const e = civs[on];
             const sa = strengthOf[o], sb = strengthOf[on];
-            const pWin = 0.11 * Math.pow(sa / (sa + sb + 0.001), 2.2) / (1 + walls[n] * 1.5);
+            const pWin = 0.11 * Math.pow(sa / (sa + sb + 0.001), 2.2) / (1 + walls[n] * 1.5 * KF[on * NKF + KK.defence] / KF[o * NKF + KK.siege]);      // (walls count for what their builders know of holding them, against what the attacker knows of breaking them)
             if (rnd() < 0.08) battles.push({ i: n, from: i, year, a: o, b: on, siege: walls[n] > 0 });
             if (rnd() < pWin) { claim(n, c, i); cellsOf[on]--; cellsOf[o]++; budget[o] -= 0.5; battles.push({ i: n, from: i, year, a: o, b: on, siege: walls[n] > 0, taken: true }); if (level[n] >= 2) { const sackP = Math.min(0.7, 0.18 * (c.policy.stance === 'aggressive' ? 1.5 : 1) * (c.tech + 0.05 < e.tech ? 2 : 1) * tv(c, 'sack', 1)); if (rnd() < sackP) { pop[n] *= 0.12; rubble.set(n, year); logEvent(c, `${fullName(c)} sacks ${cellName.get(n) || 'the city'}; its people are scattered`, level[n] >= 3 || e.player || c.player, 'war', n); } else { pop[n] *= 0.85; rubble.set(n, year); } } if (rnd() < 0.05) logEvent(c, `${fullName(c)} takes ${cellName.get(n) || 'land'} from ${fullName(e)}`, false); }
           }
         }
       }
       // sea colonisation
-      if (budget[o] > 0 && (flags[i] & 4) && c.tech > 0.22 && p > 0.3 * K && r1 < 0.02) {
-        const R = seaRange(c.tech) * tv(c, 'sea', 1) + ports[o] * 3;
+      if (budget[o] > 0 && (flags[i] & 4) && know.can(o, 'colonies') && p > 0.3 * K && r1 < 0.02) {
+        const R = seaRange(c.tech) * tv(c, 'sea', 1) * KF[o * NKF + KK.sea] + ports[o] * 3;
         const y = (i / W) | 0, x = i - y * W;
         const dy = Math.round((rnd() * 2 - 1) * R), dx = Math.round((rnd() * 2 - 1) * R / cosLat[y]);
         const yy = y + dy; if (yy >= 0 && yy < H) {
@@ -524,15 +577,19 @@ function createSim(world, seed) {
         }
       }
       // tech diffusion, religion spread, and who the merchants can reach by land (the realms touched in these ten years or the ten before)
-      const nb = [];
+      const nb = []; const tBefore = a.tech;
       for (let b = 0; b < MAXC; b++) {
         const n = contact[c * MAXC + b]; if (!n) continue; const bv = civs[b]; if (!bv) { contact[c * MAXC + b] = 0; continue; }
         nb.push(b);
-        if (bv.tech > a.tech) a.tech += (bv.tech - a.tech) * 0.015;
+        if (bv.tech > a.tech) a.tech += (bv.tech - a.tech) * SPREAD[bv.era];
         if (!a.religion && bv.religion && rnd() < 0.08) { a.religion = bv.religion; logEvent(a, `${fullName(a)} adopts ${bv.religion}`, cellsOf[c] > 40); }
         contact[c * MAXC + b] = 0;
       }
-      { const was = lastNb[c]; lastNb[c] = nb; let all = nb; if (was) { all = nb.slice(); for (const b of was) if (civs[b] && all.indexOf(b) < 0) all.push(b); } market.touch(c, all); }
+      { const was = lastNb[c]; lastNb[c] = nb; let all = nb; if (was) { all = nb.slice(); for (const b of was) if (civs[b] && all.indexOf(b) < 0) all.push(b); } market.touch(c, all);
+        // (what is known to those it touches or trades with is learned half again as fast)
+        // and what merchants bring from across the sea teaches too, half as well as a neighbour
+        const near = all.slice(); for (const L of market.links) { const b = L.a === c ? L.b : L.b === c ? L.a : -1; if (b < 0 || near.indexOf(b) >= 0) continue; near.push(b); const bv = civs[b]; if (bv && bv.tech > a.tech && !(a.wars && a.wars[b] !== undefined)) a.tech += (bv.tech - a.tech) * SPREAD[bv.era] * 0.5; } know.around(c, near); }
+      a.taught = (a.tech - tBefore) / 10;      // what its neighbours taught it, a year (for the page)
       syncEra(a, c);
     }
     // random disasters
@@ -622,7 +679,7 @@ function createSim(world, seed) {
       if (!land[i] || pop[i] <= 0) continue; const d = Math.sqrt(dx * dx * cosLat[yy] * cosLat[yy] + dy * dy); if (d > radius) continue;
       const kill = (0.25 + rnd() * 0.3) * (1 - d / radius);
       const o = owner[i]; if (o >= 0 && pop[i] > hitPop && civs[o]) { hitPop = pop[i]; hit = civs[o]; }
-      pop[i] *= (1 - kill);
+      pop[i] *= (1 - (o >= 0 && civs[o] ? kill / KF[o * NKF + KK.health] : kill));
     }
     if (hit && (natural ? popOf[hit.id] > 20 : true)) { logEvent(hit, `A great plague sweeps through ${fullName(hit)}`, popOf[hit.id] > 200 || hit.player); hit.stability -= 0.1; plagues.push({ i: center, year, r: radius }); }
   }
@@ -674,7 +731,7 @@ function createSim(world, seed) {
     port: { cost: 90, dur: 10, slot: false, name: 'Harbour', desc: 'Piers and warehouses on the shore. Trade income, ships, and colonies across the sea.' },
     market: { cost: 70, dur: 8, slot: true, name: 'Market', desc: 'A market quarter. +4% income, and trade goods earn more.' },
     temple: { cost: 80, dur: 12, slot: true, name: 'Temple', desc: 'A temple quarter. +3% stability; faith spreads from here.' },
-    academy: { cost: 150, dur: 14, slot: true, name: 'Academy', desc: 'Scholars and a library. +8% knowledge growth.' },
+    academy: { cost: 150, dur: 14, slot: true, name: 'Academy', desc: 'Scholars and a library. Insight grows by up to half as much again, as more of your towns have one.' },
     mine: { cost: 110, dur: 10, slot: true, name: 'Mine', desc: 'Works what this land yields, in earnest: more than twice as much of it comes to market.' },
     workshop: { cost: 60, dur: 8, slot: true, ind: true, name: 'Workshops', desc: 'Potters, tanners, glassmakers, papermakers and jewellers under one roof. Their work costs a third less.' },
     weaver: { cost: 60, dur: 8, slot: true, ind: true, name: 'Weaving house', desc: 'Looms for wool, cotton and flax. Cloth costs a third less to make.' },
@@ -708,7 +765,8 @@ function createSim(world, seed) {
   // can this realm start this work here? returns null when it can, else the reason
   function cannot(c, kind, i) {
     const B = BUILD[kind]; if (!B) return 'Unknown work';
-    if (kind === 'levy') return year < c.army ? 'An army is already in the field' : null;
+    const lack = (work, lv) => { const D = know.lacks(c.id, work, lv); return D ? `Needs ${D.name}` : null; };
+    if (kind === 'levy') return lack('levy') || (year < c.army ? 'An army is already in the field' : null);
     if (i < 0 || !land[i]) return 'That is not land';
     if (kind === 'settle') {
       if (owner[i] === c.id) return 'Already yours';
@@ -718,21 +776,21 @@ function createSim(world, seed) {
     }
     if (owner[i] !== c.id) return 'Not your land';
     if (inProgress(i, kind)) return 'Already being built';
-    if (kind === 'farm') return infra[i] >= 5 ? 'Fully farmed' : level[i] < 1 ? 'Needs a settlement' : null;
-    if (kind === 'walls') return walls[i] >= 3 ? 'Fully fortified' : level[i] < 1 ? 'Needs a settlement' : null;
-    if (kind === 'port') return !(flags[i] & 4) ? 'Needs a coast' : (special[i] & 1) ? 'Already a harbour' : level[i] < 1 ? 'Needs a settlement' : null;
-    if (kind === 'academy') return level[i] < 2 ? 'Needs a town or city' : c.era < 3 ? 'Academies come with the Classical age' : (special[i] & 2) ? 'Already has an academy' : null;
-    if (kind === 'temple') return level[i] < 1 ? 'Needs a settlement' : (special[i] & 4) ? 'Already has a temple' : null;
-    if (kind === 'market') return level[i] < 1 ? 'Needs a settlement' : c.era < 1 ? 'Markets come with the Bronze Age' : (special[i] & 8) ? 'Already has a market' : null;
+    if (kind === 'farm') return infra[i] >= 5 ? 'Fully farmed' : lack('farm', infra[i] + 1) || (level[i] < 1 ? 'Needs a settlement' : null);
+    if (kind === 'walls') return walls[i] >= 3 ? 'Fully fortified' : lack('walls', walls[i] + 1) || (level[i] < 1 ? 'Needs a settlement' : null);
+    if (kind === 'port') return lack('port') || (!(flags[i] & 4) ? 'Needs a coast' : (special[i] & 1) ? 'Already a harbour' : level[i] < 1 ? 'Needs a settlement' : null);
+    if (kind === 'academy') return lack('academy') || (level[i] < 2 ? 'Needs a town or city' : (special[i] & 2) ? 'Already has an academy' : null);
+    if (kind === 'temple') return lack('temple') || (level[i] < 1 ? 'Needs a settlement' : (special[i] & 4) ? 'Already has a temple' : null);
+    if (kind === 'market') return lack('market') || (level[i] < 1 ? 'Needs a settlement' : (special[i] & 8) ? 'Already has a market' : null);
     if (B.ind) {
       if (indAt(i, kind)) return 'Already built here';
-      const need = { smithy: 1, warehouse: 1, shipyard: 2, factory: 6, refinery: 7, lab: 8 }[kind] || 0; if (c.era < need) return `Not before the ${ERAS[need][0]}${/Age$/.test(ERAS[need][0]) ? '' : ' age'}`;
+      const no = lack(kind); if (no) return no;
       if (kind === 'shipyard') return !(special[i] & 1) ? 'Needs a harbour' : null;
       if (kind === 'smithy' || kind === 'warehouse' || kind === 'factory' || kind === 'refinery' || kind === 'lab') return level[i] < 2 ? 'Needs a town or city' : null;
       return level[i] < 1 ? 'Needs a settlement' : null;
     }
-    if (kind === 'mine') { const g = goods[i] ? GOODS[goods[i]] : null; return !g ? 'This land yields nothing to work' : c.era < gera[i] ? `Your people cannot yet work ${g.name.toLowerCase()}` : (special[i] & 512) ? 'Already mined' : level[i] < 1 ? 'Needs a settlement' : null; }
-    if (kind === 'wonder') return i !== c.capital ? 'Wonders rise in the capital' : level[i] < 2 ? 'The capital must be a town first' : (special[i] & 16) ? 'The capital already has its wonder' : null;
+    if (kind === 'mine') { const g = goods[i] ? GOODS[goods[i]] : null; if (!g) return 'This land yields nothing to work'; const D = know.estate(c.id, goods[i]); return D ? `Needs ${D.name}` : c.era < gera[i] ? `Your people cannot yet work ${g.name.toLowerCase()}` : (special[i] & 512) ? 'Already mined' : level[i] < 1 ? 'Needs a settlement' : null; }
+    if (kind === 'wonder') return lack('wonder') || (i !== c.capital ? 'Wonders rise in the capital' : level[i] < 2 ? 'The capital must be a town first' : (special[i] & 16) ? 'The capital already has its wonder' : null);
     if (kind === 'capital') return level[i] < 2 ? 'A capital needs at least a town' : c.capital === i ? 'Already the capital' : null;
     return null;
   }
@@ -768,14 +826,15 @@ function createSim(world, seed) {
     const c = cv.id; const f = (1 + cv.tech * 4 + Math.sqrt(popOf[c]) / 40) * 0.6 * buildCost(c);
     const i = rnd() < 0.45 ? cv.capital : bestCell[c]; if (i < 0 || owner[i] !== c || !level[i]) return;
     const e = cv.era, lv = level[i]; const opts = [];
-    if (e >= 1 && !(special[i] & 8)) opts.push(['market', 8]);
-    if (!(special[i] & 4) && (cv.religion || e >= 2)) opts.push(['temple', 4]);
-    if (e >= 3 && lv >= 2 && !(special[i] & 2)) opts.push(['academy', 2]);
-    if (e >= 2 && (flags[i] & 4) && !(special[i] & 1)) opts.push(['port', 1]);
-    if (e >= 1 && e <= 5 && lv >= 2 && walls[i] < (e >= 4 ? 3 : 2) && (Object.keys(cv.wars).length || rnd() < 0.5)) opts.push(['walls', 0]);
-    if (infra[i] < 5 && rnd() < 0.5) opts.push(['farm', 0]);
-    if (goods[i] && e >= gera[i] && !(special[i] & 512) && (GOODS[goods[i]].mine || rnd() < 0.4)) opts.push(['mine', 512]);
-    if (i === cv.capital && !(special[i] & 16) && lv >= 2 && rankOf(cv) <= 4) opts.push(['wonder', 16]);
+    const ok = (k) => !cannot(cv, k, i);      // (its age no longer decides what it may raise: what it has learned does)
+    if (!(special[i] & 8) && ok('market')) opts.push(['market', 8]);
+    if (!(special[i] & 4) && (cv.religion || e >= 2) && ok('temple')) opts.push(['temple', 4]);
+    if (lv >= 2 && !(special[i] & 2) && ok('academy')) opts.push(['academy', 2]);
+    if (e >= 2 && (flags[i] & 4) && !(special[i] & 1) && ok('port')) opts.push(['port', 1]);
+    if (e >= 1 && e <= 5 && lv >= 2 && walls[i] < (e >= 4 ? 3 : 2) && (Object.keys(cv.wars).length || rnd() < 0.5) && ok('walls')) opts.push(['walls', 0]);
+    if (infra[i] < 5 && rnd() < 0.5 && ok('farm')) opts.push(['farm', 0]);
+    if (goods[i] && !(special[i] & 512) && (GOODS[goods[i]].mine || rnd() < 0.4) && ok('mine')) opts.push(['mine', 512]);
+    if (i === cv.capital && !(special[i] & 16) && lv >= 2 && rankOf(cv) <= 4 && ok('wonder')) opts.push(['wonder', 16]);
     if (!opts.length) return;
     const want = tv(cv, 'build', null); const pref = want ? opts.filter(o => want.includes(o[0])) : []; const from = pref.length && rnd() < 0.7 ? pref : opts;
     const [k] = from[Math.floor(rnd() * from.length)]; const cost = COST[k] * f; if (cv.wealth < cost || inProgress(i, k)) return;
@@ -833,7 +892,7 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(cellsOf[c.id] > 20 || c.player ? -30 : -8), rulers: c.rulers.slice(-10) } : null), worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
-      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]),
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), cal: calShift,
     };
   }
   function load(s) {
@@ -856,11 +915,15 @@ function createSim(world, seed) {
     cellName.clear(); for (let k = 0; k < s.names.length; k += 2) cellName.set(s.names[k], s.names[k + 1]);
     siteU.fill(-1); if (s.sites) for (let k = 0; k < s.sites.length; k += 3) { siteU[s.sites[k]] = s.sites[k + 1] / 100; siteV[s.sites[k]] = s.sites[k + 2] / 100; }
     civs.fill(null); freeIds.length = 0; civCount = 0;
-    for (let c = MAXC - 1; c >= 0; c--) { if (s.civs[c]) { civs[c] = s.civs[c]; civCount++; fmOf[c] = foodMult(civs[c].tech); if (civs[c].eraSince === undefined) civs[c].eraSince = year - 500; } else freeIds.push(c); }
+    for (let c = MAXC - 1; c >= 0; c--) { if (s.civs[c]) { civs[c] = s.civs[c]; civCount++; if (civs[c].eraSince === undefined) civs[c].eraSince = year - 500; } else freeIds.push(c); }
     worldEvents.length = 0; worldEvents.push(...s.worldEvents); history.length = 0; if (s.history) history.push(...s.history);
+    // what each realm knows; a world saved before there were discoveries is given what its knowledge is worth, the way the autopilot would have learned it
+    const hadKnow = know.load(s.know); if (!hadKnow) for (let c = 0; c < MAXC; c++) if (civs[c]) { know.born(c, -1, civs[c].tech); know.settle(c, civs[c]); }
     recount(); countIndustry(); st.year = year; st.civCount = civCount; st.player = player;
+    calShift = hadKnow ? s.cal || 0 : Math.max(0, histYearOf(frontTech) - year);      // (a world from before the calendar keeps its own: see calShift)
     // the market as it was left; a world saved before there was one gets thirty quiet years to find its prices
     if (!market.load(s.econ)) { for (let c = 0; c < MAXC; c++) if (civs[c]) market.born(c, -1, 0); touchAll(); market.warm(30); } else touchAll();
+    for (let c = 0; c < MAXC; c++) if (civs[c]) know.around(c, lastNb[c]);
   }
   // who touches whom by land, read off the map (the tick keeps it up from border contacts afterwards)
   function touchAll() {
@@ -871,7 +934,8 @@ function createSim(world, seed) {
   // rebuild everything the tick derives from the cell arrays (levels, per-realm totals, strengths) so a loaded or edited world reads right before its first year runs
   function recount() {
     popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); bestPop.fill(-1); rawPop.fill(0); held.fill(0); urban.fill(0); portCells.fill(-1);
-    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; fmOf[c] = foodMult(cv.tech); }
+    townsOf.fill(0); frontTech = 0; bandHi.fill(0); peakAt.fill(0);
+    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; fmOf[c] = fmNow(cv); if (cv.tech > frontTech) frontTech = cv.tech; }
     for (let k = 0; k < LI.length; k++) {
       const i = LI[k]; const o = owner[i]; const c = o >= 0 ? civs[o] : null; const p = pop[i];
       if (!c) { level[i] = 0; continue; }
@@ -880,7 +944,7 @@ function createSim(world, seed) {
       if (p > 0.05) yieldsOf(i, o, c, p);
       if (p > bestPop[o]) { bestPop[o] = p; bestCell[o] = i; }
       const fm = fmOf[o]; const s1 = 6 * fm + 0.2, s2 = 25 * fm + 1, s3 = 90 * fm + 4, s4 = 300 * fm + 15;
-      level[i] = p >= s4 ? 4 : p >= s3 ? 3 : p >= s2 ? 2 : p >= s1 ? 1 : 0; if (level[i] >= 2) urban[o] += p;
+      level[i] = p >= s4 ? 4 : p >= s3 ? 3 : p >= s2 ? 2 : p >= s1 ? 1 : 0; if (level[i] >= 2) { urban[o] += p; townsOf[o]++; }
       if (c.capital === i && level[i] < 1) level[i] = 1;
       if (level[i] && !cellName.has(i)) cellName.set(i, makeName(c.style, 2, 3));
       if (level[i] && !gBand[i]) { gBand[i] = Math.min(255, Math.round(Math.log2(p * 1000 + 1) * 3)); gPrev[i] = gBand[i]; }
@@ -894,21 +958,27 @@ function createSim(world, seed) {
     popOf, cellsOf, strengthOf, acad, temples, ports, markets, wonders, worldEvents, allEvents, history, ERAS, COST,
     volcanoes, fires, floods, quakes, battles, plagues, ruins, rubble, get comet() { return comet; },
     goods, gera, GOODS, GOOD_ID, market, rawPop, held, urban, satOf, touchAll, IND, ind, indN, indAt, workName, eff,
+    know, insightParts, reachFor, townsOf,
+    // the year in which history's first realm had come to know this much (for the page: how far ahead of its time a realm is)
+    // the year in which the first peoples knew this much, by this world's calendar (history's own, unless the world came from before the calendar)
+    histYear(t) { return histYearOf(t) - calShift; }, get calShift() { return calShift; },
     cellDist,
     // where a realm's yearly income comes from (the same sum the tick makes), for the ledger
     incomeParts(cv) {
-      const c = cv.id, base = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * tv(cv, 'income', 1), living = market.LS[c];
-      const parts = { taxes: base, ports: base * ports[c] * 0.05, markets: base * Math.min(0.3, markets[c] * 0.04), mines: base * Math.min(0.3, mines[c] * 0.05), living: base * 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1)), customs: market.rev[c], upkeep: popOf[c] * 0.05 * (cv.policy.military - 1) };
-      parts.net = parts.taxes + parts.ports + parts.markets + parts.mines + parts.living + parts.customs - parts.upkeep; return parts;
+      const c = cv.id, base = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * tv(cv, 'income', 1) * KF[c * NKF + KK.income], living = market.LS[c];
+      const parts = { taxes: base, ports: base * ports[c] * 0.05, markets: base * Math.min(0.3, markets[c] * 0.04), mines: base * Math.min(0.3, mines[c] * 0.05), living: base * 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1)), customs: market.rev[c], upkeep: popOf[c] * 0.05 * (cv.policy.military - 1), scholars: popOf[c] * SCHOLARS * (cv.policy.research - 1) };
+      parts.net = parts.taxes + parts.ports + parts.markets + parts.mines + parts.living + parts.customs - parts.upkeep - parts.scholars; return parts;
     },
     // does this realm's age know how to work what this cell yields?
-    knows(c, i) { return !!goods[i] && !!c && c.era >= gera[i]; },
+    knows(c, i) { return !!goods[i] && !!c && c.era >= gera[i] && !!gmask[c.id * NG + goods[i]]; },
+    // the discovery the player's realm lacks to raise this work here (null: none, whatever else may stand in the way)
+    needFor(kind, i) { const c = playerCiv(); if (!c) return null; if (kind === 'farm') return i >= 0 && infra[i] < 5 ? know.lacks(c.id, 'farm', infra[i] + 1) : null; if (kind === 'walls') return i >= 0 && walls[i] < 3 ? know.lacks(c.id, 'walls', walls[i] + 1) : null; if (kind === 'mine') return i >= 0 && goods[i] ? know.estate(c.id, goods[i]) : null; return know.lacks(c.id, kind); },
     tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, plague, meteor, bounty,
     TRAITS, traitOf, fullName, fmtYear, describeCell, isAtWar, capacity, eraOf, strength, save, load, recount, rnd, religionName, makeName, logEvent, evolveGovAll,
     settlementsOf(id) { const out = []; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === id && level[i]) out.push(i); } out.sort((a, b) => pop[b] - pop[a]); return out; },
     cultivation(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 0; const c = civs[o]; const K = capacity(i, c); const farm = Math.min(1, Math.max(0, (c.tech - 0.025) / 0.1)); return K > 0.01 ? Math.min(1, pop[i] / K) * farm * (level[i] ? 1 : 0.6) : 0; },
     prophet(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 'Click a state'; const c = civs[o]; c.religion = religionName(c.style); c.stability = Math.min(1, c.stability + 0.2); logEvent(c, `A prophet walks out of the desert. ${fullName(c)} takes up ${c.religion}`, true); return `${c.religion} is born`; },
-    enlighten(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 'Click a state'; const c = civs[o]; c.tech = Math.min(1, c.tech + 0.06); fmOf[o] = foodMult(c.tech); const e = eraOf(c.tech); if (e !== c.era) { c.era = e; evolveGov(c); } logEvent(c, `A golden age of learning dawns in ${fullName(c)}`, true); return `${fullName(c)} leaps ahead`; },
+    enlighten(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 'Click a state'; const c = civs[o]; c.tech = Math.min(1, c.tech + 0.06); fmOf[o] = fmNow(c); const e = eraOf(c.tech); if (e !== c.era) { c.era = e; evolveGov(c); } logEvent(c, `A golden age of learning dawns in ${fullName(c)}`, true); return `${fullName(c)} leaps ahead`; },
   };
 }
 

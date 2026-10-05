@@ -1,10 +1,13 @@
 // How much each raw good's land must yield, measured from the world itself.
 //   node tools/econ/calibrate.js [seed] [--write]     (--write puts the table into src/econ.js between its CAL marks)
 //
-// The simulation is run from 10,000 BC to 2000 AD (the market steps with it but changes nothing here: only who lives
-// where, and what their age wants, is read). In every 500-year stretch, for every raw good, two sums are kept:
+// The simulation is run from 10,000 BC to 2050 (the market steps with it but changes nothing here: only who lives
+// where, and what their age wants, is read). History's ages are each cut in three stretches (the Stone Age from
+// 8000 BC, when the world has filled; the last ages are decades long, the first millennia: a stretch is a share of
+// an age, which is what a player spends his turns in), and in every stretch, for every raw good, two sums are kept:
 //   need:   the lots the world would use in a year at usual prices (ECON.req of every realm's knowledge, times its people)
-//   supply: the people living on that good's land (mines counted over) times how hard their age works (F^0.7)
+//   supply: the people living on that good's land in realms that know how to work it (mines counted over), times how
+//           hard their age works (F^0.7)
 // need / supply is the yield that would give the world exactly what it would use; the table holds the geometric mean
 // of that over the stretches in which at least three realms bring the good in and the world wants it at least half
 // as much, a head, as it ever does (tin is sized by the Bronze Age, not by the centuries after it). A good that does not travel (grain,
@@ -12,7 +15,7 @@
 // nobody ate rice in Gaul, so Gaul's bread must come from grain alone.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const path = require('path'); const PNG = require('pngjs').PNG; const root = path.join(__dirname, '..', '..');
-(0, eval)(fs.readFileSync(path.join(root, 'src/econ.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/sim.js'), 'utf8'));
+(0, eval)(fs.readFileSync(path.join(root, 'src/econ.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/know.js'), 'utf8')); (0, eval)(fs.readFileSync(path.join(root, 'src/sim.js'), 'utf8'));
 const E = window.ECON; const W = 720, H = 360, N = W * H; const png = PNG.sync.read(fs.readFileSync(path.join(root, 'data/world.png')));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
 for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.data[i * 4 + 1] / 255; wd.flags[i] = png.data[i * 4 + 2]; wd.land[i] = png.data[i * 4 + 2] & 1; }
@@ -35,14 +38,18 @@ function reqOf(cv, c) {
   }
   return x;
 }
-const STEP = 500, B0 = -8000, NBK = Math.ceil((2000 - B0) / STEP); const need = [], sup = [], holders = [];
+const AGES = [-8000, -3300, -1200, -500, 500, 1400, 1760, 1900, 1970, 2050], CUT = 3; const B0 = AGES[0], END = AGES[AGES.length - 1];
+const EDGE = []; for (let a = 0; a + 1 < AGES.length; a++) for (let k = 0; k < CUT; k++) EDGE.push(Math.round(AGES[a] + (AGES[a + 1] - AGES[a]) * k / CUT)); EDGE.push(END);
+const NBK = EDGE.length - 1; const EVERY = EDGE.slice(0, NBK).map((y, b) => Math.max(1, Math.floor((EDGE[b + 1] - y) / 12)));      // a dozen looks at each stretch
+const need = [], sup = [], holders = [];
 for (let k = 0; k < NBK; k++) { need.push(new Float64Array(NG)); sup.push(new Float64Array(NG)); holders.push(new Float64Array(NG)); }
 const heads = new Float64Array(NBK);
 const cells = new Uint32Array(NG); for (const i of sim.LI) cells[sim.goods[i]]++;
 const t0 = Date.now(); let samples = new Uint32Array(NBK);
-while (sim.year < 2000) {
-  sim.tick(); if (sim.year % 25 !== 0 || sim.year < B0) continue;
-  const b = Math.min(NBK - 1, Math.floor((sim.year - B0) / STEP)); samples[b]++;
+let bk = 0;
+while (sim.year < END) {
+  sim.tick(); if (sim.year < B0) continue; while (bk < NBK - 1 && sim.year >= EDGE[bk + 1]) bk++;
+  const b = bk; if ((sim.year - EDGE[b]) % EVERY[b] !== 0) continue; samples[b]++;
   for (const cv of sim.civs) { if (!cv) continue; const c = cv.id, P = sim.popOf[c]; if (P <= 0) continue; heads[b] += P; const x = reqOf(cv, c), F7 = Math.pow(1 + 5 * cv.tech, 0.7);
     for (let g = 1; g < NG; g++) { const G = E.GOODS[g]; if (!G.raw) continue; const rp = sim.rawPop[c * NG + g]; if (rp > 0) { sup[b][g] += rp * F7; holders[b][g]++; } if (LOCAL.includes(g) && !(rp > 0)) continue; need[b][g] += P * x[g]; } }
 }
@@ -55,6 +62,7 @@ for (let g = 1; g < NG; g++) { const G = E.GOODS[g]; if (!G.raw) continue; let l
   cal[G.key] = n ? +Math.exp(ls / n).toPrecision(3) : 0.5;
   rows.push(`${G.key.padEnd(10)} cells ${String(cells[g]).padStart(5)}  yield ${String(cal[G.key]).padStart(8)}   ${per.join(' ')}`);
 }
+console.log('stretches begin: ' + EDGE.slice(0, NBK).join(' '));
 console.log(rows.join('\n'));
 const text = '  const CAL = ' + JSON.stringify(cal).replace(/"/g, '').replace(/,/g, ', ').replace(/:/g, ': ') + ';';
 if (write) { const p = path.join(root, 'src/econ.js'); const s = fs.readFileSync(p, 'utf8'); const a = s.indexOf('/* CAL:BEGIN */'), z = s.indexOf('/* CAL:END */'); if (a < 0 || z < 0) throw new Error('no CAL marks in src/econ.js'); fs.writeFileSync(p, s.slice(0, a) + '/* CAL:BEGIN */\n' + text + '\n  ' + s.slice(z)); console.log('written to src/econ.js'); } else console.log(text);

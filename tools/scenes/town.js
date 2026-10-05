@@ -17,7 +17,7 @@
   if (P.season !== undefined) { window.__seasonLock = true; G.setSeason(P.season); }
   if (!G.sim.playerCiv || !G.sim.playerCiv()) G.start(P.lon, P.lat, 'Test');
   const S = G.sim, c = S.playerCiv(), cap = c.capital;
-  c.tech = P.tech; S.pop[cap] = P.pop; S.walls[cap] = P.walls; if (P.special) S.special[cap] |= P.special;
+  c.tech = P.tech; c.era = S.eraOf(c.tech); if (window.__T && __T.teach) __T.teach(c); S.pop[cap] = P.pop; S.walls[cap] = P.walls; if (P.special) S.special[cap] |= P.special;
   if (P.ind) S.ind.set(cap, Uint8Array.from(P.ind));
   G.run(3);
   if (P.settled) c.eraSince = S.year - 200;

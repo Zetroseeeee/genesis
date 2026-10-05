@@ -105,3 +105,8 @@ trade_lens   | tools/scenes/market.js | {lens:true} | | 20
 works        | tools/scenes/town.js | {lon:31.25,lat:29.9,tech:0.2,pop:9,walls:1,special:524,ind:[5,6,7,8,9,10,0,0,0,0],grow:false} | setTimeout(() => __sceneLook('town', 2.2, 0.95, 0.4), 7000); | 32
 works_smithy | tools/scenes/town.js | {lon:31.25,lat:29.9,tech:0.2,pop:9,walls:1,special:524,ind:[5,6,7,8,9,10,0,0,0,0],grow:false} | setTimeout(() => __sceneLook('smithy', 5, 1.0, 0.3), 7000); | 32
 works_north  | tools/scenes/town.js | {lon:10,lat:52,tech:0.2,pop:6,walls:2,special:524,ind:[5,6,7,8,9,10,0,0,0,0],grow:false} | setTimeout(() => __sceneLook('workshop', 5, 1.0, 0.3), 7000); | 32
+# --- knowledge: the first choice, a discovery's page with a queue, a later age, where the realm stands ---
+know         | tools/scenes/know.js | {} | | 16
+know_queue   | tools/scenes/know.js | {learn:['farming','pottery','weaving'],queue:['megaliths','quarrying'],key:'bronze'} | | 16
+know_iron    | tools/scenes/know.js | {years:9000,age:2,key:'iron'} | | 22
+know_stand   | tools/scenes/know.js | {years:9000,tab:'stand'} | | 22

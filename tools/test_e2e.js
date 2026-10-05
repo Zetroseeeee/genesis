@@ -63,7 +63,7 @@ server.listen(0, async () => {
     await ev(() => { document.getElementById('found-name').value = 'Kemet'; document.getElementById('found-ok').click(); }); await wait(2600); await frames(5);
     s = await state(); check(s.mode === 'play', 'mode play after founding'); check(s.player >= 0, 'player set');
     const nm = await ev(() => __G.sim.playerCiv().name); check(nm === 'Kemet', 'custom name used: ' + nm);
-    check(s.left, 'inspector opened on the new village'); check(s.t1 === 'Advance', 'turn button says Advance: ' + s.t1);
+    check(s.left, 'inspector opened on the new village'); check(s.t1 === 'Knowledge', 'the turn button asks what the people will learn first: ' + s.t1);
     const cap = await ev(() => { const c = __G.sim.playerCiv(); return { lvl: __G.sim.level[c.capital], owner: __G.sim.owner[c.capital] === c.id, cells: __G.sim.cellsOf[c.id] }; }); check(cap.lvl >= 1 && cap.owner, 'capital is a village the player owns');
     check((await ev(() => __G.sim.st.civCount)) >= 10, 'other tribes seeded');
   });
@@ -78,6 +78,63 @@ server.listen(0, async () => {
     const s = await state(); check(s.mode === 'play' && s.player >= 0, 'random start enters play');
     const cap = await ev(() => { const c = __G.sim.playerCiv(); const i = c.capital; return { river: !!(__G.sim.flags[i] & 2), fert: __G.sim.fert[i] }; }); check(cap.fert > 0.3, 'random start on decent land (fert ' + cap.fert.toFixed(2) + ')');
     check(s.dist < 0.006, 'camera flew in to town height (dist ' + s.dist.toFixed(5) + ')');
+  });
+
+  // ---------- knowledge ----------
+  await scenario('knowledge: the opening choice, the tree, a study and a queue, where you stand', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); }); await page.keyboard.press('Escape'); await frames(2);
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), k = S.know; return { t1: document.getElementById('turn1').textContent, known: k.count[c.id], pool: Math.round(k.pool[c.id] * KNOW.UNIT), tile: document.getElementById('eco-know').textContent + '/' + document.getElementById('eco-know-d').textContent, farm: S.cannot('farm', c.capital) }; });
+    check(r.t1 === 'Knowledge' && r.known === 0 && r.pool === 1000, `a new people knows nothing and has insight to spend (${r.pool}); the turn button says ${r.t1}`); check(/choose/.test(r.tile), 'the top bar says to choose: ' + r.tile); check(/Needs Farming/.test(r.farm), 'no fields yet: ' + r.farm);
+    await ev(() => document.getElementById('turn').click()); await frames(3);
+    r = await ev(() => { const cards = [...document.querySelectorAll('#kn-canvas .kn-card')]; const sc = document.getElementById('kn-scroll'); return { open: document.getElementById('know').open, cards: cards.length, nd: KNOW.ND, eras: document.querySelectorAll('#kn-canvas .kn-era').length, brs: document.querySelectorAll('#kn-canvas .kn-br').length, lines: document.querySelectorAll('#kn-canvas .kn-lines path').length, openN: cards.filter(b => b.classList.contains('open')).length, later: cards.filter(b => b.classList.contains('later')).length, wide: sc.scrollWidth > sc.clientWidth * 2, now: document.getElementById('kn-now').textContent, rate: document.getElementById('kn-rate').textContent, info: document.querySelector('#kn-info h3') ? document.querySelector('#kn-info h3').textContent : '',
+      overlap: (() => { const rs = cards.map(b => b.getBoundingClientRect()); let n = 0; for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) if (rs[i].left < rs[j].right - 1 && rs[j].left < rs[i].right - 1 && rs[i].top < rs[j].bottom - 1 && rs[j].top < rs[i].bottom - 1) n++; return n; })() }; });
+    check(r.open, 'a click on the turn button opens the tree'); check(r.cards === r.nd && r.eras === 9 && r.brs === 6 && r.lines > 150, `every discovery has its card: ${r.cards} cards, ${r.eras} ages, ${r.brs} branches, ${r.lines} lines`); check(r.overlap === 0, `no two cards overlap (${r.overlap})`);
+    check(r.openN >= 10 && r.later > 100 && r.wide, `the first age is open to study, the later ones dimmed, and the tree scrolls through the ages (${r.openN} open, ${r.later} later)`); check(/await your word/.test(r.now) && /1,000 insight unspent/.test(r.now), 'the strip says nothing is being studied: ' + r.now); check(/insight a year/.test(r.rate) && r.info.length > 2, `the pace of learning is shown (${r.rate.trim()}), and a discovery's page (${r.info})`);
+    // what the people hold already pays for is marked; the keyboard is on the chosen card, and the arrows walk the tree
+    r = await ev(() => { const cards = [...document.querySelectorAll('#kn-canvas .kn-card.open')]; const a = document.activeElement; return { once: cards.filter(b => /at once/.test(b.querySelector('.st').textContent)).length, open: cards.length, focus: a ? (a.id || a.className) : '', sel: document.querySelector('.kn-card.sel').dataset.k }; });
+    check(r.once === r.open && r.once >= 10, `cards that can be learned out of hand say so (${r.once} of ${r.open})`); check(/kn-card/.test(r.focus) && /sel/.test(r.focus), 'the keyboard starts on the chosen discovery, not on the button that closes the screen: ' + r.focus);
+    const sel0 = r.sel; await page.keyboard.press('ArrowDown'); await frames(2); const sel1 = await ev(() => document.querySelector('.kn-card.sel').dataset.k); await page.keyboard.press('ArrowRight'); await frames(2);
+    r = await ev(() => ({ sel: document.querySelector('.kn-card.sel').dataset.k, focus: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.k : '', h: document.querySelector('#kn-info h3').textContent }));
+    check(sel1 !== sel0 && r.sel !== sel1 && r.focus === r.sel && r.h.length > 2, `the arrow keys move from discovery to discovery (${sel0} > ${sel1} > ${r.sel})`);
+    // farming: its page, then learned at once out of what the people hold
+    await ev(() => document.querySelector('.kn-card[data-k="farming"]').click()); await frames(2);
+    r = await ev(() => ({ h: document.querySelector('#kn-info h3').textContent, gives: [...document.querySelectorAll('#kn-info .kn-gives li')].map(li => li.textContent), btn: document.querySelector('#kn-info [data-kact="study"]') ? document.querySelector('#kn-info [data-kact="study"]').textContent : '', leads: document.querySelectorAll('#kn-info .kn-chips .kn-chip').length, sel: document.querySelector('.kn-card.sel').dataset.k, hot: document.querySelectorAll('#kn-canvas .kn-lines path.lead').length }));
+    check(r.h === 'Farming' && r.sel === 'farming' && r.gives.some(g => /food from the land/.test(g)) && r.gives.some(g => /Farms up to level 2/.test(g)), 'the page says what farming gives: ' + r.gives.join(' | ')); check(r.btn === 'Learn now' && r.leads >= 4 && r.hot >= 4, `it can be learned at once, and what it leads to is shown (${r.leads} discoveries, ${r.hot} lines lit)`);
+    await ev(() => document.querySelector('#kn-info [data-kact="study"]').click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { known: S.know.knows(c.id, 'farming'), cls: document.querySelector('.kn-card[data-k="farming"]').className, st: document.querySelector('.kn-card[data-k="farming"] .st').textContent, farm: S.cannot('farm', c.capital), toast: window.__toasts.slice(-1)[0] || '', state: document.querySelector('#kn-info .kn-state').textContent, pool: Math.round(S.know.pool[c.id] * KNOW.UNIT) }; });
+    check(r.known && /known/.test(r.cls) && r.st === 'known' && /learn Farming/.test(r.toast), `farming is learned on the spot (${r.pool} insight left): ${r.toast}`); check(!/Needs/.test(r.farm || ''), 'and fields can be laid out'); check(/know this/.test(r.state), 'its page says so');
+    // pottery by double click; then weaving has to be studied
+    await ev(() => { const b = document.querySelector('.kn-card[data-k="pottery"]'); b.click(); b.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); }); await frames(2);
+    await ev(() => { document.querySelector('.kn-card[data-k="weaving"]').click(); }); await frames(1); await ev(() => document.querySelector('#kn-info [data-kact="study"]').click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), k = S.know; const b = document.querySelector('.kn-card[data-k="weaving"]'); return { pot: k.knows(c.id, 'pottery'), cur: k.cur[c.id] >= 0 ? KNOW.LIST[k.cur[c.id]].key : '', cls: b.className, st: b.querySelector('.st').textContent, bar: parseFloat(b.querySelector('.bar').style.width), now: document.getElementById('kn-now').textContent, tile: document.getElementById('eco-know').textContent + ' / ' + document.getElementById('eco-know-d').textContent }; });
+    check(r.pot, 'a double click learns pottery'); check(r.cur === 'weaving' && /study/.test(r.cls) && /%/.test(r.st) && r.bar > 3 && r.bar < 100, `weaving is begun with what is left (${r.st})`); check(/Studying\s*Weaving/.test(r.now), 'the strip names it: ' + r.now); check(/^\d+% \/ .*yrs/.test(r.tile), 'and so does the top bar: ' + r.tile);
+    // a queue: megaliths bring what they stand on
+    await ev(() => document.querySelector('.kn-card[data-k="megaliths"]').click()); await frames(1);
+    r = await ev(() => ({ cls: document.querySelector('.kn-card[data-k="megaliths"]').className, st: document.querySelector('.kn-card[data-k="megaliths"] .st').textContent, btn: document.querySelector('#kn-info [data-kact="queue"]').textContent })); check(/locked/.test(r.cls) && /after /.test(r.st), 'megaliths wait on something: ' + r.st);
+    await ev(() => document.querySelector('#kn-info [data-kact="queue"]').click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { q: S.know.mind(c).q.slice(), chips: [...document.querySelectorAll('#kn-now .kn-q')].map(e => e.textContent.replace('✕', '').trim()), badges: [...document.querySelectorAll('#kn-canvas .kn-card .q')].filter(e => !e.hidden).length }; });
+    check(r.q.join(',') === 'ritual,quarrying,megaliths' && r.chips.length === 3 && r.badges === 3, `queued with what they stand on: ${r.chips.join(', ')}`);
+    await ev(() => document.querySelector('#kn-now .kn-q .x').click()); await frames(2); check((await ev(() => __G.sim.know.mind(__G.sim.playerCiv()).q.length)) === 2, 'a discovery can be taken out of the queue');
+    // a later age can be looked at but not studied
+    await ev(() => document.querySelector('.kn-card[data-k="bronze"]').click()); await frames(1);
+    r = await ev(() => ({ state: document.querySelector('#kn-info .kn-state').textContent, chips: document.querySelectorAll('#kn-info .goodchip').length, study: !!document.querySelector('#kn-info [data-kact="study"]') })); check(/Bronze Age/.test(r.state) && !r.study && r.chips >= 2, 'bronze belongs to a later age, and its page shows the goods it opens: ' + r.state);
+    await ev(() => document.querySelector('#kn-canvas .kn-era[data-e="4"]').click());
+    let sl = 0; for (let k = 0; k < 40 && sl <= 800; k++) { await wait(300); sl = await ev(() => document.getElementById('kn-scroll').scrollLeft); }      // (the tree glides there, a frame at a time: slow frames make it a slow glide)
+    check(sl > 800, `a click on an age scrolls there (${Math.round(sl)} px)`);
+    // where you stand
+    await ev(() => document.querySelector('#kn-tabs [data-ktab="stand"]').click()); await frames(2);
+    r = await ev(() => ({ rows: document.querySelectorAll('#kn-stand .kn-srow').length, world: document.querySelectorAll('#kn-stand .kn-wrow').length, me: !!document.querySelector('#kn-stand .kn-wrow.me'), age: document.querySelector('#kn-stand .kn-age').textContent, ahead: document.getElementById('kn-stand').textContent })); check(r.rows >= 3 && r.world >= 3 && r.me && /Stone Age/.test(r.age), `the standing tab lists the edges and the most learned realms (${r.rows} edges, ${r.world} realms)`); check(/ahead|behind|level/.test(r.ahead), 'and says whether the people are ahead of their age');
+    // the scholars choose for themselves; K closes
+    await ev(() => { document.querySelector('#kn-tabs [data-ktab="tree"]').click(); document.querySelector('#kn-now [data-kact="auto"]').click(); }); await frames(2); check(await ev(() => __G.sim.know.mind(__G.sim.playerCiv()).auto), 'the scholars can be left to choose');
+    await page.keyboard.press('k'); await frames(2); r = await ev(() => ({ open: document.getElementById('know').open, t1: document.getElementById('turn1').textContent })); check(!r.open && r.t1 === 'Advance', 'K closes the tree, and the turn button is Advance again: ' + r.t1);
+    await page.keyboard.press('k'); await frames(2); check(await ev(() => document.getElementById('know').open), 'K opens it'); await page.keyboard.press('Escape'); await frames(2); check(!(await ev(() => document.getElementById('know').open)), 'Esc closes it');
+    // the build panel: what is known is offered, what waits on a discovery says which, and a click goes there
+    await ev(() => { const S = __G.sim; __G.select(S.playerCiv().capital); }); await frames(2);
+    r = await ev(() => [...document.querySelectorAll('#bgrid .bq')].map(b => ({ k: b.dataset.kind, need: b.dataset.need || '', dis: b.disabled, why: b.querySelector('.why') ? b.querySelector('.why').textContent : '' })));
+    { const by = Object.fromEntries(r.map(x => [x.k, x])); check(by.farm && !by.farm.need && by.workshop && !by.workshop.need, 'farms and workshops are offered'); check(by.brewery && by.brewery.need === 'brewing' && /Needs Brewing/.test(by.brewery.why) && !by.brewery.dis, 'the brewery waits on brewing: ' + (by.brewery && by.brewery.why)); check(!by.market && !by.port && !by.academy, 'what a later age will teach is left off the list: ' + r.map(x => x.k).join()); }
+    await ev(() => document.querySelector('.bq[data-kind="brewery"]').click()); await frames(2); r = await ev(() => ({ open: document.getElementById('know').open, sel: document.querySelector('.kn-card.sel') ? document.querySelector('.kn-card.sel').dataset.k : '' })); check(r.open && r.sel === 'brewing', 'a click on it opens the tree at brewing'); await page.keyboard.press('Escape'); await frames(1);
+    // (the scenarios that follow build things: give the people what the Stone Age knows)
+    await ev(() => { const S = __G.sim; __T.teach(S.playerCiv(), 0); __G.select(S.playerCiv().capital); });
   });
 
   // ---------- turns ----------
@@ -134,11 +191,11 @@ server.listen(0, async () => {
 
   // ---------- build tools ----------
   await scenario('city: build panel lists works with cost and years, starts them, places on a plot, shows the queue', async (check) => {
-    await ev(() => { const S = __G.sim; S.playerCiv().wealth = 1e6; const c = S.playerCiv(); __G.select(c.capital); });
+    await ev(() => { const S = __G.sim; S.playerCiv().wealth = 1e6; const c = S.playerCiv(); __T.teach(c); __G.select(c.capital); });
     const cards = await ev(() => [...document.querySelectorAll('#bgrid .bq')].map(b => ({ k: b.dataset.kind, dis: b.disabled, txt: b.textContent })));
-    { const ks = cards.map(c => c.k); const must = ['farm', 'walls', 'port', 'market', 'temple', 'academy', 'workshop', 'weaver', 'brewery', 'granary', 'wonder', 'capital', 'levy']; check(must.every(k => ks.includes(k)) && ks.indexOf('farm') === 0 && ks.indexOf('levy') === ks.length - 1, 'cards listed: ' + ks.join()); check(!ks.includes('factory') && !ks.includes('refinery') && !ks.includes('lab'), 'what the age has not reached is left off the list: ' + ks.join()); }
+    { const ks = cards.map(c => c.k); const must = ['farm', 'walls', 'port', 'market', 'temple', 'workshop', 'weaver', 'brewery', 'granary', 'wonder', 'capital', 'levy']; check(must.every(k => ks.includes(k)) && ks.indexOf('farm') === 0 && ks.indexOf('levy') === ks.length - 1, 'cards listed: ' + ks.join()); check(!ks.includes('factory') && !ks.includes('refinery') && !ks.includes('lab') && !ks.includes('academy'), 'what a later age will teach is left off the list: ' + ks.join()); }
     check(!cards.find(c => c.k === 'farm').dis && !cards.find(c => c.k === 'walls').dis && !cards.find(c => c.k === 'temple').dis, 'farms, walls and temple are buildable in a village');
-    const era = await ev(() => __G.sim.playerCiv().era); const mk = cards.find(c => c.k === 'market'); check(era >= 1 ? !mk.dis : (mk.dis && /Bronze/.test(mk.txt)), era >= 1 ? 'market buildable from the Bronze Age' : 'market card says it needs the Bronze Age');
+    const era = await ev(() => __G.sim.playerCiv().era); const mk = cards.find(c => c.k === 'market'); check(era >= 1 && !mk.dis, 'a people that knows markets can raise one');
     check(/\d+ · \d+ yrs?/.test(cards.find(c => c.k === 'farm').txt), 'cards show cost and years: ' + cards.find(c => c.k === 'farm').txt);
     // farms: immediate start, shows in the queue
     await ev(() => document.querySelector('.bq[data-kind="farm"]').click()); await frames(2);
@@ -211,7 +268,7 @@ server.listen(0, async () => {
   await scenario('chronicle modal: tabs, filters, click-to-fly, close', async (check) => {
     await page.keyboard.press('c'); await frames(2);
     let r = await ev(() => ({ open: document.getElementById('chron').open, log: document.querySelectorAll('#log .fe').length, filters: document.querySelectorAll('#logfilters .btn').length }));
-    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 8, 'eight filters');
+    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 9, 'nine filters');
     await ev(() => document.querySelector('#logfilters [data-f="mine"]').click()); const mine = await ev(() => [...document.querySelectorAll('#log .fe')].every(e => e.classList.contains('mine'))); check(mine, 'Mine filter shows only own events');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="powers"]').click()); check((await ev(() => document.querySelectorAll('#powers .pw').length)) > 3, 'powers list');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="graphs"]').click()); await frames(2); check((await ev(() => { const c = document.getElementById('g-world'); return c.width > 0 && c.height > 0; })), 'graphs drawn');
@@ -322,7 +379,7 @@ server.listen(0, async () => {
     check(n.markers > 0, `goods markers drawn (${n.markers}; ${JSON.stringify(n.dbg)})`); check(n.withText > 0, 'markers carry the good\'s name this close');
   });
   await scenario('market: the board, a good and its book, a purchase, an order, the tabs', async (check) => {
-    await ev(() => { const S = __G.sim; for (const c of S.civs) if (c && c.tech < 0.2) { c.tech = 0.2; c.era = S.eraOf(c.tech); } S.playerCiv().wealth = 1e6; __G.run(60); });
+    await ev(() => { const S = __G.sim; for (const c of S.civs) if (c && c.tech < 0.2) { c.tech = 0.2; c.era = S.eraOf(c.tech); __T.teach(c); } S.playerCiv().wealth = 1e6; __G.run(60); });
     await page.keyboard.press('m'); await frames(3);
     let r = await ev(() => ({ open: document.getElementById('market').open, rows: document.querySelectorAll('#mk-table button.mk-row').length, groups: document.querySelectorAll('#mk-table .mk-group').length, tape: document.querySelectorAll('#mk-tape .mk-roll button').length, figs: document.getElementById('mk-tape').textContent, sub: document.getElementById('mk-sub').textContent, realm: __G.sim.fullName(__G.sim.playerCiv()), purse: document.getElementById('mk-purse').textContent, good: document.querySelector('#mk-good h3') ? document.querySelector('#mk-good h3').textContent : '' }));
     check(r.open, 'M opens the market'); check(r.rows >= 20 && r.groups === 4, `the board lists the goods of the age in four groups (${r.rows} rows, ${r.groups} groups)`); check(r.tape >= 6 && /World product/.test(r.figs), `the tape runs the world's prices (${r.tape} entries)`); check(r.sub.includes(r.realm) && /\d/.test(r.purse), 'the head names the realm and its treasury: ' + r.sub + ' / ' + r.purse); check(r.good.length > 2, 'a good is open: ' + r.good);
@@ -406,7 +463,8 @@ server.listen(0, async () => {
   await scenario('render: six regions at town height draw towns of their own culture', async (check) => {
     const spots = [[2.3, 48.8, 'north'], [31.25, 29.9, 'mena'], [108.9, 34.3, 'easia'], [-99.1, 19.4, 'america'], [77.2, 28.6, 'sasia'], [3.9, 6.5, 'africa']];
     for (const [lon, lat, cul] of spots) {
-      const r = await ev(([lon, lat]) => { const S = __G.sim; const i = (() => { const x = Math.floor((lon + 180) / 360 * 720), y = Math.floor((90 - lat) / 180 * 360); return y * 720 + x; })(); let c = S.civs[S.owner[i]]; if (!c) { c = S.land[i] ? S.spawnTribe(i, {}) : null; for (let d = 1; d <= 6 && !c; d++) for (let dy = -d; dy <= d && !c; dy++) for (let dx = -d; dx <= d && !c; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue; const j = i + dy * 720 + dx; if (j < 0 || j >= S.N || !S.land[j]) continue; c = S.owner[j] >= 0 ? S.civs[S.owner[j]] : S.spawnTribe(j, {}); } } if (!c) return { none: true }; c.tech = 0.45; S.pop[c.capital] = 30; __G.run(3); __G.world.refreshTextures(); const [sl, sa] = __G.world.siteOf(c.capital); __T.cam(sl + 0.003, sa - 0.003, 0.0003, 1.0, 0.4); return { culture: TOWN.CULTURES[TOWN.civCulture(S, c)], cap: c.capital }; }, [lon, lat]);
+      const r = await ev(([lon, lat, cul]) => { const S = __G.sim; const i = (() => { const x = Math.floor((lon + 180) / 360 * 720), y = Math.floor((90 - lat) / 180 * 360); return y * 720 + x; })(); let c = S.civs[S.owner[i]]; if (!c) { c = S.land[i] ? S.spawnTribe(i, {}) : null; for (let d = 1; d <= 6 && !c; d++) for (let dy = -d; dy <= d && !c; dy++) for (let dx = -d; dx <= d && !c; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue; const j = i + dy * 720 + dx; if (j < 0 || j >= S.N || !S.land[j]) continue; c = S.owner[j] >= 0 ? S.civs[S.owner[j]] : S.spawnTribe(j, {}); } } if (c && S.land[i] && TOWN.CULTURES[TOWN.civCulture(S, c)] !== cul) { S.owner[i] = -1; c = S.spawnTribe(i, {}) || c; }      // (an empire from elsewhere may hold the place by now: the test wants a people of the place itself)
+      if (!c) return { none: true }; c.tech = 0.45; S.pop[c.capital] = 30; __G.run(3); __G.world.refreshTextures(); const [sl, sa] = __G.world.siteOf(c.capital); __T.cam(sl + 0.003, sa - 0.003, 0.0003, 1.0, 0.4); return { culture: TOWN.CULTURES[TOWN.civCulture(S, c)], cap: c.capital }; }, [lon, lat, cul]);
       if (r.none) { check(false, `${cul}: no realm could be placed`); continue; }
       await wait(2500); await frames(6);
       const b = await ev(() => ({ n: __G.world.buildingCount, kinds: Object.keys(__G.world.inst).filter(k => __G.world.inst[k].count > 0) }));

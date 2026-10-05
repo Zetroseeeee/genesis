@@ -9,7 +9,7 @@
   const P = Object.assign({ lon: 31.25, lat: 29.9, tech: 0, years: 7600, tab: 'board', good: 'tin', lens: false, alt: 3200000 }, window.__scene || {});
   if (!G.sim.playerCiv || !G.sim.playerCiv()) G.start(P.lon, P.lat, 'Kemet');
   const S = G.sim, c = S.playerCiv(); G.mapcam.fly = null;
-  for (const o of S.civs) if (o && o.tech < P.tech) { o.tech = P.tech; o.era = S.eraOf(o.tech); }
+  for (const o of S.civs) if (o && o.tech < P.tech) { o.tech = P.tech; o.era = S.eraOf(o.tech); if (window.__T && __T.teach) __T.teach(o); }
   c.wealth += 5000; if (P.ind) S.ind.set(c.capital, Uint8Array.from(P.ind));
   G.run(P.years);
   const intro = document.getElementById('intro'); if (intro) intro.hidden = true;

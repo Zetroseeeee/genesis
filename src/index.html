@@ -67,7 +67,7 @@
   /* ---------- overlay grid ---------- */
   #overlay { position: fixed; inset: 0; pointer-events: none; z-index: 5; padding: max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); box-sizing: border-box; }
   #overlay > * { pointer-events: auto; position: absolute; }
-  #tl { top: max(10px, env(safe-area-inset-top, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; gap: var(--gap); align-items: flex-start; max-width: min(760px, calc(100vw - 420px)); }
+  #tl { top: max(10px, env(safe-area-inset-top, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; gap: var(--gap); align-items: flex-start; max-width: min(860px, calc(100vw - 420px)); }
   #identity { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 10px; }
   #identity .sw { width: 12px; height: 26px; border-radius: 2px; background: #5b6779; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25); flex: none; }
   #identity .name { font-family: var(--display); font-size: calc(20px * var(--ui-scale)); font-weight: 600; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
@@ -211,6 +211,7 @@
   .bq .why { font-size: 10px; color: var(--text-3); line-height: 1.2; }
   .bq:hover:not(:disabled) { background: rgb(214 178 94 / 0.12); border-color: var(--gold); }
   .bq.on { background: rgb(214 178 94 / 0.18); border-color: var(--gold); color: var(--gold-2); }
+  .bq.need { border-style: dashed; } .bq.need > svg, .bq.need .n, .bq.need .m { opacity: 0.5; } .bq.need .why { color: #A9D0FA; } .bq.need:hover { border-color: var(--sci); background: rgb(93 169 245 / 0.10); }
   .bq.pulse { animation: bqpulse 1.2s ease-in-out 3; }
   @keyframes bqpulse { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 0 2px var(--gold); } }
   .bq:disabled { cursor: not-allowed; color: var(--text-3); }
@@ -581,6 +582,96 @@
   .mk-bar { position: relative; display: block; height: 8px; border-radius: 4px; background: rgb(255 255 255 / 0.08); }
   .mk-bar i { display: block; height: 100%; border-radius: 4px; background: var(--prod); max-width: 100%; }
   .mk-bar em { position: absolute; right: 0; top: -15px; font-style: normal; font-size: 11px; color: var(--text-3); }
+
+  /* ----- the knowledge screen (tree.js) ----- */
+  #know .modal { width: min(1480px, calc(100vw - 32px)); height: calc(100vh - 64px); }
+  .b-land { --bc: var(--food); } .b-craft { --bc: var(--prod); } .b-trade { --bc: var(--coin); } .b-war { --bc: var(--mil); } .b-state { --bc: var(--cul); } .b-mind { --bc: var(--sci); }
+  #kn-rate { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-variant-numeric: tabular-nums lining-nums; margin-right: 6px; white-space: nowrap; }
+  #kn-rate svg { width: 16px; height: 16px; color: var(--sci); } #kn-rate span { font-size: var(--fs-cap); color: var(--text-2); font-weight: 500; }
+  .kn-now { display: flex; align-items: center; gap: 14px; padding: 0 14px; min-height: 44px; border-bottom: 1px solid var(--rule); background: rgb(0 0 0 / 0.24); flex: none; font-size: var(--fs-cap); }
+  .kn-cur { display: inline-flex; align-items: center; gap: 10px; appearance: none; background: none; border: 0; color: var(--text); font: inherit; cursor: pointer; padding: 6px 0; white-space: nowrap; flex: none; }
+  .kn-cur b { font-size: var(--fs-body); font-weight: 600; } .kn-cur.idle { cursor: default; } .kn-cur.idle b { color: var(--warn); }
+  .kn-cur:focus-visible { outline: 2px solid var(--select); outline-offset: 2px; }
+  .kn-prog { display: inline-block; width: 150px; height: 6px; border-radius: 3px; background: rgb(255 255 255 / 0.1); overflow: hidden; } .kn-prog i { display: block; height: 100%; background: var(--sci); }
+  .kn-queue { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .kn-q { display: inline-flex; border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; flex: none; }
+  .kn-q button { appearance: none; background: none; border: 0; color: var(--text-2); font: inherit; padding: 3px 8px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .kn-q button:hover { color: var(--text); } .kn-q button i { font-style: normal; color: var(--gold-2); font-weight: 700; } .kn-q .x { padding: 3px 8px 3px 2px; color: var(--text-3); }
+  .kn-auto { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); cursor: pointer; white-space: nowrap; flex: none; } .kn-auto input { accent-color: var(--gold); }
+  .kn-body { flex: 1 1 auto; min-height: 0; display: flex; } .kn-body > section { flex: 1; min-width: 0; min-height: 0; }
+  .kn-tree { display: grid; grid-template-columns: minmax(0, 1fr) 348px; }
+  .kn-scroll { overflow: auto; position: relative; cursor: grab; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.18) transparent; background: rgb(9 13 19); }
+  .kn-scroll.drag { cursor: grabbing; user-select: none; }
+  .kn-canvas { display: flex; width: max-content; position: relative; }
+  .kn-side { position: sticky; left: 0; z-index: 4; width: 132px; flex: none; background: rgb(15 20 28); border-right: 1px solid var(--rule); }
+  .kn-corner { position: sticky; top: 0; height: 40px; background: rgb(15 20 28); border-bottom: 1px solid var(--rule); z-index: 1; box-sizing: border-box; }
+  .kn-br { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 12px; box-sizing: border-box; border-top: 1px solid var(--rule); }
+  .kn-br svg { width: 20px; height: 20px; color: var(--bc); }
+  .kn-br b { font-family: var(--display); font-size: calc(15px * var(--ui-scale)); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
+  .kn-br small { font-family: var(--serif); font-style: italic; font-size: 12px; color: var(--text-3); line-height: 1.25; }
+  .kn-field { position: relative; flex: none; }
+  .kn-eras { position: sticky; top: 0; height: 40px; z-index: 3; background: rgb(15 20 28); border-bottom: 1px solid var(--rule); box-sizing: border-box; }
+  .kn-era { position: absolute; top: 0; height: 39px; box-sizing: border-box; appearance: none; background: none; border: 0; border-left: 1px solid var(--rule); color: var(--text-2); font: inherit; cursor: pointer; text-align: left; padding: 0 20px; display: flex; align-items: center; gap: 12px; }
+  .kn-era b { font-family: var(--display); font-size: calc(14px * var(--ui-scale)); letter-spacing: 0.16em; text-transform: uppercase; font-weight: 600; white-space: nowrap; }
+  .kn-era small { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+  .kn-era.now b { color: var(--gold-2); } .kn-era.later b { color: var(--text-3); } .kn-era:hover b { color: var(--text); }
+  .kn-era:focus-visible { outline: 2px solid var(--select); outline-offset: -2px; }
+  .kn-col { position: absolute; top: 0; border-left: 1px solid var(--rule); box-sizing: border-box; pointer-events: none; }
+  .kn-col.now { background: linear-gradient(180deg, rgb(214 178 94 / 0.09), rgb(214 178 94 / 0.025)); } .kn-col.later { background: rgb(0 0 0 / 0.24); }
+  .kn-band { position: absolute; left: 0; background: rgb(255 255 255 / 0.02); pointer-events: none; }
+  .kn-lines { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .kn-lines path { fill: none; stroke: rgb(255 255 255 / 0.11); stroke-width: 1.4; }
+  .kn-lines path.have { stroke: rgb(214 178 94 / 0.38); } .kn-lines path.hot { stroke: var(--gold-2); stroke-width: 1.9; } .kn-lines path.lead { stroke: rgb(127 227 255 / 0.72); stroke-width: 1.5; }
+  .kn-card { position: absolute; width: 184px; height: var(--kn-ch, 44px); box-sizing: border-box; display: grid; grid-template-columns: 30px minmax(0, 1fr); grid-template-rows: 1fr 1fr; column-gap: 8px; align-items: center; padding: 3px 8px 3px 7px; border: 1px solid var(--rule); border-top-color: var(--edge-hi); border-radius: var(--radius); background: rgb(22 29 41); color: var(--text); font: inherit; text-align: left; cursor: pointer; overflow: hidden; z-index: 1; }
+  .kn-card .ic { grid-row: 1 / 3; width: 30px; height: 30px; border-radius: 3px; display: grid; place-items: center; background: rgb(255 255 255 / 0.06); color: var(--bc); }
+  .kn-card .ic svg { width: 19px; height: 19px; }
+  .kn-card .nm { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: end; line-height: 1.2; }
+  .kn-card .st { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: start; font-variant-numeric: tabular-nums lining-nums; line-height: 1.35; }
+  .kn-card .bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--sci); }
+  .kn-card .q { position: absolute; right: 5px; top: 5px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--gold); color: #1c1200; font-style: normal; font-weight: 700; font-size: 10.5px; display: grid; place-items: center; padding: 0 4px; box-sizing: border-box; }
+  .kn-card:hover { border-color: var(--gold); } .kn-card:focus-visible { outline: 2px solid var(--select); outline-offset: 2px; }
+  .kn-card.known { background: linear-gradient(90deg, rgb(214 178 94 / 0.22), rgb(214 178 94 / 0.08)), rgb(22 29 41); border-color: rgb(214 178 94 / 0.5); } .kn-card.known .st { color: var(--gold-2); }
+  .kn-card.study { border-color: var(--sci); box-shadow: 0 0 0 1px var(--sci), 0 0 16px rgb(93 169 245 / 0.28); } .kn-card.study .st { color: #A9D0FA; }
+  .kn-card.open { background: rgb(31 41 57); border-color: rgb(255 255 255 / 0.24); } .kn-card.open .st { color: var(--text-2); }
+  .kn-card.open.now .st { color: var(--pos); }
+  .kn-card.locked { background: rgb(18 24 34); border-color: rgb(255 255 255 / 0.06); } .kn-card.locked > span { opacity: 0.6; }
+  .kn-card.later { background: rgb(15 20 29); border-color: rgb(255 255 255 / 0.07); } .kn-card.later > span { opacity: 0.48; }
+  .kn-card.sel { outline: 2px solid var(--select); outline-offset: 1px; } .kn-card.sel > span { opacity: 1; }
+  .kn-canvas.tight .kn-card { padding: 2px 8px 2px 7px; } .kn-canvas.tight .kn-card .ic { width: 26px; height: 26px; } .kn-canvas.tight .kn-card .ic svg { width: 17px; height: 17px; }
+  .kn-canvas.tight .kn-card .nm { line-height: 1.15; } .kn-canvas.tight .kn-card .st { line-height: 1.25; }
+  .kn-info { border-left: 1px solid var(--rule); overflow-y: auto; padding: 16px 16px 22px; display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.15) transparent; }
+  .kn-info > * { flex: none; }
+  .kn-head { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; align-items: center; }
+  .kn-head .ic { width: 44px; height: 44px; border-radius: 4px; display: grid; place-items: center; background: rgb(255 255 255 / 0.06); color: var(--bc); } .kn-head .ic svg { width: 28px; height: 28px; }
+  .kn-head h3 { margin: 0; font-family: var(--display); font-size: calc(21px * var(--ui-scale)); font-weight: 600; letter-spacing: 0.04em; line-height: 1.15; }
+  .kn-head .micro { text-transform: none; letter-spacing: 0.01em; font-weight: 400; }
+  .kn-text { margin: 0; font-family: var(--serif); font-style: italic; font-size: 14px; line-height: 1.55; color: var(--text-2); }
+  .kn-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .kn-state { font-size: var(--fs-cap); color: var(--text-2); line-height: 1.45; } .kn-state.known { color: var(--gold-2); } .kn-state.study { color: #A9D0FA; }
+  .kn-sect { display: flex; flex-direction: column; gap: 6px; }
+  .kn-gives { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; }
+  .kn-gives li { padding-left: 14px; position: relative; } .kn-gives li::before { content: ''; position: absolute; left: 0; top: 0.68em; width: 6px; height: 2px; background: var(--gold); }
+  .kn-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .kn-chip { appearance: none; background: rgb(255 255 255 / 0.04); border: 1px solid var(--rule); border-radius: 12px; color: var(--text-2); font: inherit; font-size: var(--fs-cap); padding: 3px 10px; cursor: pointer; }
+  .kn-chip:hover { border-color: var(--gold); color: var(--text); } .kn-chip.known { border-color: rgb(214 178 94 / 0.5); color: var(--gold-2); } .kn-chip.study { border-color: var(--sci); color: #A9D0FA; }
+  .kn-chip:focus-visible { outline: 2px solid var(--select); outline-offset: 2px; }
+  .kn-who { font-size: var(--fs-cap); color: var(--text-3); line-height: 1.5; }
+  #know .linkish { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--gold-2); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-align: left; }
+  #know .goodchip[data-good] { cursor: pointer; } #know .goodchip[data-good]:hover { border-color: var(--gold); } #know .goodchip svg { fill: none; }
+  #kn-stand:focus, dialog > .modal:focus { outline: none; }
+  #kn-stand { overflow-y: auto; padding: 16px 18px 24px; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.15) transparent; }
+  .kn-cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; }
+  .kn-note { margin: 0; font-size: var(--fs-cap); color: var(--text-2); line-height: 1.5; max-width: 64ch; }
+  .kn-age { display: grid; grid-template-columns: auto minmax(60px, 1fr) auto; gap: 12px; align-items: center; padding: 8px 0 10px; border-bottom: 1px solid var(--rule); font-size: 13px; }
+  .kn-age b { font-family: var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold-2); font-weight: 600; } .kn-age .kn-prog { width: auto; } .kn-age .kn-prog i { background: var(--gold); }
+  .kn-srow { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(110px, 1fr) 138px; gap: 12px; align-items: center; padding: 5px 0; font-size: 13px; border-bottom: 1px solid rgb(255 255 255 / 0.04); } .kn-srow .num { text-align: right; font-size: 12px; }
+  .kn-sbar { position: relative; height: 8px; border-radius: 4px; background: rgb(255 255 255 / 0.07); } .kn-sbar::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: rgb(255 255 255 / 0.4); }
+  .kn-sbar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; } .kn-sbar i.up { background: var(--pos); } .kn-sbar i.dn { background: var(--neg); }
+  .kn-wrow { display: grid; grid-template-columns: 10px minmax(0, 1.2fr) minmax(70px, 1fr) 34px; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; } .kn-wrow > i { width: 10px; height: 10px; border-radius: 2px; }
+  .kn-wrow span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .kn-wrow b { text-align: right; font-weight: 600; } .kn-wrow.me span:nth-child(2) { color: var(--gold-2); font-weight: 600; }
+  .kn-wbar { height: 6px; border-radius: 3px; background: rgb(255 255 255 / 0.07); overflow: hidden; } .kn-wbar i { display: block; height: 100%; opacity: 0.85; }
+  .kn-frow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 84px; gap: 10px; padding: 4px 0; font-size: 13px; color: var(--text-2); } .kn-frow span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .kn-frow .num { text-align: right; color: var(--text-3); } .kn-frow.me span { color: var(--gold-2); }
+  @media (max-width: 900px) { .kn-tree { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(120px, 44%); } .kn-info { border-left: 0; border-top: 1px solid var(--rule); } .kn-cols { grid-template-columns: minmax(0, 1fr); } .kn-auto { display: none; } .kn-prog { width: 70px; } }
   .mk-bar.ok i { background: var(--pos); } .mk-bar.low i { background: var(--warn); } .mk-bar.bad i { background: var(--neg); }
   .mk-idle { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: var(--fs-cap); color: var(--text-3); padding-top: 10px; }
   .mk-two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-bottom: 6px; }
@@ -675,6 +766,7 @@
           <div class="slider"><span class="micro">Research</span><input type="range" id="pol-research" min="0.5" max="2" step="0.1" value="1"><span class="num" id="pol-research-v">1.0</span></div>
           <div class="slider"><span class="micro">Military</span><input type="range" id="pol-military" min="0.5" max="2" step="0.1" value="1"><span class="num" id="pol-military-v">1.0</span></div>
           <div class="slider"><span class="micro">Taxes</span><input type="range" id="pol-tax" min="0.5" max="2" step="0.1" value="1"><span class="num" id="pol-tax-v">1.0</span></div>
+          <div class="hint">Research is what you pay your scholars: twice the coin brings half as much insight again. Military is paid the same way. Heavy taxes slow growth and try your people's patience.</div>
           <div class="seg"><button class="btn stance" data-stance="consolidate">Consolidate</button><button class="btn stance on" data-stance="steady">Steady</button><button class="btn stance" data-stance="aggressive">Aggressive</button></div>
           <div class="hint">Consolidate: no automatic spread, you settle by hand. Aggressive: fast spread, stability suffers.</div>
           <div class="row" style="flex-wrap:nowrap"><input type="text" id="in-name" placeholder="Rename your state" aria-label="State name"><button class="btn" id="btn-rename">Set</button></div>
@@ -689,6 +781,7 @@
     <button class="btn ghost" id="l-city" title="Your capital: build and manage (B)"><svg viewBox="0 0 24 24"><path d="M4 21V9h3V6h3v3h4V6h3v3h3v12z"/><path d="M10 21v-5h4v5"/></svg>City</button>
     <button class="btn ghost" id="l-empire" title="Your realm: settlements and policy (R)"><svg viewBox="0 0 24 24"><path d="M4 20h16M6 20V9l6-5 6 5v11M10 20v-6h4v6"/></svg>Realm</button>
     <button class="btn ghost" id="l-market" title="Goods, prices, trade and workshops (M)"><svg viewBox="0 0 24 24"><path d="M4 19V9M9 19V5M14 19v-7M19 19V8"/><path d="M3 19h18"/></svg>Market</button>
+    <button class="btn ghost" id="l-know" title="What your people know and what they study (K)"><svg viewBox="0 0 24 24"><path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/></svg>Knowledge</button>
     <button class="btn ghost" id="l-expand" title="Settle new land touching your border"><svg viewBox="0 0 24 24"><path d="M6 21V4h10l-2 3 2 3H6"/></svg>Expand</button>
     <button class="btn ghost" id="l-chronicle" title="World history, powers and graphs (C)"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>Chronicle</button>
     <button class="btn ghost" id="l-build" title="God powers (G)"><svg viewBox="0 0 24 24"><path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/></svg>Powers</button>
@@ -758,7 +851,7 @@
   </div>
 </div></dialog>
 
-<dialog id="market"><div class="modal panel">
+<dialog id="market"><div class="modal panel" tabindex="-1">
   <div class="phead"><h2 class="display">Market</h2><span class="micro" id="mk-sub"></span><span id="mk-purse"></span><button class="btn icon ghost" id="mk-close" title="Close (Esc)">✕</button></div>
   <div class="mk-tape" id="mk-tape"></div>
   <div class="tabs" id="mk-tabs"><button class="on" data-mtab="board">Goods</button><button data-mtab="trade">Trade</button><button data-mtab="works">Workshops</button><button data-mtab="ledger">Ledger</button></div>
@@ -767,6 +860,16 @@
     <section data-mpane="trade" id="mk-trade" hidden></section>
     <section data-mpane="works" id="mk-works" hidden></section>
     <section data-mpane="ledger" id="mk-ledger" hidden></section>
+  </div>
+</div></dialog>
+
+<dialog id="know"><div class="modal panel">
+  <div class="phead"><h2 class="display">Knowledge</h2><span class="micro" id="kn-sub"></span><span id="kn-rate"></span><button class="btn icon ghost" id="kn-close" title="Close (Esc)">✕</button></div>
+  <div class="kn-now" id="kn-now"></div>
+  <div class="tabs" id="kn-tabs"><button class="on" data-ktab="tree">Discoveries</button><button data-ktab="stand">Where you stand</button></div>
+  <div class="kn-body">
+    <section data-kpane="tree" class="kn-tree"><div class="kn-scroll" id="kn-scroll"><div class="kn-canvas" id="kn-canvas"></div></div><aside class="kn-info" id="kn-info"></aside></section>
+    <section data-kpane="stand" id="kn-stand" tabindex="-1" hidden></section>
   </div>
 </div></dialog>
 
@@ -826,6 +929,7 @@
 <script src="geo.js"></script>
 <script src="shadows.js"></script>
 <script src="econ.js"></script>
+<script src="know.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -841,4 +945,5 @@
 <script src="movers.js"></script>
 <script src="events.js"></script>
 <script src="market.js"></script>
+<script src="tree.js"></script>
 <script src="main.js"></script>

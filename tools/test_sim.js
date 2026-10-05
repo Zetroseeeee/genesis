@@ -4,6 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -13,6 +14,8 @@ for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.dat
 const fails = []; let checks = 0; const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null; const want = (n) => !ONLY || ONLY.includes(String(n));
 function check(cond, msg) { checks++; if (!cond) { fails.push(msg); console.log('  FAIL', msg); } }
 const t0 = Date.now(); const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...a);
+// give a realm every discovery up to an age, and any others by name (the tests set `tech` by hand: this is the knowledge that goes with it)
+const teach = (sim, c, upto, keys) => { for (const D of window.KNOW.LIST) if ((upto !== undefined && D.era <= upto) || (keys && keys.includes(D.key))) sim.know.learn(c.id, c, D.id, true); sim.know.lastT[c.id] = c.tech; sim.know.pool[c.id] = 0; };
 
 function invariants(sim, tag) {
   let badPop = 0, badOwner = 0, badLevel = 0, orphanOwner = 0, nanCount = 0;
@@ -80,6 +83,10 @@ log('2. player actions and god powers');
   c.wealth = 1e6;
   const near = (() => { const y = (i0 / W) | 0, x = i0 - y * W; return [-1, 1].map(d => y * W + x + d).find(j => sim.land[j] && sim.owner[j] < 0); })();
   const r = {};
+  // a people that knows nothing can raise nothing: each work waits on its discovery
+  r.farm0 = sim.act('farm', i0); check(/Needs Farming/.test(r.farm0) && sim.needFor('farm', i0).key === 'farming', `no fields before farming: "${r.farm0}"`);
+  r.levy0 = sim.act('levy', -1); check(/Needs Chieftains/.test(r.levy0), `no levy before there is someone to call it: "${r.levy0}"`);
+  teach(sim, c, 0);
   r.settleFar = sim.act('settle', sim.LI[sim.LI.length - 5]); check(/touch|border|Not|cannot|reach/i.test(r.settleFar) || !/^Settled/.test(r.settleFar), `settle far away should fail: "${r.settleFar}"`);
   if (near !== undefined) { r.settle = sim.act('settle', near); check(/^Settled/.test(r.settle), `settle adjacent: "${r.settle}"`); }
   // works take years: pay now, the effect lands when the site is finished
@@ -88,6 +95,8 @@ log('2. player actions and god powers');
   r.farm2 = sim.act('farm', i0); check(/Already being built/.test(r.farm2), `no second farm site at once: "${r.farm2}"`);
   r.develop = sim.act('develop', i0); check(/Already being built/.test(r.develop), 'develop is the old name for farm');
   finish(sim.durOf('farm', c.era) + 1); check(sim.infra[i0] === 1 && !sim.inProgress(i0, 'farm'), `farm finished after its years (infra ${sim.infra[i0]})`);
+  sim.act('farm', i0); finish(sim.durOf('farm', c.era) + 1); r.farm3 = sim.act('farm', i0); check(sim.infra[i0] === 2 && /Needs Irrigation/.test(r.farm3), `the third level of farms waits on irrigation: "${r.farm3}"`);
+  teach(sim, c, undefined, ['irrigation', 'rotation', 'sciencefarming', 'masonry', 'castles', 'sailing', 'boats']);
   for (let k = 0; k < 6; k++) { sim.act('farm', i0); finish(sim.durOf('farm', c.era) + 1); } r.farmCap = sim.act('farm', i0); check(/Fully farmed/.test(r.farmCap) && sim.infra[i0] === 5, `farm cap: infra ${sim.infra[i0]} "${r.farmCap}"`);
   r.walls = sim.act('walls', i0); check(/Walls under construction/.test(r.walls) && sim.walls[i0] === 0, `walls start: "${r.walls}"`); finish(sim.durOf('walls', c.era) + 1); check(sim.walls[i0] === 1, 'walls level 1 after construction');
   for (let k = 0; k < 4; k++) { sim.act('walls', i0); finish(sim.durOf('walls', c.era) + 1); } r.wallsCap = sim.act('fortify', i0); check(sim.walls[i0] === 3 && /Fully fortified/.test(r.wallsCap), `walls cap: ${sim.walls[i0]} "${r.wallsCap}"`);
@@ -96,12 +105,12 @@ log('2. player actions and god powers');
   r.temple = sim.act('temple', i0, 5); check(/Temple under construction/.test(r.temple) && sim.inProgress(i0, 'temple').slot === 5, `temple on plot 5: "${r.temple}"`);
   check(sim.freeSlots(i0).length === sim.NSLOTS - 1 && !sim.freeSlots(i0).includes(5), 'the plot is taken while the temple is being built');
   finish(sim.durOf('temple', c.era) + 1); check((sim.special[i0] & 4) && sim.slotOf(i0, 'temple') === 5, 'temple finished on its plot');
-  r.market0 = sim.act('market', i0); check(/Bronze Age/.test(r.market0), `market in the Stone Age refused: "${r.market0}"`);
-  c.tech = 0.1; c.era = sim.eraOf(c.tech);
+  r.market0 = sim.act('market', i0); check(/Needs Markets/.test(r.market0), `market before markets are known refused: "${r.market0}"`);
+  c.tech = 0.1; c.era = sim.eraOf(c.tech); teach(sim, c, 1);
   r.market = sim.act('market', i0, 5); check(/Market under construction/.test(r.market) && sim.inProgress(i0, 'market').slot !== 5, `market picks another plot when 5 is taken: "${r.market}"`); finish(sim.durOf('market', c.era) + 1); check(!!(sim.special[i0] & 8), 'market bit set');
-  r.academy0 = sim.act('academy', i0); check(/town or city|Classical/.test(r.academy0), `academy refused early: "${r.academy0}"`);
+  r.academy0 = sim.act('academy', i0); check(/Needs Philosophy/.test(r.academy0), `academy refused early: "${r.academy0}"`);
   sim.pop[i0] = 50; sim.tick(); check(sim.level[i0] >= 2, `village grew to a town with 50k people (level ${sim.level[i0]})`);
-  c.tech = 0.31; c.era = sim.eraOf(c.tech);
+  c.tech = 0.31; c.era = sim.eraOf(c.tech); teach(sim, c, 3);
   r.academy = sim.act('academy', i0); check(/Academy under construction/.test(r.academy), `academy: "${r.academy}"`); finish(sim.durOf('academy', c.era) + 1); check(!!(sim.special[i0] & 2), 'academy bit set');
   r.wonder = sim.act('wonder', i0); check(/Wonder under construction/.test(r.wonder) && !(sim.special[i0] & 16), `wonder starts: "${r.wonder}"`);
   r.wonder2 = sim.act('wonder', i0); check(/Already being built/.test(r.wonder2), `second wonder refused while building: "${r.wonder2}"`);
@@ -222,7 +231,7 @@ log('6. rulers and trade goods');
   // save/load keeps the ruler's personality
   const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, s.seed || 1); sim2.load(s); const p2 = sim2.playerCiv(); check(p2.ruler.trait === c.ruler.trait && p2.ruler.seed === c.ruler.seed, 'ruler personality survives save/load');
   // an old save without personalities still works
-  for (const cv of s.civs) if (cv) { delete cv.ruler.trait; delete cv.trade; } delete s.econ; delete s.ind; const sim3 = createSim(wd, 1); sim3.load(s); sim3.tick(); check(sim3.playerCiv().trade.living >= 0 && sim3.playerCiv().ruler.name, 'a save from before personalities and markets loads and ticks');
+  for (const cv of s.civs) if (cv) { delete cv.ruler.trait; delete cv.trade; delete cv.know; } delete s.econ; delete s.ind; delete s.know; const sim3 = createSim(wd, 1); sim3.load(s); sim3.tick(); check(sim3.playerCiv().trade.living >= 0 && sim3.playerCiv().ruler.name, 'a save from before personalities and markets loads and ticks');
 }
 }
 if (want(7)) {
@@ -232,6 +241,7 @@ log('7. construction, growth and the planner');
   const T = window.TOWN; const sim = createSim(wd, 77);
   const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Builders', null); for (let k = 0; k < 24; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
   for (const cv of sim.civs) if (cv) { cv.tech = 0.1; cv.era = sim.eraOf(cv.tech); cv.eraSince = sim.year - 300; cv.wealth = 400; }
+  teach(sim, c, 1);
   // the AI builds through the same sites the player uses
   let sitesSeen = 0, kinds = new Set(); for (let y = 0; y < 600; y++) { sim.tick(); for (const [i, l] of sim.works) if (sim.owner[i] !== c.id) { sitesSeen++; for (const w of l) kinds.add(w.k); } }
   check(sitesSeen > 0, `AI realms raise works through construction sites (${sitesSeen} site-years, kinds ${[...kinds].join('/')})`);
@@ -240,7 +250,7 @@ log('7. construction, growth and the planner');
   const k1 = T.scaleOf(100), k2 = T.scaleOf(1000), k3 = T.scaleOf(9000); check(k1 > 15 && k2 > 8 && k2 < 12 && k3 > 2 && k3 < 3, `representational scale tapers (${k1.toFixed(1)}, ${k2.toFixed(1)}, ${k3.toFixed(1)})`);
   check(T.radiusM(sim, i0, c) < 26000, `no town is drawn wider than its region (${(T.radiusM(sim, i0, c) / 1000).toFixed(1)} km)`);
   // growth: a jump in people opens a ring of building sites that close over the years
-  c.wealth = 1e6; c.tech = 0.26; c.era = sim.eraOf(c.tech); c.eraSince = sim.year - 300; sim.bonusFert[i0] = 0.6; sim.tick(); // room to grow: better land, better knowledge
+  c.wealth = 1e6; c.tech = 0.26; c.era = sim.eraOf(c.tech); c.eraSince = sim.year - 300; teach(sim, c, 2); sim.bonusFert[i0] = 0.6; sim.tick(); // room to grow: better land, better knowledge
   sim.pop[i0] = Math.min(sim.pop[i0] * 1.6, sim.capacity(i0, c) * 0.9); sim.tick();
   check(sim.year - sim.gYear[i0] <= 1 && sim.gBand[i0] > sim.gPrev[i0], `growth band recorded (band ${sim.gBand[i0]} from ${sim.gPrev[i0]}, ${sim.year - sim.gYear[i0]} yrs ago; pop ${sim.pop[i0].toFixed(2)} of ${sim.capacity(i0, c).toFixed(2)})`);
   const L0 = T.layout(sim, i0, c, {}); const n0 = L0.items.length; let maxSites = 0; for (let y = 0; y < 14; y++) { sim.tick(); const L = T.layout(sim, i0, c, {}); maxSites = Math.max(maxSites, L.items.filter(it => it.prog !== undefined).length); }
@@ -249,9 +259,11 @@ log('7. construction, growth and the planner');
   // a work in progress shows up in the plan at its plot, growing with the years
   sim.act('temple', i0, 4); sim.tick(); sim.tick(); const Lw = T.layout(sim, i0, c, {}); const site = Lw.items.find(it => it.prog !== undefined && (it.style & 1024)); check(!!site && site.prog < 1, `the temple site is in the plan (prog ${site && site.prog.toFixed(2)})`); check(Lw.plots[4].used, 'plot 4 is marked used');
   // an era change rebuilds the town over the decades, never all at once
-  c.tech = 0.43; c.era = 4; c.eraSince = sim.year; sim.tick(); const La = T.layout(sim, i0, c, {}); const oldKinds = (L) => L.items.filter(it => it.prog === undefined && it.style % 8 !== 3 && !(it.style & 1024) && ['adobe', 'longhouse', 'courtyard', 'hut', 'gable', 'hip', 'tenement'].includes(it.kind)).length; // non-stone houses: what the Classical town was built of
+  // (in the first age in which this people builds anew: where the old ways last, a new age changes nothing in a town)
+  let e1 = 3; while (e1 < 8 && T.styleEra(e1, c.culture) === T.styleEra(e1 - 1, c.culture)) e1++;
+  c.tech = sim.ERAS[e1][1] + 0.01; c.era = e1; c.eraSince = sim.year; teach(sim, c, e1); sim.tick(); const La = T.layout(sim, i0, c, {}); const oldKinds = (L) => L.items.filter(it => it.prog === undefined && it.style % 8 !== 3 && !(it.style & 1024) && ['adobe', 'longhouse', 'courtyard', 'hut', 'gable', 'hip', 'tenement'].includes(it.kind)).length; // non-stone houses: what the Classical town was built of
   const before = oldKinds(La); for (let y = 0; y < 30; y++) sim.tick(); const Lb = T.layout(sim, i0, c, {}); for (let y = 0; y < 40; y++) sim.tick(); const Lc = T.layout(sim, i0, c, {});
-  log(`   era wave: ${before} old houses at the start, ${oldKinds(Lb)} after 30 years, ${oldKinds(Lc)} after 70; sites mid-way ${Lb.items.filter(it => it.prog !== undefined).length}`);
+  log(`   era wave (${sim.ERAS[e1][0]}): ${before} old houses at the start, ${oldKinds(Lb)} after 30 years, ${oldKinds(Lc)} after 70; sites mid-way ${Lb.items.filter(it => it.prog !== undefined).length}`);
   check(Lb.items.filter(it => it.prog !== undefined).length > 0 || oldKinds(Lb) < before, 'the new age shows rebuilding sites or renewed houses mid-way');
   // save/load keeps sites, plots and growth
   sim.act('walls', i0); const sv = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, sv.seed || 1); sim2.load(sv);
@@ -276,6 +288,7 @@ log('8. the market');
   const sim = createSim(wd, 77); const M = sim.market; const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2));
   const c = sim.setPlayer(i0, 'Merchants', null); for (let k = 0; k < 30; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
   for (const cv of sim.civs) if (cv) { cv.tech = 0.2; cv.era = sim.eraOf(cv.tech); }
+  teach(sim, c, 2);
   let tM = 0, nM = 0; { const st0 = M.step; M.step = (o) => { const t = process.hrtime.bigint(); st0(o); tM += Number(process.hrtime.bigint() - t) / 1e6; nM++; }; }
   for (let y = 0; y < 1500; y++) sim.tick();
   const live = sim.civs.filter(Boolean); log(`   ${sim.fmtYear(sim.year)}: ${live.length} realms, ${M.links.length} trade links, world product ${M.worldGdp.toFixed(0)}, trade ${M.worldTrade.toFixed(0)}; the market takes ${(tM / nM).toFixed(2)} ms a year`);
@@ -312,7 +325,7 @@ log('8. the market');
   { const cap = c.capital; sim.pop[cap] = Math.max(sim.pop[cap], 60); sim.tick(); c.wealth = 1e6;
     const eff0 = sim.eff[c.id * 8 + 0]; const msg = sim.act('workshop', cap, 3); check(/Workshops under construction/.test(msg), `workshops: "${msg}"`); check(/Already being built/.test(sim.act('workshop', cap)), 'and not twice at once');
     const g1 = sim.act('granary', cap); check(/Granary under construction/.test(g1), `granary: "${g1}"`);
-    check(/Not before the Industrial age/.test(sim.cannot('factory', cap)), `no factory in the Iron Age: "${sim.cannot('factory', cap)}"`); check(/harbour/.test(sim.cannot('shipyard', cap)) || (sim.special[cap] & 1), 'a shipyard wants a harbour');
+    check(/Needs The factory/.test(sim.cannot('factory', cap)), `no factory in the Iron Age: "${sim.cannot('factory', cap)}"`); check(/harbour/.test(sim.cannot('shipyard', cap)) || (sim.special[cap] & 1), 'a shipyard wants a harbour');
     for (let y = 0; y < 30; y++) sim.tick();
     check(sim.indAt(cap, 'workshop') > 0 && sim.slotOf(cap, 'workshop') >= 0 && !sim.freeSlots(cap).includes(sim.slotOf(cap, 'workshop')), `the workshops stand on their plot (${sim.slotOf(cap, 'workshop') + 1})`);
     check(sim.eff[c.id * 8 + 0] > eff0 + 0.25, `and make the crafts cheaper (${eff0.toFixed(2)} to ${sim.eff[c.id * 8 + 0].toFixed(2)})`); check(/Already built/.test(sim.cannot('workshop', cap)), 'one of a kind to a town');
@@ -330,10 +343,79 @@ log('8. the market');
     sim.tick(); sim2.tick(); const a = M.LS[c.id], b = M2.LS[c.id]; check(Math.abs(a - b) < 0.03, `and the next year goes the same way (living ${a.toFixed(3)} and ${b.toFixed(3)})`); check(M2.links.length > 0 && Math.abs(M2.links.length - M.links.length) <= Math.max(6, M.links.length * 0.25), `the merchants find their roads again (${M2.links.length} links, ${M.links.length} before)`);
     sane('a loaded world', sim2);
     // a world saved before there was a market: it finds its prices in the loading
-    delete s.econ; delete s.ind; for (const cv of s.civs) if (cv) { delete cv.econ; delete cv.trade; } const sim3 = createSim(wd, 1); sim3.load(s); const M3 = sim3.market; const p3 = sim3.playerCiv();
+    delete s.econ; delete s.ind; delete s.know; for (const cv of s.civs) if (cv) { delete cv.econ; delete cv.trade; delete cv.know; } const sim3 = createSim(wd, 1); sim3.load(s); const M3 = sim3.market; const p3 = sim3.playerCiv();
     let moved = 0; for (let g = 1; g < NG; g++) if (Math.abs(M3.px[p3.id * NG + g] - 1) > 0.02) moved++; check(moved > 5 && M3.LS[p3.id] !== 0.6, `a world from before the market finds its prices on loading (${moved} goods off the usual price, living ${M3.LS[p3.id].toFixed(2)})`);
     for (let y = 0; y < 50; y++) sim3.tick(); sane('an old world, 50 years on', sim3);
   }
+}
+}
+if (want(9)) {
+// ---------- 9. knowledge: the discoveries, what they open, who learns what ----------
+log('9. knowledge');
+{
+  const KN = window.KNOW, E = window.ECON; const L = KN.LIST, U = KN.UNIT;
+  // the tables hang together
+  check(L.length === KN.ND && L.length >= 170 && new Set(L.map(d => d.key)).size === L.length && new Set(L.map(d => d.name)).size === L.length, `${L.length} discoveries, each with a key and a name of its own`);
+  { const per = new Array(KN.NE).fill(0), sum = new Array(KN.NE).fill(0); for (const D of L) { per[D.era]++; sum[D.era] += D.cost; } let bad = 0; for (let e = 0; e < KN.NE; e++) { const band = KN.ERA_AT[e + 1] - (e ? KN.ERA_AT[e] : KN.T0); if (Math.abs(sum[e] - band) > 1e-9) bad++; } check(bad === 0 && per.every(n => n >= 12), `an age's discoveries cost together what the age is long (per age: ${per.join(', ')})`); }
+  check(L.every(D => D.need.every(n => L[n].era <= D.era && n !== D.id)), 'a discovery stands only on earlier ones');
+  check(L.every(D => D.text && D.text.length > 20 && D.text.length < 220 && D.cost > 0 && D.w >= 0.5 && D.w <= 1.5), 'every discovery has a line about it and a cost');
+  { const idle = L.filter(D => !Object.keys(D.gives).length).map(D => D.key); check(idle.length === 0, `every discovery gives something (${idle.join(', ') || 'none idle'})`); }
+  { const sim0 = createSim(wd, 9); const k = sim0.know; const noGate = E.RECIPES.filter((R, r) => !k.recipeGate(r)).map(R => R.key); check(noGate.length === 0, `every craft is opened by a discovery (${noGate.join(', ') || 'all'})`);
+    const late = E.RECIPES.filter((R, r) => k.recipeGate(r) && k.recipeGate(r).era !== R.era).map(R => R.key); check(late.length === 0, `and by one of the craft's own age (${late.join(', ') || 'all'})`);
+    const gated = E.GOODS.filter(g => g && g.raw && k.goodGate(g.id)); check(gated.length >= 18 && gated.every(g => k.goodGate(g.id).era <= Math.max(1, g.era)), `${gated.length} goods of the land wait on a discovery of their age or an earlier one`);
+    check(['grain', 'fish', 'cattle', 'timber', 'stone', 'salt'].every(key => !k.goodGate(E.ID[key])), 'what every people lives on waits on nothing');
+    for (const w of KN.WORKS) check(KN.WORK_BY[w] !== undefined || w === 'farm' || w === 'walls', `the ${w} is opened by a discovery`); check(KN.FARM.length === 4 && KN.WALLS.length === 3, 'farms have four discoveries to their five levels, walls three'); }
+  // a people begins with nothing but a little to spend
+  const sim = createSim(wd, 91); const k = sim.know; const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2));
+  const c = sim.setPlayer(i0, 'Scholars', null); for (let n = 0; n < 30; n++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], { tech: 0.018 + sim.rnd() * 0.017 });
+  check(k.count[c.id] === 0 && Math.abs(k.pool[c.id] * U - 1000) < 1 && k.cur[c.id] === -1, `the player's people know nothing yet and hold ${Math.round(k.pool[c.id] * U)} insight`);
+  { const others = sim.civs.filter(x => x && x !== c); const known = others.map(x => k.count[x.id]); check(Math.max(...known) > 0 && Math.max(...known) <= 6 && others.every(x => k.pool[x.id] < 0.004), `other peoples begin with what their knowledge was worth (${Math.min(...known)} to ${Math.max(...known)} discoveries)`); check(k.first.every(f => !f || f.name === ''), 'and nobody is remembered as first to what was known at the dawn'); }
+  check(/Needs Farming/.test(sim.cannot('farm', i0)) && /Needs Pottery/.test(sim.cannot('workshop', i0)) && k.rmask[c.id * E.NR + E.RECIPES.findIndex(R => R.key === 'pottery')] === 0, 'no fields, no workshops and no potters before they are learned');
+  check(k.study(c.id, c, 'bronze') !== null && k.study(c.id, c, 'megaliths') !== null, 'what belongs to a later age, or stands on what is not known, cannot be studied yet');
+  { const before = k.pool[c.id]; const why = k.study(c.id, c, 'farming'); check(why === null && k.knows(c.id, 'farming') && Math.abs(before - k.pool[c.id] - L[KN.ID.farming].cost) < 1e-9, `with insight in hand a discovery is learned at once (${Math.round(k.pool[c.id] * U)} left)`); check(sim.cannot('farm', i0) === null || !/Needs/.test(sim.cannot('farm', i0)), 'and farms can be laid out'); check(k.farmCap[c.id] === 2 && /Irrigation/.test(k.lacks(c.id, 'farm', 3).name), 'up to the second level; the third waits on irrigation'); }
+  { k.study(c.id, c, 'pottery'); check(k.knows(c.id, 'pottery') && !sim.needFor('workshop', i0) && k.rmask[c.id * E.NR + E.RECIPES.findIndex(R => R.key === 'pottery')] === 1, 'pottery opens the workshops and sets the potters to work'); check(c.events.some(e => e.type === 'know' && /Pottery/.test(e.text)), 'the chronicle says so'); }
+  { const why = k.study(c.id, c, 'weaving'); const st = k.status(c.id, c, sim.insightParts(c).total); check(why === null && !k.knows(c.id, 'weaving') && st.d.key === 'weaving' && st.prog > 0 && st.prog < 1 && st.years > 10 && isFinite(st.years), `the next one is begun with what is left (${Math.round(st.prog * 100)}%, ${st.years} years to go)`); }
+  // the queue: a discovery of a later age waits behind what it stands on
+  k.enqueue(c.id, c, 'bronze'); check(JSON.stringify(k.mind(c).q) === JSON.stringify(['copper', 'bronze']), `queueing bronze queues copper before it (${k.mind(c).q.join(', ')})`);
+  k.enqueue(c.id, c, 'megaliths'); check(k.mind(c).q.join(',') === 'copper,bronze,ritual,quarrying,megaliths', `and megaliths what they stand on (${k.mind(c).q.join(', ')})`);
+  k.dequeue(c, 'bronze'); check(k.mind(c).q.indexOf('bronze') < 0, 'a discovery can be taken out of the queue');
+  { const p0 = sim.insightParts(c).total; c.policy.research = 2; const p2 = sim.insightParts(c).total; check(p2 > p0 * 1.4 && p2 < p0 * 1.6, `twice the scholars' pay is half as much insight again (${(p2 / p0).toFixed(2)}x)`); sim.recount(); check(sim.incomeParts(c).scholars > 0, 'and it is paid for'); c.policy.research = 1; }
+  // years pass: the queue is worked, then the scholars wait, then they choose for themselves
+  k.step(c.id, c, 0.02);      // (a windfall, to see the queue worked without waiting two thousand years)
+  check(k.knows(c.id, 'weaving') && k.knows(c.id, 'megaliths') && !k.knows(c.id, 'copper') && k.mind(c).q.join(',') === 'copper', `the queue is worked in order as far as the age allows (${k.count[c.id]} known, queue ${k.mind(c).q.join(', ')})`);
+  let waited = 0; for (let y = 0; y < 60; y++) { sim.tick(); if (k.cur[c.id] < 0) waited++; }
+  check(waited >= 20 && waited <= 30 && k.mind(c).self && k.cur[c.id] >= 0, `left without a word the scholars wait a generation, then choose for themselves (${waited} idle years; last their own choice: ${k.mind(c).self})`);
+  // everybody learns; nobody knows what stands on something they do not know, nor what their age has not reached
+  for (let y = 0; y < 7900; y++) sim.tick();
+  { let open = 0, early = 0, over = 0, n = 0, most = 0; for (const cv of sim.civs) { if (!cv) continue; n++; most = Math.max(most, k.count[cv.id]); let spent = 0; for (const D of L) { if (!k.has[cv.id * k.ND + D.id]) continue; spent += D.cost; if (D.era > cv.era) early++; for (const q of D.need) if (!k.has[cv.id * k.ND + q]) open++; } if (spent > (cv.tech - KN.T0) * 1.5 + 0.004) over++; }
+    check(open === 0 && early === 0, `what a realm knows always stands on what it knows, within its age (${open} without footing, ${early} ahead of their age)`); check(over === 0, `nobody has learned more than its knowledge could pay for (${over} realms)`);
+    log(`   ${sim.fmtYear(sim.year)}: ${n} realms, the most learned knows ${most} discoveries; the player ${k.count[c.id]}, in the ${sim.ERAS[c.era][0]}`); check(most > 25, `the world has learned things (${most})`); }
+  { const M = sim.market; let craft = 0, land = 0; for (const cv of sim.civs) { if (!cv) continue; for (let r = 0; r < E.NR; r++) if (M.mk[cv.id * E.NR + r] > 0 && !k.rmask[cv.id * E.NR + r]) craft++; for (let g = 1; g < E.NG; g++) if (E.GOODS[g].raw && M.out[cv.id * E.NG + g] > 0 && !k.gmask[cv.id * E.NG + g]) land++; } check(craft === 0 && land === 0, `nobody makes what it has not learned to make, nor works land it cannot (${craft} crafts, ${land} goods)`); }
+  { const firsts = L.filter(D => D.first && k.first[D.id] && k.first[D.id].name); check(firsts.length > 0 && firsts.every(D => k.first[D.id].y <= sim.year && k.first[D.id].y > -9990), `the world remembers who was first (${firsts.slice(0, 3).map(D => D.name + ': ' + k.first[D.id].name + ', ' + sim.fmtYear(k.first[D.id].y)).join('; ')})`); check(sim.worldEvents.some(e => e.type === 'know') || sim.allEvents.some(e => e.type === 'know'), 'and the chronicle records it'); }
+  // edges are measured against the age: a realm that keeps step stands level
+  { const far = sim.civs.filter(Boolean).sort((a, b) => b.tech - a.tech)[0]; const st = k.standing(far.id, far.tech); const fs = st.filter(r => r.key !== 'stab').map(r => r.key === 'build' ? 1 / r.f : r.f); check(fs.every(v => v > 0.6 && v < 1.7), `edges stay near what the age expects (${Math.min(...fs).toFixed(2)} to ${Math.max(...fs).toFixed(2)} for ${sim.fullName(far)})`);
+    const sim9 = createSim(wd, 5); const z = sim9.spawnTribe(sim9.LI.find(i => sim9.fert[i] > 0.6), { tech: 1 }); for (const D of L) sim9.know.learn(z.id, z, D.id, true); sim9.know.refresh(z.id, 1); const all = sim9.know.standing(z.id, 1); check(all.every(r => r.key === 'stab' ? Math.abs(r.f) < 1e-6 : Math.abs(r.f - 1) < 1e-6), 'a people that knows everything at the end of the last age stands exactly level'); }
+  // what a neighbour knows is learned half again as fast
+  { const a = sim.civs.find(x => x && x !== c && k.available(x.id, x.era).length); if (a) { const d = k.available(a.id, a.era)[0]; const py = sim.insightParts(a).total; k.nb[a.id * k.ND + d] = 0; const y0 = k.yearsFor(a.id, d, py); k.nb[a.id * k.ND + d] = 1; const y1 = k.yearsFor(a.id, d, py); check(y1 < y0 && y1 >= Math.floor(y0 / 1.5) - 1, `a discovery the neighbours know takes ${y1} years, not ${y0}`); } }
+  // a realm cut from another knows what its parent knew
+  { let kid = null; for (const cv of sim.civs) if (cv && cv.founded > sim.year - 3000 && k.count[cv.id] > 20) { kid = cv; break; } check(!!kid, `realms born late know things from the start (${kid ? sim.fullName(kid) + ': ' + k.count[kid.id] : 'none found'})`); }
+  // save and load
+  { const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, s.seed || 1); sim2.load(s); const k2 = sim2.know; let dh = 0, dc = 0, dp = 0; for (const cv of sim.civs) { if (!cv) continue; for (let d = 0; d < k.ND; d++) if (k.has[cv.id * k.ND + d] !== k2.has[cv.id * k.ND + d]) dh++; if (k.cur[cv.id] !== k2.cur[cv.id]) dc++; dp = Math.max(dp, Math.abs(k.prog[cv.id] - k2.prog[cv.id]) * U, Math.abs(k.pool[cv.id] - k2.pool[cv.id]) * U); }
+    check(dh === 0 && dc === 0 && dp < 0.01, `what every realm knows, studies and holds survives save and load (${dh} discoveries, ${dc} studies differ; ${dp.toFixed(4)} insight off)`); const p2 = sim2.playerCiv(); check(JSON.stringify(p2.know) === JSON.stringify(c.know), "and the player's queue"); check(k2.first.filter(Boolean).length === k.first.filter(Boolean).length, 'and who was first');
+    let df = 0; for (const cv of sim.civs) if (cv) for (let q = 0; q < k.NK; q++) df = Math.max(df, Math.abs(k.f[cv.id * k.NK + q] - k2.f[cv.id * k.NK + q])); check(df < 1e-5, `and the edges come out the same (${df.toExponential(1)})`);
+    sim.tick(); sim2.tick(); check(Math.abs(k.count[c.id] - k2.count[p2.id]) <= 1 && Math.abs(c.tech - p2.tech) < 1e-6, `the next year goes the same way (${k.count[c.id]} and ${k2.count[p2.id]} known, knowledge ${(Math.abs(c.tech - p2.tech) * U).toExponential(1)} insight apart)`);
+    // a world saved before there were discoveries: every realm is given what its knowledge is worth
+    delete s.know; for (const cv of s.civs) if (cv) delete cv.know; const sim3 = createSim(wd, 1); sim3.load(s); const k3 = sim3.know; let none = 0, off = 0; for (const cv of sim3.civs) { if (!cv) continue; if (cv.tech > KN.T0 + 0.01 && !k3.count[cv.id]) none++; let spent = 0; for (const D of L) if (k3.has[cv.id * k3.ND + D.id]) spent += D.cost; if (Math.abs(spent + k3.prog[cv.id] + k3.pool[cv.id] - Math.max(0, cv.tech - KN.T0)) > 1e-6) off++; }
+    check(none === 0 && off === 0, `a world from before knowledge is given what its knowledge is worth (${none} realms left with nothing, ${off} with the wrong sum)`); for (let y = 0; y < 50; y++) sim3.tick(); invariants(sim3, 'an old world with new knowledge, 50 years on');
+    // history keeps a calendar now. A world saved before it, and far ahead of it, keeps its own: set forward once, saved with the world
+    check(sim.calShift === 0 && sim2.calShift === 0, 'a new world runs by history\'s calendar');
+    { const s4 = JSON.parse(JSON.stringify(s)); for (const cv of s4.civs) if (cv) { cv.tech = Math.min(1, cv.tech + 0.3); cv.era = sim.eraOf(cv.tech); } const sim4 = createSim(wd, 1); sim4.load(s4); const front = sim4.civs.filter(Boolean).sort((a, b) => b.tech - a.tech)[0]; const tf = sim4.insightParts(front).time;
+      check(sim4.calShift > 1500 && Math.abs(tf - 1) < 0.1, `an old world far ahead of history has its calendar set forward (${sim4.calShift} years; its first realm learns at ×${tf.toFixed(2)})`); check(Math.abs(sim4.histYear(front.tech) - sim4.year) <= 1, 'by which its first realm is on time');
+      const sim5 = createSim(wd, 1); sim5.load(JSON.parse(JSON.stringify(sim4.save()))); check(sim5.calShift === sim4.calShift, 'and the calendar is saved with the world'); const t0 = front.tech; for (let y = 0; y < 40; y++) sim4.tick(); check(front.tech > t0 + 20 * 0.00003, `it goes on learning (${((front.tech - t0) * U).toFixed(0)} insight in 40 years)`); invariants(sim4, 'an old world ahead of history, 40 years on'); }
+  }
+  // speed
+  { const sim4 = createSim(wd, 12); for (let n = 0; n < 40; n++) sim4.spawnTribe(sim4.LI[Math.floor(sim4.rnd() * sim4.LI.length)], {}); for (const cv of sim4.civs) if (cv) { cv.tech = 0.5; cv.era = sim4.eraOf(0.5); } for (let y = 0; y < 300; y++) sim4.tick(); const k4 = sim4.know; const st0 = k4.step; let tk = 0, nk = 0; k4.step = (a, b, g) => { const t = process.hrtime.bigint(); st0(a, b, g); tk += Number(process.hrtime.bigint() - t) / 1e6; nk++; };
+    for (let y = 0; y < 200; y++) sim4.tick(); log(`   knowledge takes ${(tk / 200).toFixed(3)} ms a year for ${sim4.st.civCount} realms`); check(tk / 200 < 1.5, `knowledge is quick enough (${(tk / 200).toFixed(3)} ms a year)`); }
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

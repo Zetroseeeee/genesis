@@ -187,7 +187,7 @@
   // CAL is measured, not chosen: tools/econ/calibrate.js runs the world and works out, for every raw good, how many
   // lots the world would use for each lot-per-thousand its land could give. A yield is that times the good's abund.
   /* CAL:BEGIN */
-  const CAL = {grain: 0.417, fish: 0.84, cattle: 1.2, timber: 0.482, stone: 0.542, salt: 0.373, copper: 0.0619, tin: 0.0801, iron: 0.207, horses: 0.0603, gold: 0.00375, gems: 0.0152, wine: 0.225, spices: 0.0225, silk: 0.00846, furs: 0.0814, ivory: 0.00243, cotton: 0.619, coal: 20.1, oil: 3.07, rice: 0.202, maize: 0.358, wool: 1.72, olives: 6.61, sugar: 0.726, tea: 0.507, coffee: 0.391, cocoa: 0.416, tobacco: 1.58, silver: 0.396, amber: 0.31, obsidian: 3.8, incense: 0.663, dyes: 0.389, jade: 0.21, saltpetre: 0.237, rubber: 0.162, gas: 21.7, uranium: 0.198, bauxite: 2.39, rareearth: 0.313, lithium: 1.25};
+  const CAL = {grain: 0.4, fish: 0.754, cattle: 1.17, timber: 0.536, stone: 0.549, salt: 0.308, copper: 0.0558, tin: 0.0592, iron: 0.176, horses: 0.0431, gold: 0.00269, gems: 0.0165, wine: 0.171, spices: 0.011, silk: 0.00417, furs: 0.0746, ivory: 0.00166, cotton: 0.834, coal: 33.5, oil: 5.19, rice: 0.232, maize: 0.352, wool: 1.45, olives: 4.43, sugar: 0.714, tea: 0.34, coffee: 0.653, cocoa: 0.54, tobacco: 1.35, silver: 0.231, amber: 0.236, obsidian: 4.39, incense: 0.332, dyes: 0.396, jade: 0.136, saltpetre: 0.282, rubber: 0.216, gas: 23.5, uranium: 0.153, bauxite: 2.22, rareearth: 0.139, lithium: 0.752};
   /* CAL:END */
   const yieldOf = (g) => (CAL[g.key] === undefined ? 0.5 : CAL[g.key]) * g.abund;
 
@@ -315,7 +315,9 @@
     // ----- who can trade with whom, and what the road costs -----
     let links = [], Tl = new Float32Array(0), linksAt = -1e9;
     const radius = (c) => Math.min(25, Math.sqrt(Math.max(1, cellsOf[c]) / Math.PI) * 0.8);
-    const seaReach = (cv) => Math.min(400, Math.max(6, host.seaRange(cv.tech) * (host.tv ? host.tv(cv, 'sea', 1) : 1)) + 3 * ports[cv.id]);
+    const kf = host.kf || null, NKF = host.NKF || 0, K_TRADE = host.K_TRADE || 0, K_SEA = host.K_SEA || 0;      // what each realm knows, as factors (know.js): trade, the range of ships
+    const rm = host.rmask || null, ym = host.ymul || null;                                                   // the crafts each realm knows; what it gets from each good's land for what it knows
+    const seaReach = (cv) => Math.min(400, Math.max(6, host.seaRange(cv.tech) * (host.tv ? host.tv(cv, 'sea', 1) : 1) * (kf ? kf[cv.id * NKF + K_SEA] : 1)) + 3 * ports[cv.id]);
     function buildLinks(year) {
       linksAt = year; const seen = new Map(); links = [];
       const add = (a, b, k, sea, d) => { if (a > b) { const t = a; a = b; b = t; } const key = a * MAXC + b; const l = seen.get(key); if (l) { if (k < l.k) { l.k = k; l.sea = sea; l.d = d; } l.both = true; } else { const L = { a, b, k, sea, d, v: 0, top: 0, tv: 0 }; seen.set(key, L); links.push(L); } };
@@ -384,7 +386,7 @@
         for (let g = 1; g < NG; g++) av[o + g] = stock[o + g];
         for (let k = 0; k < NRAW; k++) {
           const g = RAWS[k]; const rp = rawPop[o + g]; if (!(rp > 0)) continue;
-          const x = px[o + g]; const q = rp * yld[g] * F7 * (x < 0.36 ? 0.6 : x > 2.25 ? 1.5 : Math.sqrt(x)) * (crop[g] ? 1 + (hs - 1) * crop[g] : 1) * wShock[g];
+          const x = px[o + g]; const q = rp * yld[g] * F7 * (x < 0.36 ? 0.6 : x > 2.25 ? 1.5 : Math.sqrt(x)) * (crop[g] ? 1 + (hs - 1) * crop[g] : 1) * wShock[g] * (ym ? ym[o + g] : 1);
           out[o + g] = q; av[o + g] += q;
         }
         // what people and the state want, by what is cheap for its kind
@@ -409,7 +411,7 @@
         const w = W0 * (0.55 + 0.9 * util[c]);
         for (let r = 0; r < NR; r++) {
           let A = act[ro + r];
-          if (rEra[r] > era) { if (A) act[ro + r] = 0; continue; }
+          if (rEra[r] > era || (rm && !rm[ro + r])) { if (A) act[ro + r] = 0; continue; }      // (a craft its age has not reached, or that it has not learned)
           const l = eff ? rL[r] / eff[eo + rSec[r]] : rL[r]; let cost = l * w;
           for (let j = rI0[r], j1 = rI0[r + 1]; j < j1; j++) { const g = IG[j]; cost += IQ[j] * base[g] * px[o + g]; }
           const go = rOut[r]; const m = (base[go] * px[o + go] - cost) / cost; const seed = 0.002 * L / l;
@@ -424,14 +426,14 @@
         for (let r = 0; r < NR; r++) {
           const A = act[ro + r]; mk[ro + r] = 0; if (A <= 0) continue; const j0 = rI0[r], j1 = rI0[r + 1]; let q = A;
           for (let j = j0; j < j1; j++) { const g = IG[j]; const can = av[o + g] * (fin[o + g] > 0 ? 0.6 : 1) / IQ[j]; if (can < q) q = can; }
-          for (let j = j0; j < j1; j++) { const g = IG[j]; need[o + g] += A * IQ[j]; if (q > 0) { av[o + g] -= q * IQ[j]; used[o + g] += q * IQ[j]; } }
+          for (let j = j0; j < j1; j++) { const g = IG[j]; need[o + g] += A * IQ[j]; if (q > 0) { const left = av[o + g] - q * IQ[j]; av[o + g] = left > 0 ? left : 0; used[o + g] += q * IQ[j]; } }      // (never a hair below nothing)
           const l = eff ? rL[r] / eff[eo + rSec[r]] : rL[r];
           if (q > 0) { const go = rOut[r]; av[o + go] += q; out[o + go] += q; mk[ro + r] = q; busy += q * l; }
           if (q < A) { const top = q * 1.3 + 0.002 * L / l; if (A > top) act[ro + r] = top; }
         }
         util[c] = L > 0 ? busy / L : 0;
         // everything wanted: by people, by the workshops, and a little of everything by the merchants
-        const mer = 0.0015 * P * F7 * (1 + 0.3 * Math.sqrt(markets[c])) * (hold ? hold[c] : 1); let n = 0;
+        const mer = 0.0015 * P * F7 * (1 + 0.3 * Math.sqrt(markets[c])) * (hold ? hold[c] : 1) * (kf ? kf[c * NKF + K_TRADE] : 1); let n = 0;
         for (let g = 1; g < NG; g++) {
           let nd = need[o + g] + fin[o + g]; if (gEra[g] <= era + 1) nd += mer * ibase[g];
           need[o + g] = nd; const a = av[o + g];
@@ -536,7 +538,7 @@
       // every line of work a realm's age knows: what it means to make, what it made, what it earns on a lot, and what holds it back
       lines(c) {
         const cv = civs[c]; if (!cv) return []; const o = c * NG, era = cv.era, w = W0 * (0.55 + 0.9 * util[c]), res = [];
-        for (let r = 0; r < NR; r++) { const R = RECIPES[r]; if (R.era > era) continue; const l = R.l / (host.eff ? host.eff[c * 8 + R.sec] : 1); let cost = l * w; const short = [];
+        for (let r = 0; r < NR; r++) { const R = RECIPES[r]; if (R.era > era || (rm && !rm[c * NR + r])) continue; const l = R.l / (host.eff ? host.eff[c * 8 + R.sec] : 1); let cost = l * w; const short = [];
           for (const [g, q] of R.in) { cost += q * base[g] * px[o + g]; if (act[c * NR + r] > 0 && mk[c * NR + r] < act[c * NR + r] * 0.98) { const want = act[c * NR + r] * q; if (used[o + g] + stock[o + g] < want * 1.05) short.push(g); } }
           const price = base[R.out] * px[o + R.out]; res.push({ r, plan: act[c * NR + r], made: mk[c * NR + r], cost, price, margin: (price - cost) / cost, work: mk[c * NR + r] * l, short }); }
         return res;

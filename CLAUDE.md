@@ -52,6 +52,16 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   long the market takes a year. `node tools/econ/calibrate.js [seed] --write` measures how much each raw good's land
   must yield and writes the table into `src/econ.js` (between its CAL marks): run it after changing where goods lie
   (`PLACES`), what people want (`CATS`) or how things are made (`RECIPES`), or a good will be far too scarce or too plenty.
+- `node tools/know/pace.js [seed,seed] [--fit N] [--write]` — the pace of history: when the realms in front enter each
+  age, how far behind the middle realm is, how many people there are. With `--fit` it moves each age's yearly gain of
+  knowledge (`RATE` in `src/sim.js`, between its marks) toward the dates history kept (bronze 3300 BC, iron 1200 BC,
+  500 BC, AD 500, 1400, 1760, 1900, 1970); `--write` puts the table in. Run it over two seeds after touching what
+  insight depends on (the discoveries' edges to research, towns, academies, how knowledge spreads): one world's
+  dates swing by a century or two on a hair, so do not chase the last fifty years.
+  `node tools/know/people.js [seed,seed] [--fit N] [--write]` does the same for how many people there are: the world's
+  count against history's (4 million in 10,000 BC, 220 in the year 1, 970 in 1800, 6,140 in 2000), and with `--fit`
+  the table of how many a unit of land feeds at each stage of knowledge (`FOOD` in `src/sim.js`, between its marks).
+  Fit the pace first, then the people, then the market's yields (`calibrate.js`): each stands on the one before.
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
 - `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
@@ -68,7 +78,8 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | File | Global | Role |
 | --- | --- | --- |
 | `src/econ.js` | `ECON` | Goods, recipes, wants; where the Earth keeps things; one world's market: prices, workshops, trade between realms |
-| `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market once a year) |
+| `src/know.js` | `KNOW` | The discoveries (174, in nine ages and six branches), what each opens and gives; one world's knowledge: who knows what, who studies what |
+| `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, biome shader, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
 | `src/buildings.js` | `BKIT` | Procedural building kit (unit archetypes) and its material shader |
@@ -78,6 +89,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/textures.js` | `TEX` | Generated material atlases as texture arrays; UI art |
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
 | `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
+| `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
 | `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
 | `desktop/updater.js` | | Keeps the game's files current without replacing the app (plain Node, no Electron inside) |
@@ -125,6 +137,33 @@ Conventions that matter:
   year's cost with 200 realms): flat typed arrays, no objects in the yearly loops. The player's own dealings (customs,
   bans, the reserve, standing orders) live on the realm as `civ.econ` and are saved with it; the market's state is
   saved packed (`save().econ`), and a world saved before the market finds its prices on loading (`market.warm`).
+- **Knowledge** (`know.js`; `sim.know`). A realm's `tech` is still what its age comes from; what it gains in a year
+  (`insightParts`: the age's pace `RATE`, how many it is, what it pays its scholars, the share of its towns with an
+  academy, peace at home, its ruler, what it knows of learning) is also what it can spend on discoveries, in the same
+  unit (shown times 100,000 as "insight"). The discoveries of an age cost together what the age is long, so a realm
+  that studies without a pause has learned its age when the age ends. A discovery opens things outright (a good's
+  land can be worked: `know.gmask`; a craft: `know.rmask`, which the market obeys; a work: `sim.cannot` says
+  `Needs <discovery>` and `sim.needFor` gives it; farm and wall levels; colonies; a faith) and gives edges (food,
+  growth, taxes, insight, arms, stability, cheaper works, health, trade, reach, ships, siege, walls, each kind of
+  workshop, each kind of yield). **An edge is measured against the age**: the simulation multiplies by
+  `(1 + what the realm knows) / (1 + what its age expects by now)` (`know.f`; stability is added), so a realm that
+  keeps step is exactly where the old tables put it, one that learns farming first feeds more for a while, one that
+  leaves it feeds fewer. That is what keeps history's pace whatever realms choose; do not add an edge that is not
+  measured this way. What every people lives on (grain, fish, cattle, timber, stone, salt) waits on nothing.
+  The autopilot picks by need (`weight` in `know.js`: what the age cannot do without, metal under its own hills, a
+  craft whose goods it is short of, its ruler's leaning, what its neighbours know); what a neighbour or a trading
+  partner knows is learned half again as fast, and `tech` itself still drifts toward more learned neighbours
+  (`SPREAD`, faster in later ages). **History keeps its calendar** (`HIST`, `timeF` in `sim.js`): a realm ahead of
+  what the first peoples of history knew in that year learns the slower the further ahead it is (nobody has gone that
+  way before), and the first realm of a world that is behind learns the faster; everyone else learns at their own
+  pace. That, not the rates, is what holds the ages to their dates in every world, and it is why a turn is as long as
+  it is (`TURN_YEARS` in `main.js`: 200 years in the Stone Age down to 5: about 170 turns from the first fields to
+  the present). The player's realm keeps a queue on the realm (`civ.know`); with nothing chosen
+  its scholars wait a generation and then choose for themselves. A people begins knowing nothing, with 1,000 insight
+  in hand: the first choice is the player's. Saves carry it packed by discovery key (`save().know`), so discoveries
+  can be added; a world saved before knowledge is given what its `tech` is worth, the way the autopilot would have
+  learned it. Tests and scenes that set `tech` by hand must teach as well (`teach` in `tools/test_sim.js`,
+  `__T.teach` in `tools/testcam.js`).
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by
