@@ -121,7 +121,7 @@ jobs:
           mkdir -p out/mnt && hdiutil attach -nobrowse -readonly -mountpoint out/mnt "out/$DMG"
           test -d out/mnt/Holocene.app && test -L out/mnt/Applications && test -s out/mnt/Holocene.app/Contents/Resources/app/desktop/content.json
           codesign --verify --deep --strict out/mnt/Holocene.app
-          hdiutil detach out/mnt || hdiutil detach -force out/mnt
+          hdiutil detach out/mnt || hdiutil detach -force out/mnt || true      # (a first try can report failure and still unmount: the forced one then finds nothing)
           ls -la out
       # From here on things are given out, and only if this build proved itself above.
       # 1. The files that installed apps may lack go on the shelves and the new list is put up beside the one in force.
@@ -142,17 +142,26 @@ jobs:
         id: field
         if: steps.stage.outcome == 'success' && steps.stage.outputs.expect != 'first'
         run: |
-          set -uo pipefail
+          # (nothing here stops the step by itself: only the last line decides, and every stage says where it got to in a
+          #  log that is kept - a step that dies between two lines leaves nothing to read)
+          set +e; set -uo pipefail
+          say() { echo "$*" | tee -a out/field-step.log; }
           EXPECT="${{ steps.stage.outputs.expect }}"; [ "$EXPECT" = "same" ] && EXPECT="nothing offered"
           mkdir -p out/prev out/prevmnt
-          if ! curl -fL --retry 3 -sS -o out/prev.dmg "https://github.com/$GITHUB_REPOSITORY/releases/download/latest/$DMG"; then echo "no earlier app is published under this name: nothing to test with"; exit 0; fi
-          hdiutil attach -nobrowse -readonly -mountpoint out/prevmnt out/prev.dmg >/dev/null && cp -R out/prevmnt/Holocene.app out/prev/ && { hdiutil detach out/prevmnt >/dev/null || hdiutil detach -force out/prevmnt >/dev/null; }
-          if [ ! -s out/prev/Holocene.app/Contents/Resources/app/desktop/content.json ]; then echo "the earlier app has no updater: nothing to test with"; exit 0; fi
-          echo "the app that is out: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' out/prev/Holocene.app/Contents/Info.plist); expecting: $EXPECT"
+          if ! curl -fL --retry 3 -sS -o out/prev.dmg "https://github.com/$GITHUB_REPOSITORY/releases/download/latest/$DMG"; then say "no earlier app is published under this name: nothing to test with"; exit 0; fi
+          say "the earlier app's image: $(stat -f%z out/prev.dmg) bytes"
+          hdiutil attach -nobrowse -readonly -mountpoint out/prevmnt out/prev.dmg >/dev/null 2>>out/field-step.log || say "the image would not mount"
+          cp -R out/prevmnt/Holocene.app out/prev/ 2>>out/field-step.log || say "copying the app out of its image reported an error"
+          # (a first try can report failure and still unmount: the forced one then finds nothing to unmount, which is no failure of the test)
+          hdiutil detach out/prevmnt >/dev/null 2>&1 || hdiutil detach -force out/prevmnt >/dev/null 2>&1 || say "(the image stayed mounted, or was gone already)"
+          if [ ! -x out/prev/Holocene.app/Contents/MacOS/Holocene ]; then say "the earlier app could not be got out of its image: it was not tested, so nothing is given out"; exit 1; fi
+          if [ ! -s out/prev/Holocene.app/Contents/Resources/app/desktop/content.json ]; then say "the earlier app has no updater: nothing to test with"; exit 0; fi
+          say "the app that is out: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' out/prev/Holocene.app/Contents/Info.plist); expecting: $EXPECT"
           GENESIS_SMOKE=1 GENESIS_SMOKE_UPDATE=1 GENESIS_SMOKE_EXPECT="$EXPECT" GENESIS_UPDATE_MANIFEST=manifest-next.json GENESIS_USERDATA="$PWD/out/prev-userdata" GENESIS_SMOKE_SHOT="$PWD/out/field.png" \
             out/prev/Holocene.app/Contents/MacOS/Holocene --smoke 2>out/field.err | tee out/field.log
+          say "the app ended ($(wc -c < out/field.log | tr -d ' ') bytes of report)"
           grep '\[update\]' out/field.log || true
-          grep -q '"ok":true' out/field.log
+          if grep -q '"ok":true' out/field.log; then say "it ended as expected"; else say "it did NOT end as expected"; exit 1; fi
       # 3. The whole app first (an installed app that is told "fetch the app" must find this one), then the list goes in force.
       - name: Publish
         id: publish
@@ -176,7 +185,7 @@ jobs:
         run: |
           { echo "run $GITHUB_RUN_ID at $(date -u): launch ${{ steps.launch.outcome }}, drill ${{ steps.drill.outcome }}, stage ${{ steps.stage.outcome }}, field ${{ steps.field.outcome }}, publish ${{ steps.publish.outcome }}"; ls -la release out 2>&1 || true; } > out/desktop-run.log
           gh release view ci-logs >/dev/null 2>&1 || gh release create ci-logs --title "CI logs" --notes "Logs from workflow runs." --latest=false
-          for f in out/desktop-run.log out/stage.log out/manifest-plan.json out/field.log out/field.err out/field.png out/published.log; do [ -s "$f" ] && gh release upload ci-logs "$f" --clobber || true; done
+          for f in out/desktop-run.log out/stage.log out/manifest-plan.json out/field-step.log out/field.log out/field.err out/field.png out/published.log; do [ -s "$f" ] && gh release upload ci-logs "$f" --clobber || true; done
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Was it given out?
