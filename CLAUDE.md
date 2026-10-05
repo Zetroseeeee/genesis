@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~45–60 min for all 28).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~26 min for all 35).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session

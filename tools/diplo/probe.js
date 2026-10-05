@@ -5,12 +5,13 @@
 //   SRC=<dir> node tools/diplo/probe.js ...     the same world from another checkout's src (to compare with an older game)
 // Run it over two seeds (12345 and 777, three and a half minutes each) after touching diplo.js or the simulation's wars.
 // What the world should go on doing, as measured for 0.17.0 against the game before diplomacy (in brackets):
-//   wars begun for a realm in a century   2000 BC 0.23-0.26 (0.25)   0 AD 0.21-0.24 (0.24)   AD 1000 0.27-0.31 (0.27-0.30)
-//                                         1600 0.34-0.39 (0.38-0.40)   1900 0.32-0.45 (0.38-0.42)   2000 0.44-0.47 (0.38-0.46)
+//   wars begun for a realm in a century   2000 BC 0.23-0.27 (0.25)   0 AD 0.21-0.24 (0.24)   AD 1000 0.27-0.37 (0.27-0.30)
+//                                         1600 0.34-0.41 (0.38-0.40)   1900 0.32-0.45 (0.38-0.42)   2000 0.40-0.47 (0.38-0.46)
 //     about half of them from the Iron Age on are wars a realm goes into beside a friend
-//   realms in AD 2000                     272-280 (288-298): few are lost to unions, none to the mere arithmetic of pacts
+//   realms in AD 2000                     250-280 (288-298): a few dozen are lost to unions over twelve thousand years; the same
+//                                         seed measures fifteen apart from one small change to the next
 //   the five greatest hold                12-15 % of all held land (12 %)
-//   vassals                               25-40 at a time from the Classical age on (a tenth of all realms), made by asking, by
+//   vassals                               25-45 at a time from the Classical age on (a tenth to a sixth of all realms), made by asking, by
 //                                         inheritance and by seeking a protector in about equal parts; a handful freed and joined
 //                                         to their lords in every age
 //   bound to somebody                     four realms in five from the Classical age on

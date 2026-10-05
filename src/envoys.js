@@ -25,7 +25,7 @@ window.ENVOYS = (function () {
     peace: ['offers peace', null], call: ['calls you to war', null],
   };
 
-  let ctx = null, tab = 'realms', sel = -1, filter = 'all', lastSig = '', cause = '';
+  let ctx = null, tab = 'realms', sel = -1, filter = 'all', lastSig = '', cause = '', picked = false;      // (cause: the reason a war would be given; picked: the player chose it himself - else it is the best there is)
   const S = () => ctx.sim(); const DP = () => window.DIPLO; const DK = () => S().diplo;
   const me = () => { const s = S(); return s ? s.playerCiv() : null; };
   const pace = (c) => DP().PACE[Math.max(0, Math.min(8, c.era | 0))];
@@ -35,6 +35,7 @@ window.ENVOYS = (function () {
   const sw = (b) => `<i class="dp-sw" style="background:${b.color}"></i>`;
   const link = (b) => `<button class="linkish" data-dsel="${b.id}">${nm(b)}</button>`;
   const names = (list) => list.map((b) => link(b)).join(', ');
+  const coin = (v) => v >= 10 ? String(Math.round(v)) : v >= 0.05 ? v.toFixed(1) : '0';      // (a small realm's tenth is less than a coin: say how much less)
   const arms = (r) => r >= 1.5 ? 'far better than yours' : r >= 1.15 ? 'better than yours' : r > 0.87 ? 'as good as yours' : r > 0.67 ? 'worse than yours' : 'far worse than yours';
   const weight = (r) => r >= 3 ? 'far stronger than you' : r >= 1.5 ? 'stronger than you' : r > 0.67 ? 'about your match' : r > 0.33 ? 'weaker than you' : 'far weaker than you';
   const wordOf = (rep) => rep >= 70 ? 'trusted' : rep >= 55 ? 'good' : rep >= 45 ? 'ordinary' : rep >= 30 ? 'doubted' : 'worth little';
@@ -52,7 +53,7 @@ window.ENVOYS = (function () {
       const a = e.target.closest('[data-dact]'); if (a) { if (!a.disabled) act(a.dataset.dact, a.dataset.k, a.dataset.v); return; }
       const j = e.target.closest('[data-kgo]'); if (j && ctx.openTree) { close(); ctx.openTree(j.dataset.kgo); return; }
       const f = e.target.closest('[data-dfilter]'); if (f) { filter = f.dataset.dfilter; render(); return; }
-      const c2 = e.target.closest('[data-dcause]'); if (c2) { cause = c2.dataset.dcause; render(); return; }
+      const c2 = e.target.closest('[data-dcause]'); if (c2) { cause = c2.dataset.dcause; picked = true; render(); return; }
       const r = e.target.closest('[data-dsel]'); if (r) { show(+r.dataset.dsel); }
     });
   }
@@ -62,7 +63,7 @@ window.ENVOYS = (function () {
     const s = S(); if (!s || !me()) return; const dlg = $('dip'); if (!dlg.open) { dlg.showModal(); dlg.firstElementChild.focus({ preventScroll: true }); }
     if (id !== undefined && id >= 0 && s.civs[id] && s.civs[id] !== me()) show(id); else setTab(t || tab);
   }
-  function show(id) { sel = id; cause = ''; setTab('realms'); requestAnimationFrame(() => { const el = document.querySelector(`#dp-list .dp-row[data-dsel="${id}"]`); if (el) el.scrollIntoView({ block: 'nearest' }); }); }
+  function show(id) { sel = id; cause = ''; picked = false; setTab('realms'); requestAnimationFrame(() => { const el = document.querySelector(`#dp-list .dp-row[data-dsel="${id}"]`); if (el) el.scrollIntoView({ block: 'nearest' }); }); }
   function close() { const d = $('dip'); if (d.open) d.close(); }
   function setTab(t) { tab = t; document.querySelectorAll('#dp-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.dtab === t)); document.querySelectorAll('#dip [data-dpane]').forEach((p) => { p.hidden = p.dataset.dpane !== t; }); render(); }
 
@@ -127,8 +128,8 @@ window.ENVOYS = (function () {
     // what is between you
     const lines = [];
     if (atWar) lines.push(`<div class="dp-line war">${svg(ICON.war)}<span>At war since ${s.fmtYear(c.wars[b.id])}</span></div>`);
-    if (db.lord === c.id) { const no = d.cannotJoin(c, b); lines.push(`<div class="dp-line">${svg(ICON.vassal)}<span>Your vassal since ${s.fmtYear(db.since)}: pays you ${Math.round(d.trOut[b.id])} coin a year<small>${no ? esc(no) : 'It could be joined to your crown now.'}</small></span><span class="dp-btns"><button class="btn" data-dact="annex"${no ? ' disabled' : ''}>Join to the crown</button><button class="btn" data-dact="break" data-k="vassal">Release</button></span></div>`); }
-    if (dc.lord === b.id) lines.push(`<div class="dp-line">${svg(ICON.lord)}<span>Your lord since ${s.fmtYear(dc.since)}: you pay a tenth of your income, and follow them to war</span><span class="dp-btns"><button class="btn danger" data-dact="rebel">Throw off the yoke</button></span></div>`);
+    if (db.lord === c.id) { const no = d.cannotJoin(c, b); lines.push(`<div class="dp-line tall">${svg(ICON.vassal)}<span>Your vassal since ${s.fmtYear(db.since)}: pays you ${coin(d.trOut[b.id])} coin a year, and follows you to war<small>${no ? esc(no) : 'It could be joined to your crown now.'}</small></span><span class="dp-btns"><button class="btn" data-dact="annex"${no ? ' disabled' : ''}>Join to the crown</button><button class="btn" data-dact="break" data-k="vassal">Release</button></span></div>`); }
+    if (dc.lord === b.id) lines.push(`<div class="dp-line tall">${svg(ICON.lord)}<span>Your lord since ${s.fmtYear(dc.since)}: you pay a tenth of your income, and follow them to war</span><span class="dp-btns"><button class="btn danger" data-dact="rebel">Throw off the yoke</button></span></div>`);
     for (const p of P.PACTS) if (d.has(c, b.id, p.key)) lines.push(`<div class="dp-line">${svg(ICON[p.key])}<span>${esc(p.name)} ${upto(dc.pact[b.id][p.key], c)}</span><span class="dp-btns"><button class="btn" data-dact="break" data-k="${p.key}" title="They will not forget it, and nobody will trust your word so readily">Break</button></span></div>`);
     if (dc.ban[b.id]) lines.push(`<div class="dp-line">${svg(ICON.ban)}<span>Your markets are closed to them since ${s.fmtYear(dc.ban[b.id])}</span><span class="dp-btns"><button class="btn" data-dact="ban" data-k="off">Open them</button></span></div>`);
     if (db.ban[c.id]) lines.push(`<div class="dp-line">${svg(ICON.ban)}<span>Their markets are closed to you</span></div>`);
@@ -165,7 +166,7 @@ window.ENVOYS = (function () {
     // war: what stands in the way, the reasons that could be given, what each costs, who would come in
     { const no = d.cannotFight(c, b); let w = '';
       if (no) w = `<div class="gv-note">${esc(no)}.</div>`;
-      else { const cs = d.causes(c, b); if (!cs.some((x) => x.key === cause)) cause = cs[0].key; const W = d.warCost(c, b, cause);
+      else { const cs = d.causes(c, b); if (!picked || !cs.some((x) => x.key === cause)) cause = cs[0].key; const W = d.warCost(c, b, cause);
         const theirs = d.friends(b, false).filter((x) => x !== c && !d.bound(x, c)), ours = d.friends(c, true).filter((x) => x !== b && !d.bound(x, b)); const sa = s.mightOf[c.id] + ours.reduce((t, x) => t + s.mightOf[x.id], 0), sb = s.mightOf[b.id] + theirs.reduce((t, x) => t + s.mightOf[x.id], 0);
         w = cs.map((x) => `<button class="dp-cause${x.key === cause ? ' sel' : ''}" data-dcause="${x.key}"><b>${esc(x.name)}</b><small>${esc(x.text)}</small></button>`).join('');
         w += `<ul class="gv-gives">${W.stab ? `<li class="bad">−${Math.round(W.stab * 100)} stability: your people see no reason for it</li>` : ''}${W.rep ? `<li class="bad">Your word falls by ${W.rep}${W.broke ? ': it breaks your ' + P.PACT[W.broke].name.toLowerCase() : ''}</li>` : ''}${!W.stab && !W.rep ? '<li class="good">Nobody at home or abroad holds it against you</li>' : ''}<li class="${theirs.length ? 'bad' : 'none'}">${theirs.length ? 'Beside them: ' + names(theirs) : 'Nobody is sworn to defend them'}</li><li class="${ours.length ? 'good' : 'none'}">${ours.length ? 'Beside you: ' + names(ours) : 'You would fight alone'}</li><li class="${sa > sb * 1.15 ? 'good' : sa * 1.15 < sb ? 'bad' : 'none'}">Your side ${sa > sb * 1.15 ? 'is the stronger' : sa * 1.15 < sb ? 'is the weaker' : 'is about their match'}: ${(sa / Math.max(0.01, sb)).toFixed(1)} to 1</li><li class="none">A clear win could bring: ${esc(lc(P.CAUSES[cause].goal === 'land' ? 'the land you take' : P.CAUSES[cause].goal === 'tribute' ? 'reparations, besides the land you take' : P.CAUSES[cause].goal === 'vassal' ? 'their submission' : 'a government of your kind in their capital'))}</li></ul>`;
@@ -232,10 +233,10 @@ window.ENVOYS = (function () {
     let h = `<div class="dp-cols"><div><div class="dp-stat"><span class="ic">${svg(ICON.word)}</span><div><span class="micro">Your word</span><b>${wordOf(dc.rep)} <span class="num">${Math.round(dc.rep)}</span></b>${meter(dc.rep, 100, dc.rep >= 55 ? 'pos' : dc.rep < 45 ? 'neg' : '')}<p class="gv-note">Every realm weighs it when you propose something. Standing by a friend raises it; breaking an oath costs 30, leaving a friend to fight alone 10, and in the later ages a war without a reason up to 18. It finds its way back to 50 by five a turn.</p></div></div>`;
     h += `<div class="dp-stat"><span class="ic">${svg(ICON.war)}</span><div><span class="micro">Your conquests</span><b>${dreadOf(dc.inf)} <span class="num">${Math.round(dc.inf)}</span></b>${meter(dc.inf, 80, dc.inf >= 10 ? 'neg' : '')}<p class="gv-note">Land taken in war makes others wary, your neighbours most of all, and less when the war had a reason. It is forgotten by half in three turns.</p></div></div>`;
     const inn = d.trIn[c.id], out = d.trOut[c.id];
-    h += `<div class="dp-stat"><span class="ic">${svg(ICON.owes)}</span><div><span class="micro">Tribute and reparations</span><b><span class="num ${inn - out > 0 ? 'pos' : inn - out < 0 ? 'neg' : ''}">${signed(Math.round(inn - out))}</span> coin a year</b><p class="gv-note">${inn > 0.5 ? `Paid to you: ${Math.round(inn)}. ` : ''}${out > 0.5 ? `Paid by you: ${Math.round(out)}. ` : ''}A vassal pays a tenth of what it earns; the beaten pay an eighth for three turns.</p></div></div></div>`;
+    h += `<div class="dp-stat"><span class="ic">${svg(ICON.owes)}</span><div><span class="micro">Tribute and reparations</span><b><span class="num ${inn - out > 0 ? 'pos' : inn - out < 0 ? 'neg' : ''}">${Math.abs(inn - out) < 0.05 ? '0' : (inn > out ? '+' : '−') + coin(Math.abs(inn - out))}</span> coin a year</b><p class="gv-note">${inn > 0.05 ? `Paid to you: ${coin(inn)}. ` : ''}${out > 0.05 ? `Paid by you: ${coin(out)}. ` : ''}A vassal pays a tenth of what it earns; the beaten pay an eighth for three turns.</p></div></div></div>`;
     const sect = (title, body) => `<div class="gv-sect"><span class="micro">${title}</span>${body}</div>`; let r = '';
     if (lord) r += sect('Your lord', `<div class="dp-line">${svg(ICON.lord)}<span>${link(lord)} since ${s.fmtYear(dc.since)}</span></div>`);
-    r += sect('Your vassals', vass.length ? vass.map((v) => `<div class="dp-line">${svg(ICON.vassal)}<span>${link(v)} since ${s.fmtYear(d.D(v).since)}<small>pays ${Math.round(d.trOut[v.id])} coin a year</small></span></div>`).join('') : '<div class="gv-note">None. A much weaker neighbour may bend the knee if asked, or put itself under your protection; a beaten one can be made to.</div>');
+    r += sect('Your vassals', vass.length ? vass.map((v) => `<div class="dp-line">${svg(ICON.vassal)}<span>${link(v)} since ${s.fmtYear(d.D(v).since)}<small>pays ${coin(d.trOut[v.id])} coin a year</small></span></div>`).join('') : '<div class="gv-note">None. A much weaker neighbour may bend the knee if asked, or put itself under your protection; a beaten one can be made to.</div>');
     const pacts = []; for (const k in dc.pact) { const b = s.civs[+k]; if (!b) continue; for (const p of P.PACTS) if (d.has(c, b.id, p.key)) pacts.push([dc.pact[k][p.key], b, p]); } pacts.sort((x, z) => x[0] - z[0]);
     r += sect('What you have sworn', pacts.length ? pacts.map(([u, b, p]) => `<div class="dp-line">${svg(ICON[p.key])}<span>${esc(p.name)} with ${link(b)} ${upto(u, c)}</span></div>`).join('') : '<div class="gv-note">Nothing yet.</div>');
     const WHAT = { claim: 'a claim on their borderland', land: 'land that was yours', refused: 'tribute refused', rebel: 'a rebel vassal' };

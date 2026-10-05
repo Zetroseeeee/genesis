@@ -7,7 +7,7 @@ Runs `src/sim.js` in node (no browser). ~4 minutes.
 
 | section | what it checks |
 |---|---|
-| 1 autopilot | 12,000 years on seed 7, 4,000 on two more; invariants every 2,000 years (finite population, valid owners, era == eraOf(tech), war symmetry, bounded event/ruin lists, settlement levels), speed < 12 ms/year |
+| 1 autopilot | 12,000 years on seed 7, 4,000 on two more; invariants every 2,000 years (finite population, valid owners, era == eraOf(tech), war symmetry, bounded event/ruin lists, settlement levels), a year's speed against the machine's own (`workUnit`: the same game takes 9.9 ms a year on one box and 13.1 on the next) |
 | 2 actions | every build tool, capital move, levy, rename, war/peace, all god powers, cost gating |
 | 3 save/load | round trip through JSON: owners, population (log-quantised), levels, ruins, volcanoes, comet, wonder era bits, per-realm totals rebuilt by `recount()`, save < 4.5 MB |
 | 4 determinism | same seed ⇒ identical worlds |
@@ -23,7 +23,7 @@ Runs `src/sim.js` in node (no browser). ~4 minutes.
 (`(0, eval)(src)`): a direct `eval` inside a CommonJS module makes every `Math`/typed-array lookup dynamic and the sim runs 8× slower.
 
 ## 2. Browser end-to-end — `node build.js && node test_e2e.js [filter]`
-Playwright + headless Chromium on SwiftShader (software GL, so slow: ~45 minutes for all 28 scenarios; filter with `|`-separated substrings, e.g. `node test_e2e.js "disaster|labels:"`). Serves `dist/` locally, loads `local.html`, injects `testcam.js` (`__T` helpers) and records page errors, console errors and WebGL program errors per scenario. Screenshots of failures go to `shots/e2e_*.png`, the log to `shots/test_e2e.log`.
+Playwright + headless Chromium on SwiftShader (software GL, so slow: ~26 minutes for all 35 scenarios; filter with `|`-separated substrings, e.g. `node test_e2e.js "disaster|labels:"`). Serves `dist/` locally, loads `local.html`, injects `testcam.js` (`__T` helpers) and records page errors, console errors and WebGL program errors per scenario. Screenshots of failures go to `shots/e2e_*.png`, the log to `shots/test_e2e.log`.
 
 Scenarios: boot; intro (choose homeland, sea click refused, random start); turns (advance/report, Enter/stop early, war/era/disaster interrupts, continuous mode and speed keys); laws (the fields and their laws, a law's page with whose hand it strengthens, a reform begun and in force, a form's page with its ways, a chiefdom proclaimed, the estates and where their power comes from, a demand granted, the lens of government with its key and the layers' menu beside it); diplomacy (the realms within reach in their groups, a realm's page with what it thinks and why, a sworn peace proposed and agreed, a gift, a claim, war declared with its price told first, the war's page and a peace, envoys answered, the wars and the standing pages, the lens of relations with its key); city build panel (cards with cost/years/reasons, farm start, temple placement on a plot marker, queue, scaffolding at the site, completion, levy; broke/rich gating); god powers via the Powers dock; inspector (own/foreign/wild/sea, ruler card and portrait, trade row, policy sliders, stance, rename, war button); chronicle modal; menu settings persistence; save → reload → continue (+ no-save and corrupt-save handling); camera limits/pick/compass/minimap; hotkeys; labels (realms high up, towns at region height, no overlaps); goods markers; hover chip; HUD layout at 800×500 and 1920×1080; orbit→street render sweep with instance-cap and `gl.getError()` checks; six cultures draw their own towns; 30 s live run.
 
@@ -56,7 +56,7 @@ checkout, which has none), `GENESIS_UPDATE_GUARD` (seconds an update is given to
 the restart, "What's new", the spark while playing, the case where a whole new app is needed - and keeps pictures.
 
 ## Debug hooks
-`window.__G` (settings, sim, terrain, world, mapcam, movers, fx, turnRun, run(n), start(lon, lat, name), select(i), labelDbg) and `testcam.js` (`__T.cam/era/capital/erupt/fire/battle/quake/flood…`; `__T.teach(c, upto)` gives a realm every discovery of its ages, `__T.era` and `__T.world` do so by themselves).
+`window.__G` (settings, sim, terrain, world, mapcam, movers, fx, turnRun, run(n), start(lon, lat, name), select(i), labelDbg, attention(): what waits on the player, in the order the turn button lays it before him) and `testcam.js` (`__T.cam/era/capital/erupt/fire/battle/quake/flood…`; `__T.teach(c, upto)` gives a realm every discovery of its ages, `__T.era` and `__T.world` do so by themselves; `__T.quiet()` sends home whoever waits on the player and stops the realms that rule themselves from proposing anything: the suite calls it before every scenario that is not about envoys, so that the turn button is the scenario's).
 `node dbg3.js "<script>" "<probe returning an object>" <wait ms>` runs a script in the page and prints the probe.
 `node shot2.js <name> "<script>" <t1> <t2>` takes two screenshots (`shots/<name>_a.png`, `_b.png`).
 

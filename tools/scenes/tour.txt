@@ -116,6 +116,8 @@ laws_medieval | tools/scenes/gov.js | {age:4,years:60,auth:90,key:'standing'} | 
 laws_forms   | tools/scenes/gov.js | {age:5,years:40,tab:'form',auth:120,key:'absolute'} | | 22
 laws_estates | tools/scenes/gov.js | {age:4,years:60,tab:'estates',demand:['nobles','fiefs']} | | 22
 laws_lens    | tools/scenes/gov.js | {years:9500,lens:true} | | 26
+# --- a battle before a town: two great realms' armies (they are drawn by their might) ---
+battle       | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { const S = __G.sim, c = S.playerCiv(), e = S.civs.find((x) => x && x !== c); S.mightOf[c.id] = 500; S.mightOf[e.id] = 800; __T.battle(false); __sceneLook('town', 3.0, 1.05, 0); }, 7000); | 34
 # --- diplomacy: a neighbour's page in peace and in war, a vassal's, envoys waiting, the wars, where the realm stands, the lens of relations ---
 dip          | tools/scenes/dip.js | {pick:'asker'} | | 16
 dip_war      | tools/scenes/dip.js | {pick:'war'} | | 16

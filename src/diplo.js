@@ -60,7 +60,7 @@ window.DIPLO = (function () {
   const MOODS = [[60, 'devoted'], [35, 'friendly'], [12, 'warm'], [-12, 'indifferent'], [-35, 'wary'], [-60, 'hostile'], [-1e9, 'bitter']];
   const moodOf = (o) => { for (const [min, w] of MOODS) if (o >= min) return w; return 'bitter'; };
   // what a realm's standing with another comes to on the map (the lens of relations), most telling first
-  const STAND = { self: ['Your realm', '#EFE9DA'], war: ['At war with you', '#E2313F'], vassal: ['Your vassals', '#A9D94A'], lord: ['Your lord', '#B48CE0'], ally: ['Sworn to you', '#35C277'], friend: ['Friends', '#5FB2EA'], neutral: ['Indifferent', '#98A1AC'], wary: ['Wary of you', '#E6BC45'], hostile: ['Hostile', '#E0762F'], far: ['Beyond your envoys', '#4A525C'] };
+  const STAND = { self: ['Your realm', '#EFE9DA'], war: ['At war with you', '#E2313F'], vassal: ['Your vassals', '#A9D94A'], lord: ['Your lord', '#B48CE0'], ally: ['Sworn to you', '#35C277'], friend: ['Friends', '#4AA3F0'], neutral: ['Indifferent', '#98A1AC'], wary: ['Wary of you', '#E6BC45'], hostile: ['Hostile', '#E0762F'], far: ['Beyond your envoys', '#4A525C'] };
   // kinds of rule that cannot live beside one another once nations and parties exist (rule.js KINDS): [a, b, how much they dislike it]
   const CREEDS = [['party', 'council', 16], ['party', 'crown', 14], ['party', 'empire', 14], ['party', 'faith', 16], ['sword', 'council', 8], ['experts', 'faith', 6]];
   const creedGap = (ka, kb) => { for (const [x, y, v] of CREEDS) if ((ka === x && kb === y) || (ka === y && kb === x)) return v; return 0; };
@@ -152,12 +152,13 @@ window.DIPLO = (function () {
     const ratio = (a, b) => (host.mightOf[a.id] + 0.01) / (host.mightOf[b.id] + 0.01);      // (how a's might stands to b's: its arms and its numbers)
 
     // ----- opinion: how a regards b, from -100 to 100; with `out` the reasons are listed too: [what, by how much] -----
+    // (The reasons are worded for the one who is thought of, who is the one that reads them - "what they think of you": "you" is b, "they" a.)
     function opinion(a, b, out) {
       if (!a || !b || a === b) return 0; const da = D(a), db = D(b), y = year(); let o = 0; const put = (t, v) => { if (!v) return; o += v; if (out) out.push([t, v]); };
       const m = memOf(a, b.id); if (Math.abs(m) >= 0.5) put(m > 0 ? 'Old favours' : 'Old wrongs', Math.round(m));
       if (a.religion && b.religion) { if (a.religion === b.religion) put('The same faith', 6); else { const fl = host.faithLaw(a), base = fl === 'orthodoxy' ? -16 : fl === 'established' ? -10 : fl === 'tolerance' || fl === 'secular' || fl === 'godless' ? 0 : -6; put('Another faith', Math.round(base * (host.trait(a) === 'pious' ? 1.5 : 1))); } }
       const ka = host.kind(a), kb = host.kind(b); if (ka === kb && ka !== 'kin') put('Ruled alike', 4); else if (a.era >= 6 || b.era >= 6) put('Ruled by another creed', -creedGap(ka, kb));
-      const near = touches(a, b.id); { const ta = host.tongue(a); if (ta && ta === host.tongue(b)) put('Kindred speech', 5); else if (near && (a.era >= 6 || b.era >= 6)) put('Another nation on your border', -8); }      // (once peoples think of themselves as nations)
+      const near = touches(a, b.id); { const ta = host.tongue(a); if (ta && ta === host.tongue(b)) put('Kindred speech', 5); else if (near && (a.era >= 6 || b.era >= 6)) put('Another nation on their border', -8); }      // (once peoples think of themselves as nations)
       const ts = tradeShare(a, b.id); if (ts > 0.005) put('Trade between you', Math.min(10, Math.round(50 * ts)));
       const p = da.pact[b.id]; let bind = false;
       if (p) { if (p.nap > y) { put('A sworn peace', 4); bind = true; } if (p.trade > y) put('A trade agreement', 5); if (p.alliance > y) { put('An alliance', 20); bind = true; } else if (p.defence > y) { put('A defensive pact', 12); bind = true; } if (p.marriage > y) { put('A royal marriage', 12); bind = true; } }
@@ -166,18 +167,18 @@ window.DIPLO = (function () {
         const big = host.mightOf[b.id] > host.mightOf[a.id] * 2, need = big && !!threatTo(a); put(need ? 'Your protection' : big ? 'The tribute they pay you' : 'Your yoke', need ? 6 : big ? -6 : -12); }
       else if (!bind && near) {      // (neighbours are rivals first: the border itself, a neighbour of one's own weight, a strong one with an appetite)
         put('A shared border', -5); const r = ratio(b, a);
-        if (r > 2) { if (host.aggression(b) > 0.6 || db.inf > 5) put('A strong neighbour with an appetite', -10); } else if (r > 0.67 && r < 1.5) put('A rival of your own weight', -6);
+        if (r > 2) { if (host.aggression(b) > 0.6 || db.inf > 5) put('Your strength, and your appetite', -10); } else if (r > 0.67 && r < 1.5) put('A rival of their own weight', -6);
       }
       // (peace kept is trust earned: two points for every turn since they last fought, or since the younger of them was founded; six at most)
       if (near && a.wars[b.id] === undefined) { const t = a.truce ? a.truce[b.id] : undefined, since = t !== undefined ? t - 100 : Math.max(a.founded || 0, b.founded || 0), v = Math.floor(2 * (y - since) / pace(a)); if (v > 0) put('A long peace', v > 6 ? 6 : v); }
-      if (db.ban[a.id]) put('Their markets are closed to you', -10);
-      if (db.inf > 1) put('Their conquests', -Math.min(40, Math.round(db.inf * (near ? 0.8 : 0.4))));
-      if (db.rep !== 50) put(db.rep > 50 ? 'Their word is good' : 'Their word is worth little', Math.round((db.rep - 50) * 0.4));
-      if (da.claim[b.id * 4] > y) put('Your claim on their land', -8); if (db.claim[a.id * 4] > y) put('Their claim on your land', -12);
-      if (da.claim[b.id * 4 + 1] > y) put('They hold land that was yours', -10);
-      if (near) { const g = host.covets(a, b); if (g) put(out ? 'They hold ' + g.toLowerCase() + ', and you have none' : 'covet', -8); }
+      if (db.ban[a.id]) put('Your markets are closed to them', -10);
+      if (db.inf > 1) put('Your conquests', -Math.min(40, Math.round(db.inf * (near ? 0.8 : 0.4))));
+      if (db.rep !== 50) put(db.rep > 50 ? 'Your word is good' : 'Your word is worth little', Math.round((db.rep - 50) * 0.4));
+      if (da.claim[b.id * 4] > y) put('Their claim on your land', -8); if (db.claim[a.id * 4] > y) put('Your claim on their land', -12);
+      if (da.claim[b.id * 4 + 1] > y) put('You hold land that was theirs', -10);
+      if (near) { const g = host.covets(a, b); if (g) put(out ? 'You hold ' + g.toLowerCase() + ', and they have none' : 'covet', -8); }
       const wb = host.warsN(b); if (wb && host.warsN(a)) for (const k in a.wars) if (b.wars[k] !== undefined && +k !== a.id && +k !== b.id) { put('A common enemy', 12); break; }
-      if (wb) { let w = 0; for (const k in b.wars) { const e = civs[+k]; if (e && e !== a && (has(a, e.id, 'alliance') || has(a, e.id, 'defence') || D(e).lord === a.id || da.lord === e.id)) { w = 1; break; } } if (w) put('At war with your friends', -14); }
+      if (wb) { let w = 0; for (const k in b.wars) { const e = civs[+k]; if (e && e !== a && (has(a, e.id, 'alliance') || has(a, e.id, 'defence') || D(e).lord === a.id || da.lord === e.id)) { w = 1; break; } } if (w) put('You are at war with their friends', -14); }
       const t = host.trait(a); if (t === 'conqueror' && near) put('A conqueror\'s eye', -6); else if (t === 'steward') put('A ruler who keeps the peace', 4); else if (t === 'tyrant') put('A ruler who trusts nobody', -4);
       return o > 100 ? 100 : o < -100 ? -100 : o;
     }
@@ -220,8 +221,9 @@ window.DIPLO = (function () {
       if (!host.knows(a.id, P.need)) return 'Needs ' + host.discovery(P.need); if (host.atWar(a, b.id)) return 'You are at war';
       if (kind === 'vassal') { if (D(b).lord === a.id) return 'Already your vassal'; if (lordOf(a)) return 'A vassal takes no vassals'; if (D(a).lord === b.id) return 'They are your lord'; }
       else if (kind === 'protect') { if (D(a).lord === b.id) return 'Already your lord'; if (lordOf(a)) return 'You have a lord already'; if (vassalsOf(a.id).length) return 'A lord of vassals kneels to nobody'; if (D(b).lord === a.id) return 'They are your vassal'; }
-      else { if (has(a, b.id, kind) && D(a).pact[b.id][kind] - year() > Math.max(pace(a), pace(b))) return 'Already in force';      // (it can be sworn again in its last turn)
-        if (kind === 'defence' && has(a, b.id, 'alliance')) return 'Your alliance covers it'; if (kind === 'marriage' && (!host.blood(a) || !host.blood(b))) return 'Both realms must be ruled by blood'; if ((kind === 'defence' || kind === 'alliance') && (lordOf(a) || lordOf(b))) return 'A vassal follows its lord'; }
+      else { if (kind === 'nap' && (D(b).lord === a.id || D(a).lord === b.id)) return D(b).lord === a.id ? 'Your vassal is sworn to you already' : 'You are sworn to your lord already';
+        if (has(a, b.id, kind) && D(a).pact[b.id][kind] - year() > Math.max(pace(a), pace(b))) return 'Already in force';      // (it can be sworn again in its last turn)
+        if (kind === 'defence' && has(a, b.id, 'alliance')) return 'Your alliance covers it'; if (kind === 'marriage' && (!host.blood(a) || !host.blood(b))) return 'Both realms must be ruled by blood'; if ((kind === 'defence' || kind === 'alliance') && (lordOf(a) || lordOf(b))) return D(b).lord === a.id ? 'Your vassal follows you to war already' : 'A vassal follows its lord'; }
       return null;
     }
     // it is agreed
@@ -406,6 +408,12 @@ window.DIPLO = (function () {
       else if (terms === 'vassal') { count(stats.how, 'beaten'); subject(w, l, null); }
       else if (terms === 'regime') { const f = host.formFor(l, w); if (f) host.setForm(l, f); }
     }
+    // a realm has lost its last land in a war: no peace is made with the dead, so whoever took the land is marked for it here (the simulation
+    // calls this just before it strikes the realm off)
+    function fell(l) {
+      for (const k in l.wars) { const w = civs[+k]; if (!w) continue; const taken = Math.max(0, host.cellsOf[w.id] - (w.warStart[l.id] || host.cellsOf[w.id])); if (taken <= 0) continue;
+        const goal = D(w).goal[l.id] || 'none', just = goal !== 'none' && goal !== 'ally'; D(w).inf = Math.min(80, D(w).inf + (Math.min(30, taken / 5) + 4) * (just ? 0.6 : 1)); count(stats.peace, 'conquest'); host.won(w, l); }
+    }
     // the player sues for peace on terms (winner: the id of whoever is to be the winner); a realm that rules itself answers at once
     function cannotSue(p, b) {
       if (!host.atWar(p, b.id)) return 'You are not at war'; if (D(p).side[b.id] !== undefined) return 'This is ' + nameOf(civs[D(p).side[b.id]] || p) + '\'s war to end'; if (D(b).side[p.id] !== undefined) return 'They fight for ' + nameOf(civs[D(b).side[p.id]] || b) + ': make peace there'; return null;
@@ -557,7 +565,7 @@ window.DIPLO = (function () {
       return o >= 12 || has(p, b.id, 'nap') || has(p, b.id, 'trade') ? (o < -12 ? 'wary' : 'friend') : o >= -12 ? 'neutral' : o >= -35 ? 'wary' : 'hostile';
     }
     return { stats, D, tick, step, born, died, wake, heir, reach, opinion, reasons, judge, cannot, propose, answer, breakPact, release, rebel, annex, cannotJoin, gift, giftWorth, claim, claimCost, embargo, causes, warCost, cannotFight, declare,
-      abandon, score, termsFor, wouldEnd, cannotSue, sue, conclude, warsEnd, warWith, think, has, pactOf, anyPact, bound, friends, lordOf, vassalsOf, threatTo, standing, memOf, remember, tradeShare, trIn, trOut, touches, ratio, seal, subject,
+      abandon, score, termsFor, wouldEnd, cannotSue, sue, conclude, fell, warsEnd, warWith, think, has, pactOf, anyPact, bound, friends, lordOf, vassalsOf, threatTo, standing, memOf, remember, tradeShare, trIn, trOut, touches, ratio, seal, subject,
       union, join, closed, agreed, termOf, ver, partnersOf, claimUntil, holds, askedAt, CLAIMS };
   }
   return { PACE, PACTS, PACT, VASSAL, OPENS, CAUSES, TERMS, TERM_TEXT, RANK, MOODS, moodOf, STAND, TRIBUTE, REPARATION, REPARATION_TURNS, CLAIM_TURNS, UNION_TURNS, UNJUST_STAB, UNJUST_REP, creedGap, create };

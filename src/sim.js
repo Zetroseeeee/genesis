@@ -338,7 +338,7 @@ function createSim(world, seed) {
     shake: (cv, by) => { cv.stability = Math.max(0, cv.stability - by); }, tongue: (cv) => STYLES[cv.style] ? STYLES[cv.style].k : '', kind: (cv) => RULE.FORM[rule.ruleOf(cv).gov].kind, blood: (cv) => rule.succession(cv) === 'blood',
     faithLaw: (cv) => rule.ruleOf(cv).laws.faith, tradeLaw: (cv) => rule.ruleOf(cv).laws.trade, covets: (a, b) => { const g = covetOf(a, b); return g ? GOODS[g].name : ''; }, absorb, formFor,
     setForm: (cv, key) => { const F = RULE.FORM[key]; if (!F) return; if (!rule.known(cv.id, F)) rule.ruleOf(cv).brought = key; rule.setForm(cv.id, cv, F, 'imposed'); },
-    alarm: () => {}, trait: (cv) => cv.ruler ? cv.ruler.trait : '', aggression: (cv) => cv.aggression, ruler: (cv) => cv.ruler ? `${cv.ruler.title} ${cv.ruler.name}` : fullName(cv), nameOf: (cv) => fullName(cv), income: (cv) => cv.income || 0, fmtYear });
+    alarm: () => {}, trait: (cv) => cv.ruler ? cv.ruler.trait : '', aggression: (cv) => cv.player ? (cv.policy.stance === 'aggressive' ? 0.9 : cv.policy.stance === 'consolidate' ? 0.25 : 0.5) : cv.aggression,      /* (the player's appetite is what his stance says, not a number he cannot see) */ ruler: (cv) => cv.ruler ? `${cv.ruler.title} ${cv.ruler.name}` : fullName(cv), nameOf: (cv) => fullName(cv), income: (cv) => cv.income || 0, fmtYear });
   function pickTrait(c) {
     const w = { conqueror: 1 + (c.aggression > 0.6 ? 1 : 0), builder: 1, pious: c.religion ? 1.4 : 0.6, scholar: c.era >= 3 ? 1.3 : 0.4, merchant: c.era >= 2 ? 1.2 : 0.3, tyrant: 0.5, steward: 1, navigator: c.era >= 3 && ports[c.id] ? 1.4 : 0.2 };
     let sum = 0; for (const k in w) sum += w[k]; let r = rnd() * sum; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return 'steward';
@@ -358,6 +358,8 @@ function createSim(world, seed) {
   }
   function killCiv(c, why) {
     for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c.id && level[i] >= 2) markRuin(i, c.era, c.culture); }
+    // (its enemies' wars with it are over now: left on their lists until they next looked, they passed to whoever was born under its number)
+    for (const k in c.wars) { const e = civs[+k]; if (e && e.wars[c.id] !== undefined) { delete e.wars[c.id]; warCnt[e.id] = -1; } }
     c.alive = false; civCount--; st.civCount = civCount; civs[c.id] = null; freeIds.push(c.id); mightOf[c.id] = 0; diplo.died(c.id);
     pushWorld({ year, text: `${fullName(c)} is no more${why ? ' — ' + why : ''}.`, civ: c.id, type: 'state', loc: c.capital, dead: true });
   }
@@ -509,7 +511,7 @@ function createSim(world, seed) {
     diplo.tick();      // (who trades with whom; what tribute changes hands this year)
     for (let c = 0; c < MAXC; c++) {
       const cv = civs[c]; if (!cv) continue;
-      if (cellsOf[c] === 0) { killCiv(cv, 'its last lands were lost'); continue; }
+      if (cellsOf[c] === 0) { diplo.fell(cv); killCiv(cv, 'its last lands were lost'); continue; }
       if (cv.capital < 0 || owner[cv.capital] !== c) { cv.capital = bestCell[c]; logEvent(cv, `${cellName.get(cv.capital) || 'A new city'} becomes the capital of ${fullName(cv)}`, false); }
       if (cellsOf[c] > cv.peakCells) cv.peakCells = cellsOf[c];
       // knowledge

@@ -28,6 +28,8 @@ async function scenario(name, fn) {
     if ((await ev(() => document.body.dataset.mode)) !== 'play') { await ev(() => __G.start(31.25, 29.9, 'Kemet')); await wait(300); await frames(3); }
   }
   if (page) await ev(() => { if (window.__toasts) window.__toasts.length = 0; });
+  // (envoys are a matter for the scenario about them: elsewhere nobody waits on the player at the start and the neighbours keep their proposals to themselves)
+  if (page && !/^(boot|intro|diplomacy)/.test(name)) await ev(() => { if (window.__T && __T.quiet && __G.sim && document.body.dataset.mode === 'play') __T.quiet(); });
   const before = errors.length; const t = Date.now(); const fails = [];
   const check = (cond, msg) => { if (!cond) fails.push(msg); };
   try { await fn(check); } catch (e) { fails.push('threw: ' + (e.message || e).toString().slice(0, 400)); }
@@ -359,7 +361,10 @@ server.listen(0, async () => {
     await ev(() => document.getElementById('btn-load').click()); await wait(800); await page.waitForFunction(() => !__G.mapcam.fly, null, { timeout: 320000 }); await frames(4);      // (from the home screen the camera flies down to where the world was left)
     const after = await ev(() => { const S = __G.sim; const c = S.playerCiv(); return { mode: document.body.dataset.mode, year: S.year, name: c && c.name, cells: c && S.cellsOf[c.id], civs: S.st.civCount, lon: __G.mapcam.lon, lat: __G.mapcam.lat, ruin: S.ruins.get(S.LI[123])?.name, turn: document.getElementById('turn1').textContent, left: document.getElementById('left').classList.contains('open') }; });
     check(after.mode === 'play', 'play mode after load'); check(after.year === before.year, `year ${after.year} == ${before.year}`); check(after.name === before.name, 'player name'); check(Math.abs(after.cells - before.cells) <= 1, `cells ${after.cells} ~ ${before.cells}`); check(after.civs === before.civs, `civs ${after.civs} == ${before.civs}`);
-    check(Math.abs(after.lon - before.lon) < 1e-6 && Math.abs(after.lat - before.lat) < 1e-6, 'camera restored'); check(after.ruin === 'Testruin', 'ruins restored'); check(after.turn === 'Advance', 'turn button ready');
+    check(Math.abs(after.lon - before.lon) < 1e-6 && Math.abs(after.lat - before.lat) < 1e-6, 'camera restored'); check(after.ruin === 'Testruin', 'ruins restored');
+    // (the turn button is ready: for the next turn, or for envoys who were waiting when the world was saved and still are - they are answered first)
+    check(after.turn === 'Advance' || after.turn === 'Envoys', 'turn button ready: ' + after.turn);
+    if (after.turn === 'Envoys') { const t = await ev(() => { const S = __G.sim, c = S.playerCiv(); for (const o of [...c.dip.offers]) S.diplo.answer(c, o.id, false); ENVOYS.refresh(); return c.dip.offers.length; }); await frames(4); check(t === 0 && (await state()).t1 === 'Advance', 'envoys answered, the turn button is ready'); }
     // and a turn still runs after loading
     await ev(() => document.getElementById('turn').click()); await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 300000 }); check((await state()).year > before.year, 'time runs after load');
   });
@@ -536,10 +541,10 @@ server.listen(0, async () => {
     await ev(() => { ENVOYS.show(window.__dip[1]); }); await frames(2); await ev(() => document.querySelector('#dp-info [data-dact="sue"][data-k="white"]').click()); await frames(2);
     r = await ev(() => { const S = __G.sim, c = S.playerCiv(), b = S.civs[window.__dip[1]]; return { war: S.isAtWar(c, b.id), line: [...document.querySelectorAll('#dp-info .dp-line')].map(x => x.textContent).join(' / '), no: document.querySelector('#dp-info .gv-sect:last-child').textContent }; });
     check(!r.war && /A truce until/.test(r.line) && /truce holds/i.test(r.no), 'peace as things stand, and a truce: ' + r.line);
-    // envoys: what another realm proposes waits on the player, on the tab and in the turn button
-    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[0]]; S.diplo.remember(a, c.id, 40); const no = S.diplo.propose(a, c, 'trade'); ENVOYS.close(); return { no, n: c.dip.offers.length }; }); await frames(3);
-    { const s = await state(); const adv = await ev(() => document.getElementById('advisor-text').textContent); check(r.no === null && r.n === 1 && s.t1 === 'Envoys' && /proposes a trade agreement/.test(adv), `envoys wait on the player: ${s.t1} · ${adv}`); }
-    await ev(() => document.getElementById('turn').click()); await frames(3);
+    // envoys: what another realm proposes waits on the player: among what the turn button lays before him, and on the tab
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[0]]; ENVOYS.close(); S.diplo.remember(a, c.id, 40); const no = S.diplo.propose(a, c, 'trade'); const q = __G.attention(), it = q.find((x) => x.kind === 'envoy'); return { no, n: c.dip.offers.length, t1: it ? it.t1 : '', t2: it ? it.t2 : '', at: q.indexOf(it) + 1, len: q.length }; });
+    check(r.no === null && r.n === 1 && r.t1 === 'Envoys' && /proposes a trade agreement/.test(r.t2), `envoys wait on the player: ${r.t1} · ${r.t2} (${r.at} of ${r.len} things that wait)`);
+    await ev(() => { __G.attention().find((x) => x.kind === 'envoy').act(); }); await frames(3);      // (what a press of the turn button does when their turn comes)
     r = await ev(() => ({ open: document.getElementById('dip').open, tab: document.querySelector('#dp-tabs button.on').textContent.trim(), n: (document.querySelector('#dp-tabs .dp-n') || { textContent: '' }).textContent, card: (document.querySelector('#dp-envoys .dp-offer') || { textContent: '' }).textContent }));
     check(r.open && /^Envoys/.test(r.tab) && r.n === '1' && /proposes a trade agreement/.test(r.card) && /half the customs/.test(r.card), 'the turn button leads to them: ' + r.card.slice(0, 140));
     await ev(() => document.querySelector('#dp-envoys [data-dact="answer"][data-v="yes"]').click()); await frames(2);
@@ -572,7 +577,7 @@ server.listen(0, async () => {
 
   // ---------- layouts ----------
   await scenario('layout: from 800x500 to 1920x1080 the HUD stays inside the viewport and the launchers clear of the minimap', async (check) => {
-    for (const vp of [{ width: 800, height: 500 }, { width: 1280, height: 720 }, { width: 1512, height: 900 }, { width: 1920, height: 1080 }]) {
+    for (const vp of [{ width: 800, height: 500 }, { width: 1160, height: 700 }, { width: 1920, height: 1080 }]) {      // (1160: just wide enough for the launchers' names, where they come nearest the minimap)
       await page.setViewportSize(vp); await wait(300); await frames(3); await ev(() => { document.getElementById('l-build').click(); __G.select(__G.sim.playerCiv().capital); }); await frames(2);
       const r = await ev(() => { const ids = ['tl', 'tr', 'left', 'bl', 'bc', 'br', 'turn', 'minimapbox']; const out = []; for (const id of ids) { const el = document.getElementById(id); if (!el || getComputedStyle(el).display === 'none') continue; const b = el.getBoundingClientRect(); if (b.width === 0) continue; if (b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1) out.push(`${id} ${Math.round(b.left)},${Math.round(b.top)}-${Math.round(b.right)},${Math.round(b.bottom)}`); } const a = document.getElementById('left').getBoundingClientRect(), d = document.getElementById('bc').getBoundingClientRect(); const overlap = a.left < d.right && d.left < a.right && a.top < d.bottom && d.top < a.bottom;
         // (the bar of launchers stops short of the minimap and the turn button, and none of its names is cut off)

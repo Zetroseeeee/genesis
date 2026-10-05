@@ -23,14 +23,15 @@
   const made = []; for (let k = 0; k < 7; k++) { let best = -1, bd = 9; for (const i of ring) { if (S.owner[i] >= 0) continue; const d = Math.abs(((ang(i) - k * TAU / 7 + 3 * Math.PI) % TAU) - Math.PI); if (d < bd) { bd = d; best = i; } } if (best < 0) break; const t = S.spawnTribe(best, {}); if (t) made.push(t); }
   const [foe, cold, friend, small, trader, asker, spouse] = made; const size = new Map(); [[foe, [52, 3.5]], [cold, [30, 3]], [friend, [24, 3]], [small, [6, 1.6]], [trader, [18, 3]], [asker, [14, 2.6]], [spouse, [34, 3.2]]].forEach(([t, v]) => { if (t) size.set(t, v); });
   const got = new Map(made.map((t) => [t, 1])); for (let round = 0; round < 14; round++) for (const t of made) { const [n, pop] = size.get(t); const need = n - got.get(t); if (need > 0) got.set(t, got.get(t) + grow(t, Math.min(Math.ceil(n / 10), need), pop)); }
-  const iron = S.ERAS[2][1] + 0.015; for (const x of [c, ...made]) { x.tech = iron; x.era = S.eraOf(iron); if (window.__T) __T.teach(x, 2, true); S.rule.setForm(x.id, x, RULE.FORM.kingdom, 'quiet'); x.religion = x === cold ? 'the Way of Ashur' : 'the Old Faith'; if (x !== c) { x.aggression = 0; x.dip.think = 1e12; } }
+  const king = (x) => { if (x.ruler && S.rule.naming) x.ruler.title = S.rule.naming(x, 'kingdom').titles[0]; };
+  const iron = S.ERAS[2][1] + 0.015; for (const x of [c, ...made]) { x.tech = iron; x.era = S.eraOf(iron); if (window.__T) __T.teach(x, 2, true); S.rule.setForm(x.id, x, RULE.FORM.kingdom, 'quiet'); king(x); x.religion = x === cold ? 'the Way of Ashur' : 'the Old Faith'; if (x !== c) { x.aggression = 0; x.dip.think = 1e12; } }
   c.wealth = 6000; S.recount(); S.touchAll(); G.run(6); S.touchAll();
-  if (friend) friend.ruler.trait = 'steward'; if (foe) foe.ruler.trait = 'conqueror';
+  for (const x of [c, ...made]) king(x); if (friend) friend.ruler.trait = 'steward'; if (foe) foe.ruler.trait = 'conqueror';
   // the table
   const seal = (b, kind) => { if (b) D.seal(c, b, kind); };
   if (trader) { seal(trader, 'trade'); D.remember(trader, c.id, 14); }
   if (spouse) { seal(spouse, 'marriage'); seal(spouse, 'nap'); D.remember(spouse, c.id, 10); }
-  if (small) D.subject(c, small, null);
+  if (small) D.seal(c, small, 'vassal');
   if (cold) { D.embargo(c, cold, true); D.claim(c, cold); D.remember(cold, c.id, -28); if (foe) D.seal(cold, foe, 'alliance'); }
   if (friend) { seal(friend, 'alliance'); seal(friend, 'trade'); D.remember(friend, c.id, 30); }
   if (asker) { D.remember(asker, c.id, 22); D.propose(asker, c, 'nap'); }
@@ -40,6 +41,7 @@
       if (friend && !S.isAtWar(friend, foe.id)) D.join(friend, c, foe); if (friend && !D.has(c, friend.id, 'alliance')) D.seal(c, friend, 'alliance'); if (cold && !S.isAtWar(cold, c.id)) D.join(cold, foe, c);
       const y0 = S.year - 30; for (const x of [c, friend, small]) if (x && x.wars[foe.id] !== undefined) x.wars[foe.id] = foe.wars[x.id] = y0; if (cold && cold.wars[c.id] !== undefined) cold.wars[c.id] = c.wars[cold.id] = y0;
       foe.warStart[c.id] = Math.round(S.cellsOf[foe.id] * 1.22); c.dip.offers = c.dip.offers.filter((o) => o.kind !== 'call'); D.D(c).offers.push({ id: ++D.D(c).seq, from: foe.id, kind: 'peace', terms: 'tribute', winner: c.id, since: S.year, until: S.year + 60 }); } }
+  D.tick();      // (this year's tribute is reckoned)
   out.offers = D.D(c).offers.map((o) => o.kind).join(','); out.wars = Object.keys(c.wars).length;
   const by = { war: foe, ally: friend, spouse, trader, vassal: small, cold, asker }; const sel = (by[P.pick] || asker || foe || made[0] || { id: -1 }).id;
   out.who = {}; for (const k in by) if (by[k]) out.who[k] = { id: by[k].id, name: by[k].name, regions: S.cellsOf[by[k].id], ratio: +D.ratio(by[k], c).toFixed(2), opinion: Math.round(D.opinion(by[k], c)), stands: D.standing(c, by[k]) };
