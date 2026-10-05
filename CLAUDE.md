@@ -283,19 +283,23 @@ Conventions that matter:
   and the red edge of night are the same sum along the line of sight (sunlight dimmed on its way in, the share the gas
   and the haze turn toward the eye, light scattered before from a table by the sun's height, what the air between takes
   away). It has no textures (the ground's shader has no sampler to spare): the column of air to space is a closed form,
-  and each step takes the air as it really thins along it, so six steps do for the ground and two for a house, and a
-  house stands in the same air as its street. The ground works it out per pixel (`air(vViewPos, ...)`, then
-  `airOver(colour, T, L)`), things that stand on it at their corners (`AIR.VERT` / `AIR.FRAG`), the sky per pixel out
-  to space (`world.js`: a sphere round the camera drawn last, at the far plane, with the sun's disc and the moon on it).
-  Shaders still write the colours of the screen; `airOver` takes them to light and back. Three things are not as in
-  nature, each for the game's sake: the air is twice as tall and half as dense (the ground is drawn twice as tall:
-  `THICK`); it is thinned about the eye when the camera is down among towns drawn many times larger than life
-  (`AIR.near`: a town stands clear, the hills behind it in haze); and it is thinned where it is looked down through
-  (`AIR.down`: the map stays readable from high up, the horizon and the rim keep their haze). The eye opens as the
-  light goes (`AIR.OPEN`: stops by the sun's height), which is what shows dusk and a moonlit night at all. `AIR.update`
-  runs once a frame after the camera is final. Change the air in `tools/air/sky.js` first. The stars are points on a
-  sphere that goes with the camera, at every height: from the ground they come out as the sky darkens, thin out
-  toward the horizon and twinkle.
+  and each step takes the air as it really thins along it, so five steps do for the ground and two for a house, and a
+  house stands in the same air as its street. **It is worked out at the corners of meshes, never per pixel** (a march
+  at every pixel of a large screen cost two thirds of the frame rate): the ground and the things on it in their vertex
+  shaders (`AIR.VERT`: `air(viewPos, steps, vAirT, vAirL)`, then `airOver(colour, vAirT, vAirL)` from `AIR.FRAG`), the
+  sky on a mesh of directions round the camera (`world.js`: rings set by how high above the ground a line of sight
+  passes, so the horizon from the ground and the whole thin rim from orbit get most of them; drawn last, at the far
+  plane, with the sun's disc and the moon on it). Only what turns with the angle to the sun is per pixel there
+  (`airParts` gives the gas's and the haze's shares apart, the phases are applied in the fragment shader: the bright
+  ring round the sun is sharp). Shaders still write the colours of the screen; `airOver` takes them to light and back.
+  Three things are not as in nature, each for the game's sake: the air is twice as tall and half as dense (the ground
+  is drawn twice as tall: `THICK`); it is thinned about the eye when the camera is down among towns drawn many times
+  larger than life (`AIR.near`: a town stands clear, the hills behind it in haze); and it is thinned where it is
+  looked down through (`AIR.down`: the map stays readable from high up, the horizon and the rim keep their haze). The
+  eye opens as the light goes (`AIR.OPEN`: stops by the sun's height), which is what shows dusk and a moonlit night
+  at all. `AIR.update` runs once a frame after the camera is final. Change the air in `tools/air/sky.js` first. The
+  stars are points on a sphere that goes with the camera, at every height: from the ground they come out as the sky
+  darkens, thin out toward the horizon and twinkle.
 - **The picture's last steps** (`post.js`; on a real GPU at full quality, `POST=1` in the harnesses). The scene is
   drawn into a target that holds light brighter than white (half floats, four samples) and its depth, then: shade
   (ambient occlusion from the depth alone, two reaches, a share of the distance wide so it reads at every height;

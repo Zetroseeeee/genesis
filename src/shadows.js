@@ -19,7 +19,7 @@
       if (edge <= 0.0 || s.z <= 0.0 || s.z >= 1.0) return 0.0;
       float z = s.z - uShadowP.z, t = uShadowP.y, sum = 0.0;
       // 12 taps on two rings, turned per pixel so the banding of a regular kernel becomes fine grain
-      float a = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853; float ca = cos(a), sa = sin(a);
+      float a = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) * 6.2831853; float ca = cos(a), sa = sin(a);      // (a turn that differs evenly from pixel to pixel: its grain is finer than a random one's)
       mat2 rot = mat2(ca, sa, -sa, ca);
       sum += step(texture2D(uShadowMap, s.xy + rot * vec2( 0.92,  0.00) * t).r, z);
       sum += step(texture2D(uShadowMap, s.xy + rot * vec2(-0.46,  0.80) * t).r, z);

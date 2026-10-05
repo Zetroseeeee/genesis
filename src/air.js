@@ -117,7 +117,7 @@
     float airPhR(float c) { return 0.0596831 * (1.0 + c * c); }
     float airPhM(float c) { return 0.1193662 * ${f(1 - G * G)} * (1.0 + c * c) / (${f(2 + G * G)} * pow(${f(1 + G * G)} - ${f(2 * G)} * c, 1.5)); }`;
   A.GLSL = `
-    uniform vec3 uAirC, uAirS, uAirN; uniform vec4 uAirE; uniform vec3 uAirK; uniform vec3 uAirPsi[${PSI_N}];      // the planet's centre and the way to the sun, as the camera sees them; the night's own glow; x: how strongly the sun lights the air (0: no air), y: the haze, z: the sun's disc, w: the share of the steps to take
+    uniform vec3 uAirC, uAirS, uAirN; uniform vec4 uAirE; uniform vec3 uAirK, uAirSunC, uAirPsiC; uniform float uAirQ; uniform vec3 uAirPsi[${PSI_N}];      // the planet's centre and the way to the sun, as the camera sees them; the night's own glow; x: how strongly the sun lights the air (0: no air), y: the haze, z: the sun's disc, w: the share of the steps to take
     const float A_RG = ${f(RG)}, A_RT = ${f(RT)}, A_HR = ${f(HR)}, A_HM = ${f(HM)}, A_MS = ${f(MS)}, A_ME = ${f(ME)}, A_OC = ${f(OC)}, A_OW = ${f(OW)};
     const vec3 A_BR = ${v3(BR)}, A_BO = ${v3(BO)};
     float airCol(float r, float mu, float H) {
@@ -152,6 +152,17 @@
       // (where there is little air on the line - a house across the square, the ground under a low camera - two steps tell as much as six)
       float hA = sqrt(max(tA * tA - 2.0 * q * tA + c2, 1e-12)) - A_RG, hB = rB - A_RG, hLow = min(hA, hB);
       float most = (A_BR.b * exp(min(-hLow / A_HR, 60.0)) + A_ME * uAirE.y * exp(min(-hLow / A_HM, 60.0))) * (tB - tA) * steep * mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, tB));
+      if (most < 0.05 && uAirQ > 0.5 && tB - tA < 0.02) {
+        // Little air on a short line, seen from down in it (a house across the square, the ground under a low camera): one piece,
+        // the air as it thins between its two ends, lit by the sun as it stands where the camera is (uAirSunC, uAirPsiC: worked out
+        // once a frame). A town has a million corners, and this is a fifth of the work of two steps.
+        float d = (hB - hA), eRA = exp(min(-hA / A_HR, 60.0)), eRB = exp(min(-hB / A_HR, 60.0)), eMA = exp(min(-hA / A_HM, 60.0)), eMB = exp(min(-hB / A_HM, 60.0));
+        vec3 sR = A_BR * airMean(eRA, eRB, d / A_HR); float dM = airMean(eMA, eMB, d / A_HM) * uAirE.y, sM = A_MS * dM; vec3 ext = sR + A_ME * dM;
+        float tm = 0.5 * (tA + tB), thin = (mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, tA)) + 4.0 * mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, tm)) + mix(uAirK.x, 1.0, smoothstep(uAirK.y, uAirK.y * 4.0, tB))) / 6.0;
+        T = exp(-ext * (tB - tA) * steep * thin); vec3 w = (1.0 - T) / max(ext, vec3(1e-9)) * uAirE.x;
+        LR = w * sR * uAirSunC; LM = w * sM * uAirSunC; LS = w * (sR + sM) * uAirPsiC + uAirN * (1.0 - T);
+        return;
+      }
       float fn = max(2.0, floor(steps * uAirE.w * (most < 0.05 ? 0.34 : most < 0.25 ? 0.67 : 1.0) + 0.5)); int n = int(fn);
       // (each step takes the air it passes as it really thins along it - two straight pieces of an exponential, from the heights at
       // its ends and its middle - so a few long steps come out as many short ones would, and a house stands in the same air as its street)
@@ -186,7 +197,7 @@
 
   // ---------- what the game sets each frame ----------
   if (typeof THREE !== 'undefined') {
-    A.uniforms = { uAirC: { value: new THREE.Vector3(0, 0, -3) }, uAirS: { value: new THREE.Vector3(0, 1, 0) }, uAirN: { value: new THREE.Vector3(0, 0, 0) }, uAirE: { value: new THREE.Vector4(A.expose, 1, 0, 0) }, uAirK: { value: new THREE.Vector3(1, 1, 1) },
+    A.uniforms = { uAirC: { value: new THREE.Vector3(0, 0, -3) }, uAirS: { value: new THREE.Vector3(0, 1, 0) }, uAirN: { value: new THREE.Vector3(0, 0, 0) }, uAirE: { value: new THREE.Vector4(A.expose, 1, 0, 0) }, uAirK: { value: new THREE.Vector3(1, 1, 1) }, uAirSunC: { value: new THREE.Vector3(1, 1, 1) }, uAirPsiC: { value: new THREE.Vector3(0, 0, 0) }, uAirQ: { value: 0 },
       uAirPsi: { value: A.psi.map((p) => new THREE.Vector3(p[0], p[1], p[2])) } };
   }
   // The eye opens as the light goes: how much brighter the air is shown than it is, by the sun's height where the camera stands
@@ -205,9 +216,9 @@
   A.exposure = (alt) => A.expose + (A.exposeHigh - A.expose) * sm(0.01, 0.16, alt);
   // Down among the houses the game shows things many times larger than life (town.js: a village nineteen times, a great city
   // three), and the air between the eye and the far side of a town would be the air of a day's march. So the air about the eye
-  // is thinned by that much, as far out as the things the camera is looking at (three times its distance to what it looks at),
-  // and comes to its true thickness beyond: a town stands clear, the hills behind it stand in haze.
-  A.near = (dist) => [1 / (1 + 11 * (1 - sm(0.0005, 0.006, dist))), Math.min(0.02, Math.max(0.0004, 3 * dist))];
+  // is thinned by that much, as far out as the things the camera is looking at (half as far again as what it looks at), and
+  // comes to its true thickness by four times that: a town stands clear, the country behind it goes into haze.
+  A.near = (dist) => [1 / (1 + 11 * (1 - sm(0.0005, 0.006, dist))), Math.min(0.02, Math.max(0.0003, 1.5 * dist))];
   // camera: its matrixWorld must be this frame's; sun: the way to the sun in the world (unit); dist: how far the camera is from what it looks at
   A.update = (camera, sun, alt, dist) => {
     const U = A.uniforms, e = camera.matrixWorld.elements, px = e[12], py = e[13], pz = e[14];
@@ -218,6 +229,8 @@
     const night = (1 - sm(-0.3, -0.08, sunUp)) * (1 - sm(0.004, 0.03, a));      // (below, and only there: the night's own faint light, enough to tell the sky from the hills)
     U.uAirE.value.set(A.on ? A.exposure(a) * A.opened : 0, A.haze, A.disc, A.steps);
     U.uAirN.value.set(A.night[0] * night, A.night[1] * night, A.night[2] * night);
+    // (for short lines of sight from down in the air: the sun's light where the camera is, worked out here once instead of at every corner of every house)
+    { const hC = Math.min(Math.max(a, 0), 0.004) * 0.5, sc = A.sun(RG + hC, sunUp), pc = A.psiAt(sunUp); U.uAirSunC.value.set(sc[0], sc[1], sc[2]); U.uAirPsiC.value.set(pc[0], pc[1], pc[2]); U.uAirQ.value = A.quick !== false && a < 0.004 ? 1 : 0; }
     const nk = A.near(dist === undefined ? 1 : dist); U.uAirK.value.set(A.clear === false ? 1 : nk[0], nk[1], A.clear === false ? 1 : A.down + (A.downHigh - A.down) * sm(0.05, 0.5, a));
   };
   // set the haze (1: a clear day) and work the table out again for it
