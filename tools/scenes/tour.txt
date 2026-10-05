@@ -116,3 +116,11 @@ laws_medieval | tools/scenes/gov.js | {age:4,years:60,auth:90,key:'standing'} | 
 laws_forms   | tools/scenes/gov.js | {age:5,years:40,tab:'form',auth:120,key:'absolute'} | | 22
 laws_estates | tools/scenes/gov.js | {age:4,years:60,tab:'estates',demand:['nobles','fiefs']} | | 22
 laws_lens    | tools/scenes/gov.js | {years:9500,lens:true} | | 26
+# --- diplomacy: a neighbour's page in peace and in war, a vassal's, envoys waiting, the wars, where the realm stands, the lens of relations ---
+dip          | tools/scenes/dip.js | {pick:'asker'} | | 16
+dip_war      | tools/scenes/dip.js | {pick:'war'} | | 16
+dip_vassal   | tools/scenes/dip.js | {pick:'vassal'} | | 16
+dip_envoys   | tools/scenes/dip.js | {tab:'envoys'} | | 16
+dip_wars     | tools/scenes/dip.js | {tab:'wars'} | | 16
+dip_standing | tools/scenes/dip.js | {tab:'standing'} | | 16
+dip_lens     | tools/scenes/dip.js | {lens:true} | | 22

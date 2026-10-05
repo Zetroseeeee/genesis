@@ -18,6 +18,7 @@
     --fs-cap: calc(12px * var(--ui-scale)); --fs-body: calc(14px * var(--ui-scale)); --fs-key: calc(16px * var(--ui-scale)); --fs-head: calc(18px * var(--ui-scale));
     --fs-banner: calc(28px * var(--ui-scale)); --fs-era: calc(44px * var(--ui-scale));
     --pad: calc(10px * var(--ui-scale)); --gap: calc(8px * var(--ui-scale)); --radius: 3px;
+    --bar: 56px;      /* (how tall the bar of launchers along the bottom is: what stands above it keeps clear by this much) */
   }
   html, body { height: 100%; }
   [hidden] { display: none !important; }
@@ -187,7 +188,7 @@
   #minimapbox { position: relative; contain: layout style; }      /* (not paint: the layers' menu and the lens's key open above the box) */
 
   /* left inspector */
-  #left { top: calc(max(10px, env(safe-area-inset-top, 0px)) + 52px); left: max(12px, env(safe-area-inset-left, 0px)); max-height: calc(100vh - 170px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); width: 340px; max-width: 33vw; display: flex; flex-direction: column; overflow: hidden; transform: translateX(-16px); opacity: 0; transition: transform .18s ease-out, opacity .18s; }
+  #left { top: calc(max(10px, env(safe-area-inset-top, 0px)) + 52px); left: max(12px, env(safe-area-inset-left, 0px)); max-height: calc(100vh - 126px - var(--bar) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); width: 340px; max-width: 33vw; display: flex; flex-direction: column; overflow: hidden; transform: translateX(-16px); opacity: 0; transition: transform .18s ease-out, opacity .18s; }
   #left.open { transform: none; opacity: 1; }
   #left:not(.open) { pointer-events: none !important; }
   .phead { padding: 10px 12px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; gap: 10px; }
@@ -305,9 +306,9 @@
 
   /* bottom-centre dock */
   /* the Build dock opens right above its launcher; the inspector makes room for it */
-  #bc { bottom: calc(max(10px, env(safe-area-inset-bottom, 0px)) + 54px); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: calc(100vw - 24px); }
+  #bc { bottom: calc(max(10px, env(safe-area-inset-bottom, 0px)) + var(--bar) + 10px); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: calc(100vw - 24px); }
   #dock { display: flex; align-items: stretch; padding: 4px; gap: 4px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-  body.dockopen #left { max-height: calc(100vh - 246px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+  body.dockopen #left { max-height: calc(100vh - 202px - var(--bar) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
   #docktabs { display: flex; flex-direction: column; gap: 2px; padding-right: 4px; border-right: 1px solid var(--rule); margin-right: 4px; }
   #docktabs .btn { min-height: 0; padding: 5px 8px; font-size: 10px; letter-spacing: 0.1em; }
   .dg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 6px 3px; border-radius: var(--radius); background: transparent; border: 1px solid transparent; cursor: pointer; min-width: calc(58px * var(--ui-scale)); height: calc(56px * var(--ui-scale)); position: relative; color: var(--text); box-sizing: border-box; }
@@ -327,8 +328,10 @@
   #tickertext b { font-weight: 500; color: var(--text-3); margin-right: 8px; font-variant-numeric: tabular-nums; }
 
   /* bottom-left launchers */
-  #bl { bottom: max(10px, env(safe-area-inset-bottom, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; gap: 4px; padding: 4px; }
-  #bl .btn { min-height: 36px; display: flex; align-items: center; gap: 6px; }
+  /* (each a sign with its name under it: nine names side by side ran under the minimap on a 14-inch screen, and more screens are coming) */
+  #bl { bottom: max(10px, env(safe-area-inset-bottom, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; gap: 2px; padding: 4px; }
+  #bl .btn { min-height: 46px; min-width: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 7px 8px 5px; font-size: calc(10px * var(--ui-scale)); letter-spacing: 0.08em; line-height: 1; }
+  #bl .btn svg { width: 18px; height: 18px; vertical-align: 0; flex: none; }
 
   /* bottom-right minimap + lenses + compass */
   #br { bottom: max(10px, env(safe-area-inset-bottom, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: row; align-items: flex-end; gap: 10px; }
@@ -799,7 +802,7 @@
   #movers button { appearance: none; background: none; border: 0; padding: 4px 8px; font: inherit; font-size: var(--fs-cap); color: var(--text-2); cursor: pointer; display: inline-flex; gap: 5px; align-items: center; border-radius: var(--radius); font-variant-numeric: tabular-nums; }
   #movers button:hover { background: rgb(255 255 255 / 0.06); color: var(--text); }
   #movers b { color: var(--gold-2); font-weight: 600; letter-spacing: 0.04em; } #movers i { font-style: normal; }
-  @media (max-width: 1280px) { #movers { display: none; } }
+  @media (max-width: 1360px) { #movers { display: none; } }
   .home-foot { flex-wrap: wrap; }
   .home-tape { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 3px 20px; font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums lining-nums; margin-bottom: 2px; }
   .home-tape b { font-weight: 600; color: var(--text-2); letter-spacing: 0.04em; margin-right: 3px; }
@@ -820,12 +823,15 @@
     #economy .eco .d { display: none; }
     #left { width: 320px; }
   }
+  @media (max-width: 1140px) {      /* (a narrow window has room for the signs, not for their names: the tooltip still says what each is) */
+    :root { --bar: 44px; }
+    #bl .btn { font-size: 0; gap: 0; padding: 0 11px; min-width: 0; min-height: 36px; flex-direction: row; } #bl .btn svg { width: 19px; height: 19px; }
+  }
   @media (max-width: 820px) {
     #tl { max-width: calc(100vw - 196px); flex-wrap: wrap; }
     #identity .name { max-width: 150px; font-size: calc(16px * var(--ui-scale)); }
     #date { min-width: 0; }
     #br #minimapbox { display: none; }
-    #bl .btn { font-size: 0; gap: 0; padding: 0 11px; } #bl .btn svg { width: 19px; height: 19px; }      /* (a narrow window has room for the signs, not for their names: the tooltip still says what each is) */
     #left { width: calc(100vw - 24px); max-width: none; top: auto; bottom: calc(max(10px, env(safe-area-inset-bottom, 0px)) + 74px); max-height: 42vh; }
     body.dockopen #left { max-height: 30vh; bottom: calc(max(10px, env(safe-area-inset-bottom, 0px)) + 140px); }
     .dg { min-width: 44px; }

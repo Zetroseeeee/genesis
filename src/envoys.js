@@ -35,6 +35,7 @@ window.ENVOYS = (function () {
   const sw = (b) => `<i class="dp-sw" style="background:${b.color}"></i>`;
   const link = (b) => `<button class="linkish" data-dsel="${b.id}">${nm(b)}</button>`;
   const names = (list) => list.map((b) => link(b)).join(', ');
+  const arms = (r) => r >= 1.5 ? 'far better than yours' : r >= 1.15 ? 'better than yours' : r > 0.87 ? 'as good as yours' : r > 0.67 ? 'worse than yours' : 'far worse than yours';
   const weight = (r) => r >= 3 ? 'far stronger than you' : r >= 1.5 ? 'stronger than you' : r > 0.67 ? 'about your match' : r > 0.33 ? 'weaker than you' : 'far weaker than you';
   const wordOf = (rep) => rep >= 70 ? 'trusted' : rep >= 55 ? 'good' : rep >= 45 ? 'ordinary' : rep >= 30 ? 'doubted' : 'worth little';
   const dreadOf = (inf) => inf < 1 ? 'forgotten' : inf < 10 ? 'remembered' : inf < 30 ? 'feared' : 'dreaded';
@@ -89,7 +90,7 @@ window.ENVOYS = (function () {
   function rows(c) {
     const s = S(), d = DK(); const out = [];
     for (const id of d.reach(c.id)) { const b = s.civs[id]; if (!b) continue; const st = d.standing(c, b), near = d.touches(c, id);
-      out.push({ b, st, o: d.opinion(b, c), near, r: (s.strengthOf[id] + 0.01) / (s.strengthOf[c.id] + 0.01), grp: st === 'war' ? 0 : st === 'lord' || st === 'vassal' || st === 'ally' || d.anyPact(c, id) ? 1 : near ? 2 : 3 }); }
+      out.push({ b, st, o: d.opinion(b, c), near, r: (s.mightOf[id] + 0.01) / (s.mightOf[c.id] + 0.01), grp: st === 'war' ? 0 : st === 'lord' || st === 'vassal' || st === 'ally' || d.anyPact(c, id) ? 1 : near ? 2 : 3 }); }
     out.sort((x, y) => x.grp - y.grp || y.r - x.r); return out;
   }
   const GROUPS = ['At war with you', 'Sworn to you', 'On your borders', 'Further off'];
@@ -117,9 +118,9 @@ window.ENVOYS = (function () {
   // ----- a realm's page -----
   function page(c, b) {
     const s = S(), d = DK(), P = DP(); const y = s.year; const dc = d.D(c), db = d.D(b); const atWar = s.isAtWar(c, b.id);
-    const R = d.reasons(b, c), mood = P.moodOf(R.o); const r = (s.strengthOf[b.id] + 0.01) / (s.strengthOf[c.id] + 0.01); const T = b.ruler ? s.TRAITS[b.ruler.trait] : null;
+    const R = d.reasons(b, c), mood = P.moodOf(R.o); const r = (s.mightOf[b.id] + 0.01) / (s.mightOf[c.id] + 0.01), ar = (s.strengthOf[b.id] + 0.01) / (s.strengthOf[c.id] + 0.01); const T = b.ruler ? s.TRAITS[b.ruler.trait] : null;
     let h = `<div class="gv-head dp-head"><span class="ic" style="background:${b.color}"></span><div><h3>${nm(b)}</h3><div class="micro">${esc(s.govName(b))} · ${esc(s.ERAS[b.era][0])} · ${esc(b.religion || 'no faith')}</div></div></div>`;
-    h += `<div class="dp-facts">${b.ruler ? `<span class="micro">Ruler</span><span>${esc(b.ruler.title)} ${esc(b.ruler.name)}${T ? ', ' + esc(T.a) : ''}</span>` : ''}<span class="micro">People</span><span class="num">${ctx.fmtPop ? ctx.fmtPop(s.popOf[b.id]) : Math.round(s.popOf[b.id])} in ${s.cellsOf[b.id]} regions</span><span class="micro">Strength</span><span>${weight(r)} <span class="mk-dim">(${r >= 10 ? Math.round(r) : r.toFixed(1)} to 1)</span></span></div>`;
+    h += `<div class="dp-facts">${b.ruler ? `<span class="micro">Ruler</span><span>${esc(b.ruler.title)} ${esc(b.ruler.name)}${T ? ', ' + esc(T.a) : ''}</span>` : ''}<span class="micro">People</span><span class="num">${ctx.fmtPop ? ctx.fmtPop(s.popOf[b.id]) : Math.round(s.popOf[b.id])} in ${s.cellsOf[b.id]} regions</span><span class="micro">Might</span><span title="Its arms and its numbers together: what it can put in the field, and afford to lose.">${weight(r)} <span class="mk-dim">(${r >= 10 ? Math.round(r) : r.toFixed(1)} to 1)</span></span><span class="micro">Arms</span><span title="What a fight over a region turns on, whoever has more people: knowledge, weapons, pay, order at home.">${arms(ar)}</span></div>`;
     h += `<div class="gv-acts"><button class="btn" data-dact="fly">Fly to their capital</button></div>`;
     // what they think of you
     h += `<div class="gv-sect"><span class="micro">What they think of you</span><div class="dp-mood ${MOOD_CLS[mood]}"><b>${mood}</b><span class="num">${signed(Math.round(R.o))}</span></div>${R.why.length ? `<div class="gv-why">${why(R.why, 8)}</div>` : '<div class="gv-note">They have no reason to think anything of you yet.</div>'}</div>`;
@@ -132,11 +133,11 @@ window.ENVOYS = (function () {
     if (dc.ban[b.id]) lines.push(`<div class="dp-line">${svg(ICON.ban)}<span>Your markets are closed to them since ${s.fmtYear(dc.ban[b.id])}</span><span class="dp-btns"><button class="btn" data-dact="ban" data-k="off">Open them</button></span></div>`);
     if (db.ban[c.id]) lines.push(`<div class="dp-line">${svg(ICON.ban)}<span>Their markets are closed to you</span></div>`);
     if (!atWar && s.civs[b.id] && (c.truce[b.id] || -1e9) > y) lines.push(`<div class="dp-line">${svg(ICON.truce)}<span>A truce ${upto(c.truce[b.id], c)}: neither may attack</span></div>`);
-    if (dc.claim[b.id] > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>You claim their borderland ${upto(dc.claim[b.id], c)}</span></div>`);
-    if (dc.claim[b.id + 'l'] > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>They hold land that was yours: yours to win back ${upto(dc.claim[b.id + 'l'], c)}</span></div>`);
-    if (dc.claim[b.id + 'r'] > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>They refused you tribute: a reason for war ${upto(dc.claim[b.id + 'r'], c)}</span></div>`);
-    if (dc.claim[b.id + 'b'] > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>A rebel vassal: yours to bring to heel ${upto(dc.claim[b.id + 'b'], c)}</span></div>`);
-    if (db.claim[c.id] > y || db.claim[c.id + 'l'] > y || db.claim[c.id + 'r'] > y || db.claim[c.id + 'b'] > y) lines.push(`<div class="dp-line warn">${svg(ICON.claim)}<span>They hold a reason for war against you ${upto(Math.max(db.claim[c.id] || 0, db.claim[c.id + 'l'] || 0, db.claim[c.id + 'r'] || 0, db.claim[c.id + 'b'] || 0), c)}</span></div>`);
+    { const u = d.claimUntil(c, b.id, 'claim'); if (u > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>You claim their borderland ${upto(u, c)}</span></div>`); }
+    { const u = d.claimUntil(c, b.id, 'land'); if (u > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>They hold land that was yours: yours to win back ${upto(u, c)}</span></div>`); }
+    { const u = d.claimUntil(c, b.id, 'refused'); if (u > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>They refused you tribute: a reason for war ${upto(u, c)}</span></div>`); }
+    { const u = d.claimUntil(c, b.id, 'rebel'); if (u > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>A rebel vassal: yours to bring to heel ${upto(u, c)}</span></div>`); }
+    { const u = d.holds(b, c.id); if (u > y) lines.push(`<div class="dp-line warn">${svg(ICON.claim)}<span>They hold a reason for war against you ${upto(u, c)}</span></div>`); }
     if (db.owes[c.id] > y) lines.push(`<div class="dp-line">${svg(ICON.owes)}<span>They pay you reparations ${upto(db.owes[c.id], c)}</span></div>`);
     if (dc.owes[b.id] > y) lines.push(`<div class="dp-line warn">${svg(ICON.owes)}<span>You pay them reparations ${upto(dc.owes[b.id], c)}</span></div>`);
     h += `<div class="gv-sect"><span class="micro">Between you</span>${lines.join('') || '<div class="gv-note">Nothing is sworn between you, and nothing is owed.</div>'}</div>`;
@@ -149,7 +150,7 @@ window.ENVOYS = (function () {
     const prop = (kind, name, text) => {
       const no = d.cannot(c, b, kind); if (no === 'Already in force' || no === 'Already your vassal' || no === 'Already your lord' || no === 'Your alliance covers it') return '';
       const key = no && /^Needs /.test(no) ? (kind === 'vassal' || kind === 'protect' ? P.VASSAL.need : P.PACT[kind].need) : null;
-      const j = no ? null : d.judge(b, c, kind); const asked = dc.ask[b.id + kind] !== undefined && s.year - dc.ask[b.id + kind] < pace(c) / 2;
+      const j = no ? null : d.judge(b, c, kind); const at = d.askedAt(c, b.id, kind), asked = at !== undefined && s.year - at < pace(c) / 2;
       const state = no ? (key ? `Needs <button class="linkish" data-kgo="${key}">${esc(no.slice(6))}</button>` : esc(no)) : `<b class="${j.ok ? 'pos' : 'neg'}">${j.ok ? 'They would agree' : 'They would refuse'}</b><span class="gv-why">${why(j.why, 3)}</span>`;
       return `<div class="dp-prop${no ? ' off' : ''}"><span class="ic">${svg(ICON[kind === 'protect' ? 'lord' : kind])}</span><div><b>${esc(name)}</b><small>${esc(text)}</small><div class="st">${state}</div></div><button class="btn" data-dact="propose" data-k="${kind}"${no || asked ? ' disabled' : ''}${asked ? ' title="They have only just answered that"' : ''}>${kind === 'vassal' ? 'Demand' : kind === 'protect' ? 'Ask' : d.has(c, b.id, kind) ? 'Swear again' : 'Propose'}</button></div>`;
     };
@@ -159,13 +160,13 @@ window.ENVOYS = (function () {
     { const turn = Math.max(20, Math.abs(b.income || 0) * pace(b)); const sizes = [0.15, 0.4, 1].map((f) => Math.max(5, Math.round(turn * f / 5) * 5)).filter((v, i, a) => a.indexOf(v) === i); const had = Math.max(0, d.memOf(b, c.id));
       h += `<div class="gv-sect"><span class="micro">Send a gift</span><div class="gv-acts">${sizes.map((v) => { const w = Math.max(1, Math.min(d.giftWorth(b, v), 45 - Math.round(had))); return `<button class="btn" data-dact="gift" data-k="${v}"${c.wealth < v || had >= 44 ? ' disabled' : ''} title="${c.wealth < v ? 'The treasury does not hold that' : had >= 44 ? 'Coin can buy no more goodwill here' : 'What they think of you: ' + signed(w)}">${v} coin <span class="pos">${signed(w)}</span></button>`; }).join('')}</div><div class="gv-note">Goodwill bought fades by half in three turns, and no more than 45 of it can be bought.</div></div>`; }
     // pressure: a claim, closed markets
-    { const near = d.touches(c, b.id), has = dc.claim[b.id] > s.year, cost = d.claimCost(c, b); const cl = !near ? 'You share no border' : has ? 'You hold a claim already' : d.bound(c, b) ? 'You are sworn not to' : null; const kn = S().know, needLaws = !kn.has[c.id * kn.ND + window.KNOW.ID.laws];
+    { const near = d.touches(c, b.id), has = d.claimUntil(c, b.id, 'claim') > s.year, cost = d.claimCost(c, b); const cl = !near ? 'You share no border' : has ? 'You hold a claim already' : d.bound(c, b) ? 'You are sworn not to' : null; const kn = S().know, needLaws = !kn.has[c.id * kn.ND + window.KNOW.ID.laws];
       h += `<div class="gv-sect"><span class="micro">Press them</span><div class="gv-acts"><button class="btn" data-dact="claim"${cl || needLaws || c.wealth < cost ? ' disabled' : ''} title="${esc(needLaws ? 'Needs Written laws' : cl || (c.wealth < cost ? 'Needs ' + cost + ' coin' : 'A right to their borderland, found or made: a reason for war for three turns. They will not like it.'))}">Lay claim to their borderland <span class="mk-dim">${cost} coin</span></button>${dc.ban[b.id] ? '' : `<button class="btn" data-dact="ban" data-k="on" title="Nothing passes between your markets and theirs, either way. It ends any trade agreement, and they will not like it.">Close your markets to them</button>`}</div></div>`; }
     // war: what stands in the way, the reasons that could be given, what each costs, who would come in
     { const no = d.cannotFight(c, b); let w = '';
       if (no) w = `<div class="gv-note">${esc(no)}.</div>`;
       else { const cs = d.causes(c, b); if (!cs.some((x) => x.key === cause)) cause = cs[0].key; const W = d.warCost(c, b, cause);
-        const theirs = d.friends(b, false).filter((x) => x !== c && !d.bound(x, c)), ours = d.friends(c, true).filter((x) => x !== b && !d.bound(x, b)); const sa = s.strengthOf[c.id] + ours.reduce((t, x) => t + s.strengthOf[x.id], 0), sb = s.strengthOf[b.id] + theirs.reduce((t, x) => t + s.strengthOf[x.id], 0);
+        const theirs = d.friends(b, false).filter((x) => x !== c && !d.bound(x, c)), ours = d.friends(c, true).filter((x) => x !== b && !d.bound(x, b)); const sa = s.mightOf[c.id] + ours.reduce((t, x) => t + s.mightOf[x.id], 0), sb = s.mightOf[b.id] + theirs.reduce((t, x) => t + s.mightOf[x.id], 0);
         w = cs.map((x) => `<button class="dp-cause${x.key === cause ? ' sel' : ''}" data-dcause="${x.key}"><b>${esc(x.name)}</b><small>${esc(x.text)}</small></button>`).join('');
         w += `<ul class="gv-gives">${W.stab ? `<li class="bad">−${Math.round(W.stab * 100)} stability: your people see no reason for it</li>` : ''}${W.rep ? `<li class="bad">Your word falls by ${W.rep}${W.broke ? ': it breaks your ' + P.PACT[W.broke].name.toLowerCase() : ''}</li>` : ''}${!W.stab && !W.rep ? '<li class="good">Nobody at home or abroad holds it against you</li>' : ''}<li class="${theirs.length ? 'bad' : 'none'}">${theirs.length ? 'Beside them: ' + names(theirs) : 'Nobody is sworn to defend them'}</li><li class="${ours.length ? 'good' : 'none'}">${ours.length ? 'Beside you: ' + names(ours) : 'You would fight alone'}</li><li class="${sa > sb * 1.15 ? 'good' : sa * 1.15 < sb ? 'bad' : 'none'}">Your side ${sa > sb * 1.15 ? 'is the stronger' : sa * 1.15 < sb ? 'is the weaker' : 'is about their match'}: ${(sa / Math.max(0.01, sb)).toFixed(1)} to 1</li><li class="none">A clear win could bring: ${esc(lc(P.CAUSES[cause].goal === 'land' ? 'the land you take' : P.CAUSES[cause].goal === 'tribute' ? 'reparations, besides the land you take' : P.CAUSES[cause].goal === 'vassal' ? 'their submission' : 'a government of your kind in their capital'))}</li></ul>`;
         w += `<div class="gv-acts"><button class="btn danger" data-dact="war" data-k="${cause}">Declare war</button></div>`; }
@@ -197,7 +198,7 @@ window.ENVOYS = (function () {
       text = o.terms === 'white' ? 'Each keeps what it holds, and a truce follows.' : o.terms === 'tribute' ? (win ? 'They pay you an eighth of their income for three turns.' : 'You pay them an eighth of your income for three turns.') : o.terms === 'vassal' ? (win ? 'They become your vassal.' : 'You become their vassal: a tenth of your income, and your sword in their wars.') : (win ? 'They are given a government of your kind.' : 'You are given a government of their kind.'); text += ' Decline, and the war goes on.'; }
     else if (o.kind === 'call') { const e = s.civs[o.vs]; title = `calls you to its war${e ? ' against ' + s.fullName(e) : ''}`; text = `You are sworn to it. Come, and ${e ? s.fullName(e) : 'their enemy'} is your enemy too until the war ends. Decline, and what you swore is void: nobody will trust your word so readily.`; }
     const R = d.reasons(a, c); const yes = o.kind === 'submit' ? 'Bend the knee' : o.kind === 'call' ? 'Go to war' : 'Accept';
-    return `<div class="dp-offer"><div class="dp-ohead">${sw(a)}<div><b>${link(a)}</b> ${esc(title)}<small>${P.moodOf(R.o)} towards you · ${weight((s.strengthOf[a.id] + 0.01) / (s.strengthOf[c.id] + 0.01))}</small></div></div><p class="gv-text">${esc(text)}</p><div class="dp-ofoot"><span class="mk-dim">The envoys wait until ${s.fmtYear(o.until)}</span><button class="btn${o.kind === 'submit' || o.kind === 'call' ? ' danger' : ''}" data-dact="answer" data-k="${o.id}" data-v="yes">${yes}</button><button class="btn" data-dact="answer" data-k="${o.id}" data-v="no">Decline</button></div></div>`;
+    return `<div class="dp-offer"><div class="dp-ohead">${sw(a)}<div><b>${link(a)}</b> ${esc(title)}<small>${P.moodOf(R.o)} towards you · ${weight((s.mightOf[a.id] + 0.01) / (s.mightOf[c.id] + 0.01))}</small></div></div><p class="gv-text">${esc(text)}</p><div class="dp-ofoot"><span class="mk-dim">The envoys wait until ${s.fmtYear(o.until)}</span><button class="btn${o.kind === 'submit' || o.kind === 'call' ? ' danger' : ''}" data-dact="answer" data-k="${o.id}" data-v="yes">${yes}</button><button class="btn" data-dact="answer" data-k="${o.id}" data-v="no">Decline</button></div></div>`;
   }
   function renderEnvoys(c) {
     const s = S(), d = DK(), P = DP(); const dc = d.D(c); const offers = dc.offers.slice().reverse(); const y = s.year;
@@ -217,7 +218,10 @@ window.ENVOYS = (function () {
       for (const x of s.civs) { if (!x || x === a || x === b) continue; const sd = d.D(x).side; if (sd[def.id] === att.id && s.isAtWar(x, def.id)) withA.push(x); else if (sd[att.id] === def.id && s.isAtWar(x, att.id)) withD.push(x); }
       wars.push({ att, def, withA, withD, since: a.wars[k], goal: d.D(att).goal[def.id] || 'none', sc: d.score(att, def), mine: att === c || def === c || withA.indexOf(c) >= 0 || withD.indexOf(c) >= 0 }); } }
     wars.sort((x, z) => (z.mine ? 1 : 0) - (x.mine ? 1 : 0) || z.since - x.since);
-    const row = (w) => `<div class="dp-war${w.mine ? ' mine' : ''}"><div class="who">${sw(w.att)}<span>${link(w.att)}${w.withA.length ? `<small>with ${names(w.withA)}</small>` : ''}</span></div><div class="mid"><span class="micro">${esc(P.CAUSES[w.goal].name)} · since ${s.fmtYear(w.since)}</span><span class="gv-bar"><i class="${w.sc > 0.05 ? 'pos' : w.sc < -0.05 ? 'neg' : ''}" style="margin-left:${w.sc >= 0 ? 50 : 50 + 50 * w.sc}%;width:${Math.abs(50 * w.sc)}%"></i><u style="left:50%"></u></span><small>${w.sc > 0.1 ? 'the attacker is winning' : w.sc < -0.1 ? 'the defender is winning' : 'neither is winning'}</small></div><div class="who r"><span>${link(w.def)}${w.withD.length ? `<small>with ${names(w.withD)}</small>` : ''}</span>${sw(w.def)}</div></div>`;
+    // (a war of the player's own is coloured and told from his side; anybody else's from the attacker's)
+    const row = (w) => { const you = w.att === c || w.withA.indexOf(c) >= 0 ? 1 : w.def === c || w.withD.indexOf(c) >= 0 ? -1 : 0; const mine = you * w.sc;
+      const how = you ? (mine > 0.1 ? 'your side is winning' : mine < -0.1 ? 'your side is losing' : 'neither side is winning') : (w.sc > 0.1 ? 'the attacker is winning' : w.sc < -0.1 ? 'the defender is winning' : 'neither is winning');
+      return `<div class="dp-war${w.mine ? ' mine' : ''}"><div class="who">${sw(w.att)}<span>${link(w.att)}<small>attacks${w.withA.length ? ', with ' + names(w.withA) : ''}</small></span></div><div class="mid"><span class="micro">${esc(P.CAUSES[w.goal].name)} · since ${s.fmtYear(w.since)}</span><span class="gv-bar"><i class="${you ? (mine > 0.05 ? 'pos' : mine < -0.05 ? 'neg' : '') : ''}" style="margin-left:${w.sc >= 0 ? 50 : 50 + 50 * w.sc}%;width:${Math.abs(50 * w.sc)}%"></i><u style="left:50%"></u></span><small>${how}</small></div><div class="who r"><span>${link(w.def)}<small>defends${w.withD.length ? ', with ' + names(w.withD) : ''}</small></span>${sw(w.def)}</div></div>`; };
     $('dp-wars').innerHTML = wars.length ? `<div class="micro dp-h">${wars.length} war${wars.length === 1 ? '' : 's'} within reach of your envoys${wars.some((w) => w.mine) ? ', yours first' : ''}</div>${wars.map(row).join('')}` : `<div class="dp-empty"><b>The known world is at peace.</b>No realm your envoys can reach is at war.</div>`;
   }
 
@@ -234,8 +238,9 @@ window.ENVOYS = (function () {
     r += sect('Your vassals', vass.length ? vass.map((v) => `<div class="dp-line">${svg(ICON.vassal)}<span>${link(v)} since ${s.fmtYear(d.D(v).since)}<small>pays ${Math.round(d.trOut[v.id])} coin a year</small></span></div>`).join('') : '<div class="gv-note">None. A much weaker neighbour may bend the knee if asked, or put itself under your protection; a beaten one can be made to.</div>');
     const pacts = []; for (const k in dc.pact) { const b = s.civs[+k]; if (!b) continue; for (const p of P.PACTS) if (d.has(c, b.id, p.key)) pacts.push([dc.pact[k][p.key], b, p]); } pacts.sort((x, z) => x[0] - z[0]);
     r += sect('What you have sworn', pacts.length ? pacts.map(([u, b, p]) => `<div class="dp-line">${svg(ICON[p.key])}<span>${esc(p.name)} with ${link(b)} ${upto(u, c)}</span></div>`).join('') : '<div class="gv-note">Nothing yet.</div>');
-    const claims = []; for (const k in dc.claim) { const b = s.civs[parseInt(k, 10)]; if (b && dc.claim[k] > y) claims.push(`<div class="dp-line">${svg(ICON.claim)}<span>Against ${link(b)}: ${/l$/.test(k) ? 'land that was yours' : /r$/.test(k) ? 'tribute refused' : /b$/.test(k) ? 'a rebel vassal' : 'a claim on their borderland'} ${upto(dc.claim[k], c)}</span></div>`); }
-    const against = []; for (const b of s.civs) { if (!b || b === c || !b.dip) continue; const q = b.dip.claim; const u = Math.max(q[c.id] || 0, q[c.id + 'l'] || 0, q[c.id + 'r'] || 0, q[c.id + 'b'] || 0); if (u > y) against.push(`<div class="dp-line warn">${svg(ICON.claim)}<span>${link(b)} holds one against you ${upto(u, c)}</span></div>`); }
+    const WHAT = { claim: 'a claim on their borderland', land: 'land that was yours', refused: 'tribute refused', rebel: 'a rebel vassal' };
+    const claims = [], against = []; for (const b of s.civs) { if (!b || b === c || !b.dip) continue; for (const what in WHAT) { const u = d.claimUntil(c, b.id, what); if (u > y) claims.push(`<div class="dp-line">${svg(ICON.claim)}<span>Against ${link(b)}: ${WHAT[what]} ${upto(u, c)}</span></div>`); }
+      const u = d.holds(b, c.id); if (u > y) against.push(`<div class="dp-line warn">${svg(ICON.claim)}<span>${link(b)} holds one against you ${upto(u, c)}</span></div>`); }
     r += sect('Reasons for war', (claims.join('') + against.join('')) || '<div class="gv-note">You hold none, and nobody holds one against you.</div>');
     const bans = []; for (const k in dc.ban) { const b = s.civs[+k]; if (b) bans.push(`<div class="dp-line">${svg(ICON.ban)}<span>Yours to ${link(b)} since ${s.fmtYear(dc.ban[k])}</span></div>`); } for (const b of s.civs) if (b && b !== c && b.dip && b.dip.ban[c.id]) bans.push(`<div class="dp-line warn">${svg(ICON.ban)}<span>${link(b)}'s to you</span></div>`);
     if (bans.length) r += sect('Markets closed', bans.join(''));
@@ -265,5 +270,10 @@ window.ENVOYS = (function () {
     const s = S(), c = me(); if (!s || !c || !b || b === c || !s.diplo) return null; const d = DK(), P = DP(); const o = d.opinion(b, c), key = d.standing(c, b);
     return { key, name: P.STAND[key][0], mood: P.moodOf(o), cls: MOOD_CLS[P.moodOf(o)], o: Math.round(o), within: d.reach(c.id).indexOf(b.id) >= 0, pacts: P.PACTS.filter((p) => d.has(c, b.id, p.key)).map((p) => p.name).concat(d.D(b).lord === c.id ? ['your vassal'] : d.D(c).lord === b.id ? ['your lord'] : []) };
   }
-  return { init, open, close, isOpen, refresh, render, show, tile, standing, ICON, svg, MOOD_CLS };
+  // what a discovery opens between realms, as lines for its page in the knowledge tree
+  function opensLines(key) {
+    const P = DP(); const out = []; const named = P.PACTS.filter((p) => p.need === key).map((p) => `<b>${esc(p.name)}</b>`);
+    if (named.length) out.push(`Your envoys can propose: ${named.join(', ')}`); if (P.OPENS[key]) out.push(P.OPENS[key]); return out;
+  }
+  return { init, open, close, isOpen, refresh, render, show, tile, standing, opensLines, ICON, svg, MOOD_CLS };
 })();

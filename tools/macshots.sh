@@ -1,10 +1,11 @@
 #!/bin/sh
 # Pictures of this commit on a real Apple GPU, via the Scenes workflow: tools/macshots.sh [scene names ...]
 # (no names = the whole tour, tools/scenes/tour.txt). Pictures land in shots/mac/<name>.png, frame rates in shots/mac/scenes.log.
+# REF=<branch> takes them of a branch that is pushed but not yet on main (nothing is given out to players by it).
 set -eu
 repo="$(node -p "require('./assets/models/models.json').repo")"
 before="$(gh api "repos/$repo/actions/workflows/scenes.yml/runs?per_page=1" --jq '.workflow_runs[0].id // 0' 2>/dev/null || echo 0)"
-gh api -X POST "repos/$repo/actions/workflows/scenes.yml/dispatches" -f ref=main -f "inputs[only]=$*" >/dev/null
+gh api -X POST "repos/$repo/actions/workflows/scenes.yml/dispatches" -f "ref=${REF:-main}" -f "inputs[only]=$*" >/dev/null
 echo "dispatched; waiting for the build Mac"
 run=""; for i in $(seq 1 30); do sleep 5; run="$(gh api "repos/$repo/actions/workflows/scenes.yml/runs?per_page=1" --jq '.workflow_runs[0].id')"; [ "$run" != "$before" ] && break; done
 for i in $(seq 1 ${WAIT:-110}); do

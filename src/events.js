@@ -154,8 +154,8 @@
         // the field of battle lies just outside the town toward the attacker
         const fieldD = R * 1.3 + 250; const fx = tLon + ux * fieldD * mLon, fy = tLat + uy * fieldD * mLat;
         const px = -uy, py = ux;  // across the line
-        const width = 220 + Math.min(600, (sim.strengthOf[b.a] + sim.strengthOf[b.b]) * 0.4);
-        const nA = Math.min(500, 140 + Math.round(sim.strengthOf[b.a] * 0.6)), nB = Math.min(500, 140 + Math.round(sim.strengthOf[b.b] * 0.6));
+        const width = 220 + Math.min(600, (sim.mightOf[b.a] + sim.mightOf[b.b]) * 0.4);
+        const nA = Math.min(500, 140 + Math.round(sim.mightOf[b.a] * 0.6)), nB = Math.min(500, 140 + Math.round(sim.mightOf[b.b] * 0.6));
         const colA = A.rgb, colB = B.rgb;
         const mkLine = (civCol, n, off, dir) => { const pts = []; const vc = this._vc; for (let k = 0; k < n; k++) { const across = (hash(b.i, k + off) - 0.5) * width; const rank = hash(b.i, k + off + 1000) * 60; const x0 = fx + (px * across + ux * (dir * (90 + rank))) * mLon, y0 = fy + (py * across + uy * (dir * (90 + rank))) * mLat; pts.push(x0, y0, T.meshHeightAt(x0, y0, vc)); } this.columns.push({ pts, col: civCol, n, phase: hash(b.i, off), dir: -dir, ux, uy, mLon, mLat, speed: era >= 6 ? 0.6 : 0.9 }); };
         mkLine(colA, nA, 11, 1); mkLine(colB, nB, 77, -1);

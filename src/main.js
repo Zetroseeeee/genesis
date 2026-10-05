@@ -335,7 +335,7 @@
     const out = []; const yb = Math.floor(sim.year / 20);
     const wars = Object.keys(c.wars).map(k => +k).filter(k => sim.civs[k]);
     const fresh = wars.filter(k => !seen.wars.has(k));
-    for (const k of fresh) { const w = sim.civs[k]; out.push({ id: 'war' + k, kind: 'war', cls: 'war', t1: 'War', t2: `${sim.fullName(w)} · at war with you`, body: 'See how the war stands and on what terms it could end: Diplomacy. Or raise a levy and fight.', act: () => { seen.wars.add(k); ENVOYS.open('realms', k); } }); }
+    for (const k of fresh) { const w = sim.civs[k]; out.push({ id: 'war' + k, kind: 'war', cls: 'war', t1: 'War', t2: `${sim.fullName(w)} · at war with you`, body: 'Fly to their capital. How the war stands and what peace would take: War and peace, in their panel. Or raise a levy and fight.', act: () => { seen.wars.add(k); if (w.capital >= 0) { const [lon, lat] = placeOf(w.capital); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.02), 0.08)); select(w.capital); } } }); }
     for (const k of [...seen.wars]) if (!wars.includes(k)) seen.wars.delete(k);
     // envoys waiting on an answer: the weightiest first (a peace offered, a call to arms, a demand), then what is merely proposed
     { const t = ENVOYS.tile(); if (t) { const heavy = (o) => o.kind === 'peace' || o.kind === 'call' || o.kind === 'submit' ? 0 : 1; for (const o of t.offers.filter((o) => !seen.ack.has('offer' + o.id)).sort((a, b) => heavy(a) - heavy(b)).slice(0, 3)) out.push({ id: 'offer' + o.id, kind: 'envoy', cls: heavy(o) ? 'good' : 'warn', t1: 'Envoys', t2: o.text, body: `Answer them in Diplomacy. They wait until ${sim.fmtYear(o.until)}, then go home.`, act: () => { seen.ack.add('offer' + o.id); ENVOYS.open('envoys'); } }); } }
@@ -540,7 +540,7 @@
     const wars = Object.keys(c.wars).map(k => sim.civs[+k]).filter(Boolean);
     let html = '';
     if (wars.length) html += '<div class="micro" style="padding:2px 6px 4px;color:var(--mil)">At war with</div>';
-    for (const w of wars) html += `<div class="ol war" data-cell="${w.capital}"><span class="t">⚔ ${esc(sim.fullName(w))}</span><span class="s">strength ${fmtInt(sim.strengthOf[w.id])}</span></div>`;
+    for (const w of wars) html += `<div class="ol war" data-cell="${w.capital}"><span class="t">⚔ ${esc(sim.fullName(w))}</span><span class="s">might ${fmtInt(sim.mightOf[w.id])}</span></div>`;
     if (wars.length && cells.length) html += '<div class="micro" style="padding:8px 6px 4px">Settlements</div>';
     for (const i of cells) html += `<div class="ol" data-cell="${i}"><span class="t">${i === c.capital ? '★ ' : ''}${esc(sim.cellName.get(i) || '')}</span><span class="s">${fmtPop(sim.pop[i])}</span></div>`;
     if (!cells.length) html += '<div class="hint" style="padding:4px 6px">Villages become towns as they grow; towns appear here.</div>';
@@ -959,7 +959,7 @@
     const el = $('govkey'); el.hidden = !((view.gov || view.rel) && sim && mode === 'play'); if (el.hidden) return;
     if (view.rel) {
       const c = sim.playerCiv(); const n = {}; if (c) { const within = new Set(sim.diplo.reach(c.id)); for (const b of sim.civs) { if (!b || b === c) continue; const k = within.has(b.id) ? sim.diplo.standing(c, b) : 'far'; n[k] = (n[k] || 0) + 1; } }
-      el.innerHTML = '<span class="micro">How the world stands with you</span>' + Object.keys(DIPLO.STAND).filter((k) => k !== 'self').map((k) => `<i class="${n[k] ? '' : 'off'}" style="background:${DIPLO.STAND[k][1]}"></i><span class="${n[k] ? '' : 'none'}">${DIPLO.STAND[k][0]}</span><b>${n[k] || ''}</b>`).join(''); return;
+      el.innerHTML = '<span class="micro">How the world stands with you</span>' + Object.keys(DIPLO.STAND).map((k) => { const on = n[k] || k === 'self'; return `<i class="${on ? '' : 'off'}" style="background:${DIPLO.STAND[k][1]}"></i><span class="${on ? '' : 'none'}">${DIPLO.STAND[k][0]}</span><b>${n[k] || ''}</b>`; }).join(''); return;
     }
     const n = {}, pp = {}; let pop = 0; for (const c of sim.civs) { if (!c) continue; const k = RULE.FORM[sim.rule.ruleOf(c).gov].kind; n[k] = (n[k] || 0) + 1; pp[k] = (pp[k] || 0) + sim.popOf[c.id]; pop += sim.popOf[c.id]; }
     el.innerHTML = '<span class="micro">How the world is governed</span>' + Object.keys(RULE.KINDS).map((k) => `<i class="${n[k] ? '' : 'off'}" style="background:${RULE.KINDS[k][1]}"></i><span class="${n[k] ? '' : 'none'}">${RULE.KINDS[k][0]}</span><b>${n[k] ? Math.round(100 * pp[k] / Math.max(1e-9, pop)) + '%' : ''}</b>`).join('');

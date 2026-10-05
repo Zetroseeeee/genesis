@@ -1,11 +1,21 @@
 // War and peace through the ages, in numbers: how many realms there are, how often they go to war and why, how long
 // wars last and on what terms they end, what realms have sworn to one another, who is whose vassal, what they think
-// of one another.
+// of one another, and how much of the old appetite for war finds somebody it may fall on.
 //   node tools/diplo/probe.js [seed] [last year]
 //   SRC=<dir> node tools/diplo/probe.js ...     the same world from another checkout's src (to compare with an older game)
-// Run it after touching diplo.js or the simulation's wars: the world should fight about as often as it did (a war or
-// two a generation for a realm that has neighbours, fewer once the world keeps accounts of unprovoked wars), most
-// realms should be bound to somebody, and vassals, unions and broken oaths should be events, not weather.
+// Run it over two seeds (12345 and 777, three and a half minutes each) after touching diplo.js or the simulation's wars.
+// What the world should go on doing, as measured for 0.17.0 against the game before diplomacy (in brackets):
+//   wars begun for a realm in a century   2000 BC 0.23-0.26 (0.25)   0 AD 0.21-0.24 (0.24)   AD 1000 0.27-0.31 (0.27-0.30)
+//                                         1600 0.34-0.39 (0.38-0.40)   1900 0.32-0.45 (0.38-0.42)   2000 0.44-0.47 (0.38-0.46)
+//     about half of them from the Iron Age on are wars a realm goes into beside a friend
+//   realms in AD 2000                     272-280 (288-298): few are lost to unions, none to the mere arithmetic of pacts
+//   the five greatest hold                12-15 % of all held land (12 %)
+//   vassals                               25-40 at a time from the Classical age on (a tenth of all realms), made by asking, by
+//                                         inheritance and by seeking a protector in about equal parts; a handful freed and joined
+//                                         to their lords in every age
+//   bound to somebody                     four realms in five from the Classical age on
+//   people                                within a few per cent of the same seed before diplomacy
+// If wars fall off, look at the line "appetite": pacts and fear should leave a realm somebody to fight about half the time.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;
 const src = process.env.SRC ? path.resolve(process.env.SRC) : path.join(root, 'src');
@@ -38,8 +48,9 @@ while (k < DATES.length) {
   console.log(`  wars: ${begun} begun, ${joined} of them beside a friend (${(begun / (ryears / 100)).toFixed(2)} for a realm in a century, ${((begun - joined) / (ryears / 100)).toFixed(2)} of its own), ${open.size} being fought, ${ended} ended after ${ended ? (endedLen / ended).toFixed(0) : '-'} years on average; a realm is at war ${Math.round(100 * wyears / Math.max(1, ryears))}% of its years`);
   if (D) {
     const S = D.stats; const dw = delta(S.wars, prev.wars), dp = delta(S.pacts, prev.pacts), de = delta(S.peace, prev.peace);
+    { const A = S.appetite, Z = prev.appetite || { asked: 0, old: 0, open: 0, shut: 0, kept: 0 }; const asked = A.asked - Z.asked, old = A.old - Z.old; if (asked) console.log(`  appetite: of those it could beat a realm may attack ${Math.round(100 * (A.open - Z.open) / Math.max(1, old))}%; ${Math.round(100 * (A.shut - Z.shut) / asked)}% of the time nobody; ${Math.round(100 * (A.kept - Z.kept) / Math.max(1, old))}% of the old appetite is kept`); }
     console.log(`  why: ${fmt(dw)}`); console.log(`  peace: ${fmt(de)}`);
-    console.log(`  sworn: ${fmt(dp)}; broken ${S.broken - prev.broken}, refused ${S.refused - prev.refused}; vassals made ${S.vassals - prev.vassals}, freed ${S.freed - prev.freed}, unions ${S.unions - prev.unions}; called to arms ${S.joined - prev.joined}`);
+    console.log(`  sworn: ${fmt(dp)}; broken ${S.broken - prev.broken}, refused ${S.refused - prev.refused}; vassals made ${S.vassals - prev.vassals} (${fmt(delta(S.how || {}, prev.how))}), freed ${S.freed - prev.freed}, unions ${S.unions - prev.unions} (${(S.heirs || 0) - (prev.heirs || 0)} by inheritance); called to arms ${S.joined - prev.joined}`);
     // as things stand: who is bound to whom, what realms think of those they touch
     const inForce = {}; let vass = 0, bound = 0, op = 0, opN = 0, hostile = 0, warm = 0, rep = 0, inf = 0, trib = 0, emb = 0;
     for (const cv of sim.civs) { if (!cv) continue; const d = D.D(cv); rep += d.rep; inf += d.inf; if (d.lord >= 0) vass++; let any = d.lord >= 0; for (const b in d.pact) for (const kind in d.pact[b]) if (D.has(cv, +b, kind)) { inForce[kind] = (inForce[kind] || 0) + 0.5; any = true; } if (any || D.vassalsOf(cv.id).length) bound++; if (d.ban) for (const _ in d.ban) emb++;

@@ -42,7 +42,17 @@ function invariants(sim, tag) {
     for (const k of Object.keys(c.wars)) { const b = sim.civs[+k]; check(!b || b.wars[c.id] !== undefined, `${tag}: one-sided war ${c.name} -> ${k}`); }
     check(c.ruler && c.ruler.name, `${tag}: ${c.name} has no ruler`);
     check(c.events.length <= 80, `${tag}: ${c.name} events unbounded (${c.events.length})`);
+    // what it has sworn: to living realms only, the same on both sides; a lord that lives, is not its own vassal and is not its enemy
+    const d = c.dip; check(!!d, `${tag}: ${c.name} has no diplomatic record`); if (!d) continue;
+    check(d.rep >= 0 && d.rep <= 100 && d.inf >= 0 && d.inf <= 80 && isFinite(d.rep + d.inf), `${tag}: ${c.name} word ${d.rep}, infamy ${d.inf}`);
+    for (const k in d.pact) { const b = sim.civs[+k]; check(!!b && b !== c, `${tag}: ${c.name} is sworn to a realm that is gone (${k})`); if (!b) continue; for (const kind in d.pact[k]) check(!!b.dip.pact[c.id] && b.dip.pact[c.id][kind] === d.pact[k][kind], `${tag}: a one-sided ${kind} between ${c.name} and ${b.name}`); }
+    if (d.lord >= 0) { const l = sim.civs[d.lord]; check(!!l && l !== c, `${tag}: ${c.name} has a lord that is gone (${d.lord})`); if (l) { check(l.dip.lord !== c.id, `${tag}: ${c.name} and ${l.name} are each other's lords`); check(c.wars[l.id] === undefined, `${tag}: ${c.name} is at war with its lord`); } }
+    for (const k in d.side) check(c.wars[k] !== undefined, `${tag}: ${c.name} stands beside a friend in a war it is not in (${k})`);
+    for (const k in d.owes) check(!!sim.civs[+k], `${tag}: ${c.name} owes reparations to a realm that is gone`);
+    check(d.offers.length <= 6 && (c.player || d.offers.length === 0), `${tag}: ${c.name} has ${d.offers.length} offers before it`);
+    check(Object.keys(d.mem).length <= sim.MAXC && Object.keys(d.ask).length <= sim.MAXC * 8, `${tag}: ${c.name} remembers without bound`);
   }
+  { let tin = 0, tout = 0; for (let k = 0; k < sim.MAXC; k++) { tin += sim.diplo.trIn[k]; tout += sim.diplo.trOut[k]; } check(Math.abs(tin - tout) < 1e-3 * (1 + tin), `${tag}: tribute paid ${tout.toFixed(2)} is not tribute received ${tin.toFixed(2)}`); }
   check(n === sim.st.civCount, `${tag}: civCount ${sim.st.civCount} != living ${n}`);
   check(sim.worldEvents.length <= 600, `${tag}: worldEvents unbounded (${sim.worldEvents.length})`);
   check(sim.allEvents.length <= 6000, `${tag}: allEvents unbounded (${sim.allEvents.length})`);
@@ -136,7 +146,7 @@ log('2. player actions and god powers');
   check(sim.st.civCount === sim.civs.filter(Boolean).length, `civ count in st is live between ticks (${sim.st.civCount} vs ${sim.civs.filter(Boolean).length})`);
   const target = e.capital; sim.meteor(target); check(sim.owner[target] === -1 && sim.pop[target] === 0, 'meteor clears the cell'); check(sim.ruins.size >= 0, 'ruins map intact after meteor');
   // war & peace
-  const foe = sim.civs.find(x => x && x !== c && x.alive !== false); sim.playerWar(foe.id); check(sim.isAtWar(c, foe.id) && sim.isAtWar(foe, c.id), 'declare war is mutual'); sim.playerWar(foe.id); check(!sim.isAtWar(c, foe.id), 'offer peace ends it');
+  const foe = sim.civs.find(x => x && x !== c && x.alive !== false); { const no = sim.playerWar(foe.id); check(no === null && sim.isAtWar(c, foe.id) && sim.isAtWar(foe, c.id), 'declare war is mutual' + (no ? ': ' + no : '')); const no2 = sim.playerWar(foe.id); check(no2 === null && !sim.isAtWar(c, foe.id), 'peace as things stand ends a war nobody is winning' + (no2 ? ': ' + no2 : '')); check(/truce/i.test(sim.playerWar(foe.id) || ''), 'and a truce follows'); }
   sim.renamePlayer('  Newname  '); check(c.name === 'Newname', `rename trims: "${c.name}"`);
   sim.renamePlayer(''); check(c.name === 'Newname', 'empty rename ignored');
   for (let y = 0; y < 400; y++) sim.tick(); invariants(sim, 'after actions + 400 years');
@@ -524,6 +534,144 @@ log('10. laws and government');
   // speed
   { const st0 = k.step; let tk = 0; k.step = (a, b) => { const t = process.hrtime.bigint(); st0(a, b); tk += Number(process.hrtime.bigint() - t) / 1e6; }; for (let y = 0; y < 200; y++) sim.tick(); k.step = st0;
     log(`   rule takes ${(tk / 200).toFixed(3)} ms a year for ${sim.st.civCount} realms`); check(tk / 200 < 2.5, `rule is quick enough (${(tk / 200).toFixed(3)} ms a year)`); invariants(sim, 'the world of laws in ' + sim.fmtYear(sim.year)); }
+}
+}
+if (want(11)) {
+// ---------- 11. diplomacy: opinions, pacts, vassals, causes of war, terms of peace ----------
+log('11. diplomacy');
+{
+  const DP = window.DIPLO, R = window.RULE, KN = window.KNOW;
+  // the tables hang together
+  check(DP.PACTS.length === 5 && DP.PACTS.every(P => KN.ID[P.need] !== undefined && P.turns >= 2 && P.text.length > 30) && KN.ID[DP.VASSAL.need] !== undefined, 'five pacts and vassalage, each standing on a real discovery');
+  check(Object.keys(DP.OPENS).length >= 5 && Object.keys(DP.OPENS).every(k => KN.ID[k] !== undefined && DP.OPENS[k].length > 20), 'what else discoveries open between realms (a claim, vassals, embassies, the wireless, unification) is said of real discoveries');
+  check(Object.keys(DP.CAUSES).length === 10 && Object.values(DP.CAUSES).every(C => C.name && C.text.length > 15 && ['land', 'tribute', 'vassal', 'regime', 'none'].includes(C.goal)), 'ten causes of war, each with something to win');
+  check(Object.values(DP.STAND).every(([n, h]) => n && /^#[0-9A-F]{6}$/i.test(h)) && Object.keys(DP.TERMS).every(t => DP.TERM_TEXT[t] && DP.RANK[t] !== undefined), 'standings have a colour, terms a rank and a line');
+  check(DP.moodOf(80) === 'devoted' && DP.moodOf(0) === 'indifferent' && DP.moodOf(-20) === 'wary' && DP.moodOf(-90) === 'bitter', 'opinions have words');
+  check(DP.UNJUST_STAB[0] === 0 && DP.UNJUST_STAB[1] === 0 && DP.UNJUST_REP[8] > DP.UNJUST_REP[3] && DP.UNJUST_REP[3] > 0, 'the early ages keep no account of unprovoked wars; the later ones do');
+
+  // a small world made by hand: the player in the middle, a realm two regions off on every side (so that each touches the player's land)
+  const sim = createSim(wd, 21); const W2 = sim.W; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [i - 3, i + 3, i - 3 * W2, i + 3 * W2, i - 3 * W2 - 3, i + 3 * W2 + 3, i - 3 * W2 + 3, i + 3 * W2 - 3].every(ok) && [-2, -1, 1, 2].every(d => ok(i + d) && ok(i + d * W2)));
+  const c = sim.setPlayer(i0, 'Envoys', null); const mk = (off) => { const t = sim.spawnTribe(i0 + off, {}); for (const d of [-1, 1, -W2, W2]) { const j = i0 + off + d; if (sim.owner[j] < 0 && ok(j)) { sim.owner[j] = t.id; sim.pop[j] = 0.5; } } return t; };
+  const A = mk(3), B = mk(-3), E = mk(3 * W2), F = mk(-3 * W2), G = mk(3 * W2 + 3), H = mk(-3 * W2 - 3), J = mk(-3 * W2 + 3), K2 = mk(3 * W2 - 3);
+  // (their borders are made to meet the player's: one region of each lies against his)
+  for (const [t, off] of [[A, 2], [B, -2], [E, 2 * W2], [F, -2 * W2], [G, 2 * W2 + 2], [H, -2 * W2 - 2], [J, -2 * W2 + 2], [K2, 2 * W2 - 2]]) { sim.owner[i0 + off] = t.id; sim.pop[i0 + off] = 0.5; }
+  const all = [c, A, B, E, F, G, H, J, K2]; const dp = sim.diplo; const iron = sim.ERAS[2][1] + 0.01;
+  // (nobody here does anything of his own accord: no envoys are sent and no wars begun but those the test sends and begins)
+  const still = () => { for (const x of all) if (sim.civs[x.id] === x) { x.aggression = 0; if (x !== c) x.dip.think = 1e12; } }; still();
+  const setAge = (tech) => { for (const x of all) { x.tech = tech; x.era = sim.eraOf(tech); } };
+  const pops = (list) => { for (const [x, p] of list) for (let k = 0; k < sim.LI.length; k++) { const i = sim.LI[k]; if (sim.owner[i] === x.id) sim.pop[i] = p; } sim.recount(); sim.touchAll(); };
+  pops([[c, 6], [A, 4], [B, 4], [E, 4], [F, 2], [G, 0.6], [H, 0.6], [J, 3], [K2, 3]]);
+  check(all.every(x => x.dip && x.dip.rep === 50 && x.dip.lord === -1 && !Object.keys(x.dip.pact).length), 'every realm begins with a clean slate and an ordinary name');
+  check([A, B, E, F].every(x => dp.touches(c, x.id) && dp.reach(c.id).includes(x.id)), 'the player can deal with those he touches');
+  { const r = dp.reasons(A, c); const sum = r.why.reduce((t, w) => t + w[1], 0); check(Math.abs(sum - r.o) < 1e-6 && r.o >= -100 && r.o <= 100 && r.why.some(w => /border/.test(w[0])), `an opinion is the sum of its reasons (${r.o}: ${r.why.map(w => w[0] + ' ' + w[1]).join(', ')})`); }
+
+  // before writing, nothing can be sworn; coin and war are all there is
+  check(/Needs Written laws/.test(dp.cannot(c, A, 'nap') || '') && /Needs Written laws/.test(dp.propose(c, A, 'nap') || ''), 'a sworn peace needs written laws: ' + dp.cannot(c, A, 'nap'));
+  check(/Needs Envoys/.test(dp.cannot(c, A, 'alliance') || '') && /Needs Kingship/.test(dp.cannot(c, A, 'vassal') || '') && /Needs Markets/.test(dp.cannot(c, A, 'trade') || ''), 'alliances need envoys, vassals kingship, trade agreements markets');
+  { const cs = dp.causes(c, B); const W0 = dp.warCost(c, B); check(cs[cs.length - 1].key === 'none' && cs[cs.length - 1].just && W0.stab === 0 && W0.rep === 0, 'in the Stone Age nobody asks why a war is fought'); }
+  // gifts: coin for goodwill, by what it is to the one who gets it, and no more than 45 of it
+  { c.wealth = 500; const before = dp.opinion(B, c), w0 = B.wealth; check(dp.gift(c, B, 0) !== null && dp.gift(c, B, 1e6) !== null, 'a gift of nothing, or of more than the treasury holds, is not sent');
+    check(dp.gift(c, B, 40) === null && c.wealth === 460 && B.wealth === w0 + 40, 'coin changes hands'); const after = dp.opinion(B, c); check(after > before && after - before <= 22, `and buys goodwill (${before} -> ${after})`);
+    for (let n = 0; n < 12; n++) dp.gift(c, B, 30); check(dp.memOf(B, c.id) <= 45.01 && dp.memOf(B, c.id) > 30, `but not without end (${dp.memOf(B, c.id).toFixed(1)})`); }
+
+  // the Iron Age: everything but embassies; kings on every throne
+  setAge(iron); for (const x of all) { teach(sim, x, 2); sim.rule.setForm(x.id, x, R.FORM.kingdom, 'quiet'); x.religion = 'the Old Faith'; x.ruler.trait = 'steward'; } still(); sim.recount();
+  check(all.every(x => sim.rule.succession(x) === 'blood') && dp.cannot(c, A, 'nap') === null && dp.cannot(c, A, 'alliance') === null && dp.cannot(c, A, 'marriage') === null, 'with writing, envoys and kings, everything can be proposed');
+  // a sworn peace: agreed, in force on both sides for four turns, and it binds
+  { dp.remember(A, c.id, 30); const j = dp.judge(A, c, 'nap'); check(j.ok && j.why.length > 0, `they would agree (${j.score}: ${j.why.map(w => w[0]).join(', ')})`);
+    const y = sim.year, turn = DP.PACE[c.era]; check(dp.propose(c, A, 'nap') === null && dp.has(c, A.id, 'nap') && dp.has(A, c.id, 'nap') && c.dip.pact[A.id].nap === y + 4 * turn, 'a sworn peace holds four turns, on both sides');
+    check(dp.bound(c, A) && dp.bound(A, c) && dp.warWith(A, c) === null, 'and neither will attack the other'); check(dp.cannot(c, A, 'nap') === 'Already in force', 'it cannot be sworn twice');
+    const W1 = dp.warCost(c, A); check(W1.broke === 'nap' && W1.rep >= 30, `breaking it would cost the player's word ${W1.rep}`);
+    // (who would attack whom is asked of their arms, as the fights are: not of their numbers)
+    A.ruler.trait = 'tyrant'; A.policy.military = 4; sim.recount(); let broke = 0; for (let n = 0; n < 60 && !broke; n++) { const w = dp.warWith(A, c); if (w && w.g < 0.2) broke = 1; } check(broke === 1, 'only the faithless would break a sworn peace, and seldom'); A.ruler.trait = 'steward'; A.policy.military = 1; sim.recount();
+    check(sim.mightOf[c.id] > sim.strengthOf[c.id] * 2 && Math.abs(sim.strengthOf[c.id] / sim.strengthOf[A.id] - 1) < 0.5 && sim.mightOf[c.id] / sim.mightOf[A.id] > 2, `arms and might are two figures: a realm of many is no better armed for it, and far mightier (arms ${(sim.strengthOf[c.id] / sim.strengthOf[A.id]).toFixed(2)} to 1, might ${(sim.mightOf[c.id] / sim.mightOf[A.id]).toFixed(1)} to 1)`); }
+  // refusal, and no asking again at once
+  { dp.remember(B, c.id, -200); const j = dp.judge(B, c, 'alliance'); check(!j.ok, `one who hates you refuses (${j.score})`); const n0 = dp.stats.refused; check(dp.propose(c, B, 'alliance') === 'They refuse' && dp.stats.refused === n0 + 1 && !dp.has(c, B.id, 'alliance'), 'and says so');
+    check(dp.propose(c, B, 'alliance') === 'They have only just answered that', 'and will not be asked again the same turn'); }
+  // a trade agreement halves the customs on that road; closed markets shut it
+  { dp.remember(E, c.id, 30); check(dp.propose(c, E, 'trade') === null && dp.agreed(c.id, E.id) && dp.agreed(E.id, c.id) && !dp.agreed(c.id, F.id), 'a trade agreement is agreed');
+    for (let n = 0; n < 5; n++) sim.tick(); const link = (x) => sim.market.links.find(L => (L.a === c.id && L.b === x.id) || (L.b === c.id && L.a === x.id));
+    check(!!link(E) && link(E).fr === true && !!link(F) && !link(F).fr, 'the market knows which roads have one');
+    check(dp.embargo(c, F, true) === null && dp.closed(c.id, F.id) && dp.closed(F.id, c.id), 'markets can be closed to a realm'); const before = dp.opinion(F, c); for (let n = 0; n < 2; n++) sim.tick();
+    check(link(F).shut === true && link(F).v === 0 && link(E).shut === false, 'and nothing passes on that road'); check(dp.reasons(F, c).why.some(w => /markets are closed/.test(w[0])), 'they hold it against him');
+    check(dp.embargo(c, F, false) === null && !dp.closed(c.id, F.id), 'and opened again'); sim.tick(); check(link(F).shut === false, 'the road is open'); }
+  // a claim gives a war its reason; a war without one costs quiet at home and trust abroad
+  { c.wealth = 5000; const cost = dp.claimCost(c, B); check(dp.claim(c, B) === null && c.wealth === 5000 - cost && dp.causes(c, B)[0].key === 'claim', `a claim on a neighbour's borderland costs ${cost} coin and is a reason`);
+    const W1 = dp.warCost(c, B, 'claim'), W2b = dp.warCost(c, F, 'none'); check(W1.stab === 0 && W1.rep === 0 && W2b.stab === DP.UNJUST_STAB[2] && W2b.rep === DP.UNJUST_REP[2], `a war with a reason costs nothing; one without, ${W2b.stab} stability and ${W2b.rep} of one's word`);
+ }
+  // war: those sworn to the defender come in beside it, the war is theirs to follow, and one peace ends it for all
+  // (a vassal always comes; one bound by a pact weighs it, and may leave its friend to fight alone: the world left to itself shows that)
+  { dp.subject(B, J, null); const s0 = c.stability, r0 = c.dip.rep; check(dp.declare(c, B, 'claim') === null && sim.isAtWar(c, B.id) && sim.isAtWar(B, c.id) && c.dip.goal[B.id] === 'claim', 'war is declared, for a claim');
+    check(c.stability === s0 && c.dip.rep === r0, 'at no cost at home or abroad'); check(sim.isAtWar(J, c.id) && J.dip.side[c.id] === B.id, 'their vassal comes in beside them');
+    check(/fight for/.test(dp.cannotSue(c, J) || '') && dp.cannotSue(c, B) === null, 'peace is made with the one whose war it is');
+    check(dp.reasons(B, c).o < -20 && c.events.some(e => /declares war on/.test(e.text) && /claim/.test(e.text)), 'they will not forget it, and the chronicle says why');
+    const j = dp.wouldEnd(B, c, c, 'white'); check(j.ok, 'with nobody winning they would take peace as things stand: ' + j.why); check(!dp.wouldEnd(B, c, c, 'tribute').ok && !dp.wouldEnd(B, c, c, 'vassal').ok, 'but will not pay or kneel unbeaten');
+    check(dp.sue(c, B, 'white') === null && !sim.isAtWar(c, B.id) && !sim.isAtWar(c, J.id) && J.dip.side[c.id] === undefined, 'one peace ends it for everyone'); dp.release(B, J); c.truce[J.id] = -1e9; J.truce[c.id] = -1e9; check(/truce/i.test(dp.cannotFight(c, B) || '') && /truce/i.test(dp.declare(c, B) || ''), 'and a truce follows: ' + dp.cannotFight(c, B)); }
+  // a war won: the terms follow from how it stands
+  { check(dp.declare(c, F, 'none') === null, 'another war, for no reason'); check(c.dip.rep === 50 - DP.UNJUST_REP[2], `the player's word suffers for it (${c.dip.rep})`);
+    F.warStart[c.id] = Math.round(sim.cellsOf[F.id] * 1.3); const sc = dp.score(c, F); check(sc > 0.15 && sc < 0.3, `having lost a quarter of its land they stand at ${sc.toFixed(2)}`);
+    check(dp.termsFor(c, F, sc).join() === 'tribute,white' && dp.wouldEnd(F, c, c, 'tribute').ok && !dp.wouldEnd(F, c, c, 'vassal').ok, 'they would pay, but not kneel');
+    check(dp.sue(c, F, 'vassal') !== null && sim.isAtWar(c, F.id), 'and say so'); check(dp.sue(c, F, 'tribute') === null && !sim.isAtWar(c, F.id) && F.dip.owes[c.id] > sim.year, 'reparations are agreed');
+    for (let n = 0; n < 3; n++) sim.tick(); const ip = sim.incomeParts(c); check(dp.trIn[c.id] > 0 && dp.trOut[F.id] > 0 && Math.abs(ip.tribute - dp.trIn[c.id] + dp.trOut[c.id]) < 1e-6 && ip.tribute > 0, `and paid: ${ip.tribute.toFixed(3)} a year, an eighth of what they earn`);
+    check(c.dip.inf === 0, 'no land was taken, so nobody is the warier'); }
+  // submission: by war, by demand; what a vassal owes and may not do; release, rebellion, union
+  { check(dp.declare(c, G, 'none') === null, 'a war on a small neighbour'); G.warStart[c.id] = Math.round(sim.cellsOf[G.id] * 3); const sc = dp.score(c, G); check(dp.termsFor(c, G, sc)[0] === 'vassal' && dp.wouldEnd(G, c, c, 'vassal').ok, `at ${sc.toFixed(2)} they would bend the knee`);
+    check(dp.sue(c, G, 'vassal') === null && G.dip.lord === c.id && dp.lordOf(G) === c && dp.vassalsOf(c.id).includes(G), 'and do'); check(dp.standing(c, G) === 'vassal' && dp.standing(G, c) === 'lord', 'each knows where the other stands');
+    for (let n = 0; n < 3; n++) sim.tick(); check(dp.trOut[G.id] > 0 && Math.abs(dp.trOut[G.id] / Math.max(1e-9, (G.income || 0) + dp.trOut[G.id]) - DP.TRIBUTE) < 0.02, `a vassal pays a tenth (${dp.trOut[G.id].toFixed(3)} of ${((G.income || 0) + dp.trOut[G.id]).toFixed(3)})`);
+    check(dp.cannotFight(c, G) === 'They are your vassal' && /lord/.test(dp.cannotFight(G, c) || '') && /vassal makes no wars/.test(dp.cannotFight(G, K2) || ''), 'lord and vassal do not fight, and a vassal makes no wars of its own');
+    // (an attack on the vassal is laid before its lord)
+    K2.truce = {}; check(dp.declare(K2, G, 'none') === null && sim.isAtWar(K2, G.id), 'a third realm attacks the vassal'); const o = c.dip.offers.find(x => x.kind === 'call' && x.from === G.id && x.vs === K2.id); check(!!o, 'and its lord is called');
+    check(dp.answer(c, o.id, true) === null && sim.isAtWar(c, K2.id) && c.dip.side[K2.id] === G.id && !c.dip.offers.some(x => x.kind === 'call'), 'he comes'); check(dp.abandon(c, K2) === null && !sim.isAtWar(c, K2.id) && c.dip.rep < 50, 'or goes home alone, and is thought the less of');
+    dp.conclude(K2, G, 'white');
+    // a demand without a war: the very strong may ask, the refused remember
+    pops([[c, 60], [H, 0.3]]); dp.remember(H, c.id, 40); const j = dp.judge(H, c, 'vassal'); check(j.ok, `a realm two hundred times weaker, and well disposed, bends the knee when asked (${j.score})`); check(dp.propose(c, H, 'vassal') === null && H.dip.lord === c.id, 'and does');
+    // release
+    { const m0 = dp.memOf(G, c.id); check(dp.breakPact(c, G, 'vassal') === null && G.dip.lord === -1 && dp.memOf(G, c.id) > m0 + 10, 'a vassal released remembers it kindly'); }
+    // joined to the crown: only after six turns, and only if they think well of their lord
+    check(/Not before/.test(dp.cannotJoin(c, H) || ''), 'a vassal cannot be swallowed at once: ' + dp.cannotJoin(c, H)); H.dip.since = sim.year - 7 * DP.PACE[c.era]; dp.remember(H, c.id, 60);
+    const cells = sim.cellsOf[c.id] + sim.cellsOf[H.id], hid = H.id; check(dp.annex(c, H) === null && sim.civs[hid] === null, 'after six turns of goodwill it is joined to the crown'); sim.recount(); check(sim.cellsOf[c.id] === cells, 'with all its land');
+    check(sim.civs.every(x => !x || (x.dip.lord !== hid && !x.dip.pact[hid] && x.dip.mem[hid] === undefined && x.wars[hid] === undefined)), 'and nobody is bound to what is gone');
+    // rebellion
+    dp.subject(c, G, null); check(dp.rebel(G) === null && G.dip.lord === -1 && dp.causes(c, G)[0].key === 'rebel', 'a vassal that throws off the yoke is a rebel to be brought to heel');
+    pops([[c, 2], [J, 6]]); dp.remember(J, c.id, -60); { const r = dp.propose(c, J, 'vassal'); check(r === 'They refuse' && dp.causes(c, J).some(x => x.key === 'refused'), 'a realm of his own weight refuses, and the refusal is itself a reason for war: ' + r); } }
+  // what is laid before the player: a proposal, a peace, and what happens when he says nothing
+  { c.dip.offers = c.dip.offers.filter(x => x.from !== E.id); check(dp.propose(E, c, 'alliance') === null && c.dip.offers.some(x => x.from === E.id && x.kind === 'alliance') && !dp.has(c, E.id, 'alliance'), 'what another realm proposes waits on the player'); const o = c.dip.offers.find(x => x.from === E.id && x.kind === 'alliance');
+    check(dp.answer(c, o.id, true) === null && dp.has(E, c.id, 'alliance') && dp.standing(c, E) === 'ally', 'accepted, it is in force'); check(dp.answer(c, o.id, true) === 'That has lapsed', 'an answer is given once');
+    c.dip.offers = c.dip.offers.filter(x => x.from !== J.id); dp.propose(J, c, 'trade'); const o2 = c.dip.offers.find(x => x.from === J.id && x.kind === 'trade'); const m0 = dp.memOf(J, c.id); check(dp.answer(c, o2.id, false) === null && dp.memOf(J, c.id) < m0 && !dp.has(c, J.id, 'trade'), 'declined, it is remembered a little');
+    // (a war grown old: the other side sends envoys; unanswered, they settle it as things stand)
+    J.truce = {}; c.truce = {}; check(dp.declare(J, c, 'none') === null, 'a neighbour attacks'); const old = sim.year - 3 * DP.PACE[c.era]; c.wars[J.id] = J.wars[c.id] = old; dp.warsEnd(J);
+    const o3 = c.dip.offers.find(x => x.kind === 'peace' && x.from === J.id); check(!!o3 && o3.terms === 'white' && sim.isAtWar(c, J.id), 'after a generation of war they offer peace, and wait'); o3.until = sim.year; sim.tick(); check(!sim.isAtWar(c, J.id) && !c.dip.offers.includes(o3), 'left unanswered, the envoys settle a long war as it stands'); }
+  // a pact runs its course, and can be sworn again in its last turn
+  { const u = c.dip.pact[A.id].nap; const turn = DP.PACE[c.era]; while (sim.year < u - turn + 1) sim.tick(); check(dp.has(c, A.id, 'nap') && dp.cannot(c, A, 'nap') === null, 'in its last turn a pact can be sworn again'); dp.remember(A, c.id, 30); check(dp.propose(c, A, 'nap') === null && c.dip.pact[A.id].nap > u, 'and runs on');
+    const u2 = c.dip.pact[E.id].trade; while (sim.year < u2 + 4) sim.tick(); check(!dp.has(c, E.id, 'trade') && c.dip.pact[E.id].trade === undefined && c.events.some(e => /has run its course/.test(e.text)), 'one that is not, ends, and the player is told'); }
+  // marriage: only between houses, and now and then one inherits the other
+  { pops([[A, 4], [B, 0.4]]); A.truce = {}; B.truce = {}; dp.remember(A, B.id, 30); dp.remember(B, A.id, 60); check(dp.propose(A, B, 'marriage') === null && dp.has(A, B.id, 'marriage') && dp.bound(A, B), 'two houses are joined'); sim.rule.setForm(E.id, E, R.FORM.republic, 'quiet'); check(/ruled by blood/.test(dp.cannot(c, E, 'marriage') || ''), 'a republic has no house to marry into');
+    let done = 0; for (let n = 0; n < 4000 && !done; n++) { dp.heir(A.id, A); if (!sim.civs[B.id] || !sim.civs[A.id] || B.dip.lord === A.id || A.dip.lord === B.id) done = 1; } check(done === 1, 'sooner or later one house inherits the other: ' + (sim.civs[B.id] && sim.civs[A.id] ? 'two realms, one ruler' : 'its lands')); }
+  // a vassal whose lord has grown weak throws off the yoke by itself
+  { dp.subject(F, K2, null); K2.dip.since = sim.year - 3 * DP.PACE[K2.era]; pops([[F, 0.5], [K2, 8]]); dp.remember(K2, F.id, -40); let free = 0; for (let n = 0; n < 60 && !free; n++) { dp.think(K2.id, K2); if (K2.dip.lord === -1) free = 1; } check(free === 1 && dp.claimUntil(F, K2.id, 'rebel') > sim.year, 'a vassal stronger than its lord, and ill disposed, rebels'); }
+  invariants(sim, 'the hand-made world of envoys');
+  // what is sworn, owed and remembered survives a save; a world saved before diplomacy wakes with a clean slate
+  { const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, 21); sim2.load(s); let same = 0, n = 0; const rec = (d) => { const o = Object.assign({}, d); delete o.next; return JSON.stringify(o); };      // (all but `next`: a loaded record is looked through afresh)
+    for (const x of sim.civs) { if (!x) continue; n++; if (rec(sim2.civs[x.id].dip) === rec(x.dip)) same++; }
+    check(same === n && n > 3, `every realm's record survives a save (${same} of ${n})`); check(sim2.diplo.has(sim2.playerCiv(), A.id, 'nap') && sim2.diplo.standing(sim2.playerCiv(), sim2.civs[E.id]) === dp.standing(c, E), 'and means the same');
+    for (let y = 0; y < 30; y++) sim2.tick(); invariants(sim2, 'the loaded world of envoys');
+    const old = JSON.parse(JSON.stringify(sim.save())); for (const x of old.civs) if (x) delete x.dip; const sim3 = createSim(wd, 21); sim3.load(old); check(sim3.civs.every(x => !x || (x.dip && x.dip.rep === 50 && !Object.keys(x.dip.pact).length && x.dip.lord === -1)), 'a world from before diplomacy has sworn nothing yet');
+    for (let y = 0; y < 30; y++) sim3.tick(); invariants(sim3, 'an old world, thirty years on'); }
+}
+// a world left to itself: by the Iron Age it has sworn, married, knelt and fought for reasons
+{
+  const sim = createSim(wd, 31); for (let n = 0; n < 40; n++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {}); sim.recount(); const dp = sim.diplo; const t0w = Date.now();
+  while (sim.year < -800) sim.tick(); const S = dp.stats; let bound = 0, n = 0, vass = 0; for (const x of sim.civs) { if (!x) continue; n++; if (x.dip.lord >= 0) vass++; if (x.dip.lord >= 0 || Object.keys(x.dip.pact).length || dp.vassalsOf(x.id).length) bound++; }
+  log(`   by ${sim.fmtYear(sim.year)}: ${n} realms, ${bound} bound to somebody, ${vass} vassals; sworn ${JSON.stringify(S.pacts)}; wars ${JSON.stringify(S.wars)}; peace ${JSON.stringify(S.peace)}; ${S.broken} oaths broken, ${S.unions} unions (${((Date.now() - t0w) / 1000).toFixed(0)} s)`);
+  check(['nap', 'trade', 'marriage'].every(k => S.pacts[k] > 5) && (S.pacts.defence || 0) + (S.pacts.alliance || 0) > 0, 'realms that rule themselves swear peace, open their markets, marry and stand together');
+  check(S.vassals > 3 && S.freed > 0, `some kneel (${S.vassals}) and some get up again (${S.freed})`); check((S.wars.none || 0) > 50 && (S.wars.covet || 0) + (S.wars.claim || 0) + (S.wars.reconquest || 0) > 10 && (S.wars.ally || 0) > 0, 'wars are fought for nothing, for goods, for claims and beside friends');
+  check(S.peace.white > 50 && S.peace.tribute > 3, 'most end as they stand; some are paid for'); check(bound > n * 0.3 && bound < n, `a good part of the world is bound to somebody, not all of it (${bound} of ${n})`);
+  invariants(sim, 'the world of envoys in ' + sim.fmtYear(sim.year));
+  // speed: what diplomacy costs a year
+  { const T = {}; for (const k of ['tick', 'step', 'warsEnd', 'warWith', 'heir']) { const f = dp[k]; T[k] = 0; dp[k] = function () { const t = process.hrtime.bigint(); const r = f.apply(this, arguments); T[k] += Number(process.hrtime.bigint() - t) / 1e6; return r; }; }
+    for (let y = 0; y < 300; y++) sim.tick(); let sum = 0; for (const k in T) sum += T[k]; log(`   diplomacy takes ${(sum / 300).toFixed(3)} ms a year for ${sim.st.civCount} realms (${Object.entries(T).map(([k, v]) => k + ' ' + (v / 300).toFixed(3)).join(', ')})`);
+    check(sum / 300 < 1.0, `diplomacy is quick enough (${(sum / 300).toFixed(3)} ms a year)`); }      // (0.75 here in the Iron Age with three hundred realms, a tenth of it this clock's own: a thirtieth of the year)
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);
