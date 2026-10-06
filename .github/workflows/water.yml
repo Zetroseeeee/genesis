@@ -61,7 +61,7 @@ jobs:
           [ -n "$ONLY" ] && set -- "$@" --only "$ONLY"
           [ -n "$SHEET" ] && set -- "$@" --sheet "$SHEET"
           python3 tools/water/build.py "$@" 2>&1 | tee out/water_build.log
-          ls -la out | head -30; du -sh tiles out
+          echo "$(ls out | wc -l) files in out"; du -sh tiles out      # (never "ls | head" here: with more files than head takes, ls fails on the closed pipe and the step with it - an hour's work was lost so)
       - name: Keep
         env:
           GH_TOKEN: ${{ github.token }}

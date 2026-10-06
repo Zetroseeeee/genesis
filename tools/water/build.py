@@ -43,8 +43,8 @@ What is made of them:
                        as a river of (1) is.
 
 Packs: equirectangular, as the elevation's are. Level 7 has 256 x 128 tiles of 512 texels (305 m to a texel north-south),
-a pack is 4 x 4 tiles with a rim of one texel all round (2050 x 2050), so that a lookup between two packs' texels is
-as good as one inside a pack. Levels 6 and 5 are the same field at half and a quarter of the fineness, for the eye
+a pack is 4 x 4 tiles with a rim of two texels all round (2052 x 2052), so that a lookup among sixteen texels at a
+pack's edge is as good as one inside it. Levels 6 and 5 are the same field at half and a quarter of the fineness, for the eye
 further off. A WebP without loss, three bytes a texel:
   R  the distance: 128 is the water's edge, a step is 16 m (times the level's scale: 1, 2, 4 for levels 7, 6, 5).
      128..158 is 0..480 m of land (158: that far and further), 128..98 is 0..-480 m of water, and 98..58 runs on to
@@ -52,7 +52,10 @@ further off. A WebP without loss, three bytes a texel:
      (Sixteen metres, and no further inland than a texel's diagonal: what a pack weighs is how much of it is not one
      flat value, and how many values there are. The water's edge itself lies between the texels, far finer.)
   G  what water the nearest water is: 0 the sea ... 255 fresh, in sixteen steps, smoothed over a kilometre or two
-  B  nothing yet
+  B  how open the water lies: the share of water round about (within a kilometre or two, and within six: the lesser of
+     the two, doubled), in sixteen steps. 255 on a coast the sea comes straight in on and anywhere out at sea; half that
+     and less in a harbour, a cove, a sound, a fjord, among islands, on a small lake. (Where waves break, and how high
+     they run.)
 A pack with no shore in or near it is not written: index.json says what it is instead (L land, S sea, F fresh water).
 
 The pack is kept under the name of what it was made from: twelve digits of the SHA-256 of this file and data/rivers.png
@@ -79,7 +82,7 @@ WC_WATER = 80                             # the class: permanent water bodies
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 RIVERS = os.path.join(ROOT, 'data', 'rivers.png')      # the rivers the game draws itself
 R_M = 6371000.0
-TILE, PACK_TILES, APRON = 512, 4, 1
+TILE, PACK_TILES, APRON = 512, 4, 2
 TEX = TILE * PACK_TILES                   # texels to a pack's side
 TOP = 7                                   # the finest level
 LEVELS = (7, 6, 5)
@@ -95,6 +98,7 @@ ADOPT = 3                                 # working pixels: water only the secon
 LAKE_WIDE = 250.0                         # metres: water only the second source has is kept where a disc of this radius fits into the water ...
 LAKE_BACK = 350.0                         # ... and for this far round such a place (its coves and corners)
 RIVER_NEAR = 1500.0                       # metres: this near a river the game draws, such water is that river
+OPEN_NEAR, OPEN_FAR = 1500.0, 6000.0      # metres: the two reaches over which the share of water round a place is taken (how open the water lies)
 # the distance's code (see the header): STEP metres to the step out to NEAR on both sides, then ever coarser to DEEP
 STEP, NEAR, DEEP, FAR_N = 16.0, 480.0, 3600.0, 40.0
 C_LAND, C_KNEE = 128.0 + NEAR / STEP, 128.0 - NEAR / STEP          # 158: land, that far and further; 98: where the water's code turns coarse
@@ -461,9 +465,15 @@ def process(args):
     half = 0.5 * math.sqrt(dx * dy)
     d = edt.edt(~water, anisotropy=ani, black_border=False, parallel=1) - half
     np.negative(edt.edt(water, anisotropy=ani, black_border=False, parallel=1) - half, out=d, where=water)
+    # how open the water lies: the share of water round about, near and further off (a harbour, a cove and a narrow sound are
+    # low on the first, a fjord and a sea full of islands on the second), at the fineness of the texels
+    w7 = block_mean(water.astype(np.float32), K)
+    t7 = dy * K; cy = dx / dy
+    o1 = ndimage.gaussian_filter(w7, (OPEN_NEAR / t7, OPEN_NEAR / (t7 * cy)), mode='nearest'); o2 = ndimage.gaussian_filter(w7, (OPEN_FAR / t7, OPEN_FAR / (t7 * cy)), mode='nearest')
+    opn = np.repeat(np.repeat(np.clip(np.minimum(o1, o2) * 2.0, 0.0, 1.0), K, 0), K, 1); del o1, o2
     # what kind of water: fresh's share of the water round about, at the fineness of the texels
     if fresh.any() and sea.any():
-        f7 = block_mean(fresh.astype(np.float32), K); w7 = block_mean(water.astype(np.float32), K)
+        f7 = block_mean(fresh.astype(np.float32), K)
         fb = ndimage.gaussian_filter(f7, 2.5, mode='nearest'); wb = ndimage.gaussian_filter(w7, 2.5, mode='nearest')
         kind7 = np.where(wb > 1e-3, fb / np.maximum(wb, 1e-3), 0.0).astype(np.float32)
         kind = np.repeat(np.repeat(kind7, K, 0), K, 1)
@@ -474,18 +484,18 @@ def process(args):
     for lv in LEVELS:
         k = K << (TOP - lv); scale = 1 << (TOP - lv); n = N // k + 2 * APRON
         y0, x0 = MY - k * APRON, mx - k * APRON
-        dm = block_mean(d[y0:y0 + n * k, x0:x0 + n * k], k); km = block_mean(kind[y0:y0 + n * k, x0:x0 + n * k], k)
-        img = np.zeros((n, n, 3), np.uint8); img[..., 0] = enc(dm, float(scale)); img[..., 1] = np.clip(np.rint(km * 15.0) * 17.0, 0, 255)
-        img[..., 1][img[..., 0] == int(C_LAND)] = 0                       # (far from any water the kind says nothing: one value packs smaller)
+        dm = block_mean(d[y0:y0 + n * k, x0:x0 + n * k], k); km = block_mean(kind[y0:y0 + n * k, x0:x0 + n * k], k); om = block_mean(opn[y0:y0 + n * k, x0:x0 + n * k], k)
+        img = np.zeros((n, n, 3), np.uint8); img[..., 0] = enc(dm, float(scale)); img[..., 1] = np.clip(np.rint(km * 15.0) * 17.0, 0, 255); img[..., 2] = np.clip(np.rint(om * 15.0) * 17.0, 0, 255)
+        far = img[..., 0] == int(C_LAND); img[..., 1][far] = 0; img[..., 2][far] = 0      # (far from any water neither says anything: one value packs smaller)
         st = state_of(img[..., 0], img[..., 1]); states[lv] = st
         if lv == TOP:
             if st == 'P': save(img, os.path.join(out, '%d_%d_%d.webp' % (lv, bx, by)))
         elif st == 'P':
-            np.save(os.path.join(out, 'parts', '%d_%d_%d.npy' % (lv, bx, by)), img[..., :2])
+            np.save(os.path.join(out, 'parts', '%d_%d_%d.npy' % (lv, bx, by)), img)
     return bx, by, states, (len(tiles), n_riv, n_small, time.time() - t0, n_wc)
 
 
-CONST = {'L': (int(C_LAND), 0), 'S': (int(C_DEEP), 0), 'F': (int(C_DEEP), 255)}
+CONST = {'L': (int(C_LAND), 0, 0), 'S': (int(C_DEEP), 0, 255), 'F': (int(C_DEEP), 255, 255)}      # (distance, kind, how open)
 
 
 def assemble(out, lv, parts_state, made):
@@ -498,14 +508,14 @@ def assemble(out, lv, parts_state, made):
             if any(k not in made for k in kids): states[(qx, qy)] = '?'; continue
             sts = [parts_state[(lv, k[0], k[1])] for k in kids]
             if all(s != 'P' for s in sts) and len(set(sts)) == 1: states[(qx, qy)] = sts[0]; continue
-            img = np.zeros((TEX + 2, TEX + 2, 3), np.uint8)
+            A = APRON; img = np.zeros((TEX + 2 * A, TEX + 2 * A, 3), np.uint8)
             for whole in (True, False):                               # rims first, then every block's own ground over them
                 for (kx, ky), st in zip(kids, sts):
                     a, b = kx - qx * f, ky - qy * f
                     if st == 'P': part = np.load(os.path.join(out, 'parts', '%d_%d_%d.npy' % (lv, kx, ky)))
-                    else: part = np.empty((S + 2, S + 2, 2), np.uint8); part[..., 0], part[..., 1] = CONST[st]
-                    if whole: img[b * S:b * S + S + 2, a * S:a * S + S + 2, :2] = part
-                    else: img[1 + b * S:1 + b * S + S, 1 + a * S:1 + a * S + S, :2] = part[1:-1, 1:-1]
+                    else: part = np.empty((S + 2 * A, S + 2 * A, 3), np.uint8); part[..., 0], part[..., 1], part[..., 2] = CONST[st]
+                    if whole: img[b * S:b * S + S + 2 * A, a * S:a * S + S + 2 * A] = part
+                    else: img[A + b * S:A + b * S + S, A + a * S:A + a * S + S] = part[A:-A, A:-A]
             st = state_of(img[..., 0], img[..., 1]); states[(qx, qy)] = st
             if st == 'P': save(img, os.path.join(out, '%d_%d_%d.webp' % (lv, qx, qy)))
     return states
@@ -630,7 +640,7 @@ def main():
 
     index = {'made': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'hash': pack_hash(), 'source': NOTICE + (' / ' + WC_NOTICE if have_wc else ''),
              'tile': TILE, 'packTiles': PACK_TILES, 'apron': APRON, 'partial': partial,
-             'ext': 'webp', 'code': {'step': STEP, 'near': NEAR, 'deep': DEEP, 'quad': B_QUAD, 'land': C_LAND, 'knee': C_KNEE, 'water': C_DEEP}, 'levels': {}}
+             'ext': 'webp', 'open': {'near': OPEN_NEAR, 'far': OPEN_FAR}, 'code': {'step': STEP, 'near': NEAR, 'deep': DEEP, 'quad': B_QUAD, 'land': C_LAND, 'knee': C_KNEE, 'water': C_DEEP}, 'levels': {}}
     index['levels']['7'] = {'scale': 1, 'nx': NX7, 'ny': NY7, 'packs': ''.join(states.get((x, y), '?') for y in range(NY7) for x in range(NX7))}
     for lv in (6, 5):
         f = 1 << (TOP - lv); nx, ny = NX7 // f, NY7 // f
