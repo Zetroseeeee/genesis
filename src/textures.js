@@ -53,7 +53,7 @@
   // which of them are fine: scans of a metre or two of ground (blades of grass, pebbles, cracks in mud), where the others are
   // taken from the air and show fifteen metres and more. The shader lays the fine ones smaller on the screen. The pack says
   // which they are ("fine" for a layer, from assets/ground/materials.json); this is for a pack made before it did.
-  const GROUND_FINE = { meadow: 1, marsh: 1, scree: 1, shingle: 1, savanna: 1, cracked: 1 };
+  const GROUND_FINE = { meadow: 1, marsh: 1, scree: 1, shingle: 1, savanna: 1, cracked: 1, hamada: 1 };
   async function loadGround(url, aniso, shrink, shallows, fresh) {
     let man; try { const r = await fetch(url + (fresh ? '?' + fresh : ''), fresh ? { cache: 'no-store' } : undefined); if (!r.ok) return null; man = await r.json(); } catch (e) { return null; }
     const L = man.layers || [], at = {}; L.forEach((l, i) => { if (at[l.id] === undefined) at[l.id] = i; });
