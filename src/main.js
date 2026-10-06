@@ -48,6 +48,7 @@
   // ---------- renderer ----------
   const stage = $('stage');
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
+  const msaa = (() => { try { const gl = renderer.getContext(); return !!gl.getContextAttributes().antialias && gl.getParameter(gl.SAMPLES) > 1; } catch (e) { return false; } })();      // (whether the window itself is drawn with several samples a pixel)
   // a browser drawing in software (the test harness) gets a lighter load: a quarter of the pixels, no shadow map, thinner forests, coarser models
   let softGL = false; try { const gl = renderer.getContext(); const x = gl.getExtension('WEBGL_debug_renderer_info'); softGL = /SwiftShader|llvmpipe|Software/i.test(String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER))); } catch (e) {}
   if (window.SHADOWS && (window.GENESIS_SHADOW || !softGL)) SHADOWS.init(renderer, window.GENESIS_SHADOW || 4096);      // the sun's depth map, 4096 texels across (a software renderer goes without unless asked)
@@ -1212,6 +1213,7 @@
     updateLabels(); updatePlots(); updateFlows();
     if (now - mmT > 700) { mmT = now; updateMinimap(false); }
     tpsT += dt; if (tpsT > 1) { $('yps').textContent = tpsCount + ' yr/s'; tpsCount = 0; tpsT = 0; const d = $('debug'); if (d.style.display === 'block') d.textContent = `elev ${JSON.stringify(terrain.stats.elevLevels)} tiles ${terrain.stats.tiles} sse ${terrain.stats.sse | 0} packs i${terrain.stats.packsI} e${terrain.stats.packsE} loading ${terrain.stats.loading} buildings ${world.buildingCount} trees ${trees ? trees.count : 0} labels ${labelEls.size} movers ${movers ? movers.stats.agents + '/' + movers.stats.walkers + '/' + movers.stats.ships : 0} alt ${(mapcam.alt * 6371).toFixed(1)}km dist ${(mapcam.dist * 6371).toFixed(1)}km tilt ${(mapcam.tilt * 57.3).toFixed(0)}`; }
+    if (trees) trees.uCover.value = (posted ? POST.samples > 1 : msaa) ? 1 : 0;      // (cut-out trees: several samples a pixel smooth their outlines)
     if (!modalOpen || (now | 0) % 6 === 0) { if (posted) POST.render(renderer, scene, camera, mapcam.alt, now / 1000); else renderer.render(scene, camera); }
     if (++framesDrawn === 3 && desktop) desktop.ready();      // the game is up: an update put to use just now is kept
   }

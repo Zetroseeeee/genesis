@@ -200,7 +200,27 @@
     if (c.state === 'ready') return c;
     if (!c.state) {
       c.state = 'loading';
-      new THREE.TextureLoader().load(M.base + c.file, (t) => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true; c.tex = t; c.state = 'ready'; M.stats.loaded++; }, undefined, () => { c.state = 'failed'; console.warn('card failed', c.file); });
+      // What lies round the tree in its picture has a colour too, though it is not seen: the photographs were cut from a pale
+      // screen, and it is that pale. Drawn small, a picture is an average of its texels, the unseen ones with the seen: far
+      // trees came out pale and haloed, mushrooms on a hillside. So the unseen texels are given the tree's own colour (a little
+      // darker: a crown's edge is thinner than its middle, not lighter), and the half-seen ones along the cut most of it.
+      // (Through a canvas this cannot be done: a canvas keeps no colour where it is clear. The texels go to the card as they are.)
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => {
+        let t = null;
+        try {
+          const w = im.width, h = im.height, cv = document.createElement('canvas'); cv.width = w; cv.height = h; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(im, 0, 0);
+          const src = ctx.getImageData(0, 0, w, h).data, out = new Uint8Array(w * h * 4); let r = 0, g = 0, b = 0, n = 0;
+          for (let i = 0; i < src.length; i += 16) if (src[i + 3] > 200) { r += src[i]; g += src[i + 1]; b += src[i + 2]; n++; }
+          n = Math.max(1, n); r = r / n * 0.86; g = g / n * 0.86; b = b / n * 0.86;
+          for (let y = 0; y < h; y++) { const so = (h - 1 - y) * w * 4, o = y * w * 4;      // (the picture's top row last: as a loaded image would lie)
+            for (let x = 0; x < w * 4; x += 4) { const a = src[so + x + 3], k = a >= 250 ? 1 : (a / 255) * (a / 255); out[o + x] = r + (src[so + x] - r) * k; out[o + x + 1] = g + (src[so + x + 1] - g) * k; out[o + x + 2] = b + (src[so + x + 2] - b) * k; out[o + x + 3] = a; } }
+          t = new THREE.DataTexture(out, w, h, THREE.RGBAFormat, THREE.UnsignedByteType);
+        } catch (e) { t = new THREE.Texture(im); }      // (a picture that may not be read: as it was)
+        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true; c.tex = t; c.state = 'ready'; M.stats.loaded++;
+      };
+      im.onerror = () => { c.state = 'failed'; console.warn('card failed', c.file); };
+      im.src = M.base + c.file;
     }
     return null;
   };
