@@ -477,7 +477,9 @@
         // wide of one material into another's hollows: from the step of the ladder where a stone would be a house they count for
         // less and less (gndNear: 1 near, 0 far), and what is left to say where one ground ends and the next begins is the lie of
         // the land itself. (The relief goes the same way: gRelC in ladAt().)
-        float sage = 1.0 - 0.4 * smoothstep(0.4, 0.7, clim);      // (what grows in dry country is grey with it: sage and straw, not the green-gold of a wet meadow gone dry)
+        // (dry grass is straw and olive, never the lime of the mossy ground it was scanned from; and what grows in dry country is
+        //  grey with it: sage, not the green-gold of a wet meadow gone dry)
+        float sage = 0.72 * (1.0 - 0.4 * smoothstep(0.4, 0.7, clim)); const vec3 STRAW = vec3(1.07, 1.0, 0.9);
         // (ground that lies wholly under snow is not looked up at all: the snow is)
         float snowW = max(snow, ice * 0.95); bool snowed = snowW > 0.76;
         float hU = 0.5, t2 = w2 / max(w1 + w2, 1e-4), kB = 0.0; vec3 tex = vec3(0.5);
@@ -486,13 +488,13 @@
         float townK = inDecal * smoothstep(0.04, 0.22, dec.b) * (1.0 - ice); bool roaded = inDecal * dec.b > 0.72;
         if (!snowed && !roaded) {
           float nearA = gndNear(L1), nearB = gndNear(L2), gNear = min(nearA, nearB);
-          vec4 A = gnd(L1); vec3 ca = tone(A.rgb, L1, h1); if (L1 == 1.0) ca = mix(vec3(dot(ca, vec3(0.299, 0.587, 0.114))), ca, sage);
+          vec4 A = gnd(L1); vec3 ca = tone(A.rgb, L1, h1); if (L1 == 1.0) ca = mix(vec3(dot(ca, vec3(0.299, 0.587, 0.114))), ca, sage) * STRAW;
           hU = mix(0.5, A.a, nearA); tex = ca; dl = 0.45 * dot(A.rgb, vec3(0.299, 0.587, 0.114));
           if (townK < 0.99) gRel = gndN(L1);
           // one lies in the hollows of the other: the higher of the two shows, each raised by its share. (The second is looked up
           // only where its share is large enough for any of it to stand above the first: 0.34 far off, 0.13 close to)
           if (t2 > 0.34 - 0.21 * gNear && L2 != L1 && townK < 0.99 && uGndDbg < 1.5) {
-            vec4 B = gnd(L2); vec3 cb = tone(B.rgb, L2, h2); if (L2 == 1.0) cb = mix(vec3(dot(cb, vec3(0.299, 0.587, 0.114))), cb, sage);
+            vec4 B = gnd(L2); vec3 cb = tone(B.rgb, L2, h2); if (L2 == 1.0) cb = mix(vec3(dot(cb, vec3(0.299, 0.587, 0.114))), cb, sage) * STRAW;
             float hB = mix(0.5, B.a, nearB), ha = hU + (1.0 - t2) * 1.6, hb = hB + t2 * 1.6, top = max(ha, hb) - mix(0.5, 0.16, gNear), ba = max(ha - top, 0.0), bb = max(hb - top, 0.0);
             kB = bb / (ba + bb); tex = mix(ca, cb, kB); hU = mix(hU, hB, kB); dl = mix(dl, 0.45 * dot(B.rgb, vec3(0.299, 0.587, 0.114)), kB);
             if (kB > 0.03) gRel = mix(gRel, gndN(L2), kB);

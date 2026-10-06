@@ -46,8 +46,13 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   `/eval "__T.reground()"` reads the ground's materials again after a new pack.
 - `tools/ground/pack.sh` — packs the ground's materials on GitHub (the Ground workflow: `assets/ground/materials.json`
   into the `ground` release) and brings the pack here: `data/tex/ground.json` and two atlases, which are fetched
-  (`npm run fetch`), never committed. `REF=<branch>` packs a branch's list; a run that fails fetches nothing. Look
-  at `shots/peek/ground_sheet.jpg` (and `ground_try.jpg`: the candidates under `try`) before believing a material.
+  (`npm run fetch`), never committed. `REF=<branch>` packs a branch's list; a run that fails fetches nothing. A pack
+  is kept under the name of the list it was made from (twelve digits of the SHA-256 of `materials.json` and
+  `tools/ground/build.py` together), and `tools/ground/fetch.mjs` asks for the pack of the list beside it: packing a
+  branch changes nothing for the game that is out, and **after any change to the list or the packer the pack must
+  be made before `main` is pushed** (the game's build stops if its pack is not there; elsewhere the pack made last is
+  taken, with a warning). Look at `shots/peek/ground_native.jpg` (a piece of every material texel for pixel, the
+  candidates under `try` after them) and `ground_sheet.jpg` before believing a material.
   `tools/materials.sh` lists what the free libraries have, with a sheet of their previews.
 - `node tools/air/sky.js check | sheet [name] | orbit [name]` — the air without the game, from the same sums the
   shaders use (`src/air.js`): `check` prints how close the quick sums are to slow exact ones (the column of air to
