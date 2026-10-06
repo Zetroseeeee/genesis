@@ -58,10 +58,10 @@ further off. A WebP without loss, three bytes a texel:
      break, and how high they run.)
   B  how high the nearest fresh water stands, by the game's own heights (data/e: the ground is drawn from those, and a
      lake must lie in the ground the game has, not in the Earth's): metres = 6000 (B / 255)^1.5, a metre and a half to
-     the step by the sea and thirty in Tibet. One level for a lake, taken from the heights under it (the least of
-     them, or a little under their mean where the heights do not know the lake and run downhill along it); the great
-     lakes that no block sees whole take theirs from a smoothed map of the heights far from their shores, so that
-     blocks agree. With it the game lays a lake level and cuts its shores down to it: without, the water climbed
+     the step by the sea and thirty in Tibet. One level for a lake, taken from the heights under it (the height a
+     fifth of the way up from the lowest: the level itself where the heights know the lake, its lower reach where
+     they do not and run downhill along it); the great lakes that no block sees whole take theirs from a smoothed
+     map of the heights far from their shores, so that blocks agree. With it the game lays a lake level and cuts its shores down to it: without, the water climbed
      every hillside it lay under.
 A pack with no shore in or near it is not written: index.json says what it is instead (L land, S sea, F fresh water).
 
@@ -314,7 +314,7 @@ def dem_pack(key):
         if not os.path.exists(f): _DEMP[key] = None
         else:
             if len(_DEMP) > 12: _DEMP.pop(next(iter(_DEMP)))
-            mn, sc = _DEM[key]; im = Image.open(f); a = np.asarray(im if im.mode in ('L', 'P') else im.convert('L'), dtype=np.float32)      # (a paletted picture's numbers are the bytes themselves)
+            mn, sc = _DEM[key]; a = np.asarray(Image.open(f).convert('L'), dtype=np.float32)      # (the packs are paletted pictures: a texel's number is its place in the palette, not its grey: the grey is the byte the game reads)
             _DEMP[key] = np.maximum(mn + a * sc, 0.0)
     return _DEMP[key]
 
@@ -538,13 +538,11 @@ def process(args):
     if hg is not None:
         n = len(lake_edge)
         m = fresh.ravel(); lf = lab.ravel()[m].astype(np.int64); hf = hg.ravel()[m].astype(np.float64)
-        cnt = np.maximum(np.bincount(lf, minlength=n), 1); mean = np.bincount(lf, weights=hf, minlength=n) / cnt
-        std = np.sqrt(np.maximum(np.bincount(lf, weights=hf * hf, minlength=n) / cnt - mean * mean, 0.0))
-        order = np.argsort(lf, kind='stable'); ls = lf[order]; starts = np.nonzero(np.r_[True, ls[1:] != ls[:-1]])[0]
-        mn = np.zeros(n); mn[ls[starts]] = np.minimum.reduceat(hf[order], starts)
-        # a lake the heights know lies flat in them, and its level is the least of them (its shore's texels are part hill);
-        # one they do not know runs downhill with its valley: a little under the mean, not down at the lowest end
-        lvl = np.maximum(mn, mean - std).astype(np.float32); lvl[0] = 0.0
+        # A lake the heights know lies flat in them, and most of what is under it is its level (its shore's texels are part hill,
+        # and here and there one is a step too low); one they do not know runs downhill with its valley. The height a fifth of
+        # the way up from the lowest serves both: the level of the first, the lower reach of the second.
+        order = np.lexsort((hf, lf)); ls = lf[order]; starts = np.nonzero(np.r_[True, ls[1:] != ls[:-1]])[0]; ends = np.r_[starts[1:], len(ls)]
+        lvl = np.zeros(n, np.float32); lvl[ls[starts]] = hf[order][starts + ((ends - starts - 1) * 0.2).astype(np.int64)]; lvl[0] = 0.0
         Lp = lvl[lab]
         del m, lf, hf, order, ls
         # the lakes this block does not see whole: every block must give them the same level where two meet, so theirs is a
