@@ -238,13 +238,14 @@ WC_ENV = dict(GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR', CPL_VSIL_CURL_ALLOWED_EX
               GDAL_HTTP_MERGE_CONSECUTIVE_RANGES='YES', GDAL_HTTP_MULTIPLEX='YES', VSI_CACHE='TRUE', GDAL_HTTP_TIMEOUT='90', GDAL_HTTP_CONNECTTIMEOUT='30')
 
 
-def wc_read(key, size=WC_PX):
-    """a tile's classes at size x size (from the overview that has them; never the whole file)"""
+def wc_read(key, size=WC_PX, about=None):
+    """a tile's classes at size x size (from the overview that has them; never the whole file); about: a dict to say what the file is"""
     import rasterio
     from rasterio.enums import Resampling
     with rasterio.Env(**WC_ENV):
         with rasterio.open('/vsicurl/%s/%s' % (WC_HOST, key)) as src:
-            return src.read(1, out_shape=(size, size), resampling=Resampling.nearest), src
+            if about is not None: about.update(size=(src.height, src.width), bounds=tuple(round(v, 6) for v in src.bounds), overviews=src.overviews(1), block=src.block_shapes[0], compression=str(src.compression), nodata=src.nodata)
+            return src.read(1, out_shape=(size, size), resampling=Resampling.nearest)
 
 
 def fetch_wc(cache, lat, lon, key):
@@ -255,7 +256,7 @@ def fetch_wc(cache, lat, lon, key):
     last = None
     for k in range(4):
         try:
-            a, _ = wc_read(key); break
+            a = wc_read(key); break
         except Exception as e:      # noqa
             last = e; time.sleep(3.0 * (k + 1))
     else:
@@ -564,8 +565,8 @@ def main():
             print('  latitudes:', sorted({k[0] for k in ks})[:3], '...', sorted({k[0] for k in ks})[-3:])
             for t in [(63, 24), (60, 24), (39, -3), (60, 120), (-3, -60)]:
                 if t not in hw: print(' ', t, 'is not a tile'); continue
-                t0 = time.time(); arr, src = wc_read(hw[t]); dt = time.time() - t0
-                print(' ', t, hw[t].split('/')[-1], 'full size', (src.height, src.width), 'bounds', tuple(round(v, 6) for v in src.bounds), 'overviews', src.overviews(1), 'block', src.block_shapes[0], src.compression, 'nodata', src.nodata)
+                t0 = time.time(); about = {}; arr = wc_read(hw[t], about=about); dt = time.time() - t0
+                print(' ', t, hw[t].split('/')[-1], about)
                 print('     read at', arr.shape, 'in %.1f s;' % dt, 'classes', dict(zip(*[x.tolist() for x in np.unique(arr, return_counts=True)])))
                 t0 = time.time(); n = fetch_wc(cache, t[0], t[1], hw[t]); m = read_wc(cache, *t); print('     kept as %d bytes (%.1f s); water %.4f of it' % (n, time.time() - t0, m.mean()))
             # the square degree the first source has next to no lakes in
