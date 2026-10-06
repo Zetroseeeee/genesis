@@ -16,9 +16,9 @@
   // scrub on open ground where the climate grows any. It has no pictures of its own: a bush is the crown of one of the place's
   // trees without its trunk, small, on the ground (CROWN: how far up its picture a tree's crown begins).
   const TIERS = [
-    { R: 3200, s: 40, k: 2.2, max: 40000 },
-    { R: 12000, s: 110, k: 3.0, max: 64000 },
-    { R: 36000, s: 380, k: 6.0, max: 48000 },
+    { R: 3200, s: 40, k: 2.2, max: 41000 },
+    { R: 12000, s: 110, k: 3.0, max: 76000 },
+    { R: 36000, s: 380, k: 6.0, max: 57000 },
     { R: 1150, s: 15, k: 2.2, max: 24000, under: true },
   ];
   const BAND = 0.5;      // degrees of latitude over which the plots of a tier keep one spacing along their parallels
@@ -79,9 +79,9 @@
   // the air between the eye and a tree (air.js), worked out once for each
   const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.THING : '3.0';
   const IMP_VERT = `
-    uniform float uPivot, uOrtho; uniform vec3 uSunV; uniform vec4 uHole;
+    uniform float uPivot, uOrtho, uCrown; uniform vec3 uSunV; uniform vec4 uHole;
     attribute vec3 aTree;      // how deep in a wood the tree stands (0 alone on a lawn .. 1 in closed forest), its own dice, and how much of its picture is left off from below (a bush: the crown alone)
-    varying vec2 vUv; varying vec3 vCol, vView, vNrm, vTree; varying float vHid;
+    varying vec2 vUv; varying vec3 vCol, vView, vNrm, vTree; varying float vHid, vTop;
     #ifdef CARD_SHADOW
     // is the tree in something's shadow? Asked once per tree (at its crown, toward the sun), not once per pixel of it
     uniform sampler2D uShadowMap; uniform mat4 uShadowMat; uniform vec4 uShadowP;
@@ -104,10 +104,18 @@
       vec3 toCam = uOrtho > 0.5 ? vec3(0.0, 0.0, 1.0) : normalize(-c.xyz);
       vec3 upB = upV - toCam * dot(upV, toCam); float l = length(upB); upB = l > 0.02 ? upB / l : vec3(0.0, 1.0, 0.0);
       vec3 rightV = normalize(cross(upB, toCam));
-      float hEff = max(hgt * l, wid * 0.85);                                  // from overhead a tree is as tall on screen as its crown is wide
+      // Seen from above a tree is its crown, and the crown is in the light: the picture is of a tree from the side, and laid
+      // under the eye whole it showed the trunk and the dark under side of every crown of a wood (from a mile up the trees
+      // round the eye were a black plate on the country). The higher the eye, the more of the picture's foot is left off.
+      // And the crowns of a wood meet: from the side the trees stand one behind another and hide what is between them,
+      // from above each has only its own ground to cover, and a picture's crown covers two fifths of it. A tree in a wood
+      // is drawn half again as wide from above (not one that stands alone, and not what grows under the others).
+      float top = (1.0 - uOrtho) * smoothstep(0.03, 0.4, 1.0 - l), crop = max(aTree.z, uCrown * top), big = 1.0 + 0.5 * top * aTree.x * step(aTree.z, 0.005);
+      wid *= big;
+      float hEff = max(hgt * l * big, wid * 0.85);                            // from overhead a tree is as tall on screen as its crown is wide
       float x = (position.x + 0.5 - uPivot) * flip;                           // the card turns about the trunk, not about its middle
       vec3 p = c.xyz + rightV * x * wid + upB * (position.y - 0.5 * (1.0 - l)) * hEff + toCam * wid * 0.2;
-      vUv = vec2(uv.x, aTree.z + uv.y * (1.0 - aTree.z)); vView = p; vTree = aTree;      // a mirrored card keeps its picture and turns its geometry over: the trunk stays on the pivot
+      vUv = vec2(uv.x, crop + uv.y * (1.0 - crop)); vView = p; vTree = aTree; vTop = top;      // a mirrored card keeps its picture and turns its geometry over: the trunk stays on the pivot
       air(c.xyz + upV * hgt * 0.5, ${AIR_N}, vAirT, vAirL);                   // (one air for the whole tree)
       #ifdef USE_INSTANCING_COLOR
       vCol = instanceColor;
@@ -125,12 +133,14 @@
       // The ground round the eye is the finer tier's: what this one has there is not drawn. (Where the finer tier's trees
       // stand now, not where they stood when this one was placed: the two are placed at different times, and with a hole
       // left at placing a moving eye had a bare crescent of wood behind it and a doubled one before it.)
-      vec3 off = normalize(instanceMatrix[3].xyz) - uHole.xyz; if (dot(off, off) < uHole.w) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      // (The two do not meet at a line: over the last fifth of its reach the finer tier thins out, tree by tree, and this
+      //  one comes in as it does. A wood changed its grain along a circle about the eye.)
+      vec3 off = normalize(instanceMatrix[3].xyz) - uHole.xyz; float reach = 0.8 + 0.2 * aTree.y; if (dot(off, off) < uHole.w * reach * reach) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     }`;
   const IMP_FRAG = `
     precision highp float;
     uniform sampler2D uImp; uniform vec2 uImpSize; uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uCamAlt, uUnits, uDusk, uCover;
-    varying vec2 vUv; varying vec3 vCol, vView, vNrm, vTree; varying float vHid;
+    varying vec2 vUv; varying vec3 vCol, vView, vNrm, vTree; varying float vHid, vTop;
     ${AIR_F}
     void main() {
       vec4 t = texture2D(uImp, vUv);
@@ -148,16 +158,16 @@
       // dark of the wood; only the tops are in the sun, and the side turned from it is in deep shade. (The photographs are all
       // softly lit from the front: a wood of them unshaded is a table of model trees.)
       // (wood: for the light from below; a tree that stands alone has a third of it: its own crown shades its trunk and its under side)
-      float deep = vTree.x, wood = max(deep, 0.34), low = smoothstep(0.02, 0.62, vUv.y), under = step(0.01, vTree.z) * deep;      // (under: a bush under the trees of a wood is in their shade altogether)
+      float deep = vTree.x, wood = max(deep, 0.34), low = mix(smoothstep(0.02, 0.62, vUv.y), 1.0, vTop), under = step(0.01, vTree.z) * deep;      // (under: a bush under the trees of a wood is in their shade altogether)
       col *= mix(vec3(1.08, 1.0, 0.82), vec3(0.9, 1.0, 1.1), vTree.y) * mix(1.0, 0.84, deep) * mix(1.0, 0.7, under);
       float lum = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(lum), col, mix(0.94, 0.86, deep));
       float shade = mix(1.0, 0.2 + 0.8 * low, wood) * mix(1.0, 0.4, under);
       float sky = (0.5 + 0.5 * dot(n, uUpV)) * mix(1.0, 0.35 + 0.65 * low, wood);
       float sunSide = max(dot(n, uSunV), 0.0);
       float diff = mix(0.45, 0.16, wood) + mix(0.55, 0.92, wood) * sunSide + 0.25 * max(dot(uUpV, uSunV), 0.0) * mix(1.0, low, wood);     // the photograph is already softly lit: the sun adds a bright side
-      diff *= (1.0 - 0.6 * vHid) * shade;
+      diff *= (1.0 - 0.6 * vHid * mix(1.0, 1.0 - 0.8 * low, deep)) * shade;      // (in a wood the neighbours' shadow is on a tree's foot, which is dark by 'shade' already: its top is in the sun)
       vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky) * mix(1.0, 0.4, wood), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
-      vec3 lit = col * (amb * mix(1.0, 0.3 + 0.7 * low, wood) + diff * 0.72 * uSunCol);
+      vec3 lit = col * (amb * mix(1.0, 0.3 + 0.7 * low, wood) + diff * 0.72 * uSunCol) * (1.0 + 0.25 * vTop);      // (from above it is the lit top of the crown that is seen, not the side the picture was taken from)
       gl_FragColor = vec4(airOver(lit, vAirT, vAirL), mix(1.0, cover, uCover));                     // the air between (air.js)
     }`;
   const IMP_DEPTH = `
@@ -331,13 +341,13 @@
       let mat = old ? old.material : null, depth = old ? old.userData.depthMat : null;
       if (!mat) {
         const sh = MODELS.shared;
-        const uniforms = { uImp: { value: card.tex }, uImpSize: { value: new THREE.Vector2(card.tex.image ? card.tex.image.width : 1024, card.tex.image ? card.tex.image.height : 1024) }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units }, uSunCol: sh.uSunCol, uDusk: sh.uDusk, uCover: this.uCover, uHole: this.holes[ti] };
+        const uniforms = { uImp: { value: card.tex }, uImpSize: { value: new THREE.Vector2(card.tex.image ? card.tex.image.width : 1024, card.tex.image ? card.tex.image.height : 1024) }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units }, uSunCol: sh.uSunCol, uDusk: sh.uDusk, uCover: this.uCover, uHole: this.holes[ti], uCrown: { value: CROWN[def.id] === undefined ? 0.3 : CROWN[def.id] } };
         if (window.SHADOWS) Object.assign(uniforms, SHADOWS.uniforms);
         if (window.AIR) Object.assign(uniforms, AIR.uniforms);
         mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide, extensions: { derivatives: true }, defines: window.SHADOWS ? { CARD_SHADOW: 1 } : {} });   // a mirrored card is wound the other way
         mat.alphaToCoverage = true;      // (see uCover in the shader)
         // the near trees throw true shadows: the same card, turned to the sun
-        if (window.SHADOWS && ti === 0) depth = new THREE.ShaderMaterial({ uniforms: { uImp: uniforms.uImp, uPivot: uniforms.uPivot, uOrtho: { value: 1 }, uSunV: { value: new THREE.Vector3(0, 0, 1) }, uHole: { value: new THREE.Vector4(0, 0, 0, -1) } }, vertexShader: IMP_VERT, fragmentShader: IMP_DEPTH, side: THREE.DoubleSide });
+        if (window.SHADOWS && ti === 0) depth = new THREE.ShaderMaterial({ uniforms: { uImp: uniforms.uImp, uPivot: uniforms.uPivot, uOrtho: { value: 1 }, uSunV: { value: new THREE.Vector3(0, 0, 1) }, uHole: { value: new THREE.Vector4(0, 0, 0, -1) }, uCrown: { value: 0 } }, vertexShader: IMP_VERT, fragmentShader: IMP_DEPTH, side: THREE.DoubleSide });
       }
       const I = new THREE.InstancedMesh(g, mat, cap); I.count = 0; I.frustumCulled = false; I.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       I.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3); I.instanceColor.setUsage(THREE.DynamicDrawUsage);
@@ -369,6 +379,7 @@
       let count = 0, countB = 0, countM = 0; const maxN = t.max; const exag = this.exag; const broad = this.broad;
       const casters = ti === 0 ? [] : null; const vc = new Map(); let steps = 0, waiting = false, sn = 0;
       const under = !!t.under, near = ti === 0 || under;      // (near: stands on the ground as its mesh has it)
+      const fades = !under && ti + 1 < TIERS.length && !TIERS[ti + 1].under && !!this.flora();
       const inner = ti > 0 && !under ? TIERS[ti - 1].R : 0;   // the inner disc is the finer tier's (the cards leave it in the shader: uHole; the kit's trees here)
       // what the pass places goes into one store first, whatever the kind of tree, and is handed out when the pass is whole
       const St = this._stage[ti] || (this._stage[ti] = { m: new Float32Array(maxN * 16), c: new Float32Array(maxN * 3), t: new Float32Array(maxN * 3), k: new Uint8Array(maxN) });
@@ -390,6 +401,7 @@
           const lat = gy * dLat + (hash2(gx, gy, 11) - 0.5) * dLat * 0.9, lon = gx * rowD + (hash2(gx, gy, 12) - 0.5) * rowD * 0.9;
           const dxm = (lon - lon0) * D2R * cl * R_M, dym = (lat - lat0) * D2R * R_M; const d2 = dxm * dxm + dym * dym;
           if (d2 > t.R * t.R) continue;
+          if (fades) { const rr = t.R * (0.8 + 0.2 * hash2(gx, gy, 93)); if (d2 > rr * rr) continue; }      // (it thins out over the last fifth of its reach, as the next tier comes in: uHole)
           const i = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W);
           if (sim && !sim.land[i]) continue;
           const h = near ? T.meshHeightAt(lon, lat, vc) : T.heightAt(lon, lat); if (h <= 0.5) continue;
