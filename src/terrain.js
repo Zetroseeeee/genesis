@@ -264,7 +264,7 @@
       vec3 ct = t / max(dot(t, vec3(0.299, 0.587, 0.114)), 1e-3) - 1.0, cm = m / lm - 1.0; float am = dot(cm, cm);
       float like = mix(1.0, smoothstep(0.09, 0.64, dot(ct, ct) / max(am, 1e-4)), smoothstep(0.02, 0.12, am));
       vec3 k = mix(vec3(1.0), mix(gToneG, clamp(gToneB * (lm / m), 0.4, 2.5), like), min(h.x * gToneH, 1.0));
-      vec3 o = t * k; o.b = min(o.b, max(t.b * max(k.r, k.g), min(o.r, o.g)));
+      vec3 o = t * k; o.b = min(o.b, min(max(t.b * max(k.r, k.g), min(o.r, o.g)), o.g));      // (and bare ground is never bluer than it is green: the mauve earth and the lilac shade in some scans are their light, not their ground)
       return o * mix(1.0, lt / lm, uGndT.x);
     }
     // What people have made of the ground (the land-use tiles: crops in their rows, paving) has a size too, and it is the size the
@@ -1009,7 +1009,7 @@
       // (4 pixels at first; 8 since the ground's shader grew: with four samples a pixel the shader runs for every triangle that
       // touches a pixel, so a triangle costs its area and half its edge again, and at 4 pixels that is nearly twice the area. On
       // the build Mac the Alps went from 11 frames a second to 15 by it, and the pictures cannot be told apart: tools/scenes/
-      // tour.txt has alps_q6, alps_q8, ridge_q6, ridge_q8 to hold against alps and ridge, and __T.costsMesh measures.)
+      // tour.txt has alps_q4 and ridge_q4 to hold against alps and ridge, and __T.costsMesh measures.)
       this.quadPx = 8;
       this.tiles = new Map(); this.packs = new Map(); this.loading = 0; this.maxLoading = 6;
       this.exag = opts.exag || 2.0;

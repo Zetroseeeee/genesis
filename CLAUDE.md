@@ -335,19 +335,19 @@ Conventions that matter:
   does it keep quads `quadPx` wide however shallow it lies, for the line it draws against the sky. (A triangle costs
   its area and half its edge again: at quads of 4 pixels that is nearly twice the area, at 8 less than half as much
   again. The Alps went from 11 frames a second to 15 by it on the build Mac, and the pictures cannot be told apart:
-  the tour keeps `alps_q6`, `alps_q8`, `ridge_q6`, `ridge_q8` to hold against `alps` and `ridge`.) From far out every tile
+  the tour keeps `alps_q4` and `ridge_q4` to hold against `alps` and `ridge`.) From far out every tile
   counts as seen from above (the air is worked out at the corners, and changes fastest along the rim). Whatever
   stands on the ground asks `gpuHeightAt`, which uses the mesh a tile has at the moment (`t.grid`), and
   `meshVersion` follows the meshes as it follows the tiles. A software renderer keeps its two fixed grids.
   `terrain.stats.quads` counts what is drawn; `terrain.quadPx = 0` is the old way (to compare).
-- **The ground's shader is the frame.** It looks into its textures some forty times a pixel, and it is what a view
-  costs: by pixels, not by corners (on the build Mac a view to the horizon took 46 ms, of which the ground 27).
-  Two things were found to count far more than they show, and both are per texture and per tile, not per shader
-  line: slivers (above), and how many ways a texture is looked at where it runs away from the eye (`anisotropy`).
-  The noise (fifteen lookups) has 2 ways and the photographs of detail (sixteen) 4 (`ANISO_NOISE`, `ANISO_SMALL` in
-  `main.js`); at 16 each they cost a fifth of the frame for nothing the eye finds. The ground's own pictures (the
-  generated arrays, the imagery) and the models keep 16: at 8 the grass near a town goes soft. Measure before
-  adding a lookup, and after (`cost_far`).
+- **The ground's shader is the frame.** It is what a view costs: by pixels, not by corners (on the build Mac a
+  view to the horizon takes 37 ms, of which the ground 20 and more: `cost_far`). Two things were found to count far more
+  than they show, and both are per texture and per tile, not per shader line: slivers (above), and how many ways a
+  texture is looked at where it runs away from the eye (`anisotropy`). The noise has 2 ways and, where the ground
+  is drawn the old way, the photographs of detail 4 (`ANISO_NOISE`, `ANISO_SMALL` in `main.js`); at 16 each they
+  cost a fifth of the frame for nothing the eye finds. The ground's materials, the generated arrays, the imagery
+  and the models keep 16 (for the materials 8 and 4 measured no faster: `costa_far`). Measure before adding a
+  lookup, and after.
 - **What the ground is made of** (`USE_GROUND` in `terrain.js`, `TEX.ground` in `textures.js`). Twenty-one
   materials, each with its colours, its relief and its heights: twenty scans of real ground from the free libraries
   (public domain: Poly Haven, ambientCG; the list is `assets/ground/materials.json`) and the canopy of a wood, which
@@ -399,7 +399,15 @@ Conventions that matter:
   the game draws a village at (`ltex`); between the houses of a town that is not paved the beaten ways are pale and
   grass holds on beside them. A software renderer takes the pack at a quarter of its size (`GROUND=1`: whole).
   `uGndShow = <layer>` shows one material everywhere; `uGndV` is how much a meadow varies.
-  COSTNOTE
+  **What it costs** (the build Mac, a virtual GPU, 1680 by 1050; `costg_*` holds the materials against the ground
+  drawn the old way in one page): looking down on a town 28 frames a second against 31, on a meadow 29 against
+  31, over a town to the horizon 26 against 38, the Alps from 19 km 15 against 25. Half of it is the lookups
+  (twelve to twenty of them a pixel) and half the arithmetic of choosing and toning, which is why a kind of ground
+  is gone into only where there is any of it, nothing is looked up that cannot show (under water, under snow,
+  under a road, a second material too small to appear, relief from the step where it no longer counts), and the
+  meshes went to quads of 8 pixels. Three things that were tried and measured no faster on that card: lookups
+  told how large a pixel is (`textureGrad`: a tenth slower), branches round the two places of a ladder, fewer ways
+  of filtering. `__T.costsGround()` goes through the parts (`uGndDbg`).
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.

@@ -64,10 +64,10 @@ window.__T.costsAniso = function () {
   const g = window.TEX && TEX.ground; if (!g) return 'no materials'; const full = window.GENESIS_ANISO || 16, set = (n) => () => { __T.aniso(n, g.albedo, g.relief); };
   __T.cost([[full + ' ways', () => {}], ['8 ways', set(8)], ['4 ways', set(4)], [full + ' again', set(full)], ['8 again', set(8)], ['4 again', set(4)], [full + ' a third time', set(full)]], 3, 1200);
 };
-// how fine the ground's meshes need be, now that a pixel of ground costs what it does: quads of 4 pixels (as the game has them), 5, 6, 8
+// how fine the ground's meshes need be, now that a pixel of ground costs what it does: quads of 8 pixels (as the game has them), 4, 6, 12
 window.__T.costsMesh = function () {
   const T = __G.terrain, q = T.quadPx;
-  __T.cost([['quads of ' + q + ' px', () => {}], ['of 5', () => { T.quadPx = 5; }], ['of 6', () => { T.quadPx = 6; }], ['of 8', () => { T.quadPx = 8; }], ['of ' + q + ' again', () => { T.quadPx = q; }], ['of 6 again', () => { T.quadPx = 6; }]], 3, 2500);
+  __T.cost([['quads of ' + q + ' px', () => {}], ['of 4', () => { T.quadPx = 4; }], ['of 6', () => { T.quadPx = 6; }], ['of 12', () => { T.quadPx = 12; }], ['of ' + q + ' again', () => { T.quadPx = q; }], ['of 4 again', () => { T.quadPx = 4; }], ['of ' + q + ' a third time', () => { T.quadPx = q; }]], 3, 2500);
 };
 // how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
 window.__T.aniso = function (n, ...texs) {
