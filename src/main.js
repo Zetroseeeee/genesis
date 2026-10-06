@@ -129,7 +129,7 @@
       terrain = new TERRAIN.Terrain({ scene, index, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
-      trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png').catch((e) => console.warn('veg', e));
+      trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL) trees.slice = 1e9; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png').catch((e) => console.warn('veg', e));
       life = new LIFE.Life({ scene, terrain }); if (softGL) life.budget = 0.5; movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);

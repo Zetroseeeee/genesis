@@ -7,7 +7,8 @@
   const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   const fr = (x) => x - Math.floor(x);
 
-  // tiers: radius (m), spacing (m), scale multiplier, max instances
+  // tiers: radius (m), spacing (m), scale multiplier, max instances (room for a closed wood of slender trees, each with its
+  // neighbour: the nearest are placed first, so a tier that ran out of room left a bare ring at its far edge)
   // (Near: close enough set that the crowns of a wood meet, 40 m for trees drawn 44 m tall. Far off: many smaller ones, not
   // a few giants: a wood on a far slope is a nap of crowns on the ground's own canopy, which the sparse great trees of before
   // stood on like mushrooms.)
@@ -16,10 +17,11 @@
   // trees without its trunk, small, on the ground (CROWN: how far up its picture a tree's crown begins).
   const TIERS = [
     { R: 3200, s: 40, k: 2.2, max: 40000 },
-    { R: 12000, s: 110, k: 3.0, max: 40000 },
-    { R: 36000, s: 380, k: 6.0, max: 30000 },
+    { R: 12000, s: 110, k: 3.0, max: 64000 },
+    { R: 36000, s: 380, k: 6.0, max: 48000 },
     { R: 1150, s: 15, k: 2.2, max: 24000, under: true },
   ];
+  const BAND = 0.5;      // degrees of latitude over which the plots of a tier keep one spacing along their parallels
   const CROWN = { tree_oak_a: 0.3, tree_beech_a: 0.28, tree_birch_a: 0.3, tree_spruce_a: 0.1, tree_pine_a: 0.52, tree_stonepine_a: 0.55, tree_cypress_a: 0.06, tree_olive_a: 0.34, tree_acacia_a: 0.42, tree_palm_a: 0.56, tree_rain_a: 0.45, tree_kapok_a: 0.6, tree_bamboo_a: 0.25, tree_baobab_a: 0.62 };
   // how much scrub open ground carries, by flora zone (a share of the plots that are grass and not wood)
   const SCRUB = { med: 0.2, dry: 0.07, savanna: 0.12, temperate: 0.045, easia: 0.06, boreal: 0.05, rain: 0.2 };
@@ -77,7 +79,7 @@
   // the air between the eye and a tree (air.js), worked out once for each
   const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.THING : '3.0';
   const IMP_VERT = `
-    uniform float uPivot, uOrtho; uniform vec3 uSunV;
+    uniform float uPivot, uOrtho; uniform vec3 uSunV; uniform vec4 uHole;
     attribute vec3 aTree;      // how deep in a wood the tree stands (0 alone on a lawn .. 1 in closed forest), its own dice, and how much of its picture is left off from below (a bush: the crown alone)
     varying vec2 vUv; varying vec3 vCol, vView, vNrm, vTree; varying float vHid;
     #ifdef CARD_SHADOW
@@ -120,6 +122,10 @@
       vHid = 0.0;
       #endif
       gl_Position = projectionMatrix * vec4(p, 1.0);
+      // The ground round the eye is the finer tier's: what this one has there is not drawn. (Where the finer tier's trees
+      // stand now, not where they stood when this one was placed: the two are placed at different times, and with a hole
+      // left at placing a moving eye had a bare crescent of wood behind it and a doubled one before it.)
+      vec3 off = normalize(instanceMatrix[3].xyz) - uHole.xyz; if (dot(off, off) < uHole.w) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     }`;
   const IMP_FRAG = `
     precision highp float;
@@ -210,7 +216,10 @@
       this.scene = scene; this.terrain = terrain; this.exag = terrain.exag; this.sim = null; this.renderer = renderer || null;
       this.veg = null; this.noise = null; this.ready = false; this.enabled = true;
       this.uCover = { value: 0 };      // 1 while the picture is drawn with several samples a pixel (main.js says so each frame)
+      this.slice = 4; this._job = null;        // milliseconds a frame for placing trees (main.js gives a software renderer all it needs: its frames are long anyway)
       this.imps = TIERS.map(() => new Map()); this.modelCount = TIERS.map(() => 0);   // real trees: picture cards per tier and species
+      this.holes = TIERS.map(() => ({ value: new THREE.Vector4(0, 0, 0, -1) }));      // where the tier inside each has its trees (uHole)
+      this._stage = TIERS.map(() => null);
       const mk = (detail, max) => {
         const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x10190a, emissiveIntensity: 0.6 });
         const m = new THREE.InstancedMesh(treeGeometry(detail), mat, max); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -272,22 +281,34 @@
     }
     update(cam, sim, now) {
       this.sim = sim;
-      if (!this.ready || !this.enabled || cam.alt > 0.007) { if (this.count) { this.clear(); for (const L of this.last) L.t = -1e9; } return; }
-      // one tier per call keeps frames smooth
-      for (let ti = 0; ti < TIERS.length; ti++) {
-        const t = TIERS[ti], L = this.last[ti];
+      if (!this.ready || !this.enabled || cam.alt > 0.007) { if (this.count || this._job) { this.clear(); for (const L of this.last) L.t = -1e9; } return; }
+      // Placing a tier is tens of thousands of plots, each asking the country what grows there: a tenth of a second and more.
+      // Done at once it was a dropped beat every second or two, for as long as the game ran. It is done a slice a frame
+      // (this.slice milliseconds), into buffers the picture does not see, and shown when it is whole.
+      if (this._job) { const t0 = performance.now(); let r; do { r = this._job.next(); } while (!r.done && performance.now() - t0 < this.slice); if (r.done) this._job = null; }
+      // A tier is placed again when the eye has moved, and when what its trees stand in has changed: at once for the season
+      // and the leaves; no oftener than every second or two for the ground (its heights and its water arrive piece by
+      // piece after the eye) and for the years of the world (clearings grow with their towns); and now and then for
+      // whatever this does not know of.
+      const S = this.season, B = this.bareness, q = (v) => Math.round((v || 0) * 24), T = this.terrain;
+      const sig = (S ? q(S.y) + ',' + q(S.w) : '') + ':' + (B ? q(B.x) + ',' + q(B.y) + ',' + q(B.z) + ',' + q(B.w) : '') + ':' + (this.flora() ? 1 : 0) + ':' + (this.climate ? 1 : 0);
+      const far = (sim ? sim.year : 0) + ':' + (T.stats ? T.stats.packsI + ':' + T.stats.packsE : ''), nearby = far + ':' + (T.meshVersion || 0);
+      for (let ti = 0; ti < TIERS.length && !this._job; ti++) {
+        const t = TIERS[ti], L = this.last[ti], near = ti === 0 || t.under, soft = near ? nearby : far;
         // (what grows under the trees is only there to be seen from close to: from higher up it is not placed at all)
         if (t.under && cam.alt > 0.00042) { if (this.modelCount[ti]) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; L.t = -1e9; } continue; }
         const moved = GEO.distKm(cam.lon, cam.lat, L.lon, L.lat) * 1000 > t.R * 0.18;
         const zoomed = ti === 0 && Math.abs(Math.log((cam.dist || 1) / (L.dist || 1))) > 0.25;     // closer or farther: the near trees change their level of detail
-        if (!moved && !zoomed && now - L.t < 6000) continue;
-        this.buildTier(ti, cam, now); break;
+        const age = now - L.t, stale = L.sig !== sig || (L.soft !== soft && age > (near ? 1500 : 4000));
+        if (!moved && !zoomed && !stale && age < (L.partial ? 2500 : 60000)) continue;
+        this._job = this.buildSteps(ti, cam, now, sig, soft);
       }
       let c = this.broad.count; for (const m of this.meshes) c += m.count; for (const n of this.modelCount) c += n; this.count = c;
     }
     clear() {
+      this._job = null;
       for (const m of this.meshes) m.count = 0; this.broad.count = 0; this.count = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1;
-      for (let ti = 0; ti < TIERS.length; ti++) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; }
+      for (let ti = 0; ti < TIERS.length; ti++) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; this.holes[ti].value.w = -1; }
     }
     // ----- real trees: the photograph of each species on a card -----
     // The trees of each flora zone that have a card: { zone: [{ def, w, region }] }, or null while the library has none
@@ -299,37 +320,59 @@
         for (const z in f.zones) (zones[z] = zones[z] || []).push({ def: d, w: f.zones[z], region: f.region || null }); }
       return (this._flora = n ? zones : null);
     }
-    impMesh(ti, def) {
-      let I = this.imps[ti].get(def.id); if (I) return I;
+    // A kind of tree in a tier: one card, drawn as many times as the last pass placed it. It has room for what it needs
+    // and is given more when it needs more (a wood of one kind is forty thousand of it, most kinds stand a few hundred
+    // to a pass: with room for a whole tier each, the trees of a journey round the world held hundreds of megabytes).
+    impMesh(ti, def, need) {
+      const old = this.imps[ti].get(def.id); if (old && old.userData.cap >= need) return old;
       const card = MODELS.card(def); if (!card) return null;
-      const sh = MODELS.shared; const g = new THREE.PlaneGeometry(1, 1); g.translate(0, 0.5, 0);
-      const uniforms = { uImp: { value: card.tex }, uImpSize: { value: new THREE.Vector2(card.tex.image ? card.tex.image.width : 1024, card.tex.image ? card.tex.image.height : 1024) }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units }, uSunCol: sh.uSunCol, uDusk: sh.uDusk, uCover: this.uCover };
-      if (window.SHADOWS) Object.assign(uniforms, SHADOWS.uniforms);
-      if (window.AIR) Object.assign(uniforms, AIR.uniforms);
-      const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide, extensions: { derivatives: true }, defines: window.SHADOWS ? { CARD_SHADOW: 1 } : {} });   // a mirrored card is wound the other way
-      mat.alphaToCoverage = true;      // (see uCover in the shader)
-      I = new THREE.InstancedMesh(g, mat, TIERS[ti].max); I.count = 0; I.frustumCulled = false; I.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      I.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(TIERS[ti].max * 3).fill(1), 3); I.instanceColor.setUsage(THREE.DynamicDrawUsage);
-      I.userData.tree = new THREE.InstancedBufferAttribute(new Float32Array(TIERS[ti].max * 3), 3); I.userData.tree.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aTree', I.userData.tree);
-      I.userData.aspect = card.aspect; I.renderOrder = TIERS[ti].under ? 0.5 : ti; this.scene.add(I); this.imps[ti].set(def.id, I);      // near tier first: what it covers, the bushes under it and the far tiers need not draw
-      if (window.SHADOWS && ti === 0) {             // the near trees throw true shadows: the same card, turned to the sun
-        const depth = new THREE.ShaderMaterial({ uniforms: { uImp: uniforms.uImp, uPivot: uniforms.uPivot, uOrtho: { value: 1 }, uSunV: { value: new THREE.Vector3(0, 0, 1) } }, vertexShader: IMP_VERT, fragmentShader: IMP_DEPTH, side: THREE.DoubleSide });
-        SHADOWS.caster(I, depth);
+      const cap = Math.min(TIERS[ti].max, Math.max(256, Math.pow(2, Math.ceil(Math.log2(Math.max(need, 1))))));
+      const g = new THREE.PlaneGeometry(1, 1); g.translate(0, 0.5, 0);
+      let mat = old ? old.material : null, depth = old ? old.userData.depthMat : null;
+      if (!mat) {
+        const sh = MODELS.shared;
+        const uniforms = { uImp: { value: card.tex }, uImpSize: { value: new THREE.Vector2(card.tex.image ? card.tex.image.width : 1024, card.tex.image ? card.tex.image.height : 1024) }, uPivot: { value: card.pivot === undefined ? 0.5 : card.pivot }, uOrtho: { value: 0 }, uSunV: sh.uSunV, uUpV: sh.uUpV, uDay: sh.uDay, uCamAlt: sh.uCamAlt, uUnits: { value: MODELS.units }, uSunCol: sh.uSunCol, uDusk: sh.uDusk, uCover: this.uCover, uHole: this.holes[ti] };
+        if (window.SHADOWS) Object.assign(uniforms, SHADOWS.uniforms);
+        if (window.AIR) Object.assign(uniforms, AIR.uniforms);
+        mat = new THREE.ShaderMaterial({ uniforms, vertexShader: IMP_VERT, fragmentShader: IMP_FRAG, side: THREE.DoubleSide, extensions: { derivatives: true }, defines: window.SHADOWS ? { CARD_SHADOW: 1 } : {} });   // a mirrored card is wound the other way
+        mat.alphaToCoverage = true;      // (see uCover in the shader)
+        // the near trees throw true shadows: the same card, turned to the sun
+        if (window.SHADOWS && ti === 0) depth = new THREE.ShaderMaterial({ uniforms: { uImp: uniforms.uImp, uPivot: uniforms.uPivot, uOrtho: { value: 1 }, uSunV: { value: new THREE.Vector3(0, 0, 1) }, uHole: { value: new THREE.Vector4(0, 0, 0, -1) } }, vertexShader: IMP_VERT, fragmentShader: IMP_DEPTH, side: THREE.DoubleSide });
       }
+      const I = new THREE.InstancedMesh(g, mat, cap); I.count = 0; I.frustumCulled = false; I.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      I.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3); I.instanceColor.setUsage(THREE.DynamicDrawUsage);
+      I.userData.tree = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); I.userData.tree.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aTree', I.userData.tree);
+      I.userData.cap = cap; I.userData.aspect = card.aspect; I.userData.idle = 0;
+      I.renderOrder = TIERS[ti].under ? 0.5 : ti;      // near tier first: what it covers, the bushes under it and the far tiers need not draw
+      if (depth) SHADOWS.caster(I, depth);
+      if (old) { I.visible = old.visible; this.scene.remove(old); old.geometry.dispose(); old.dispose(); }
+      this.scene.add(I); this.imps[ti].set(def.id, I);
       return I;
     }
-    buildTier(ti, cam, now) {
+    // a kind that has not stood here for many passes gives its room back
+    dropMesh(ti, id) {
+      const I = this.imps[ti].get(id); if (!I) return; this.imps[ti].delete(id); this.scene.remove(I);
+      I.geometry.dispose(); I.material.dispose(); if (I.userData.depthMat) I.userData.depthMat.dispose(); I.dispose();
+    }
+    buildTier(ti, cam, now) { const it = this.buildSteps(ti, cam, now, '', ''); while (!it.next().done) { /* all at once (tools) */ } }
+    *buildSteps(ti, cam, now, sig, soft) {
       const t = TIERS[ti]; const mesh = this.meshes[ti]; const T = this.terrain; const sim = this.sim;
-      this.last[ti] = { lon: cam.lon, lat: cam.lat, t: now, dist: cam.dist };
+      this.last[ti] = { lon: cam.lon, lat: cam.lat, t: now, dist: cam.dist, sig, soft, partial: false };
       const lat0 = cam.lat, lon0 = cam.lon; const cl = Math.max(0.15, Math.cos(lat0 * D2R));
+      // The plots are the world's, not the eye's: a row of them runs along its parallel at the spacing its own latitude gives
+      // (by bands of half a degree), wherever the eye is. (Spaced by the eye's latitude, every tree of a wood changed
+      // places each time the eye had gone a few hundred metres north.)
       const dLat = t.s / R_M / D2R, dLon = dLat / cl; const n = Math.ceil(t.R / t.s);
-      const gy0 = Math.round(lat0 / dLat), gx0 = Math.round(lon0 / dLon);
+      const gy0 = Math.round(lat0 / dLat), span = 2 * n + 1; const rows = (this._rows || (this._rows = []))[ti] || (this._rows[ti] = new Float64Array(span * 2));
+      for (let r = 0; r < span; r++) { const d = dLat / Math.max(0.15, Math.cos((Math.floor((gy0 - n + r) * dLat / BAND) + 0.5) * BAND * D2R)); rows[r * 2] = d; rows[r * 2 + 1] = Math.round(lon0 / d); }
       const m = this._m, q = this._q, s = this._s, p = this._p, col = this._c, basis = this._basis;
       let count = 0, countB = 0, countM = 0; const maxN = t.max; const exag = this.exag; const broad = this.broad;
-      const casters = ti === 0 ? (this.casters = []) : null; if (ti === 0) this.castersVersion = (this.castersVersion || 0) + 1; const vc = new Map();
+      const casters = ti === 0 ? [] : null; const vc = new Map(); let steps = 0, waiting = false, sn = 0;
       const under = !!t.under, near = ti === 0 || under;      // (near: stands on the ground as its mesh has it)
-      const inner = ti > 0 && !under ? TIERS[ti - 1].R : 0;   // leave the inner disc to the finer tier
-      const imps = this.imps[ti]; for (const I of imps.values()) I.count = 0; const flora = this.flora();
+      const inner = ti > 0 && !under ? TIERS[ti - 1].R : 0;   // the inner disc is the finer tier's (the cards leave it in the shader: uHole; the kit's trees here)
+      // what the pass places goes into one store first, whatever the kind of tree, and is handed out when the pass is whole
+      const St = this._stage[ti] || (this._stage[ti] = { m: new Float32Array(maxN * 16), c: new Float32Array(maxN * 3), t: new Float32Array(maxN * 3), k: new Uint8Array(maxN) });
+      const kinds = [], kindOf = new Map(); const imps = this.imps[ti]; const flora = this.flora();
       const camPos = cam.camera ? cam.camera.position : null; const pxPerRad = (window.innerHeight || 800) / (2 * Math.tan(((cam.camera && cam.camera.fov) || 45) * Math.PI / 360));
       const screenPx = (window.innerWidth || 1280) * (window.innerHeight || 800); let covered = 0; const coverCap = this.coverCap === undefined ? 9 : this.coverCap, coverMin = this.coverMin === undefined ? 0.012 : this.coverMin;      // how many times over the big near trees may cover the picture (big: more than coverMin of it each)
       const kTier = t.k * exag * 0.5;                // how many times life size this tier draws a tree, away from any town
@@ -337,15 +380,16 @@
       const budget = this.budget === undefined ? 1 : this.budget; const towns = new Map();       // the towns near the trees of this pass: where each stands, how large, its plan
       // the plots nearest the eye first: within each kind of tree the cards are then drawn front to back, and a card
       // behind nearer ones costs next to nothing (a forest seen from low down is many trees deep at every pixel)
-      const span = 2 * n + 1; const order = (this._orders || (this._orders = []))[ti] || (this._orders[ti] = new Float64Array(span * span));
+      const order = (this._orders || (this._orders = []))[ti] || (this._orders[ti] = new Float64Array(span * span));
       const eye = camPos ? GEO.fromVec(camPos) : [lon0, lat0]; const ex = (((eye[0] - lon0 + 540) % 360) - 180) / dLon, ey = (eye[1] - lat0) / dLat;
       { let o = 0; for (let jy = -n; jy <= n; jy++) for (let jx = -n; jx <= n; jx++) { const ddx = jx - ex, ddy = jy - ey; order[o] = Math.round((ddx * ddx + ddy * ddy) * 16) * 65536 + o; o++; } order.sort(); }
       for (let oi = 0; oi < order.length && count + countB + countM < maxN; oi++) {
-        { const cellIdx = order[oi] % 65536; const gx = gx0 - n + (cellIdx % span), gy = gy0 - n + Math.floor(cellIdx / span);
+        if ((++steps & 63) === 0) yield;
+        { const cellIdx = order[oi] % 65536, row = Math.floor(cellIdx / span); const gy = gy0 - n + row, rowD = rows[row * 2], gx = rows[row * 2 + 1] - n + (cellIdx % span);
           const h1 = hash2(gx, gy, 3 + ti);
-          const lat = gy * dLat + (hash2(gx, gy, 11) - 0.5) * dLat * 0.9, lon = gx * dLon + (hash2(gx, gy, 12) - 0.5) * dLon * 0.9;
+          const lat = gy * dLat + (hash2(gx, gy, 11) - 0.5) * dLat * 0.9, lon = gx * rowD + (hash2(gx, gy, 12) - 0.5) * rowD * 0.9;
           const dxm = (lon - lon0) * D2R * cl * R_M, dym = (lat - lat0) * D2R * R_M; const d2 = dxm * dxm + dym * dym;
-          if (d2 > t.R * t.R || d2 < inner * inner) continue;
+          if (d2 > t.R * t.R) continue;
           const i = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W);
           if (sim && !sim.land[i]) continue;
           const h = near ? T.meshHeightAt(lon, lat, vc) : T.heightAt(lon, lat); if (h <= 0.5) continue;
@@ -409,19 +453,20 @@
             // (a bush or a young tree is the crown of the tree alone, two to six metres of it; a tree in a wood is as tall as its stand)
             const crop = under ? (CROWN[def.id] === undefined ? 0.35 : CROWN[def.id]) : 0;
             const life = under ? Math.min(6.5, Math.max(1.6, lifeH * (0.1 + 0.16 * hash2(gx, gy, 21)))) * (fw.f > 0.4 ? 1 : 0.7) : lifeH * (0.72 + hash2(gx, gy, 21) * 0.5) * (0.84 + 0.34 * stB); const hgt = life * kEff;
-            const I = this.impMesh(ti, def);
-            if (I && I.count < I.instanceMatrix.count) {
+            const card = MODELS.card(def); if (!card) waiting = true;      // (its picture has not arrived: the pass is done again soon)
+            if (card && sn < maxN) {
+              const aspect = card.aspect; let ki = kindOf.get(def.id); if (ki === undefined) { ki = kinds.length; kinds.push({ def, n: 0 }); kindOf.set(def.id, ki); }
               p.copy(f.up).multiplyScalar(1 + (h * exag - 0.15 * kEff) / R_M);
               // a tree right in front of the eye fills the picture, and a wood of them fills it many times over. The
               // nearest are placed first: once they have covered the picture a few times, no more big ones are added
               // (what they would show is behind the others already)
               if (camPos && (near || coverMin === 0)) { const dd = Math.sqrt((p.x - camPos.x) * (p.x - camPos.x) + (p.y - camPos.y) * (p.y - camPos.y) + (p.z - camPos.z) * (p.z - camPos.z)); const apx = hgt / R_M / Math.max(dd, 1e-9) * pxPerRad;
-                const share = apx * apx * I.userData.aspect * 0.55 / screenPx; if (share > coverMin) { if (covered > coverCap) continue; covered += share; } }
+                const share = apx * apx * aspect * 0.55 / screenPx; if (share > coverMin) { if (covered > coverCap) continue; covered += share; } }
               // (no two are of one build: each is a little broader or narrower than its picture, and leans a little its own way)
               basis.makeBasis(f.east, f.up, f.north.clone().negate()); q.setFromRotationMatrix(basis);
               this._yaw.setFromAxisAngle(this._fwd, (hash2(gx, gy, 45) - 0.5) * (under ? 0.3 : 0.13)); q.multiply(this._yaw);
               const wide = (0.86 + 0.3 * hash2(gx, gy, 44)) / (1 - crop);
-              s.set(hgt * I.userData.aspect * wide / R_M, hgt / R_M, (hash2(gx, gy, 31) < 0.5 ? 1 : 3) / R_M); m.compose(p, q, s); I.setMatrixAt(I.count, m);
+              s.set(hgt * aspect * wide / R_M, hgt / R_M, (hash2(gx, gy, 31) < 0.5 ? 1 : 3) / R_M); m.compose(p, q, s); m.toArray(St.m, sn * 16);
               const fr2 = 1 - fall, br = 1 - bare;                                    // the season: leaves turn, then go
               col.setRGB(v * (fr2 * br + fall * 1.75 + bare * 0.95), v * (fr2 * br + fall * 0.95 + bare * 0.78), v * (fr2 * br + fall * 0.35 + bare * 0.62));
               if (leafless) col.setRGB(v * 0.86, v * 0.77, v * 0.63);              // bare twigs are bark-brown and dark (the photographs, cut from a blue screen, come out pale and a little pink)
@@ -432,25 +477,25 @@
               // how deep in a wood it stands: by how much of the country round it is wood (a tree by a town, drawn at the town's
               // scale, is a tree on a green: it keeps its light)
               const wood = (kEff > kTier * 1.05 ? 0 : smooth(0.3, 0.72, fw.f)) * (leafless ? 0.4 : 1), dice = 0.55 * stB + 0.45 * hash2(gx, gy, 43);      // (a bare wood lets the light through)
-              I.userData.tree.setXYZ(I.count, wood, dice, crop);
-              I.setColorAt(I.count, col); I.count++; countM++;
-              if (casters && !(window.SHADOWS && SHADOWS.ready && SHADOWS.enabled)) casters.push(lon, lat, hgt * I.userData.aspect * 0.8, hgt);   // with the depth map on, the card throws its own true shadow
+              St.t[sn * 3] = wood; St.t[sn * 3 + 1] = dice; St.t[sn * 3 + 2] = crop;
+              col.toArray(St.c, sn * 3); St.k[sn++] = ki; kinds[ki].n++; countM++;
+              if (casters && !(window.SHADOWS && SHADOWS.ready && SHADOWS.enabled)) casters.push(lon, lat, hgt * aspect * 0.8, hgt);   // with the depth map on, the card throws its own true shadow
               // slender trees stand closer than broad ones: a spruce or a birch brings a neighbour, so a wood of them closes its canopy too
-              if (!under && I.userData.aspect < 0.78 && kEff <= kTier * 1.05 && hash2(gx, gy, 81) < density && I.count < I.instanceMatrix.count) {
+              if (!under && aspect < 0.78 && kEff <= kTier * 1.05 && hash2(gx, gy, 81) < density && sn < maxN) {
                 const a2 = hash2(gx, gy, 82) * 6.2832, r2 = (0.34 + 0.16 * hash2(gx, gy, 83)) * t.s; const lon2 = lon + Math.cos(a2) * r2 / (R_M * D2R * cl), lat2 = lat + Math.sin(a2) * r2 / (R_M * D2R);
                 const h2 = ti === 0 ? T.meshHeightAt(lon2, lat2, vc) : h; const wa2 = ti < 2 ? T.waterAlpha(lon2, lat2) : 1; const rv2 = river && ti < 2 ? river.nearestRiver(lon2, lat2) : null;
                 if (h2 > 0.5 && !(wa2 >= 0 && wa2 < 0.62) && !(rv2 && rv2.d < rv2.hw + 6)) {
                   const f2 = GEO.enu(lon2, lat2); const g2 = hgt * (0.78 + 0.3 * hash2(gx, gy, 84)); p.copy(f2.up).multiplyScalar(1 + (h2 * exag - 0.15 * kEff) / R_M);
                   basis.makeBasis(f2.east, f2.up, f2.north.clone().negate()); q.setFromRotationMatrix(basis);
-                  s.set(g2 * I.userData.aspect / R_M, g2 / R_M, (hash2(gx, gy, 85) < 0.5 ? 1 : 3) / R_M); m.compose(p, q, s); I.setMatrixAt(I.count, m);
-                  I.userData.tree.setXYZ(I.count, wood, 0.55 * stB + 0.45 * hash2(gx, gy, 87), 0);
-                  col.multiplyScalar(0.94 + 0.12 * hash2(gx, gy, 86)); I.setColorAt(I.count, col); I.count++; countM++;
+                  s.set(g2 * aspect / R_M, g2 / R_M, (hash2(gx, gy, 85) < 0.5 ? 1 : 3) / R_M); m.compose(p, q, s); m.toArray(St.m, sn * 16);
+                  St.t[sn * 3] = wood; St.t[sn * 3 + 1] = 0.55 * stB + 0.45 * hash2(gx, gy, 87); St.t[sn * 3 + 2] = 0;
+                  col.multiplyScalar(0.94 + 0.12 * hash2(gx, gy, 86)); col.toArray(St.c, sn * 3); St.k[sn++] = ki; kinds[ki].n++; countM++;
                 }
               }
             }                                              // nothing of this species has arrived yet: the ground stays bare for the moment it takes
             continue;
           }
-          if (under) continue;
+          if (under || d2 < inner * inner) continue;
           const hgt = (14 + hash2(gx, gy, 21) * 12) * kEff * (1 + conifer * 0.25);
           const wid = hgt * (0.55 - conifer * 0.15) * (ti === 2 ? 1.6 : 1);
           p.copy(f.up).multiplyScalar(1 + (h * exag - 1) / R_M);
@@ -468,8 +513,20 @@
       }
       mesh.count = count; GEO.touch(mesh.instanceMatrix, count); GEO.touch(mesh.instanceColor, count);
       if (ti === 0) { broad.count = countB; GEO.touch(broad.instanceMatrix, countB); GEO.touch(broad.instanceColor, countB); }
-      for (const I of imps.values()) { GEO.touch(I.instanceMatrix, I.count); GEO.touch(I.instanceColor, I.count); GEO.touch(I.userData.tree, I.count); }      // only the trees placed: a species has room for a forest of itself
-      this.modelCount[ti] = countM;
+      // The pass is whole: every kind of tree is handed what was placed of it, in the order it was placed (nearest first).
+      for (const K of kinds) { K.I = this.impMesh(ti, K.def, K.n); K.o = 0; }
+      for (let a = 0; a < sn; a++) {
+        const K = kinds[St.k[a]], I = K.I; if (!I) continue; const o = K.o++, dm = I.instanceMatrix.array, dc = I.instanceColor.array, dt = I.userData.tree.array;
+        for (let b = 0, a16 = a * 16, o16 = o * 16; b < 16; b++) dm[o16 + b] = St.m[a16 + b];
+        dc[o * 3] = St.c[a * 3]; dc[o * 3 + 1] = St.c[a * 3 + 1]; dc[o * 3 + 2] = St.c[a * 3 + 2]; dt[o * 3] = St.t[a * 3]; dt[o * 3 + 1] = St.t[a * 3 + 1]; dt[o * 3 + 2] = St.t[a * 3 + 2];
+      }
+      for (const [id, I] of Array.from(imps)) { const ki = kindOf.get(id), nI = ki === undefined || kinds[ki].I !== I ? 0 : kinds[ki].o;
+        I.count = nI; GEO.touch(I.instanceMatrix, nI); GEO.touch(I.instanceColor, nI); GEO.touch(I.userData.tree, nI);
+        if (nI) I.userData.idle = 0; else if (++I.userData.idle > 12) this.dropMesh(ti, id); }
+      // (and the tier outside this one draws nothing where these stand)
+      if (!under && ti + 1 < TIERS.length && !TIERS[ti + 1].under) { const c = GEO.enu(lon0, lat0).up; this.holes[ti + 1].value.set(c.x, c.y, c.z, (t.R / R_M) * (t.R / R_M)); }
+      if (casters) { this.casters = casters; this.castersVersion = (this.castersVersion || 0) + 1; }
+      this.modelCount[ti] = countM; this.last[ti].partial = waiting;
     }
   }
   window.TREES = { Trees };
