@@ -1,5 +1,5 @@
 # The tour: one line per picture.  name | scene script | window.__scene | script run after the scene | seconds to settle
-# (tools/scenes/town.js: __sceneLook(what, distance, tilt, turn); tools/scenes/forest.js: __forest(lon, lat, alt, tilt, heading, season))
+# (tools/scenes/town.js: __sceneLook(what, distance, tilt, turn); tools/scenes/forest.js: __forest(lon, lat, alt, tilt, heading, season, [sun's height, bearing]))
 home         | tools/scenes/home.js | null | | 14
 home_saved   | tools/scenes/home.js | {years:400,tech:0.5,pop:120} | | 18
 home_lights  | tools/scenes/home.js | {years:400,tech:0.85,pop:900,turn:-34} | | 18
@@ -184,3 +184,22 @@ costa_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,
 costm_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsMesh(); }, 9000); | 64
 alps_q4      | tools/scenes/forest.js | null | __G.terrain.quadPx = 4; const f = () => __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 30
 ridge_q4     | tools/scenes/forest.js | null | __G.terrain.quadPx = 4; const f = () => __forest(11.83, 46.44, 900, 1.3, 2.2, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 35
+# --- water: the sea from the air, from a hill and from close to; shallows and surf; the sun's path at dusk; lakes of the north (those
+#     the radar took for land are the second source's), a mountain lake, a fjord, a delta, a lagoon; the seas of a region ---
+sea_air      | tools/scenes/forest.js | null | const f = () => __forest(27.40, 37.00, 3000, 1.1, 0.5, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+sea_cove     | tools/scenes/forest.js | null | const f = () => __forest(27.415, 37.012, 350, 1.25, 0.9, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+sea_low      | tools/scenes/forest.js | null | const f = () => __forest(27.42, 37.015, 60, 1.45, 0.9, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+surf         | tools/scenes/forest.js | null | const f = () => __forest(-1.33, 44.0, 500, 1.2, 3.3, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+surf_low     | tools/scenes/forest.js | null | const f = () => __forest(-1.326, 44.0, 90, 1.4, 3.3, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+sea_dusk     | tools/scenes/forest.js | null | const f = () => __forest(27.40, 37.00, 400, 1.42, 4.6, 0.5, [0.08, 4.6]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+sea_glint    | tools/scenes/forest.js | null | const f = () => __forest(27.40, 37.00, 9000, 1.0, 4.6, 0.5, [0.45, 4.6]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+lakes        | tools/scenes/forest.js | null | const f = () => __forest(25.75, 62.15, 3000, 0.9, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+lake_fin     | tools/scenes/forest.js | null | const f = () => __forest(25.80, 62.075, 180, 1.3, 3.0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+lakes_radar  | tools/scenes/forest.js | null | const f = () => __forest(26.55, 63.12, 3000, 0.9, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+lake_alp     | tools/scenes/forest.js | null | const f = () => __forest(8.45, 47.0, 2200, 1.15, 0.6, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+lake_tibet   | tools/scenes/forest.js | null | const f = () => __forest(90.6, 30.72, 2500, 1.15, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+fjord        | tools/scenes/forest.js | null | const f = () => __forest(6.9, 61.12, 2500, 1.2, 1.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+delta        | tools/scenes/forest.js | null | const f = () => __forest(30.37, 31.47, 3500, 1.05, 0.2, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+lagoon       | tools/scenes/forest.js | null | const f = () => __forest(-151.74, -16.5, 6000, 0.9, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+tundra       | tools/scenes/forest.js | null | const f = () => __forest(100.5, 72.5, 4000, 0.9, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+sea_region   | tools/scenes/forest.js | null | const f = () => __forest(25.0, 37.5, 300000, 0.5, 0.0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 32

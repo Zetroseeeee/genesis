@@ -7,6 +7,8 @@
   const GRID_CH = { 8: '!', 16: ':', 32: '.', 64: ',', 128: ';' };      // (a tile's mesh, in the signature of the drawn surface)
   // how much of the ground's small relief there is, by the water mask of the picture of the Earth (1 land, 0.75 a river's band, 0.5 a lake)
   const WET = (a) => { const t = Math.min(1, Math.max(0, (a - 0.66) / 0.3)); return t * t * (3 - 2 * t); };
+  // the code of the water's edge (tools/water/build.py writes it into data/w/index.json; a pack made otherwise is not read)
+  const WCODE = { step: 16, near: 480, deep: 3600, quad: 1.55, land: 158, knee: 98, water: 58 };
   // ---------- shared tile geometry (u, v, skirt) ----------
   function buildTileGeometry(GRID) {
     const n = GRID + 1; const pos = []; const idx = [];
@@ -30,13 +32,30 @@
     return g;
   }
 
+  // a texel of the water's edge to metres from the shore, water negative (tools/water/build.py has the code, wDecF below is its twin here)
+  const WDEC = `float wDec(float v) { float c = v * 255.0, u = max(${WCODE.knee.toFixed(1)} - c, 0.0); return c >= ${WCODE.knee.toFixed(1)} ? (min(c, ${WCODE.land.toFixed(1)}) - 128.0) * ${WCODE.step.toFixed(1)} : -(${WCODE.near.toFixed(1)} + ${WCODE.step.toFixed(1)} * u + ${WCODE.quad.toFixed(4)} * u * u); }
+    vec2 wKO(float g) { float b = floor(g * 255.0 + 0.5), k = floor(b / 16.0); return vec2(k, b - k * 16.0) / 15.0; }`;      // (the second byte: what water in its upper four bits, how open it lies in the lower: both 0..1)
+  const wDecF = (c) => { const u = Math.max(WCODE.knee - c, 0); return c >= WCODE.knee ? (Math.min(c, WCODE.land) - 128) * WCODE.step : -(WCODE.near + WCODE.step * u + WCODE.quad * u * u); };
+  const sm01 = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // Where the field of the water's edge is here, the ground's corners go by it. The sea lies at nought and the land comes up out
+  // of it over SHORE_RISE metres (the heights have a coast of their own, a texel or two from the true one: a strip of sea lay
+  // tilted up a hillside, and a strip of land flat at the sea's level); and the ground's small relief begins at the water's edge
+  // and has its full height WET_RISE metres inland (still water lies level). The vertex shader and the CPU's twins of it.
+  const SHORE_RISE = 220, WET_RISE = 90;
+  // And the rise begins a little inland, not at the water's edge: a triangle of the mesh that has one corner in the water must
+  // lie flat, or the water in it climbs toward the corner on land (the sea stood up the shore like a wave about to break). So the
+  // ground keeps to the water's level for a quad and a half of the tile's mesh as it is at the moment (uShoreQ, metres), and never
+  // for less than SHORE_FLAT: the mesh asks the field between four texels, the picture among sixteen and roughened, and the two
+  // lines lie that far apart.
+  const SHORE_FLAT = 60;
   // the air between the eye and the ground (air.js), worked out at the corners of the mesh: it changes slowly, and the mesh is fine where the eye is near
   const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.LAND : '4.0';
   const VERT = `
     uniform float uLon0, uDLon, uLat0, uDLat, uLatC, uLonC; uniform vec2 uGeoC, uPhaseB;
     uniform float uDLon0, uDLat0, uMercA, uTanA, uCosA;   // tile-centre-relative offsets and the Mercator terms for the fine (metre-scale) texture frame
-    uniform sampler2D uElev, uNoise, uImg; uniform vec4 uElevRect, uImgRect; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag, uSkirt, uCamAlt, uQuality;
-    varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
+    uniform sampler2D uElev, uNoise, uImg, uWater; uniform vec4 uElevRect, uImgRect, uWaterRect, uWaterP; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag, uSkirt, uCamAlt, uQuality, uShoreQ;
+    varying vec2 vUV, vGL, vGLf;
+    ${WDEC} varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     ${AIR_V}
     const float R_MV = ${R_M.toFixed(1)};
     float hAtV(vec2 uv) { return max(uElevMin + texture2D(uElev, uElevRect.xy + uv * uElevRect.zw).r * 255.0 * uElevScale, 0.0); }
@@ -46,6 +65,11 @@
       float lon = uLon0 + u * uDLon; float lat = uLat0 + v * uDLat;
       float ev = texture2D(uElev, uElevRect.xy + vec2(u, v) * uElevRect.zw).r;
       float h = max(uElevMin + ev * 255.0 * uElevScale, 0.0);
+      // (the water's edge, where the field of it is here: how far inland this corner lies, and what water lies off it)
+      float wdv = 1e4, wkv = 0.0;
+      if (uWaterP.x > 1.5) { wdv = uWaterP.z; wkv = uWaterP.w; }
+      else if (uWaterP.x > 0.5) { vec2 wc = uWaterRect.xy + vec2(u, v) * uWaterRect.zw, wsz = vec2(textureSize(uWater, 0)); wdv = wDec(texture2D(uWater, wc).r) * uWaterP.y; wkv = wKO(texelFetch(uWater, ivec2(clamp(floor(wc * wsz), vec2(0.0), wsz - 1.0)), 0).g).x; }      // (the distance weighed between texels by the card; what water it is from the nearest texel: its byte holds two things)
+      if (uWaterP.x > 0.5) h *= mix(1.0, smoothstep(uShoreQ, uShoreQ + ${SHORE_RISE.toFixed(1)}, wdv), 1.0 - wkv);
       float cl0 = cos(lat);
       vec2 gl0 = vec2(lon * cl0 - uGeoC.x, lat - uGeoC.y);
       // micro-relief displacement: the same two noise octaves the fragment shader shades with, so silhouettes match
@@ -62,7 +86,7 @@
         // Still water lies level: the small relief ends where the picture of the Earth has water, and the shore runs down
         // to it. (A lake heaved as the land is was a sheet of bumps, ten metres up and down, under a flat picture of
         // water. WET in the height queries below is the same.)
-        float wet = smoothstep(0.66, 0.96, texture2D(uImg, uImgRect.xy + vec2(u, v) * uImgRect.zw).a);
+        float wet = uWaterP.x > 0.5 ? smoothstep(uShoreQ, uShoreQ + ${WET_RISE.toFixed(1)}, wdv) : smoothstep(0.66, 0.96, texture2D(uImg, uImgRect.xy + vec2(u, v) * uImgRect.zw).a);
         h += (n1 * 90.0 * (0.08 + st) + n2 * 9.0 * (0.08 + 1.2 * st)) * amp * dispOn * wet;
         h = max(h, 0.5);
       }
@@ -92,6 +116,17 @@
     precision highp float;
     uniform sampler2D uElev; uniform vec4 uElevRect; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag;
     uniform sampler2D uImg; uniform vec4 uImgRect;
+    uniform vec4 uWaterK;      // (x: how ragged the shore; y, z, w: to try things by)
+    // The sky as still water would mirror it: its light at five heights above the horizon (the root of the height's sine: 0, a
+    // quarter .. 1) toward the sun, across and away from it, worked out once a frame where the camera stands (main.js: skyMirror).
+    uniform vec3 uSkyR[15]; uniform vec4 uSeaK;      // (uSeaK: x how high the waves run, y how much surf, z how clear the water, w 1: the water as it was drawn before)
+    vec3 skyAt(float sinE, float cosAz) {
+      float x = sqrt(clamp(sinE, 0.0, 1.0)) * 4.0, i = min(floor(x), 3.0); int k = int(i) * 3;
+      vec3 lo = cosAz >= 0.0 ? mix(uSkyR[k + 1], uSkyR[k], cosAz) : mix(uSkyR[k + 1], uSkyR[k + 2], -cosAz);
+      vec3 hi = cosAz >= 0.0 ? mix(uSkyR[k + 4], uSkyR[k + 3], cosAz) : mix(uSkyR[k + 4], uSkyR[k + 5], -cosAz);
+      return mix(lo, hi, x - i);
+    }
+    uniform sampler2D uWater; uniform vec4 uWaterRect, uWaterP;      // the water's edge (data/w): P = 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; for 2 the distance and the kind
     uniform float uDLon, uDLat, uLevel;
     uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason; uniform vec4 uBare;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
     uniform sampler2D uOwner, uPal, uSim, uInfo, uNoise;
@@ -133,6 +168,7 @@
     #endif
     float hAt(vec2 uv) { return max(uElevMin + texture2D(uElev, uElevRect.xy + uv * uElevRect.zw).r * 255.0 * uElevScale, 0.0); }
     vec4 noise2(vec2 p) { return texture2D(uNoise, p); }
+    ${WDEC}
     #ifdef USE_GROUND
     // ---------- the ground's materials (textures.js: scans of real ground with their relief and heights), laid at a ladder of sizes ----------
     // A material repeats every twelve metres, every twenty-four, and so on, doubling, up to two hundred kilometres; a pixel is given
@@ -297,6 +333,25 @@
       float dhdy = (hN - hS) / (2.0 * tuv.y * tileHm);     // toward north
       vec3 nEnu = normalize(vec3(-dhdx * uExag, -dhdy * uExag, 1.0));
       float slope = 1.0 - nEnu.z;                           // 0 flat .. ~1 cliff
+      // variation noise in geographic space (stable across tiles and LODs)
+      #ifdef USE_GROUND
+      // (read three levels coarser than the card would: here they choose which material lies where, and a choice made of grain a
+      // pixel or two across is a snow of single pixels. So a patch is never drawn smaller than some eight pixels: before it comes
+      // to that it has faded into the mean, and the next coarser of the four carries on)
+      // (Told the level outright, and never finer than the third: asked only to go three coarser than the card would, a noise seen
+      // from close to is still read at its finest, since the card's own answer there is far below nought. The ladder bends its
+      // repeats by these, and bent by a noise's fine grain a scan is drawn out into streaks.)
+      float nLod; { vec2 gx = dFdx(vGL), gy = dFdy(vGL); nLod = 0.5 * log2(max(max(dot(gx, gx), dot(gy, gy)), 1e-30)) + 17.64; }      // (the level the card would take for one repeat a radian, and three more)
+      vec4 nMac = textureLod(uNoise, gc(3.0), max(nLod + 1.585, 3.0));
+      vec4 nMid = textureLod(uNoise, gc(24.0), max(nLod + 4.585, 3.0));
+      vec4 nMic = textureLod(uNoise, gc(180.0), max(nLod + 7.492, 3.0));
+      vec4 nFin = textureLod(uNoise, gc(800.0), max(nLod + 9.644, 3.0));
+      #else
+      vec4 nMac = noise2(gc(3.0));
+      vec4 nMid = noise2(gc(24.0));
+      vec4 nMic = noise2(gc(180.0));
+      vec4 nFin = noise2(gc(800.0));
+      #endif
       // ---------- imagery ----------
       // magnification estimate first (needed for the warp)
       vec2 duv0 = fwidth(vUV * uImgRect.zw * 4096.0);
@@ -337,6 +392,51 @@
       float lakeW = (1.0 - smoothstep(0.04, win, abs(a - 0.5))) * step(0.2, a) * (1.0 - step(0.62, a)) * plateau;
       float bandW = (1.0 - smoothstep(0.03, 0.06 + min(aw * 1.2, 0.08) * (1.0 - minify), abs(a - 0.75))) * step(0.64, a) * (1.0 - step(0.9, a)) * plateau;
       bandW *= mix(1.0, smoothstep(0.015, 0.06, aw), minify);        // far away only true thin lines count, not mip-averaged river country
+      // ---------- the water's edge ----------
+      // Where the field of distances is here (data/w), it and not the picture says what is water: metres to the shore (wD,
+      // water negative), what water it is (wK: 0 the sea .. 1 fresh), and how many of those metres a pixel spans (wPx).
+      // Its four texels are fetched and weighed here: a texel is three hundred metres, from a hilltop a thousand pixels, and
+      // a card's own weighing has 256 steps. The line where the distance passes nought lies true between the texels; what
+      // roughens it at the scale of a cove or a rock is the noise of the place (a beach runs smooth, a steep shore ragged).
+      float wOn = step(0.5, uWaterP.x), wD = 0.0, wK = 0.0, wPx = 1.0, wCov = 0.0, wBend = 0.0, wOpen = 1.0;
+      if (wOn > 0.5) {
+        if (uWaterP.x > 1.5) { wD = uWaterP.z; wK = uWaterP.w; wPx = 1e3; }
+        else {
+          vec2 wsz = vec2(textureSize(uWater, 0)), wq = (uWaterRect.xy + vUV * uWaterRect.zw) * wsz - 0.5, wi = floor(wq), wf = wq - wi;
+          ivec2 iLast = ivec2(wsz) - 1, i0 = ivec2(wi), i1 = min(i0 + 1, iLast); i0 = max(i0, ivec2(0));
+          vec2 t00 = texelFetch(uWater, i0, 0).rg, t10 = texelFetch(uWater, ivec2(i1.x, i0.y), 0).rg, t01 = texelFetch(uWater, ivec2(i0.x, i1.y), 0).rg, t11 = texelFetch(uWater, i1, 0).rg;
+          float d00 = wDec(t00.r), d10 = wDec(t10.r), d01 = wDec(t01.r), d11 = wDec(t11.r);
+          wD = mix(mix(d00, d10, wf.x), mix(d01, d11, wf.x), wf.y); { vec2 ko = mix(mix(wKO(t00.g), wKO(t10.g), wf.x), mix(wKO(t01.g), wKO(t11.g), wf.x), wf.y); wK = ko.x; wOpen = ko.y; }
+          vec2 wg = vec2(mix(d10 - d00, d11 - d01, wf.y), mix(d01 - d00, d11 - d10, wf.x)), wx = dFdx(vUV) * uWaterRect.zw * wsz, wy = dFdy(vUV) * uWaterRect.zw * wsz;
+          // Weighed between four texels the shore is a run of straight pieces, a texel long each. Near it, and from close enough
+          // to see that, sixteen texels give a line that curves (Catmull-Rom: it still passes where the field has it, so a rock
+          // a texel across stays), and how the shore bends there (wBend, 1/m: a bay positive, a headland negative; from the
+          // second differences of a smoother weighing, which does not jump from texel to texel).
+          float wNear = (1.0 - smoothstep(300.0, 420.0, abs(wD))) * (1.0 - smoothstep(0.2, 0.35, max(length(wx), length(wy))));
+          if (wNear > 0.0) {
+            vec2 f = wf, f2 = f * f, f3 = f2 * f, g = 1.0 - f;
+            vec4 cx = vec4(-0.5 * f3.x + f2.x - 0.5 * f.x, 1.5 * f3.x - 2.5 * f2.x + 1.0, -1.5 * f3.x + 2.0 * f2.x + 0.5 * f.x, 0.5 * f3.x - 0.5 * f2.x), cy = vec4(-0.5 * f3.y + f2.y - 0.5 * f.y, 1.5 * f3.y - 2.5 * f2.y + 1.0, -1.5 * f3.y + 2.0 * f2.y + 0.5 * f.y, 0.5 * f3.y - 0.5 * f2.y);
+            vec4 dx4 = vec4(-1.5 * f2.x + 2.0 * f.x - 0.5, 4.5 * f2.x - 5.0 * f.x, -4.5 * f2.x + 4.0 * f.x + 0.5, 1.5 * f2.x - f.x), dy4 = vec4(-1.5 * f2.y + 2.0 * f.y - 0.5, 4.5 * f2.y - 5.0 * f.y, -4.5 * f2.y + 4.0 * f.y + 0.5, 1.5 * f2.y - f.y);
+            vec4 bx = vec4(g.x * g.x * g.x, 3.0 * f3.x - 6.0 * f2.x + 4.0, -3.0 * f3.x + 3.0 * f2.x + 3.0 * f.x + 1.0, f3.x) / 6.0, by = vec4(g.y * g.y * g.y, 3.0 * f3.y - 6.0 * f2.y + 4.0, -3.0 * f3.y + 3.0 * f2.y + 3.0 * f.y + 1.0, f3.y) / 6.0;
+            vec4 ex = vec4(g.x, 3.0 * f.x - 2.0, 1.0 - 3.0 * f.x, f.x), ey = vec4(g.y, 3.0 * f.y - 2.0, 1.0 - 3.0 * f.y, f.y);
+            vec2 wm = vec2(tileWm, tileHm) / (uWaterRect.zw * wsz);          // a texel, metres east-west and north-south (as the pack's level has them)
+            float v = 0.0, lap = 0.0; vec2 gr = vec2(0.0); ivec2 ib = ivec2(wi) - 1;
+            for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++) {
+              float d = (i == 1 || i == 2) && (j == 1 || j == 2) ? (i == 1 ? (j == 1 ? d00 : d01) : (j == 1 ? d10 : d11)) : wDec(texelFetch(uWater, clamp(ib + ivec2(i, j), ivec2(0), iLast), 0).r);
+              v += cx[i] * cy[j] * d; gr += vec2(dx4[i] * cy[j], cx[i] * dy4[j]) * d; lap += (ex[i] * by[j] / (wm.x * wm.x) + bx[i] * ey[j] / (wm.y * wm.y)) * d;
+            }
+            wD = mix(wD, v, wNear); wg = mix(wg, gr, wNear); wBend = lap * wNear * uWaterP.y;      // (the texels' metres are those of the finest level: uWaterP.y times them is the truth, and wm has it already)
+          }
+          wD *= uWaterP.y; wg *= uWaterP.y;
+          wPx = max(length(vec2(dot(wg, wx), dot(wg, wy))), 1e-3);
+          float rough = mix(9.0, 42.0, smoothstep(0.02, 0.2, slope)) * uWaterK.x;
+          wD += ((nMic.b - 0.5) * 2.0 + (nFin.b - 0.5) * 0.6) * rough * (1.0 - smoothstep(300.0, 480.0, abs(wD)));
+          // the sea's edge comes up the beach and runs back (a few metres; a lake's lies still)
+          wD += sin(uTime * 0.55 + nMid.r * 31.0 + nMic.g * 5.0) * 3.5 * (1.0 - wK) * smoothstep(0.3, 0.9, wOpen) * uSeaK.y * (1.0 - smoothstep(60.0, 160.0, abs(wD))) * (1.0 - smoothstep(4.0, 14.0, wPx));
+        }
+        wCov = clamp(0.5 - wD / wPx, 0.0, 1.0);
+        seaW = wCov * (1.0 - wK); landW = 1.0 - seaW; lakeW = wCov * wK; bandW *= 1.0 - wCov;
+      }
       // camera-local decal: vector rivers and roads painted straight onto the ground
       vec2 dcu = (vec2(vLon, vLat) - uDecalRect.xy) * uDecalRect.zw;
       float inDecal = uDecalOn * step(0.0, dcu.x) * step(dcu.x, 1.0) * step(0.0, dcu.y) * step(dcu.y, 1.0);
@@ -359,25 +459,6 @@
       float texPerPx = max(duv.x, duv.y);                            // >1 minified, <1 magnified
       float detailFade = clamp(1.0 - texPerPx * 0.9, 0.0, 1.0);      // 0 far, 1 close
       float closeFade = max(clamp(1.0 - texPerPx * 0.25, 0.0, 1.0), smoothstep(0.03, 0.003, uCamAlt));
-      // variation noise in geographic space (stable across tiles and LODs)
-      #ifdef USE_GROUND
-      // (read three levels coarser than the card would: here they choose which material lies where, and a choice made of grain a
-      // pixel or two across is a snow of single pixels. So a patch is never drawn smaller than some eight pixels: before it comes
-      // to that it has faded into the mean, and the next coarser of the four carries on)
-      // (Told the level outright, and never finer than the third: asked only to go three coarser than the card would, a noise seen
-      // from close to is still read at its finest, since the card's own answer there is far below nought. The ladder bends its
-      // repeats by these, and bent by a noise's fine grain a scan is drawn out into streaks.)
-      float nLod; { vec2 gx = dFdx(vGL), gy = dFdy(vGL); nLod = 0.5 * log2(max(max(dot(gx, gx), dot(gy, gy)), 1e-30)) + 17.64; }      // (the level the card would take for one repeat a radian, and three more)
-      vec4 nMac = textureLod(uNoise, gc(3.0), max(nLod + 1.585, 3.0));
-      vec4 nMid = textureLod(uNoise, gc(24.0), max(nLod + 4.585, 3.0));
-      vec4 nMic = textureLod(uNoise, gc(180.0), max(nLod + 7.492, 3.0));
-      vec4 nFin = textureLod(uNoise, gc(800.0), max(nLod + 9.644, 3.0));
-      #else
-      vec4 nMac = noise2(gc(3.0));
-      vec4 nMid = noise2(gc(24.0));
-      vec4 nMic = noise2(gc(180.0));
-      vec4 nFin = noise2(gc(800.0));
-      #endif
       // procedural micro-relief: hillsides are gullied and rocky at this scale, not smooth
       float bumpA = detailFade * smoothstep(0.06, 0.004, uCamAlt) * step(0.5, uQuality);
       if (bumpA > 0.001) {
@@ -793,6 +874,12 @@
       // beach: a sand strip where the land runs down into the sea
       // (only on the sea's side of the shore line: a lake's shore is grass or forest to the water, and snow lies on a beach as on anything)
       float beach = (1.0 - smoothstep(0.40, 0.52, a)) * landW * closeFade * (1.0 - ice) * (1.0 - lakeW) * (1.0 - bandW) * (1.0 - snowLying * 0.85);
+      // (By the field of the water's edge a beach has a width in metres: wide where the land comes down flat to the sea, none
+      //  under a steep shore, and not the same all along a coast. Seen from so far that a pixel is wider than the beach, it
+      //  has its share of the pixel.)
+      float beachW = mix(120.0, 12.0, smoothstep(0.03, 0.17, slope)) * (0.3 + 1.4 * nMid.g) * uWaterK.y;
+      beachW *= clamp(0.75 + wBend * 220.0, 0.12, 1.6);      // (sand gathers in a bay and is washed off a headland: a rock in the sea is rock)
+      if (wOn > 0.5) beach = (1.0 - smoothstep(beachW * 0.45, beachW, wD)) * step(0.0, wD + wPx) * (1.0 - wK) * landW * (1.0 - ice) * (1.0 - snowLying * 0.85) * clamp(beachW / max(wPx, 1e-3), 0.0, 1.0);
       vec3 beachCol = vec3(0.82, 0.76, 0.6) * (0.85 + 0.3 * dl);
       #ifdef USE_TEXARR
       #ifdef USE_GROUND
@@ -803,17 +890,23 @@
       #endif
       land = mix(land, beachCol, beach * 0.75);
       // ---------- water ----------
-      float shelf = info.r;
-      vec3 deep = vec3(0.02, 0.09, 0.20), shallow = vec3(0.05, 0.32, 0.42), coast = vec3(0.10, 0.45, 0.50);
-      vec3 water = mix(deep, shallow, pow(shelf, 1.6));
-      water = mix(water, coast, smoothstep(0.86, 1.0, shelf) * 0.6);
+      // How deep it is: by the field, the metres out from the shore times how fast the bottom falls there (gently on a shelf,
+      // fast where the deep sea comes up to the coast); without the field, by the shelf alone. Through the first metres the
+      // bottom shows: pale where sand lies (a bay), dark under a headland; red light goes first, then green, and what is left
+      // of deep water is its own blue. All of it is what comes up out of the water: what the surface mirrors is added last.
+      float shelf = info.r, off = max(-wD, 0.0), shelf2 = shelf * shelf;
+      float depthSea = wOn > 0.5 ? off * mix(0.11, 0.022, shelf2) + off * off * mix(4e-4, 8e-6, shelf2) : mix(400.0, 2.5, smoothstep(0.6, 1.0, shelf));
+      float clear = uSeaK.z * mix(1.0, 0.5, smoothstep(0.42, 0.62, abs(vLat) / (0.5 * PI)));      // (warm seas are clear; the green seas of the north are not)
+      float sandy = wOn > 0.5 ? clamp(0.62 + wBend * 260.0, 0.12, 1.0) : 0.8;
+      vec3 seaDeep = mix(vec3(0.016, 0.070, 0.165), vec3(0.030, 0.150, 0.215), pow(shelf, 1.5)) * mix(1.0, 0.82, 1.0 - clear);
+      vec3 seaBed = mix(vec3(0.15, 0.18, 0.15), vec3(0.66, 0.63, 0.47), sandy);      // (wet sand under water is no longer the pale of a beach)
       #ifdef USE_TEXARR
       #ifdef USE_GROUND
       #define gOnS gOn0
       #else
       #define gOnS gOn
       #endif
-      { float shal = smoothstep(0.9, 1.0, shelf) * seaW * gOnS;   // sunlit sand and caustics in the shallows, drifting slowly
+      { float shal = (1.0 - smoothstep(4.0, 9.0, depthSea)) * seaW * gOnS;   // sunlit sand and caustics in the shallows, drifting slowly
         #ifdef USE_GROUND
         #define SHAL(c) texture(uGnd, vec3(c, uGndShal)).rgb
         #else
@@ -828,29 +921,68 @@
           // height, and a turned one lays its own light and dark across both
           vec2 drift = vec2(uTime * 0.012, -uTime * 0.008); float farK = smoothstep(0.00003, 0.00016, uCamAlt);
           vec3 sh = mix(SHAL(gcf(8.0) + drift), SHAL(gcf(16.0) + drift * 0.5), farK) * (0.72 + 0.56 * dot(SHAL(gcr() - drift * 0.3), vec3(0.299, 0.587, 0.114)));
-          water = mix(water, sh * 0.85, shal * mix(0.5, 0.3, farK));
+          seaBed = mix(seaBed, sh * vec3(1.0, 1.0, 0.9), shal * sandy * mix(0.85, 0.5, farK));
         } }
         #undef SHAL
       #endif
-      // waves: animated normal perturbation
-      vec2 wp = gc(180.0);
-      vec4 n1 = noise2(wp + vec2(uTime * 0.02, 0.0)), n2 = noise2(gc(486.0) - vec2(0.0, uTime * 0.03));
-      vec3 nWater = normalize(vec3((n1.r - 0.5 + n2.r - 0.5) * 0.25 * closeFade, (n1.g - 0.5 + n2.g - 0.5) * 0.25 * closeFade, 1.0));
-      // close to the water: real wave normals (two scrolling scales), stronger on open sea than on rivers
-      float waveMix = smoothstep(0.02, 0.002, uCamAlt) * (0.6 + 0.4 * seaW);
-      if (waveMix > 0.01) {
-        vec3 w1 = texture2D(uWaterN, gc(600.0) + vec2(uTime * 0.03, uTime * 0.017)).rgb * 2.0 - 1.0;
-        vec3 w2 = texture2D(uWaterN, gc(2400.0) * mat2(0.8, 0.6, -0.6, 0.8) - vec2(uTime * 0.05, -uTime * 0.021)).rgb * 2.0 - 1.0;
-        vec3 wn = normalize(vec3((w1.xy + w2.xy * 0.7) * 0.55 * (0.4 + 0.6 * seaW), 1.0));
-        nWater = normalize(mix(nWater, wn, waveMix));
+      vec3 water = mix(seaDeep, seaBed, exp(-vec3(0.46, 0.095, 0.060) * depthSea / max(clear, 0.05)));
+      // lakes: clear and blue-green where the summers are warm, dark as tea in the north (peat, and depth); high in the
+      // mountains milky with what the ice grinds. Their shallows are a few metres of mud and stones.
+      float depthLake = wOn > 0.5 ? off * 0.045 : 30.0;
+      vec3 lakeDeep = mix(mix(vec3(0.030, 0.125, 0.160), vec3(0.028, 0.062, 0.060), smoothstep(0.2, 0.9, info.b)), vec3(0.085, 0.300, 0.330), smoothstep(1500.0, 3000.0, vH) * (1.0 - smoothstep(0.2, 0.9, info.b) * 0.5));
+      vec3 inland = mix(lakeDeep, vec3(0.40, 0.38, 0.27), exp(-vec3(0.60, 0.20, 0.16) * depthLake) * 0.85);
+      // ---------- waves ----------
+      // Four sizes of one picture of a ruffled surface, each drifting its own way (repeats of 40 m, 160 m, 640 m and 2.5 km:
+      // ripples, waves, the swell, the wind's patches). The card averages each as it grows small in the picture, and what is
+      // averaged away is not gone: it is how rough the water is within a pixel (the shorter the averaged normal, the more),
+      // which is what spreads the sun's image into a path and lifts what the sea mirrors at the horizon above the horizon.
+      float seaShare = seaW / max(seaW + lakeW + vecRiver * (1.0 - seaW), 1e-3);
+      float gust = mix(0.45, 1.15, smoothstep(0.25, 0.75, nMid.g * 0.65 + nMac.g * 0.35));        // (the wind does not lie evenly on the water)
+      float lee = smoothstep(0.25, 0.9, wOpen);                                                     // (0 in a harbour, a cove, a narrow sound; 1 where the water lies open)
+      float fetch = wOn > 0.5 ? mix(0.35, 1.0, smoothstep(40.0, 900.0, off)) * mix(0.4, 1.0, lee) : 1.0;      // (nor do waves grow in the lee of a shore)
+      float amp = uSeaK.x * gust * mix(mix(0.14, 0.5, smoothstep(0.5, 1.0, wOpen)), fetch, seaShare);      // (a pond lies still, a great lake has its waves)
+      vec2 wSlope = vec2(0.0); float wRough = mix(0.0003, 0.0010, seaShare);
+      vec2 gdx = dFdx(vGL) * 50.0, gdy = dFdy(vGL) * 50.0;      // (how the place runs across the pixel: taken here, where every pixel passes; the lookups below are only made on water)
+      if (max(max(seaW, lakeW), max(vecRiver, floodW)) > 0.003) {
+        #define WAVES(m, M, drift) (textureGrad(uWaterN, gc(m) * M + drift, (gdx * m) * M, (gdy * m) * M).rgb * 2.0 - 1.0)
+        vec3 o1 = WAVES(3200.0, mat2(1.0, 0.0, 0.0, 1.0), vec2(uTime * 0.046, uTime * 0.021));
+        vec3 o2 = WAVES(800.0, mat2(0.8, 0.6, -0.6, 0.8), -vec2(uTime * 0.017, -uTime * 0.009));
+        vec3 o3 = WAVES(200.0, mat2(0.6, -0.8, 0.8, 0.6), vec2(uTime * 0.0061, uTime * 0.0034));
+        vec3 o4 = WAVES(50.0, mat2(-0.28, 0.96, -0.96, -0.28), -vec2(uTime * 0.0019, uTime * 0.0011));
+        #undef WAVES
+        vec4 ak = vec4(0.55, 0.62, 0.50, 0.34) * amp; ak.zw *= seaShare;      // (a lake has no swell)
+        wSlope = o1.xy / max(o1.z, 0.4) * ak.x + (o2.xy / max(o2.z, 0.4)) * mat2(0.8, -0.6, 0.6, 0.8) * ak.y + (o3.xy / max(o3.z, 0.4)) * mat2(0.6, 0.8, -0.8, 0.6) * ak.z + (o4.xy / max(o4.z, 0.4)) * mat2(-0.28, -0.96, 0.96, -0.28) * ak.w;
+        vec4 lost = clamp(1.0 - vec4(dot(o1, o1), dot(o2, o2), dot(o3, o3), dot(o4, o4)) - 0.03, 0.0, 0.07);
+        wRough += dot(lost, ak * ak);
       }
-      float foam = smoothstep(0.55, 0.9, n2.b) * smoothstep(0.35, 0.6, a) * (1.0 - smoothstep(0.6, 0.75, a)) * closeFade;
-      vec3 inland = mix(vec3(0.06, 0.27, 0.36), vec3(0.10, 0.38, 0.43), n1.r) * (1.0 - 0.3 * smoothstep(0.2, 0.9, info.b));      // lake water: deep blue-green, darker in the north (peat and depth)
+      vec3 nWater = normalize(vec3(-wSlope, 1.0));
+      // ---------- surf ----------
+      // Where the bottom comes up under them the waves of the sea break: lines of white water running in along the shore,
+      // more of them on a coast that lies open and under a headland than in a bay, none on a lake. From too far to tell
+      // the lines apart, a pale fringe.
+      float foam = 0.0, wetSand = 0.0;
+      float surfK = mix(0.45 * smoothstep(0.8, 1.0, wOpen), smoothstep(0.30, 0.95, wOpen), 1.0 - wK);      // (the sea breaks where it comes in from the open; of lakes only the great ones have surf, and less)
+      if (wOn > 0.5 && uWaterP.x < 1.5 && surfK > 0.01 && wD > -260.0 && wD < 14.0) {
+        float open = clamp(0.8 - wBend * 200.0, 0.2, 1.5) * (0.35 + 1.1 * nMac.b) * uSeaK.y * surfK;
+        float zone = mix(26.0, 95.0, shelf2) * (0.6 + 0.8 * nMid.b);                 // how far out they begin to break, metres
+        float inZone = (1.0 - smoothstep(zone * 0.35, zone, off)) * step(0.0, off - 0.01);
+        float lam = 34.0, ph = off / lam + uTime * 0.11 + (nMic.g - 0.5) * 1.6 + (nMid.b - 0.5) * 4.0, f = fract(ph);
+        vec4 fz = textureLod(uNoise, gc(180.0) + vec2(floor(ph) * 0.37, uTime * 0.004), max(log2(max(length(gdx), length(gdy)) * 184320.0), 2.0));        // (what breaks a line of surf into pieces, another for every wave; its level is told, for the pieces change from one wave to the next)
+        // a wave breaks along a stretch of itself at a time, not from end to end of the coast; white at its front, a trail behind
+        float piece = smoothstep(0.50, 0.66, fz.r * 0.6 + fz.b * 0.4 + (open - 0.8) * 0.2);
+        float line = (exp(-f * 6.0) + 0.3 * exp(-(1.0 - f) * 18.0)) * piece * mix(0.55, 1.0, 1.0 - smoothstep(0.0, zone, off));
+        float lace = smoothstep(0.55, 0.85, fz.g) * 0.45 * (1.0 - smoothstep(0.0, zone * 0.5, off));       // the lace the last wave left behind, close in
+        float fine = 1.0 - smoothstep(lam * 0.10, lam * 0.26, wPx);
+        foam = clamp(mix(0.14 * (0.4 + 1.2 * nMid.g), max(line, lace), fine) * inZone * open, 0.0, 1.0) * wCov;
+        // the edge itself: white where the water runs out on the sand or is thrown up a rock, here and there
+        foam = max(foam, (1.0 - smoothstep(0.0, 2.6, abs(wD + 0.8))) * smoothstep(0.42, 0.68, fz.g * 0.5 + nFin.g * 0.5) * 0.8 * fine * clamp(open, 0.0, 1.0) * step(wPx, 2.5));
+        wetSand = (1.0 - smoothstep(1.0, 11.0, wD)) * step(0.0, wD) * (1.0 - wK);
+      }
       // vector rivers: shallow bright banks, dark deep channel, a pale wet bank line
       float rdepth = smoothstep(0.52, 0.95, rivR) * (0.5 + 0.5 * dec.g);
       vec3 riverCol = mix(vec3(0.20, 0.37, 0.34), vec3(0.03, 0.15, 0.25), rdepth);
       riverCol = mix(riverCol, vec3(0.36, 0.34, 0.24), arid * 0.4 * (1.0 - rdepth * 0.5));        // the rivers of dry countries run brown with silt
-      inland = mix(inland, riverCol, vecRiver);
+      inland = mix(inland, riverCol, vecRiver * (1.0 - lakeW));
       inland = mix(inland, vec3(0.36, 0.33, 0.22), floodW * 0.85);
       // where the snow lies long, still water freezes: lakes and rivers under white ice (blown clear in places), and in
       // the hardest winters the sea stands fast along the shore
@@ -864,12 +996,17 @@
       float floe = smoothstep(0.35, 0.65, nMid.b + 0.3 * nMic.a) * smoothstep(0.0, 0.08, latN0 - iceEdge + 0.1);
       vec3 iceCol = mix(vec3(0.74, 0.82, 0.9), vec3(0.9, 0.93, 0.96), floe);
       water = mix(water, iceCol, seaIce * mix(0.55, 1.0, floe));
-      water = mix(water, lakeIce, frozen * smoothstep(0.86, 0.97, shelf) * 0.94);
+      float seaFast = frozen * (wOn > 0.5 ? 1.0 - smoothstep(300.0, 1500.0, off) : smoothstep(0.86, 0.97, shelf));
+      water = mix(water, lakeIce, seaFast * 0.94);
+      float iced = max(max(seaIce * mix(0.55, 1.0, floe), seaFast) * seaShare, frozen * (1.0 - seaShare));      // how much of the water here is ice (it mirrors nothing)
+      foam *= 1.0 - iced;
+      land = mix(land, land * vec3(0.66, 0.68, 0.72), wetSand * beach);          // the sand the last wave wetted
       // ---------- compose surface ----------
-      float inlandMix = max(max(inlandW * mix(0.9, 0.7, closeFade), lakeW * 0.95), vecRiver * 0.97);   // a river is water from bank to bank, and a lake from shore to shore, not a tint on the ground
+      float inlandMix = max(max(inlandW * mix(0.9, 0.7, closeFade), lakeW * (wOn > 0.5 ? 1.0 : 0.95)), vecRiver * 0.97);   // a river is water from bank to bank, and a lake from shore to shore, not a tint on the ground
       vec3 col = mix(land, inland, inlandMix) * landW + water * seaW;
+      float wetAll = clamp(seaW + max(lakeW, max(vecRiver * 0.97, floodW * 0.8)) * landW, 0.0, 1.0);      // how much of the pixel is water that mirrors (not the far river country)
       col = mix(col, mix(vec3(0.33, 0.25, 0.17), vec3(0.50, 0.48, 0.44), paves) * (0.78 + 0.44 * nFin.r), bridgeW * landW);     // the deck of the crossing
-      col += vec3(0.9) * foam * 0.5 * (1.0 - frozen);
+      col = mix(col, vec3(0.94, 0.95, 0.96), foam);
       float flatW = max(1.0 - landW, min(1.0, inlandW * 1.4));        // rivers and lakes lie flat and ripple, whatever the slope they cross
       #ifdef USE_GROUND
       // the relief of what the ground is made of, laid over the lie of the land
@@ -886,7 +1023,7 @@
       vec3 sunV = normalize((viewMatrix * vec4(uSun, 0.0)).xyz);
       float sunUp = dot(upV, sunV);
       float day = smoothstep(-0.15, 0.25, sunUp);
-      float diff = max(dot(nV, sunV), 0.0);
+      float diff = mix(max(dot(nV, sunV), 0.0), max(sunUp, 0.0), wetAll * (1.0 - foam));      // (what comes up out of water is lit by how high the sun stands, not by the lie of a wave)
       // ---------- terrain self-shadowing: march the heightmap toward the sun ----------
       float shadow = 1.0;
       float shadowMix = smoothstep(0.15, 0.08, uCamAlt) * step(0.5, uQuality);
@@ -914,7 +1051,7 @@
       // cloud shadows (same texture the cloud shell uses, same drift)
       float cloudA = texture2D(uClouds, vec2(fract((vLon - uCloudShift) / (2.0 * PI)), vLat / PI + 0.5)).g;
       float cloudShadow = 1.0 - 0.55 * smoothstep(0.3, 0.8, cloudA) * uCloudVis;
-      diff *= shadow * cloudShadow;
+      float sunVis = shadow * cloudShadow; diff *= sunVis;
       // the light of the hour (models.js, buildings.js and the trees take the same from the world's uniforms): a low sun
       // is warm and, the eye opening to it, strong; night is blue and enough to see by; dusk lends a rose glow
       // (from far out day and night are seen together: the eye is not opened to the low sun there, and the edge of night is a narrow band)
@@ -927,14 +1064,28 @@
       ambC *= 0.7 + 0.3 * nLocal.z;      // (the light of the sky comes from above: what leans away from it, a slope or the side of a stone, has less of it)
       #endif
       vec3 lit = col * (ambC + diff * 1.05 * sunCol * mix(1.0, 0.5, seaW * 0.3));
-      // specular on water
-      vec3 viewDir = normalize(-vViewPos);
-      vec3 refl = reflect(-sunV, nV);
-      float specD = max(dot(refl, viewDir), 0.0); float highK = smoothstep(0.02, 0.4, uCamAlt);
-      float spec = mix(pow(specD, 90.0), pow(specD, 34.0) * 0.5, highK) * (seaW + inlandW * 0.14) * day * (1.0 - frozen * 0.85);   // a river glints; it is not a mirror. From orbit the sun on the sea is a wide soft patch
-      // (the sun's own image on the water is far brighter than the sheen round it: where the picture can hold that, it is given)
-      float glint = pow(specD, 900.0) * (seaW + inlandW * 0.6) * day * (1.0 - frozen) * (1.0 - highK) * uGlow;
-      lit += mix(vec3(0.9, 0.95, 1.0), vec3(1.0, 0.93, 0.8), highK) * (spec * 0.9 + glint * 5.0);
+      // ---------- what the water mirrors ----------
+      // Still water is a mirror, dark looked down into and bright along the eye's level (Fresnel): it shows the sky that
+      // stands where its light comes from, and the sun as a path of sparks as wide as the water is rough. Reckoned in
+      // light, as the air is (the colours here are roots of light).
+      vec3 viewDir = normalize(-vViewPos); float highK = smoothstep(0.02, 0.4, uCamAlt);
+      float mirror = wetAll * (1.0 - foam) * (1.0 - iced * 0.9);
+      if (mirror > 0.003) {
+        float nv = max(dot(nV, viewDir), 0.0), rgh = sqrt(wRough);
+        float fres = (0.02 + 0.98 * pow(1.0 - nv, 5.0)) / (1.0 + 2.2 * rgh);      // (a rough sea turns its faces to the eye: it never mirrors as flatly as a pond)
+        vec3 rf = reflect(-viewDir, nV); float sinE = dot(rf, upV);
+        vec3 rH = rf - upV * sinE, sHz = sunV - upV * sunUp;
+        float cosAz = dot(rH, sHz) / max(length(rH) * length(sHz), 1e-4);
+        vec3 sky = skyAt(abs(sinE) + 0.55 * rgh, cosAz);
+        // (from far out the camera's own sky is not the sky over the water it sees: there, a day's sky by how high the sun stands over that water)
+        sky = mix(sky, vec3(0.20, 0.36, 0.66) * smoothstep(-0.08, 0.25, sunUp), highK) * mix(1.0, 0.55, cloudShadow < 0.999 ? 1.0 - cloudShadow : 0.0);
+        vec3 hv = normalize(sunV + viewDir); float nh = max(dot(nV, hv), 0.0), nl = max(dot(nV, sunV), 0.0), vh = max(dot(viewDir, hv), 0.0);
+        float a2 = max(wRough, 2e-4), dd = nh * nh * (a2 - 1.0) + 1.0, D = a2 / (PI * dd * dd);
+        float sunF = 0.02 + 0.98 * pow(1.0 - vh, 5.0);
+        float glit = min(D * sunF * 0.25 / (vh * vh + 0.02) * nl, mix(1.2, 60.0, uGlow)) * step(0.0, sunUp + 0.02);
+        vec3 light = mix(lit * lit, sky, fres * mirror) + sunCol * sunCol * (5.4 * sunVis * glit * mirror);
+        lit = sqrt(max(light, 0.0));
+      }
       // night side: keep a little moonlight and city lights
       float night = 1.0 - smoothstep(-0.22, 0.02, sunUp);
       float light = sim.r; float highUp = smoothstep(0.003, 0.014, uCamAlt);   // orbital city lights fade out as real windows take over
@@ -981,7 +1132,7 @@
           float polClose = max(closeFade, smoothstep(0.06, 0.006, uCamAlt));   // altitude-driven so far hills do not flip to full tint
           float fillA = (mix(0.18, 0.03, polClose) + mix(0.16, 0.05, polClose) * band) * uPolitical;
           fillA = mix(fillA, mix(0.7, 0.22, polClose) + 0.12 * band, uLens);      // under a lens the colour is what is being read: the land shows through, no more
-          float clip = smoothstep(0.45, 0.65, a) + ice * 0.0;
+          float clip = wOn > 0.5 ? 1.0 - wCov : smoothstep(0.45, 0.65, a);
           // (under a lens the colour is the realm's own, as light or dark as the ground under it: laid over sand as a wash it went pale)
           vec3 tinted = mix(lit * 0.55 + pc * 0.5, pc * (0.42 + 0.72 * dot(lit, vec3(0.3, 0.59, 0.11))), uLens);
           lit = mix(lit, tinted, inside * fillA * clip);
@@ -1009,7 +1160,7 @@
 
   // ---------- pack loading ----------
   class Pack {
-    constructor(kind, L, px, py) { this.kind = kind; this.L = L; this.px = px; this.py = py; this.key = `${kind}${L}/${px}/${py}`; this.state = 'new'; this.texture = null; this.data = null; this.w = 0; this.h = 0; this.min = 0; this.scale = 0; this.lastUsed = 0; this.users = 0; }
+    constructor(kind, L, px, py) { this.kind = kind; this.L = L; this.px = px; this.py = py; this.key = `${kind}${L}/${px}/${py}`; this.state = 'new'; this.texture = null; this.data = null; this.w = 0; this.h = 0; this.min = 0; this.scale = 0; this.lastUsed = 0; this.users = 0; this.flat = null; this.dist = null; }
   }
 
   class Terrain {
@@ -1038,7 +1189,7 @@
       this.exag = opts.exag || 2.0;
       this.frame = 0; this.visible = [];
       this.sseThreshold = 360; this.maxTiles = 380; this.maxLevel = 9;
-      this.stats = { tiles: 0, packsI: 0, packsE: 0, loading: 0 };
+      this.stats = { tiles: 0, packsI: 0, packsE: 0, packsW: 0, loading: 0 };
       // flat elevation texture for absent packs (sea)
       const flat = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat); flat.needsUpdate = true;
       this.flatTex = flat;
@@ -1050,30 +1201,43 @@
       this.elevMax = this.index.elev.maxLevel; this.imgMax = this.index.img.maxLevel;
       this.l6 = new Set((this.index.elev.l6 || []).map(([x, y]) => `${x}/${y}`));
       this.l7 = new Set((this.index.elev.l7 || []).map(([x, y]) => `${x}/${y}`));
+      // The water's edge (data/w, tools/water/build.py): a field of distances to the nearest shore, far finer than the
+      // picture's own map of land and water. Where it has not been fetched, or a pack of it is still on its way, the
+      // picture's map serves as it always did.
+      this.water = opts.water && opts.water.levels && opts.water.code ? opts.water : null; this.wMin = 99; this.wMax = -1;
+      if (this.water && Object.keys(WCODE).some((k) => Math.abs(this.water.code[k] - WCODE[k]) > 1e-6)) { console.warn('water: the pack has another code than this game reads; the coasts are the picture\'s own'); this.water = null; }
+      if (this.water) {
+        for (const k of Object.keys(this.water.levels)) { this.wMin = Math.min(this.wMin, +k); this.wMax = Math.max(this.wMax, +k); }
+        const c = this.water.code, dec = this.wDec = new Float32Array(256);      // a byte's metres (the shader's wDec is the twin of this)
+        for (let i = 0; i < 256; i++) { const u = Math.max(c.knee - i, 0); dec[i] = i >= c.knee ? (Math.min(i, c.land) - 128) * c.step : -(c.near + c.step * u + c.quad * u * u); }
+      }
+      const wflat = new THREE.DataTexture(new Uint8Array([158, 0]), 1, 1, THREE.RGFormat, THREE.UnsignedByteType); wflat.internalFormat = 'RG8'; wflat.unpackAlignment = 1; wflat.needsUpdate = true; this.waterTex = wflat;      // (this three does not find RG8 for itself)
+      this.wKind = 0; this.wOpen = 1; this.stats.packsW = 0;
     }
     // ----- packs -----
     packInfo(kind, L, px, py) {
       const key = `${L}/${px}/${py}`;
+      if (kind === 'w') { const l = this.water && this.water.levels[L]; if (!l || px < 0 || py < 0 || px >= l.nx || py >= l.ny) return undefined; const c = l.packs[py * l.nx + px]; return c === 'P' ? 1 : c; }      // (L, S, F: no shore in it; ?: not made)
       if (kind === 'e') { if (L === 7) return this.l7.has(`${px}/${py}`) ? this.index.elev.packs[key] : undefined; if (L === 6) return this.l6.has(`${px}/${py}`) ? this.index.elev.packs[key] : undefined; return this.index.elev.packs[key]; }
       return this.index.img.packs[key];
     }
     getPack(kind, L, px, py, priority) {
       const key = `${kind}${L}/${px}/${py}`;
       let p = this.packs.get(key);
-      if (!p) { p = new Pack(kind, L, px, py); const info = this.packInfo(kind, L, px, py); if (info === undefined || info === 0) { p.state = 'absent'; } else { p.info = info; } this.packs.set(key, p); }
+      if (!p) { p = new Pack(kind, L, px, py); const info = this.packInfo(kind, L, px, py); if (info === undefined || info === 0) { p.state = 'absent'; } else if (kind === 'w' && info !== 1) { p.state = 'absent'; p.flat = info === '?' ? null : info; } else { p.info = info; } this.packs.set(key, p); }
       p.lastUsed = this.frame; if (priority !== undefined) p.priority = Math.max(p.priority || 0, priority);
       if (p.state === 'new') this.queue.push(p);
       return p;
     }
     async loadPack(p) {
       p.state = 'loading'; this.loading++;
-      const url = this.base + (p.kind === 'e' ? `e/${p.L}_${p.px}_${p.py}.png` : `i/${p.L}_${p.px}_${p.py}.webp`);
+      const url = this.base + (p.kind === 'e' ? `e/${p.L}_${p.px}_${p.py}.png` : p.kind === 'w' ? `w/${p.L}_${p.px}_${p.py}.${this.water.ext || 'webp'}` : `i/${p.L}_${p.px}_${p.py}.webp`);
       try {
         const r = await fetch(url); if (!r.ok) throw new Error('http ' + r.status);
         const blob = await r.blob();
         const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
         p.w = bmp.width; p.h = bmp.height;
-        const tex = new THREE.Texture(bmp);
+        let tex = new THREE.Texture(bmp);
         tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false;
         if (p.kind === 'e') {
           tex.format = THREE.LuminanceFormat; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
@@ -1081,6 +1245,15 @@
           // CPU copy for height queries
           const cv = document.createElement('canvas'); cv.width = p.w; cv.height = p.h; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0);
           const d = ctx.getImageData(0, 0, p.w, p.h).data; const out = new Uint8Array(p.w * p.h); for (let i = 0; i < out.length; i++) out[i] = d[i * 4]; p.data = out;
+        } else if (p.kind === 'w') {
+          // the water's edge: red the distance's code, green what water it is (0 the sea .. 255 fresh). Looked at between its
+          // texels as it is: there is a coarser level for the eye further off.
+          // (Two bytes a texel, the same store for the card and for whoever asks here where the water is.)
+          p.scale = this.water.levels[p.L].scale;
+          const cv = document.createElement('canvas'); cv.width = p.w; cv.height = p.h; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0);
+          const d = ctx.getImageData(0, 0, p.w, p.h).data, n = p.w * p.h, two = new Uint8Array(n * 2); const hasOpen = !!this.water.open; for (let i = 0; i < n; i++) { two[i * 2] = d[i * 4]; two[i * 2 + 1] = (Math.round(d[i * 4 + 1] / 17) << 4) | (hasOpen ? Math.round(d[i * 4 + 2] / 17) : 15); } p.dist = two;      // (what water, and how open it lies, sixteen steps each in one byte; a pack made before the second was reckoned counts as open)
+          if (bmp.close) bmp.close();
+          tex = new THREE.DataTexture(two, p.w, p.h, THREE.RGFormat, THREE.UnsignedByteType); tex.internalFormat = 'RG8'; tex.flipY = false; tex.unpackAlignment = 1; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
         } else {
           tex.format = THREE.RGBAFormat; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = this.opts.anisotropy || 4;
           // CPU copy of the water mask (alpha) at the finest imagery level, so buildings and ships agree with the drawn coast
@@ -1097,8 +1270,8 @@
       this.queue.length = 0; // re-queued each frame by visible tiles
     }
     evictPacks() {
-      const limits = { i: 30, e: 56 };
-      for (const kind of ['i', 'e']) {
+      const limits = { i: 30, e: 56, w: 10 };
+      for (const kind of ['i', 'e', 'w']) {
         const list = [...this.packs.values()].filter(p => p.kind === kind && p.state === 'ready' && p.users === 0);
         if (list.length <= limits[kind]) continue;
         list.sort((a, b) => a.lastUsed - b.lastUsed);
@@ -1125,6 +1298,22 @@
           const within = 1 / (1 << sh);
           const u0 = ((txl % per) + (tx - (txl << sh)) * within) / ptx, v0 = ((tyl % per) + (ty - (tyl << sh)) * within) / pty;
           return { pack: p, rect: [u0, v0, within / ptx, within / pty], level: l };
+        }
+      }
+      return null;
+    }
+    // The water's edge for a tile: { pack, rect, level } from the finest level that has arrived, { flat: 'L' | 'S' | 'F' } where
+    // there is no shore near (the index says so), or nothing: then the picture's own map of land and water is used.
+    bindWater(L, tx, ty, priority) {
+      const W = this.water; if (!W || L < this.wMin) return null;
+      const per = W.packTiles, ap = W.apron, ts = W.tile, top = Math.min(L, this.wMax);
+      for (let l = top; l >= this.wMin; l--) {
+        const sh = L - l, txl = tx >> sh, tyl = ty >> sh, px = Math.floor(txl / per), py = Math.floor(tyl / per);
+        const p = this.getPack('w', l, px, py, priority - (top - l));
+        if (p.state === 'absent') return p.flat ? { flat: p.flat, level: l } : null;
+        if (p.state === 'ready') {
+          const within = 1 / (1 << sh), side = per * ts + 2 * ap;
+          return { pack: p, level: l, rect: [(ap + ((txl % per) + (tx - (txl << sh)) * within) * ts) / side, (ap + ((tyl % per) + (ty - (tyl << sh)) * within) * ts) / side, within * ts / side, within * ts / side] };
         }
       }
       return null;
@@ -1158,6 +1347,7 @@
         uPhF: { value: new THREE.Vector2(fr(gX * k0), fr(gY * k0)) }, uPhN: { value: new THREE.Vector2(m16(gX * k0), m16(gY * k0)) }, uPhR: { value: new THREE.Vector2(fr(rX * kR), fr(rY * kR)) }, uK0: { value: k0 }, uKR: { value: kR },
         uElev: { value: this.flatTex }, uElevRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uElevTexel: { value: new THREE.Vector2(1, 1) }, uElevMin: { value: 0 }, uElevScale: { value: 0 },
         uImg: { value: this.blankImg }, uImgRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+        uWater: { value: this.waterTex }, uWaterRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uWaterP: { value: new THREE.Vector4(0, 1, 0, 0) }, uShoreQ: { value: SHORE_FLAT },      // (P: 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; and for 2 the distance and the kind)
         uExag: { value: this.exag }, uSkirt: { value: Math.max(b.w, b.h) * GEO.D2R * 0.06 + 0.00002 },
       };
       Object.assign(uniforms, this.globals);
@@ -1167,7 +1357,7 @@
       // world-space extent
       const corners = [GEO.toVec(b.lon0, b.lat0), GEO.toVec(b.lon1, b.lat0), GEO.toVec(b.lon0, b.lat1), GEO.toVec(b.lon1, b.lat1)];
       let rad = 0; for (const c of corners) rad = Math.max(rad, c.distanceTo(center));
-      const t = { key: this.tileKey(L, tx, ty), L, tx, ty, b, lonC, latC, center, mesh, uniforms, radius: rad, extent: Math.max(b.w * GEO.D2R * Math.max(Math.cos(Math.min(Math.abs(b.lat0), Math.abs(b.lat1)) * GEO.D2R), 0.02), b.h * GEO.D2R), lastUsed: 0, minH: 0, maxH: 9000, ePack: null, iPack: null, inScene: false, grid, relief: 0, midH: 0, reliefOf: null, lie: 1, standPx: 0, dist: 1 };
+      const t = { key: this.tileKey(L, tx, ty), L, tx, ty, b, lonC, latC, center, mesh, uniforms, radius: rad, extent: Math.max(b.w * GEO.D2R * Math.max(Math.cos(Math.min(Math.abs(b.lat0), Math.abs(b.lat1)) * GEO.D2R), 0.02), b.h * GEO.D2R), lastUsed: 0, minH: 0, maxH: 9000, ePack: null, iPack: null, wPack: null, inScene: false, grid, quadM: b.h * GEO.D2R * R_M, relief: 0, midH: 0, reliefOf: null, lie: 1, standPx: 0, dist: 1 };
       return t;
     }
     // How finely a tile is meshed this frame. t.sse: how many pixels it is across; t.lie: how its ground lies to the eye (the sine
@@ -1256,11 +1446,21 @@
           t.ePack = eb;
         }
         if (ib) { const p = ib.pack; if (!ib.absent) { p.users++; u.uImg.value = p.texture; u.uImgRect.value.set(ib.rect[0], ib.rect[1], ib.rect[2], ib.rect[3]); } t.iPack = ib; }
+        if (this.water) {
+          const wb = this.waterOff ? null : this.bindWater(t.L, t.tx, t.ty, pri);
+          if (wb && wb.pack) { const p = wb.pack; p.users++; u.uWater.value = p.texture; u.uWaterRect.value.set(wb.rect[0], wb.rect[1], wb.rect[2], wb.rect[3]); u.uWaterP.value.set(1, p.scale, 0, 0); }
+          else if (wb) { u.uWater.value = this.waterTex; u.uWaterP.value.set(2, 1, wb.flat === 'L' ? 480 : -3600, wb.flat === 'F' ? 1 : 0); }
+          else { u.uWater.value = this.waterTex; u.uWaterP.value.set(0, 1, 0, 0); }
+          t.wPack = wb;
+        }
         // how the tile lies to the eye, for its mesh (gridFor). From far out the planet's rim is where the air changes fastest, and the
         // air is worked out at the mesh's corners: there every tile counts as seen from above.
         if (eb) this.measure(t, eb);
         { const dC = Math.max(t.center.distanceTo(cam), 1e-6), over = t.center.dot(cam) - 1 - t.midH * this.exag / R_M; t.lie = 1 - low + low * Math.min(1, Math.max(0, over / dC)); t.standPx = t.relief * this.exag / R_M / t.dist * K; }
         const g = this.gridFor(t); if (g !== t.grid) { t.grid = g; t.mesh.geometry = this.geoms[g]; }
+        // (how far in the ground keeps to the water's level: a quad and a half of this mesh - but the field knows the land only so far
+        //  from the shore, 480 m by the finest level and twice and four times that by the coarser, and the rise must end inside that)
+        u.uShoreQ.value = Math.min(Math.max(SHORE_FLAT, 1.5 * t.quadM / t.grid), Math.max(SHORE_FLAT, (WCODE.near * (t.wPack && t.wPack.pack ? t.wPack.pack.scale : 1) - SHORE_RISE) * 0.9));
         if (!t.inScene) { this.group.add(t.mesh); t.inScene = true; }
       }
       // remove tiles not visible; dispose stale
@@ -1272,11 +1472,12 @@
       }
       this.visible = visible;
       // a version for everything that stands on the drawn surface: bumps when the set of drawn tiles, their meshes or their elevation packs change
-      { let sig = ''; for (const t of visible) sig += t.key + (t.ePack ? (t.ePack.absent ? 'a' : t.ePack.level) : '-') + GRID_CH[t.grid]; if (sig !== this.meshSig) { this.meshSig = sig; this.meshVersion = (this.meshVersion || 0) + 1; } }
+      { let sig = ''; for (const t of visible) sig += t.key + (t.ePack ? (t.ePack.absent ? 'a' : t.ePack.level) : '-') + GRID_CH[t.grid] + (t.wPack ? (t.wPack.pack ? t.wPack.level : t.wPack.flat) : ''); if (sig !== this.meshSig) { this.meshSig = sig; this.meshVersion = (this.meshVersion || 0) + 1; } }
       const hist = {}; for (const t of visible) { const l = t.ePack ? (t.ePack.absent ? 'sea' : t.ePack.level) : '-'; hist[l] = (hist[l] || 0) + 1; } this.stats.elevLevels = hist;
       this.pumpQueue();
       if (now % 30 === 0) this.evictPacks();
-      let pi = 0, pe = 0; for (const p of this.packs.values()) if (p.state === 'ready') { if (p.kind === 'i') pi++; else pe++; }
+      let pi = 0, pe = 0, pw = 0; for (const p of this.packs.values()) if (p.state === 'ready') { if (p.kind === 'i') pi++; else if (p.kind === 'w') pw++; else pe++; }
+      this.stats.packsW = pw;
       { let q = 0; for (const t of visible) q += t.grid * t.grid; this.stats.quads = q; }
       this.stats.tiles = visible.length; this.stats.packsI = pi; this.stats.packsE = pe; this.stats.loading = this.loading; this.stats.sse = this.sseThreshold;
     }
@@ -1307,12 +1508,14 @@
       const ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0));
       const d = best.data, w = best.w;
       const v = (d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay;
-      const h0 = Math.max(0, best.min + v * best.scale);
+      let h0 = Math.max(0, best.min + v * best.scale);
+      if (this.dispOn !== null) { const sd = this.shoreAt(lon, lat); this._sd = sd; if (sd !== null) h0 *= 1 + (sm01(SHORE_FLAT, SHORE_FLAT + SHORE_RISE, sd) - 1) * (1 - this.wKind); }      // (the sea lies at nought: see SHORE_RISE; not for rawHeight)
       return h0 > 1 ? h0 + this.dispAt(lon, lat, h0, bestL) : h0;
     }
     // CPU twin of the vertex-shader micro-relief (so trees and buildings sit on the displaced ground)
     dispAt(lon, lat, h0, level) {
       const n = this.noiseData; if (!n || !this.dispOn) return 0;
+      const sd0 = this._sd;      // (how far inland, as heightAt just found it; the slopes below ask for raw heights and would lose it)
       const rad = GEO.D2R; const cl = Math.cos(lat * rad);
       const gx = lon * rad * cl, gy = lat * rad;
       // the GPU texture is uploaded with flipY, so v runs from the bottom row of the image
@@ -1324,10 +1527,11 @@
       const sl = 1 - 1 / Math.sqrt(1 + (dhx * dhx + dhy * dhy) * this.exag * this.exag);
       const t = Math.min(1, Math.max(0, (sl - 0.05) / 0.3)); const st = t * t * (3 - 2 * t);
       const n1 = samp(gx * 1500, gy * 1500, 0) - 0.5, n2 = samp(gx * 9000, gy * 9000, 1) - 0.5, amp = 0.55 + 0.9 * samp(gx * 150, gy * 150, 0);
-      const a = this.waterAlpha(lon, lat);      // (still water lies level: see the vertex shader)
-      return (n1 * 90 * (0.08 + st) + n2 * 9 * (0.08 + 1.2 * st)) * amp * (a < 0 ? 1 : WET(a));
+      // (still water lies level: see the vertex shader)
+      let wet; if (sd0 !== null && sd0 !== undefined) wet = sm01(SHORE_FLAT, SHORE_FLAT + WET_RISE, sd0); else { const a = this.waterAlpha(lon, lat); wet = a < 0 ? 1 : WET(a); }
+      return (n1 * 90 * (0.08 + st) + n2 * 9 * (0.08 + 1.2 * st)) * amp * wet;
     }
-    rawHeight(lon, lat, level) { const d = this.dispOn; this.dispOn = false; const h = this.heightAt(lon, lat, level); this.dispOn = d; return h; }
+    rawHeight(lon, lat, level) { const d = this.dispOn; this.dispOn = null; const h = this.heightAt(lon, lat, level); this.dispOn = d; return h; }      // (null: neither the small relief nor the shore's levelling)
     // ----- the drawn surface, replicated on the CPU -----
     // Exactly what the vertex shader computes for the tile currently drawn at lon/lat: its bound elevation pack
     // sampled through the same rect, the same slope estimate and the same micro-relief noise, then the same
@@ -1343,6 +1547,12 @@
       const samp = (uu, vv) => { let fx = uu * p.w - 0.5, fy = vv * p.h - 0.5; const x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy))); const ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)); const d = p.data, w = p.w; return (d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay; };
       const hAt = (uu, vv) => Math.max(U.uElevMin.value + samp(R.x + uu * R.z, R.y + vv * R.w) * U.uElevScale.value, 0);
       let h = hAt(u, v);
+      // (the water's edge as the vertex shader has it: the tile's own pack, weighed between its texels as the card weighs them)
+      let wdv = null, wkv = 0; { const wb = t.wPack;
+        if (wb && wb.pack) { const p = wb.pack, r = wb.rect, fx = (r[0] + u * r[2]) * p.w - 0.5, fy = (r[1] + v * r[3]) * p.h - 0.5, x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)), d = p.dist, i = (y0 * p.w + x0) * 2, j = i + p.w * 2;
+          wdv = wDecF((d[i] * (1 - ax) + d[i + 2] * ax) * (1 - ay) + (d[j] * (1 - ax) + d[j + 2] * ax) * ay) * p.scale; { const xn = Math.max(0, Math.min(p.w - 1, Math.floor((r[0] + u * r[2]) * p.w))), yn = Math.max(0, Math.min(p.h - 1, Math.floor((r[1] + v * r[3]) * p.h))); wkv = (d[(yn * p.w + xn) * 2 + 1] >> 4) / 15; } }
+        else if (wb) { wdv = wb.flat === 'L' ? 480 : -3600; wkv = wb.flat === 'F' ? 1 : 0; } }
+      const sq = U.uShoreQ.value; if (wdv !== null) h *= 1 + (sm01(sq, sq + SHORE_RISE, wdv) - 1) * (1 - wkv);
       const camAlt = this.globals.uCamAlt.value; const q = this.globals.uQuality.value;
       const t1 = Math.min(1, Math.max(0, (camAlt - 0.06) / (0.004 - 0.06))); const dispOn = t1 * t1 * (3 - 2 * t1) * (q > 0.5 ? 1 : 0);
       if (h > 1 && dispOn > 0.001 && this.noiseData) {
@@ -1358,7 +1568,7 @@
         const n1 = nz(fr(ph.x * 30) + glx * 1500, fr(ph.y * 30) + gly * 1500, 0) - 0.5, n2 = nz(fr(ph.x * 180) + glx * 9000, fr(ph.y * 180) + gly * 9000, 1) - 0.5;
         const amp = 0.55 + 0.9 * nz(fr(ph.x * 3) + glx * 150, fr(ph.y * 3) + gly * 150, 0);
         // (still water lies level; the tile's own picture of the Earth says where, as it does to the vertex shader)
-        let wet = 1; { const ib = t.iPack, ip = ib && !ib.absent ? ib.pack : null; if (ip && ip.alpha) { const r = ib.rect, fx = (r[0] + u * r[2]) * ip.w - 0.5, fy = (r[1] + v * r[3]) * ip.h - 0.5; const x0 = Math.max(0, Math.min(ip.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(ip.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)), d = ip.alpha, w = ip.w;
+        let wet = 1; if (wdv !== null) wet = sm01(sq, sq + WET_RISE, wdv); else { const ib = t.iPack, ip = ib && !ib.absent ? ib.pack : null; if (ip && ip.alpha) { const r = ib.rect, fx = (r[0] + u * r[2]) * ip.w - 0.5, fy = (r[1] + v * r[3]) * ip.h - 0.5; const x0 = Math.max(0, Math.min(ip.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(ip.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)), d = ip.alpha, w = ip.w;
           wet = WET(((d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay) / 255); } else if (ib && !ib.absent) { const a = this.waterAlpha(lonR / GEO.D2R, latR / GEO.D2R); if (a >= 0) wet = WET(a); } }
         h += (n1 * 90 * (0.08 + st) + n2 * 9 * (0.08 + 1.2 * st)) * amp * dispOn * wet; h = Math.max(h, 0.5);
       }
@@ -1393,7 +1603,28 @@
       const ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)); const d = p.alpha, w = p.w;
       return ((d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay) / 255;
     }
-    isWater(lon, lat) { const a = this.waterAlpha(lon, lat); return a >= 0 ? a < 0.62 : this.heightAt(lon, lat) < 0.5; }
+    // How far it is to the water's edge, metres (water negative), from the finest pack of the field that is here; this.wKind
+    // is then what water that is (0 the sea .. 1 fresh). null where the field does not say (not fetched, not made, a pack still
+    // on its way): the picture's own map answers then (waterAlpha). Only what has been drawn has its packs: this asks for none.
+    shoreAt(lon, lat) {
+      const W = this.water; if (!W || this.waterOff) return null;
+      const per = W.packTiles, ap = W.apron, ts = W.tile;
+      for (let l = this.wMax; l >= this.wMin; l--) {
+        const lv = W.levels[l], [tx, ty] = GEO.tileAt(l, lon, lat), px = Math.floor(tx / per), py = Math.floor(ty / per), c = lv.packs[py * lv.nx + px];
+        if (c === 'L') { this.wKind = 0; this.wOpen = 0; return 480 * lv.scale; }
+        if (c === 'S' || c === 'F') { this.wKind = c === 'F' ? 1 : 0; this.wOpen = 1; return -3600 * lv.scale; }
+        if (c !== 'P') return null;
+        const p = this.packs.get(`w${l}/${px}/${py}`); if (!p || p.state !== 'ready') continue;
+        const span = per * 360 / (2 << l), fx = ap + (lon + 180 - px * span) / span * per * ts - 0.5, fy = ap + (90 - py * span - lat) / span * per * ts - 0.5;
+        const x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0));
+        const D = this.wDec, d = p.dist, i = (y0 * p.w + x0) * 2, j = i + p.w * 2;
+        this.wKind = (((d[i + 1] >> 4) * (1 - ax) + (d[i + 3] >> 4) * ax) * (1 - ay) + ((d[j + 1] >> 4) * (1 - ax) + (d[j + 3] >> 4) * ax) * ay) / 15;
+        this.wOpen = (((d[i + 1] & 15) * (1 - ax) + (d[i + 3] & 15) * ax) * (1 - ay) + ((d[j + 1] & 15) * (1 - ax) + (d[j + 3] & 15) * ax) * ay) / 15;
+        return ((D[d[i]] * (1 - ax) + D[d[i + 2]] * ax) * (1 - ay) + (D[d[j]] * (1 - ax) + D[d[j + 2]] * ax) * ay) * lv.scale;
+      }
+      return null;
+    }
+    isWater(lon, lat) { const d = this.shoreAt(lon, lat); if (d !== null) return d < 0; const a = this.waterAlpha(lon, lat); return a >= 0 ? a < 0.62 : this.heightAt(lon, lat) < 0.5; }
     // radius (units) of the rendered surface at lon/lat
     surfaceRadius(lon, lat) { return 1 + this.heightAt(lon, lat) * this.exag / R_M; }
     // ray-march pick against the rendered terrain. ray: THREE.Ray (world). returns {lon, lat, h, point} or null
