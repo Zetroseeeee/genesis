@@ -157,6 +157,11 @@ costg_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,
 costg_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsGround(); }, 9000); | 64
 costg_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsGround(); }, 9000); | 64
 costg_meadow | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); __T.costsGround(); }, 9000); | 64
+# (how many ways the materials are filtered: __T.costsAniso)
+costa_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 0.8, 1.0, 0.3); __T.costsAniso(); }, 9000); | 64
+costa_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsAniso(); }, 9000); | 64
+costa_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsAniso(); }, 9000); | 64
+costa_meadow | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); __T.costsAniso(); }, 9000); | 64
 # (how fine the meshes need be: __T.costsMesh; and pictures with quads of 6 pixels, to hold against alps and ridge)
 costm_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsMesh(); }, 9000); | 64
 costm_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsMesh(); }, 9000); | 64

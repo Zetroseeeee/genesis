@@ -58,6 +58,12 @@ window.__T.costsGround = function () {
     ['and no bending noise', () => { U.uGndDbg.value = 4; }], ['none of it', () => { U.uGndDbg.value = 5; }], ['the old ground', () => { U.uGndDbg.value = 0; TEX.ground = null; T.setTextures(TEX, true); }],
     ['all again', () => { TEX.ground = g; T.setTextures(TEX, true); }]], 3, 2500);
 };
+// how many ways the ground's materials need be looked at where the ground runs away from the eye (the card's own filtering:
+// 16 as the game has them, then 8 and 4), twice over
+window.__T.costsAniso = function () {
+  const g = window.TEX && TEX.ground; if (!g) return 'no materials'; const full = window.GENESIS_ANISO || 16, set = (n) => () => { __T.aniso(n, g.albedo, g.relief); };
+  __T.cost([[full + ' ways', () => {}], ['8 ways', set(8)], ['4 ways', set(4)], [full + ' again', set(full)], ['8 again', set(8)], ['4 again', set(4)], [full + ' a third time', set(full)]], 3, 1200);
+};
 // how fine the ground's meshes need be, now that a pixel of ground costs what it does: quads of 4 pixels (as the game has them), 5, 6, 8
 window.__T.costsMesh = function () {
   const T = __G.terrain, q = T.quadPx;

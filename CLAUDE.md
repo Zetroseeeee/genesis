@@ -330,9 +330,12 @@ Conventions that matter:
   (`gridOf`: 128 a side at the deepest level). What costs is not corners but slivers: with four samples a pixel the
   fragment shader runs for every triangle that touches a pixel (and for its three neighbours each time), so country
   seen from the side at full fineness, triangles a tenth of a pixel deep, cost more than the rest of the frame. A
-  tile's quads are therefore `quadPx` (4) pixels or more each way as it lies to the eye (`t.lie`); only where
+  tile's quads are therefore `quadPx` (8) pixels or more each way as it lies to the eye (`t.lie`); only where
   something stands up in it (`t.relief`, measured from the elevation it is drawn with; three pixels tall and more)
-  does it keep quads `quadPx` wide however shallow it lies, for the line it draws against the sky. From far out every tile
+  does it keep quads `quadPx` wide however shallow it lies, for the line it draws against the sky. (A triangle costs
+  its area and half its edge again: at quads of 4 pixels that is nearly twice the area, at 8 less than half as much
+  again. The Alps went from 11 frames a second to 15 by it on the build Mac, and the pictures cannot be told apart:
+  the tour keeps `alps_q6`, `alps_q8`, `ridge_q6`, `ridge_q8` to hold against `alps` and `ridge`.) From far out every tile
   counts as seen from above (the air is worked out at the corners, and changes fastest along the rim). Whatever
   stands on the ground asks `gpuHeightAt`, which uses the mesh a tile has at the moment (`t.grid`), and
   `meshVersion` follows the meshes as it follows the tiles. A software renderer keeps its two fixed grids.
@@ -363,12 +366,13 @@ Conventions that matter:
   its light and dark that leaves the whole as rich as one alone (an even mix of two photographs is flat: it looked
   out of focus).
   **Two ladders.** What a scan shows has a size (`size` in the list: metres of real ground). Most are taken from
-  the air and show fifteen metres and more; six show a metre or two (`fine`: grass, marsh, scree, shingle, red
-  earth, cracked mud). Laid as large on the screen as the others, grass has blades as long as a barn. So the fine
-  ones stand lower on the ladder (`uGndCls`, `uGndFine`): three quarters of a step while the eye is near, so that
-  blades can be seen and stand against a house as hay does, up to two and a quarter from high up, where a meadow
-  is a grain. Not lower: a repeat under a hundred and fifty pixels across is seen as rows of itself, whatever is
-  done to hide it (an aerial scan put on the fine ladder was a field of dots from a mile up).
+  the air and show fifteen metres and more; seven show a metre or two (`fine`: grass, marsh, scree, shingle, red
+  earth, cracked mud, the gravel of the stony desert). Laid as large on the screen as the others, grass has blades
+  as long as a barn. So the fine ones stand lower on the ladder (`uGndCls`, `uGndFine`): three quarters of a step
+  while the eye is near, so that blades can be seen and stand against a house as hay does, up to two and a quarter
+  from high up, where a meadow is a grain. Not lower: a repeat under a hundred and fifty pixels across is seen as
+  rows of itself, whatever is done to hide it (an aerial scan put on the fine ladder was a field of dots from a
+  mile up).
   **Which material** comes from what the shader always weighed (wood, grass, dry ground, rock), the climate and the
   slope. The two that count most are laid one in the other's hollows, by their heights. A material takes the
   brightness the photograph of the Earth has there, up to a cap of its kind (grass under a bright haze is still
