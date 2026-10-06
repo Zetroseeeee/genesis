@@ -356,30 +356,42 @@ Conventions that matter:
   **A ladder of sizes.** A material repeats every 12 m, every 24, and so on doubling, up to 200 km, in a frame of
   cells a metre and a half across (`uLadN`, `uLadF`, `vGLf * uLadK`: whole cells at the tile's centre, exact, plus
   the offset). A pixel takes the step at which a repeat is some 600 pixels across its narrow way (`uGndK.w`), so
-  the ground is sharp from every height and a repeat is never seen as one; between two steps the one gives way to
-  the other over a ragged span (`uGndT.z`, `.w`), each keeping the share of its light and dark that leaves the
-  whole as rich as one alone (an even mix of two photographs is flat: it looked out of focus). Every lookup is
-  given its own derivatives (`textureGrad`): the step changes from pixel to pixel.
+  the ground is sharp from every height and a repeat is never seen as one. The steps are held in two places, the
+  even ones and the odd ones: a place changes its step only while the other has the whole picture, so wherever a
+  place shows, where it is looked up runs on unbroken from pixel to pixel, and the lookups are ordinary ones.
+  Between two steps the one gives way to the other over a ragged span (`uGndT.z`, `.w`), each keeping the share of
+  its light and dark that leaves the whole as rich as one alone (an even mix of two photographs is flat: it looked
+  out of focus).
+  **Two ladders.** What a scan shows has a size. Laid as large on the screen as a face of rock, grass has blades as
+  long as a barn. The fine kinds (`GROUND_FINE`: grass, moor, the floor of a wood; `uGndCls`) stand lower on the
+  ladder (`uGndFine`): three quarters of a step while the eye is near, so that blades can be seen and stand against
+  a house as hay does, up to three steps from high up, where a meadow is a grain.
   **Which material** comes from what the shader always weighed (wood, grass, dry ground, rock), the climate and the
   slope. The two that count most are laid one in the other's hollows, by their heights. A material takes the
   brightness the photograph of the Earth has there, up to a cap of its kind (grass under a bright haze is still
-  grass), and a share of its hue: but only what has the material's own colour is tinted (a grey stone in the grass
-  stays grey; tinted with the grass it went blue, and brown earth mauve), and nothing past grey into blue.
-  What each of these cost to learn: the noise that *chooses* (which material, where the scree lies) is read three
-  levels coarser than the card would (`texture2D(uNoise, p, 3.0)`) and never from its fourth channel, which is
-  single texels: a choice made of grain a pixel across is a snow of single pixels from a mile up. The noise that
-  *bends* the repeats is read coarser still: bent by its fine grain the ground was drawn out into streaks. A
-  scan's heights and relief count for less from the step where a stone would be a house (`gNear`), or there are
-  hills that are not there, with faces turned from the sun. What should stay where it is while the eye draws back
-  (lusher and drier stretches of a meadow, stony patches, scree) hangs on the noise of the place, never on the
-  ladder: only the grain may change under the eye. And the scans are taken from the air, or show nothing a person
-  knows the size of: a twig laid out a hundred times larger is a log.
+  grass), and a share of its hue: but only what is as coloured as the material on the whole is tinted (a grey
+  stone in the grass stays grey; tinted with the grass it went blue, and brown earth mauve), and nothing past grey
+  into blue.
+  What each of these cost to learn. The noise of the place (`nMac` ... `nFin`) both *chooses* (which material, where
+  the scree lies) and *bends* the repeats so that they do not stand in rows. It is read at a stated level
+  (`textureLod`), three coarser than the card would take and never finer than the third, and never from its fourth
+  channel, which is single texels: chosen by grain a pixel across, the ground is a snow of single pixels from a
+  mile up; bent by fine grain, a scan is drawn out into streaks. (A bias, `texture(s, p, 3.0)`, does not do it:
+  seen from close to, the card's own level is far below nought and the bias leaves it at the finest.) A step is
+  bent by the noise that is at least fourteen of its repeats long. A scan's heights and relief count for less from
+  the step where a stone would be a house (`gndNear`, `gRelC`), or there are hills that are not there, with faces
+  turned from the sun. What should stay where it is while the eye draws back (lusher and drier stretches of a
+  meadow, stony patches, scree) hangs on the noise of the place, never on the ladder: only the grain may change
+  under the eye. And a scan must be what it is called: the first "meadow" was moss with twigs in it, and from a
+  barn's height the twigs were logs. `shots/peek/ground_native.jpg` shows a piece of every material texel for
+  pixel: look there, not at the small sheet.
   A wood's floor gives way to its canopy between 2.2 and 4.2 km from the eye (`far` in the list: one size, by
   distance, because a crown has a size as grass has not), except in settled country, which is cleared to pasture
   with trees standing in it. What people have made of the ground (crops in their rows, paving) is laid at the size
   the game draws a village at (`ltex`); between the houses of a town that is not paved the beaten ways are pale and
-  grass holds on beside them. A software renderer takes the pack at a quarter of its size. `uGndShow = <layer>`
-  shows one material everywhere; `uGndV` is how much a meadow varies.
+  grass holds on beside them. A software renderer takes the pack at a quarter of its size (`GROUND=1`: whole).
+  `uGndShow = <layer>` shows one material everywhere; `uGndV` is how much a meadow varies.
+  COSTNOTE
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.
