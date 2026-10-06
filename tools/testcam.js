@@ -58,6 +58,12 @@ window.__T.costsGround = function () {
     ['and no bending noise', () => { U.uGndDbg.value = 4; }], ['none of it', () => { U.uGndDbg.value = 5; }], ['the old ground', () => { U.uGndDbg.value = 0; TEX.ground = null; T.setTextures(TEX, true); }],
     ['all again', () => { TEX.ground = g; T.setTextures(TEX, true); }]], 3, 2500);
 };
+// what the trees cost: all; without what grows under them; with their outlines drawn pixel by pixel; none of them
+window.__T.costsTrees = function () {
+  const Tr = __G.trees; if (!Tr) return 'no trees'; const show = (ti, on) => { for (const I of Tr.imps[ti].values()) I.visible = on; };
+  __T.cost([['all (' + Tr.modelCount.join(' ') + ')', () => {}], ['no undergrowth', () => { show(3, false); }], ['and edges by the pixel', () => { Tr.coverOff = true; }], ['and no far trees', () => { show(1, false); show(2, false); }],
+    ['no trees at all', () => { show(0, false); }], ['all again', () => { for (let t = 0; t < 4; t++) show(t, true); Tr.coverOff = false; }], ['no undergrowth again', () => { show(3, false); }], ['all a third time', () => { show(3, true); }]], 3, 1500);
+};
 // how many ways the ground's materials need be looked at where the ground runs away from the eye (the card's own filtering:
 // 16 as the game has them, then 8 and 4), twice over
 window.__T.costsAniso = function () {

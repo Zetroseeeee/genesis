@@ -5,6 +5,8 @@
   const R_M = 6371000;
 
   const GRID_CH = { 8: '!', 16: ':', 32: '.', 64: ',', 128: ';' };      // (a tile's mesh, in the signature of the drawn surface)
+  // how much of the ground's small relief there is, by the water mask of the picture of the Earth (1 land, 0.75 a river's band, 0.5 a lake)
+  const WET = (a) => { const t = Math.min(1, Math.max(0, (a - 0.66) / 0.3)); return t * t * (3 - 2 * t); };
   // ---------- shared tile geometry (u, v, skirt) ----------
   function buildTileGeometry(GRID) {
     const n = GRID + 1; const pos = []; const idx = [];
@@ -33,7 +35,7 @@
   const VERT = `
     uniform float uLon0, uDLon, uLat0, uDLat, uLatC, uLonC; uniform vec2 uGeoC, uPhaseB;
     uniform float uDLon0, uDLat0, uMercA, uTanA, uCosA;   // tile-centre-relative offsets and the Mercator terms for the fine (metre-scale) texture frame
-    uniform sampler2D uElev, uNoise; uniform vec4 uElevRect; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag, uSkirt, uCamAlt, uQuality;
+    uniform sampler2D uElev, uNoise, uImg; uniform vec4 uElevRect, uImgRect; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag, uSkirt, uCamAlt, uQuality;
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     ${AIR_V}
     const float R_MV = ${R_M.toFixed(1)};
@@ -57,7 +59,11 @@
         vec2 c1 = fract(uPhaseB * 30.0) + gl0 * 1500.0, c2 = fract(uPhaseB * 180.0) + gl0 * 9000.0;
         float n1 = texture2D(uNoise, c1).r - 0.5, n2 = texture2D(uNoise, c2).g - 0.5;
         float amp = 0.55 + 0.9 * (texture2D(uNoise, fract(uPhaseB * 3.0) + gl0 * 150.0).r);
-        h += (n1 * 90.0 * (0.08 + st) + n2 * 9.0 * (0.08 + 1.2 * st)) * amp * dispOn;
+        // Still water lies level: the small relief ends where the picture of the Earth has water, and the shore runs down
+        // to it. (A lake heaved as the land is was a sheet of bumps, ten metres up and down, under a flat picture of
+        // water. WET in the height queries below is the same.)
+        float wet = smoothstep(0.66, 0.96, texture2D(uImg, uImgRect.xy + vec2(u, v) * uImgRect.zw).a);
+        h += (n1 * 90.0 * (0.08 + st) + n2 * 9.0 * (0.08 + 1.2 * st)) * amp * dispOn * wet;
         h = max(h, 0.5);
       }
       vH = h;
@@ -306,6 +312,21 @@
       float closeFade0 = max(clamp(1.0 - texPerPx0 * 0.25, 0.0, 1.0), smoothstep(0.03, 0.003, uCamAlt));
       float a = img.a;                                   // 1 land, 0.75 raster river band, 0.5 lake, 0 sea
       float aw = fwidth(a);
+      // The water's mask between the texels of the picture. A texel of it is five kilometres: from close to, thousands of
+      // pixels wide, and a card does not weigh four texels finely: it gives what lies between two of them in 256 steps.
+      // A coast was a flight of stairs; and since a lake is told from a shore by how level the mask lies (aw), with every
+      // tread of the stairs dead level and every riser a cliff, a lake near its shore was crossed by a lattice of lines of
+      // dry land, nine metres by nineteen. Magnified, the four texels are fetched and weighed here, and the slope is theirs.
+      // (texPerPx0 counts 4096 texels to a pack, which has 1024: it is four times the texels to a pixel.)
+      { vec2 isz = vec2(textureSize(uImg, 0)), tx = dFdx(vUV) * uImgRect.zw * isz, ty = dFdy(vUV) * uImgRect.zw * isz;
+        if (texPerPx0 < 0.6 && a > 0.004 && a < 0.996) {
+          vec2 t0 = uImgRect.xy * isz, ti = floor(t0), q = (t0 - ti) + (vUV * uImgRect.zw + warp) * isz - 0.5, qi = floor(q), f = q - qi;
+          ivec2 i0 = ivec2(ti + qi), mx = ivec2(isz) - 1, i1 = min(i0 + 1, mx); i0 = max(i0, ivec2(0));
+          float a00 = texelFetch(uImg, i0, 0).a, a10 = texelFetch(uImg, ivec2(i1.x, i0.y), 0).a, a01 = texelFetch(uImg, ivec2(i0.x, i1.y), 0).a, a11 = texelFetch(uImg, i1, 0).a;
+          vec2 g = vec2(mix(a10 - a00, a11 - a01, f.y), mix(a01 - a00, a11 - a10, f.x));      // (its slope, to the texel)
+          float k = smoothstep(0.6, 0.4, texPerPx0);
+          a = mix(a, mix(mix(a00, a10, f.x), mix(a01, a11, f.x), f.y), k); aw = mix(aw, abs(dot(g, tx)) + abs(dot(g, ty)), k);
+        } }
       float kSea = clamp(aw * 1.2, 0.01, 0.12);                        // crisp, anti-aliased coastline at any zoom
       float seaW = 1.0 - smoothstep(0.36 - kSea, 0.36 + kSea, a);
       float landW = 1.0 - seaW;
@@ -1303,7 +1324,8 @@
       const sl = 1 - 1 / Math.sqrt(1 + (dhx * dhx + dhy * dhy) * this.exag * this.exag);
       const t = Math.min(1, Math.max(0, (sl - 0.05) / 0.3)); const st = t * t * (3 - 2 * t);
       const n1 = samp(gx * 1500, gy * 1500, 0) - 0.5, n2 = samp(gx * 9000, gy * 9000, 1) - 0.5, amp = 0.55 + 0.9 * samp(gx * 150, gy * 150, 0);
-      return (n1 * 90 * (0.08 + st) + n2 * 9 * (0.08 + 1.2 * st)) * amp;
+      const a = this.waterAlpha(lon, lat);      // (still water lies level: see the vertex shader)
+      return (n1 * 90 * (0.08 + st) + n2 * 9 * (0.08 + 1.2 * st)) * amp * (a < 0 ? 1 : WET(a));
     }
     rawHeight(lon, lat, level) { const d = this.dispOn; this.dispOn = false; const h = this.heightAt(lon, lat, level); this.dispOn = d; return h; }
     // ----- the drawn surface, replicated on the CPU -----
@@ -1335,7 +1357,10 @@
         const nz = (cx, cy, ch) => { const w = n.width, hh = n.height; const ux = fr(cx), vy = 1 - fr(cy); const fx = ux * w - 0.5, fy = vy * hh - 0.5; let x0 = Math.floor(fx), y0 = Math.floor(fy); const ax = fx - x0, ay = fy - y0; const X0 = ((x0 % w) + w) % w, X1 = (X0 + 1) % w, Y0 = ((y0 % hh) + hh) % hh, Y1 = (Y0 + 1) % hh; const d = n.data; return ((d[(Y0 * w + X0) * 4 + ch] * (1 - ax) + d[(Y0 * w + X1) * 4 + ch] * ax) * (1 - ay) + (d[(Y1 * w + X0) * 4 + ch] * (1 - ax) + d[(Y1 * w + X1) * 4 + ch] * ax) * ay) / 255; };
         const n1 = nz(fr(ph.x * 30) + glx * 1500, fr(ph.y * 30) + gly * 1500, 0) - 0.5, n2 = nz(fr(ph.x * 180) + glx * 9000, fr(ph.y * 180) + gly * 9000, 1) - 0.5;
         const amp = 0.55 + 0.9 * nz(fr(ph.x * 3) + glx * 150, fr(ph.y * 3) + gly * 150, 0);
-        h += (n1 * 90 * (0.08 + st) + n2 * 9 * (0.08 + 1.2 * st)) * amp * dispOn; h = Math.max(h, 0.5);
+        // (still water lies level; the tile's own picture of the Earth says where, as it does to the vertex shader)
+        let wet = 1; { const ib = t.iPack, ip = ib && !ib.absent ? ib.pack : null; if (ip && ip.alpha) { const r = ib.rect, fx = (r[0] + u * r[2]) * ip.w - 0.5, fy = (r[1] + v * r[3]) * ip.h - 0.5; const x0 = Math.max(0, Math.min(ip.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(ip.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)), d = ip.alpha, w = ip.w;
+          wet = WET(((d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay) / 255); } else if (ib && !ib.absent) { const a = this.waterAlpha(lonR / GEO.D2R, latR / GEO.D2R); if (a >= 0) wet = WET(a); } }
+        h += (n1 * 90 * (0.08 + st) + n2 * 9 * (0.08 + 1.2 * st)) * amp * dispOn * wet; h = Math.max(h, 0.5);
       }
       return h;
     }

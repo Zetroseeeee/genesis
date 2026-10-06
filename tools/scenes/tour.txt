@@ -157,6 +157,27 @@ costg_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,
 costg_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsGround(); }, 9000); | 64
 costg_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsGround(); }, 9000); | 64
 costg_meadow | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); __T.costsGround(); }, 9000); | 64
+# --- woods from close to and from a hill: stands, undergrowth, the shore of a lake in the taiga, scrub on a dry hillside ---
+woods        | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 160, 1.2, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
+woods_edge   | tools/scenes/forest.js | null | const f = () => __forest(18.5, 49.6, 260, 1.25, 2.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
+taiga_shore  | tools/scenes/forest.js | null | const f = () => __forest(26.52, 63.01, 200, 1.25, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
+maquis       | tools/scenes/forest.js | null | const f = () => __forest(11.0, 43.3, 200, 1.2, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
+jungle       | tools/scenes/forest.js | null | const f = () => __forest(22.0, 0.5, 200, 1.2, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
+# (a wood from high up: the crowns must meet and be in the light, and the trees round the eye must not show as a plate on the country;
+#  and water from low down: a lake's shore and a coast are where the mask of the picture of the Earth is magnified most)
+woods_high   | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 3000, 0.75, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+woods_top    | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 5200, 0.4, 0.0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+woods_7k     | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 7000, 0.6, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+woods_9k     | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 9000, 0.6, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+lake_low     | tools/scenes/forest.js | null | const f = () => __forest(26.47, 63.03, 120, 1.3, 1.2, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
+coast_low    | tools/scenes/forest.js | null | const f = () => __forest(-0.325, 39.45, 150, 1.25, 0.3, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
+# (a town on a high plain: what is shown only from close to goes by the eye's height above the ground it looks at, not above the sea)
+high_town    | tools/scenes/town.js | {lon:-99.13,lat:19.43,tech:0.1,pop:5,walls:2,special:14,alt:620,tilt:1.25,out:1.0} | | 32
+# (what the trees cost: __T.costsTrees)
+costt_woods  | tools/scenes/forest.js | null | setTimeout(() => { __forest(10.5, 51.2, 420, 1.3, 0.4, 0.5); }, 3000); setTimeout(() => { __forest(10.5, 51.2, 420, 1.3, 0.4, 0.5); __T.costsTrees(); }, 30000); | 70
+costt_close  | tools/scenes/forest.js | null | setTimeout(() => { __forest(10.5, 51.2, 160, 1.2, 0.4, 0.5); }, 3000); setTimeout(() => { __forest(10.5, 51.2, 160, 1.2, 0.4, 0.5); __T.costsTrees(); }, 30000); | 70
+costt_farm   | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); }, 7000); setTimeout(() => { __T.costsTrees(); }, 30000); | 70
+costt_steppe | tools/scenes/forest.js | null | setTimeout(() => { __forest(65.0, 48.0, 420, 1.3, 0.4, 0.5); }, 3000); setTimeout(() => { __forest(65.0, 48.0, 420, 1.3, 0.4, 0.5); __T.costsTrees(); }, 30000); | 70
 # (how many ways the materials are filtered, and how fine the meshes need be: __T.costsAniso, __T.costsMesh; and two pictures with
 #  quads of 4 pixels, as the meshes were before the ground's shader grew, to hold against alps and ridge)
 costa_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsAniso(); }, 9000); | 64

@@ -493,7 +493,7 @@
       this.sunLight.position.copy(sun).multiplyScalar(10); this.sunLight.target.position.set(0, 0, 0);
       const camUp = cam.camera.position.clone().normalize(); const sunUp = camUp.dot(sun);
       const day = Math.min(1, Math.max(0, (sunUp + 0.15) / 0.4));
-      { const bu = this.bUniforms; const vm = cam.camera.matrixWorldInverse; bu.uSunV.value.copy(sun).transformDirection(vm); bu.uUpV.value.copy(camUp).transformDirection(vm); bu.uCamAlt.value = cam.alt || 1; bu.uTime.value = time;
+      { const bu = this.bUniforms; const vm = cam.camera.matrixWorldInverse; bu.uSunV.value.copy(sun).transformDirection(vm); bu.uUpV.value.copy(camUp).transformDirection(vm); bu.uCamAlt.value = cam.agl === undefined ? cam.alt : cam.agl || 1; bu.uTime.value = time;
         // the light of the hour, for everything that stands on the ground (the terrain works the same out per pixel):
         // a low sun is warm and, the eye opening to it, strong; below the horizon it is gone. Dusk lends a rose glow.
         const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
