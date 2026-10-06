@@ -29,11 +29,13 @@ What is made of the classes:
 Packs: equirectangular, as the elevation's are. Level 7 has 256 x 128 tiles of 512 texels (305 m to a texel north-south),
 a pack is 4 x 4 tiles with a rim of one texel all round (2050 x 2050), so that a lookup between two packs' texels is
 as good as one inside a pack. Levels 6 and 5 are the same field at half and a quarter of the fineness, for the eye
-further off. A PNG of three bytes a texel:
-  R  the distance: 128 is the water's edge. On land 128..255 is 0..800 m (times the level's scale: 1, 2, 4 for
-     levels 7, 6, 5). In water 128..64 is 0..-403 m at the same 6.3 m to the step, and 64..0 runs on to -3600 m ever
-     more coarsely (DIST below; the shader's twin is in terrain.js).
-  G  what water the nearest water is: 0 the sea ... 255 fresh, smoothed over a kilometre or two (a river's mouth)
+further off. A WebP without loss, three bytes a texel:
+  R  the distance: 128 is the water's edge, a step is 16 m (times the level's scale: 1, 2, 4 for levels 7, 6, 5).
+     128..158 is 0..480 m of land (158: that far and further), 128..98 is 0..-480 m of water, and 98..58 runs on to
+     -3600 m ever more coarsely (58: that deep in and deeper). The shader's twin of this is in terrain.js.
+     (Sixteen metres, and no further inland than a texel's diagonal: what a pack weighs is how much of it is not one
+     flat value, and how many values there are. The water's edge itself lies between the texels, far finer.)
+  G  what water the nearest water is: 0 the sea ... 255 fresh, in sixteen steps, smoothed over a kilometre or two
   B  nothing yet
 A pack with no shore in or near it is not written: index.json says what it is instead (L land, S sea, F fresh water).
 
@@ -61,28 +63,28 @@ PX = DEG / N                              # a working pixel in degrees
 MY = 168                                  # the margin round a block, working pixels north and south (17 km): the reach of the coarsest level's distances
 RIVER_WIDE = 600.0                        # metres: a river is kept as water where a disc of this radius fits into the water
 LAKE_MIN = 0.4e6                          # square metres: smaller lakes are left out
-# the distance's code (see the header): K_LIN metres to the step down to the knee, then ever coarser
-K_LIN, KNEE = 800.0 / 127.0, 64.0
-X_KNEE = (128.0 - KNEE) * K_LIN           # 403.15 m
-B_QUAD = (3600.0 - X_KNEE - K_LIN * KNEE) / (KNEE * KNEE)
+# the distance's code (see the header): STEP metres to the step out to NEAR on both sides, then ever coarser to DEEP
+STEP, NEAR, DEEP, FAR_N = 16.0, 480.0, 3600.0, 40.0
+C_LAND, C_KNEE = 128.0 + NEAR / STEP, 128.0 - NEAR / STEP          # 158: land, that far and further; 98: where the water's code turns coarse
+C_DEEP = C_KNEE - FAR_N                                            # 58: water, that deep in and deeper
+B_QUAD = (DEEP - NEAR - STEP * FAR_N) / (FAR_N * FAR_N)
 
 
 def enc(d, scale):
     """metres (land positive) -> the byte"""
     x = d / scale
-    out = 128.0 + np.minimum(x, 800.0) / K_LIN
-    deep = x < -X_KNEE
+    out = 128.0 + np.clip(x, -NEAR, NEAR) / STEP
+    deep = x < -NEAR
     if deep.any():
-        w = np.minimum(-x[deep], 3600.0) - X_KNEE
-        u = (-K_LIN + np.sqrt(K_LIN * K_LIN + 4.0 * B_QUAD * w)) / (2.0 * B_QUAD)
-        out[deep] = KNEE - u
-    return np.clip(np.rint(out), 0, 255).astype(np.uint8)
+        w = np.minimum(-x[deep], DEEP) - NEAR
+        out[deep] = C_KNEE - (-STEP + np.sqrt(STEP * STEP + 4.0 * B_QUAD * w)) / (2.0 * B_QUAD)
+    return np.clip(np.rint(out), C_DEEP, C_LAND).astype(np.uint8)
 
 
 def dec(c, scale):
     """the byte -> metres (the twin of the shader's)"""
-    c = c.astype(np.float32); u = np.maximum(KNEE - c, 0.0)
-    return np.where(c >= KNEE, (c - 128.0) * K_LIN, -(X_KNEE + K_LIN * u + B_QUAD * u * u)) * scale
+    c = c.astype(np.float32); u = np.maximum(C_KNEE - c, 0.0)
+    return np.where(c >= C_KNEE, (np.minimum(c, C_LAND) - 128.0) * STEP, -(NEAR + STEP * u + B_QUAD * u * u)) * scale
 
 
 # ---------------------------------------------------------------- the source ----------------------------------------
@@ -198,9 +200,14 @@ def block_mean(a, k):
 def state_of(dist, kind):
     """what a pack is when it has no shore in it: L, S or F; P when it has"""
     lo, hi = int(dist.min()), int(dist.max())
-    if lo == 255: return 'L'
-    if hi == 0: return 'F' if float(kind.mean()) > 127 else 'S'
+    if lo == int(C_LAND): return 'L'
+    if hi == int(C_DEEP): return 'F' if float(kind.mean()) > 127 else 'S'
     return 'P'
+
+
+def save(img, path):
+    from PIL import Image
+    Image.fromarray(img).save(path, 'WEBP', lossless=True, quality=90, method=4)
 
 
 def process(args):
@@ -208,7 +215,6 @@ def process(args):
     bx, by, cache, out, have = args
     import edt, cc3d
     from scipy import ndimage
-    from PIL import Image
     t0 = time.time()
     mx = margin_x(by); H, W = N + 2 * MY, N + 2 * mx
     lat_top = 90.0 - by * DEG + MY * PX; lon_left = -180.0 + bx * DEG - mx * PX
@@ -279,17 +285,17 @@ def process(args):
         k = K << (TOP - lv); scale = 1 << (TOP - lv); n = N // k + 2 * APRON
         y0, x0 = MY - k * APRON, mx - k * APRON
         dm = block_mean(d[y0:y0 + n * k, x0:x0 + n * k], k); km = block_mean(kind[y0:y0 + n * k, x0:x0 + n * k], k)
-        img = np.zeros((n, n, 3), np.uint8); img[..., 0] = enc(dm, float(scale)); img[..., 1] = np.clip(np.rint(km * 255.0), 0, 255)
-        img[..., 1][img[..., 0] == 255] = 0                               # (far from any water the kind says nothing: one value packs smaller)
+        img = np.zeros((n, n, 3), np.uint8); img[..., 0] = enc(dm, float(scale)); img[..., 1] = np.clip(np.rint(km * 15.0) * 17.0, 0, 255)
+        img[..., 1][img[..., 0] == int(C_LAND)] = 0                       # (far from any water the kind says nothing: one value packs smaller)
         st = state_of(img[..., 0], img[..., 1]); states[lv] = st
         if lv == TOP:
-            if st == 'P': Image.fromarray(img).save(os.path.join(out, '%d_%d_%d.png' % (lv, bx, by)), compress_level=7)
+            if st == 'P': save(img, os.path.join(out, '%d_%d_%d.webp' % (lv, bx, by)))
         elif st == 'P':
             np.save(os.path.join(out, 'parts', '%d_%d_%d.npy' % (lv, bx, by)), img[..., :2])
     return bx, by, states, (len(tiles), n_riv, n_small, time.time() - t0)
 
 
-CONST = {'L': (255, 0), 'S': (0, 0), 'F': (0, 255)}
+CONST = {'L': (int(C_LAND), 0), 'S': (int(C_DEEP), 0), 'F': (int(C_DEEP), 255)}
 
 
 def assemble(out, lv, parts_state, made):
@@ -311,7 +317,7 @@ def assemble(out, lv, parts_state, made):
                     if whole: img[b * S:b * S + S + 2, a * S:a * S + S + 2, :2] = part
                     else: img[1 + b * S:1 + b * S + S, 1 + a * S:1 + a * S + S, :2] = part[1:-1, 1:-1]
             st = state_of(img[..., 0], img[..., 1]); states[(qx, qy)] = st
-            if st == 'P': Image.fromarray(img).save(os.path.join(out, '%d_%d_%d.png' % (lv, qx, qy)), compress_level=7)
+            if st == 'P': save(img, os.path.join(out, '%d_%d_%d.webp' % (lv, qx, qy)))
     return states
 
 
@@ -320,13 +326,13 @@ def sheet(out, states, picks, path, size=512):
     from PIL import Image
     tiles = []
     for (bx, by) in picks:
-        p = os.path.join(out, '7_%d_%d.png' % (bx, by))
+        p = os.path.join(out, '7_%d_%d.webp' % (bx, by))
         if not os.path.exists(p): continue
         a = np.array(Image.open(p)); d = dec(a[..., 0], 1.0); k = a[..., 1].astype(np.float32) / 255.0
         rgb = np.zeros(a.shape, np.float32)
-        land = d > 0; t = np.clip(d / 800.0, 0, 1)
+        land = d > 0; t = np.clip(d / NEAR, 0, 1)
         rgb[land] = (np.stack([0.80 - 0.25 * t, 0.76 - 0.2 * t, 0.62 - 0.2 * t], -1))[land]
-        w = ~land; dep = np.clip(-d / 3600.0, 0, 1) ** 0.5
+        w = ~land; dep = np.clip(-d / DEEP, 0, 1) ** 0.5
         sea = np.stack([0.25 - 0.2 * dep, 0.62 - 0.4 * dep, 0.75 - 0.3 * dep], -1); fr = np.stack([0.2 - 0.12 * dep, 0.55 - 0.3 * dep, 0.45 - 0.2 * dep], -1)
         rgb[w] = (sea * (1 - k[..., None]) + fr * k[..., None])[w]
         im = Image.fromarray((rgb * 255).astype(np.uint8)).resize((size, size), Image.LANCZOS)
@@ -391,7 +397,7 @@ def main():
 
     index = {'made': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'hash': hashlib.sha256(open(os.path.abspath(__file__), 'rb').read()).hexdigest()[:12], 'source': NOTICE,
              'tile': TILE, 'packTiles': PACK_TILES, 'apron': APRON, 'partial': partial,
-             'code': {'lin': K_LIN, 'knee': KNEE, 'xknee': X_KNEE, 'quad': B_QUAD, 'land': 800.0, 'water': 3600.0}, 'levels': {}}
+             'ext': 'webp', 'code': {'step': STEP, 'near': NEAR, 'deep': DEEP, 'quad': B_QUAD, 'land': C_LAND, 'knee': C_KNEE, 'water': C_DEEP}, 'levels': {}}
     index['levels']['7'] = {'scale': 1, 'nx': NX7, 'ny': NY7, 'packs': ''.join(states.get((x, y), '?') for y in range(NY7) for x in range(NX7))}
     for lv in (6, 5):
         f = 1 << (TOP - lv); nx, ny = NX7 // f, NY7 // f
@@ -399,7 +405,7 @@ def main():
         index['levels'][str(lv)] = {'scale': 1 << (TOP - lv), 'nx': nx, 'ny': ny, 'packs': ''.join(sts[(x, y)] for y in range(ny) for x in range(nx))}
         print('level %d: %d packs with a shore' % (lv, sum(1 for v in sts.values() if v == 'P')), flush=True)
     json.dump(index, open(os.path.join(a.out, 'index.json'), 'w'))
-    files = sorted(f for f in os.listdir(a.out) if re.match(r'\d_\d+_\d+\.png$', f))
+    files = sorted(f for f in os.listdir(a.out) if re.match(r'\d_\d+_\d+\.webp$', f))
     size = sum(os.path.getsize(os.path.join(a.out, f)) for f in files)
     print('%d packs, %.1f MB' % (len(files), size / 1e6), flush=True)
     picks = [tuple(int(v) for v in s.split(',')) for s in a.sheet.split()] if a.sheet else [b for b in blocks if states.get(b) == 'P'][:16]

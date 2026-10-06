@@ -26,7 +26,7 @@ const unpack = (tar) => {
   fs.rmSync(tmp, { recursive: true, force: true }); fs.mkdirSync(tmp, { recursive: true });
   execFileSync('tar', ['-xf', tar, '-C', tmp]); fs.rmSync(tar, { force: true });
   const ix = JSON.parse(fs.readFileSync(path.join(tmp, 'index.json'), 'utf8'));
-  for (const [lv, l] of Object.entries(ix.levels)) for (let i = 0; i < l.packs.length; i++) if (l.packs[i] === 'P') { const f = path.join(tmp, `${lv}_${i % l.nx}_${Math.floor(i / l.nx)}.png`); if (!fs.existsSync(f) || fs.statSync(f).size === 0) throw new Error('the pack lacks ' + path.basename(f)); }
+  for (const [lv, l] of Object.entries(ix.levels)) for (let i = 0; i < l.packs.length; i++) if (l.packs[i] === 'P') { const f = path.join(tmp, `${lv}_${i % l.nx}_${Math.floor(i / l.nx)}.${ix.ext || 'webp'}`); if (!fs.existsSync(f) || fs.statSync(f).size === 0) throw new Error('the pack lacks ' + path.basename(f)); }
   fs.rmSync(DIR, { recursive: true, force: true }); fs.renameSync(tmp, DIR);
   return ix;
 };
