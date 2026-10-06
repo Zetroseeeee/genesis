@@ -1,7 +1,8 @@
 #!/bin/sh
 # Packs the ground's materials on GitHub (the Ground workflow) and brings the result here: tools/ground/pack.sh
 #   ->  data/tex/ground.json, ground_albedo.jpg, ground_normal.jpg; shots/peek/ground_sheet.jpg, ground_native.jpg (a piece of each, texel for pixel) and ground_build.log to look at
-# REF=<branch> packs that branch's assets/ground/materials.json (the game that is out is not touched until a build is).
+# REF=<branch> packs that branch's assets/ground/materials.json. A pack is kept under the name of the list it was made from,
+# so packing a branch changes nothing for the game that is out: its build asks for the pack of its own list.
 set -eu
 repo="$(node -p "require('./assets/models/models.json').repo")"; tag="${TAG:-ground}"
 run="${RUN:-}"      # (RUN=<id>: wait for a run already started, and fetch what it made)
