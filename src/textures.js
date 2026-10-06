@@ -50,9 +50,10 @@
   // material was added uses the one named beside it, and one that lacks any of the first sixteen is not used at all.
   const GROUND = ['meadow', 'steppe', 'scrub', 'sand', 'hamada', 'rock', 'snow', 'forestfloor', 'tundra', 'savanna', 'marsh', 'scree', 'canopy', 'shingle', 'dirt', 'cracked', 'pasture', 'crag', 'heath', 'beach', 'sandstone'];
   const GROUND_ELSE = { pasture: 'meadow', crag: 'rock', heath: 'scrub', beach: 'sand', sandstone: 'rock' };
-  // which of them are fine: what they show is small (blades of grass, moss, the litter of a wood), and the shader lays them a
-  // quarter of the size of the others on the screen (a pack's own "fine": true or false for a layer says otherwise)
-  const GROUND_FINE = { meadow: 1, steppe: 1, forestfloor: 1, tundra: 1, marsh: 1, pasture: 1, heath: 1 };
+  // which of them are fine: scans of a metre or two of ground (blades of grass, pebbles, cracks in mud), where the others are
+  // taken from the air and show fifteen metres and more. The shader lays the fine ones smaller on the screen. The pack says
+  // which they are ("fine" for a layer, from assets/ground/materials.json); this is for a pack made before it did.
+  const GROUND_FINE = { meadow: 1, marsh: 1, scree: 1, shingle: 1, savanna: 1, cracked: 1 };
   async function loadGround(url, aniso, shrink, shallows, fresh) {
     let man; try { const r = await fetch(url + (fresh ? '?' + fresh : ''), fresh ? { cache: 'no-store' } : undefined); if (!r.ok) return null; man = await r.json(); } catch (e) { return null; }
     const L = man.layers || [], at = {}; L.forEach((l, i) => { if (at[l.id] === undefined) at[l.id] = i; });

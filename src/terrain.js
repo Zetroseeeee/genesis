@@ -143,10 +143,12 @@
     //  up, 4 nor the noise that bends the ladder, 5 nothing of it at all. __T.costsGround in tools/testcam.js goes through them.)
     // Two ladders. What a scan shows has a size: a blade of grass, a stone, a face of rock. Laid at the same size on the screen
     // (a repeat some 600 pixels across), grass is drawn with blades as long as a barn where rock looks like rock. So the fine
-    // kinds (uGndCls: grass, moor, the floor of a wood) stand lower on the ladder than the coarse ones: a little lower while
-    // the eye is near (up to the fifth step, a farm filling the window: the blades can be seen, and stand as tall against a barn
-    // as hay does), and more the further it draws back, up to three steps (uGndFine: the least, how fast it grows, the most):
-    // from a mile up a meadow is a grain, not a picture of grass. (c: 0 the coarse ladder, 1 the fine.)
+    // kinds (uGndCls: scans of a metre or two of ground: grass, pebbles, scree, cracked mud; the others are taken from the air)
+    // stand lower on the ladder than the coarse ones: a little lower while the eye is near (up to the fifth step, a farm
+    // filling the window: the blades can be seen, and stand as tall against a barn as hay does), and more the further it draws
+    // back, up to two steps and a quarter (uGndFine: the least, how fast it grows, the most): from a mile up a meadow is a
+    // grain, not a picture of grass. Not lower than that: a repeat under a hundred and fifty pixels across is seen as a row of
+    // repeats, whatever is done to hide it. (c: 0 the coarse ladder, 1 the fine.)
     float gMixC[2], gLvC[2], gRelC[2], gFarOn, gDistM, gFk, gFarLow, gFar2, gFarPx, gToneL, gToneH; vec2 gUaC[2], gUbC[2], gUf, gUg, gLoc, gDx, gDy; vec3 gToneB, gToneG;
     // One step: where a material is looked up for it, and the step's share of the noise (for the ragged edge between two steps).
     // The repeats are bent a little, slowly, so that they do not stand in rows; each step is moved, and the odd ones laid the other
@@ -479,14 +481,17 @@
         // (ground that lies wholly under snow is not looked up at all: the snow is)
         float snowW = max(snow, ice * 0.95); bool snowed = snowW > 0.76;
         float hU = 0.5, t2 = w2 / max(w1 + w2, 1e-4), kB = 0.0; vec3 tex = vec3(0.5);
-        if (!snowed) {
+        // (nor what lies under a road; and under the trodden ground of a town, of which a little shows through, one material
+        // will do, and its relief is not looked up: trodden earth has its own)
+        float townK = inDecal * smoothstep(0.04, 0.22, dec.b) * (1.0 - ice); bool roaded = inDecal * dec.b > 0.72;
+        if (!snowed && !roaded) {
           float nearA = gndNear(L1), nearB = gndNear(L2), gNear = min(nearA, nearB);
           vec4 A = gnd(L1); vec3 ca = tone(A.rgb, L1, h1); if (L1 == 1.0) ca = mix(vec3(dot(ca, vec3(0.299, 0.587, 0.114))), ca, sage);
           hU = mix(0.5, A.a, nearA); tex = ca; dl = 0.45 * dot(A.rgb, vec3(0.299, 0.587, 0.114));
-          gRel = gndN(L1);
+          if (townK < 0.99) gRel = gndN(L1);
           // one lies in the hollows of the other: the higher of the two shows, each raised by its share. (The second is looked up
           // only where its share is large enough for any of it to stand above the first: 0.34 far off, 0.13 close to)
-          if (t2 > 0.34 - 0.21 * gNear && L2 != L1 && uGndDbg < 1.5) {
+          if (t2 > 0.34 - 0.21 * gNear && L2 != L1 && townK < 0.99 && uGndDbg < 1.5) {
             vec4 B = gnd(L2); vec3 cb = tone(B.rgb, L2, h2); if (L2 == 1.0) cb = mix(vec3(dot(cb, vec3(0.299, 0.587, 0.114))), cb, sage);
             float hB = mix(0.5, B.a, nearB), ha = hU + (1.0 - t2) * 1.6, hb = hB + t2 * 1.6, top = max(ha, hb) - mix(0.5, 0.16, gNear), ba = max(ha - top, 0.0), bb = max(hb - top, 0.0);
             kB = bb / (ba + bb); tex = mix(ca, cb, kB); hU = mix(hU, hB, kB); dl = mix(dl, 0.45 * dot(B.rgb, vec3(0.299, 0.587, 0.114)), kB);
@@ -1001,7 +1006,11 @@
       // runs for every triangle that touches the pixel, and for the three pixels beside it each time. Flat country seen from the
       // side needs next to no corners; what stands up in a tile (its own relief, from the elevation it is drawn with) keeps it
       // nearly as fine as it is wide, so the line of the hills against the sky stays as it was.
-      this.quadPx = 4;
+      // (4 pixels at first; 8 since the ground's shader grew: with four samples a pixel the shader runs for every triangle that
+      // touches a pixel, so a triangle costs its area and half its edge again, and at 4 pixels that is nearly twice the area. On
+      // the build Mac the Alps went from 11 frames a second to 15 by it, and the pictures cannot be told apart: tools/scenes/
+      // tour.txt has alps_q6, alps_q8, ridge_q6, ridge_q8 to hold against alps and ridge, and __T.costsMesh measures.)
+      this.quadPx = 8;
       this.tiles = new Map(); this.packs = new Map(); this.loading = 0; this.maxLoading = 6;
       this.exag = opts.exag || 2.0;
       this.frame = 0; this.visible = [];
