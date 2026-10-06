@@ -141,9 +141,10 @@
       // on a lawn: its neighbours take its light. What is low in it, the trunk and the under side of the crown, stands in the
       // dark of the wood; only the tops are in the sun, and the side turned from it is in deep shade. (The photographs are all
       // softly lit from the front: a wood of them unshaded is a table of model trees.)
-      float wood = vTree.x, low = smoothstep(0.02, 0.62, vUv.y), under = step(0.01, vTree.z) * wood;      // (under: a bush under the trees of a wood is in their shade altogether)
-      col *= mix(vec3(1.08, 1.0, 0.82), vec3(0.9, 1.0, 1.1), vTree.y) * mix(1.0, 0.84, wood) * mix(1.0, 0.7, under);
-      float lum = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(lum), col, mix(1.0, 0.86, wood));
+      // (wood: for the light from below; a tree that stands alone has a third of it: its own crown shades its trunk and its under side)
+      float deep = vTree.x, wood = max(deep, 0.34), low = smoothstep(0.02, 0.62, vUv.y), under = step(0.01, vTree.z) * deep;      // (under: a bush under the trees of a wood is in their shade altogether)
+      col *= mix(vec3(1.08, 1.0, 0.82), vec3(0.9, 1.0, 1.1), vTree.y) * mix(1.0, 0.84, deep) * mix(1.0, 0.7, under);
+      float lum = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(lum), col, mix(0.94, 0.86, deep));
       float shade = mix(1.0, 0.2 + 0.8 * low, wood) * mix(1.0, 0.4, under);
       float sky = (0.5 + 0.5 * dot(n, uUpV)) * mix(1.0, 0.35 + 0.65 * low, wood);
       float sunSide = max(dot(n, uSunV), 0.0);
@@ -267,7 +268,7 @@
       wD = Math.pow(Math.max(wD + (nMic[2] - 0.5) * 0.2, 0), 3);
       wR = Math.pow(Math.max(wR + (nMid[2] - 0.5) * 0.4 + (nMic[2] - 0.5) * 0.25, 0), 3);
       const ws = wF + wG + wD + wR + 1e-4;
-      return { f: wF / ws, g: wG / ws, warm, lum, latN, alt: h, kc, arid };
+      return { f: wF / ws, g: wG / ws, d: wD / ws, warm, lum, latN, alt: h, kc, arid };
     }
     update(cam, sim, now) {
       this.sim = sim;
@@ -310,7 +311,7 @@
       I = new THREE.InstancedMesh(g, mat, TIERS[ti].max); I.count = 0; I.frustumCulled = false; I.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       I.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(TIERS[ti].max * 3).fill(1), 3); I.instanceColor.setUsage(THREE.DynamicDrawUsage);
       I.userData.tree = new THREE.InstancedBufferAttribute(new Float32Array(TIERS[ti].max * 3), 3); I.userData.tree.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aTree', I.userData.tree);
-      I.userData.aspect = card.aspect; I.renderOrder = TIERS[ti].under ? 0 : ti; this.scene.add(I); this.imps[ti].set(def.id, I);      // near tier first: what it covers, the far tiers need not draw
+      I.userData.aspect = card.aspect; I.renderOrder = TIERS[ti].under ? 0.5 : ti; this.scene.add(I); this.imps[ti].set(def.id, I);      // near tier first: what it covers, the bushes under it and the far tiers need not draw
       if (window.SHADOWS && ti === 0) {             // the near trees throw true shadows: the same card, turned to the sun
         const depth = new THREE.ShaderMaterial({ uniforms: { uImp: uniforms.uImp, uPivot: uniforms.uPivot, uOrtho: { value: 1 }, uSunV: { value: new THREE.Vector3(0, 0, 1) } }, vertexShader: IMP_VERT, fragmentShader: IMP_DEPTH, side: THREE.DoubleSide });
         SHADOWS.caster(I, depth);
@@ -358,14 +359,14 @@
           const fw = this.forestAt(lon, lat, h);
           // in dry country trees line the rivers: palms and thorn trees along the Nile and the Euphrates, poplars along a steppe river
           const gallery = rv && fw.arid > 0.4 && h < 2200 ? (1 - smooth(rv.hw * 1.5 + 60, rv.hw * 4 + 500, rv.d)) * (0.3 + 0.25 * fw.arid) : 0;
-          if (!fw.f && !fw.g && !gallery) continue;
+          if (!fw.f && !fw.g && !gallery && !(under && fw.d)) continue;
           // far tiers only stand in real forest, so distant trees thicken the canopy instead of peppering open land
           const fmin = under ? 0 : [0.0, 0.3, 0.5][ti]; if (fw.f < fmin && !gallery) continue;
           // which flora grows here (the tree's own dice, so zones shade into each other)
           const r5 = hash2(gx, gy, 51); const zone = zoneOf(lon, lat, h, fw, r5, hash2(gx, gy, 52));
           let density = Math.max((Math.pow(fw.f, 1.15) * 1.25 + (ti === 0 ? fw.g * 0.02 : 0)) * Trees.THIN[fw.kc | 0], gallery) * budget;
           // (under the trees: young growth on some two plots in three; on open ground scrub as the climate has it, in drifts)
-          if (under) density = (fw.f * 0.62 + fw.g * (SCRUB[zone] || 0.05) * (0.3 + 2.4 * smooth(0.45, 0.75, this.noiseAt(lon * D2R * Math.cos(lat * D2R), lat * D2R, 2600, 1) * 1.6 - 0.3))) * Math.min(1, Trees.THIN[fw.kc | 0] * 1.5) * Math.min(1, budget * 2) + gallery * 0.5;
+          if (under) density = (fw.f * 0.62 + (fw.g + 0.6 * (fw.d || 0)) * (SCRUB[zone] || 0.05) * (0.3 + 2.4 * smooth(0.45, 0.75, this.noiseAt(lon * D2R * Math.cos(lat * D2R), lat * D2R, 2600, 1) * 1.6 - 0.3))) * Math.min(1, Trees.THIN[fw.kc | 0] * 1.5) * Math.min(1, budget * 2) + gallery * 0.5;
           // settlements clear the land around them and fields replace forest; what trees remain by a town are drawn at
           // the town's own scale (a village is drawn many times life size, and an oak must still stand over its huts)
           let kEff = kTier;
@@ -430,7 +431,7 @@
                 if (frost > 0.02) col.setRGB(col.r * (1 + 0.32 * frost), col.g * (1 + 0.34 * frost), col.b * (1 + 0.46 * frost)); } }
               // how deep in a wood it stands: by how much of the country round it is wood (a tree by a town, drawn at the town's
               // scale, is a tree on a green: it keeps its light)
-              const wood = kEff > kTier * 1.05 ? 0 : smooth(0.3, 0.72, fw.f), dice = 0.55 * stB + 0.45 * hash2(gx, gy, 43);
+              const wood = (kEff > kTier * 1.05 ? 0 : smooth(0.3, 0.72, fw.f)) * (leafless ? 0.4 : 1), dice = 0.55 * stB + 0.45 * hash2(gx, gy, 43);      // (a bare wood lets the light through)
               I.userData.tree.setXYZ(I.count, wood, dice, crop);
               I.setColorAt(I.count, col); I.count++; countM++;
               if (casters && !(window.SHADOWS && SHADOWS.ready && SHADOWS.enabled)) casters.push(lon, lat, hgt * I.userData.aspect * 0.8, hgt);   // with the depth map on, the card throws its own true shadow

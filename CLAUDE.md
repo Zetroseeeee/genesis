@@ -427,6 +427,21 @@ Conventions that matter:
 - Trees are cut-out photographs on camera-facing cards (`card: true` in the manifest, most without a mesh). Each
   says where it grows (`tree: { zones, region, deciduous, bare }`); `zoneOf()` in `trees.js` gives the flora zone
   of a point (boreal, temperate, med, easia, dry, savanna, rain). Near a town they are drawn at the town's scale.
+  **A wood is not a lawn with trees on it** (`trees.js`). Three tiers of trees round the eye (40 m apart within
+  3 km, so that crowns meet; 110 m to 12 km; 380 m to 36 km: many small ones far off, not a few giants) and a
+  fourth of what grows under and between them within a kilometre: young trees and bushes in a wood, scrub on open
+  ground as the climate has it (`SCRUB`). A bush has no picture of its own: it is the crown of one of the place's
+  trees without the trunk, small, on the ground (`CROWN`: how far up its picture a tree's crown begins). A wood is
+  made of **stands**: over a few hundred metres some of the zone's trees have the ground and the rest are the odd
+  one among them, and a stand has its own height and its own green (sown one by one at random, every wood was the
+  same even mix). Each tree carries `aTree`: how deep in a wood it stands, its own dice, how much of its picture
+  is left off. In a wood the shader takes its light away from below (trunks and the under sides of crowns stand in
+  the dark, the tops in the sun: the photographs are all softly lit from the front, and a wood of them unshaded is
+  a table of model trees). Two things about the pictures themselves: what lies round the tree in a card is given
+  the tree's own colour on loading (`MODELS.card`: it was the pale of the screen they were cut from, and drawn
+  small a picture is an average of its texels, so far trees were pale and haloed), and where the frame has several
+  samples a pixel the cut-out's edge is drawn by coverage (`alphaToCoverage`, `uCover`), not pixel by pixel. Trees
+  stand up to the water (the water mask climbs over a kilometre: only its lower half is shore).
 - **Climate.** `data/climate.png` is the Köppen-Geiger class of every eighth of a degree, and `data/info.png`
   carries two fields made from it: alpha = how dry the country is (the ground shader blends sand, stony plain,
   scrub, steppe and savanna by it; the photograph only says where the ground is bare), blue = how hard the winters
