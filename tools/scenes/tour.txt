@@ -157,6 +157,11 @@ costg_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,
 costg_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsGround(); }, 9000); | 64
 costg_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsGround(); }, 9000); | 64
 costg_meadow | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); __T.costsGround(); }, 9000); | 64
+# (the three ways a material can be looked up: __T.costsWays)
+costw_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 0.8, 1.0, 0.3); __T.costsWays(); }, 9000); | 64
+costw_far    | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsWays(); }, 9000); | 64
+costw_alps   | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsWays(); }, 9000); | 64
+costw_meadow | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); __T.costsWays(); }, 9000); | 64
 # (and of a lookup, by kind: eight more of each kind in turn: __T.costsProbe)
 costp_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 0.8, 1.0, 0.3); __T.costsProbe(); }, 9000); | 64
 costp_meadow | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14} | setTimeout(() => { __sceneLook('barn', 9, 1.1, 0.3); __T.costsProbe(); }, 9000); | 64

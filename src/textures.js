@@ -50,6 +50,9 @@
   // material was added uses the one named beside it, and one that lacks any of the first sixteen is not used at all.
   const GROUND = ['meadow', 'steppe', 'scrub', 'sand', 'hamada', 'rock', 'snow', 'forestfloor', 'tundra', 'savanna', 'marsh', 'scree', 'canopy', 'shingle', 'dirt', 'cracked', 'pasture', 'crag', 'heath', 'beach', 'sandstone'];
   const GROUND_ELSE = { pasture: 'meadow', crag: 'rock', heath: 'scrub', beach: 'sand', sandstone: 'rock' };
+  // which of them are fine: what they show is small (blades of grass, moss, the litter of a wood), and the shader lays them a
+  // quarter of the size of the others on the screen (a pack's own "fine": true or false for a layer says otherwise)
+  const GROUND_FINE = { meadow: 1, steppe: 1, forestfloor: 1, tundra: 1, marsh: 1, pasture: 1, heath: 1 };
   async function loadGround(url, aniso, shrink, shallows, fresh) {
     let man; try { const r = await fetch(url + (fresh ? '?' + fresh : ''), fresh ? { cache: 'no-store' } : undefined); if (!r.ok) return null; man = await r.json(); } catch (e) { return null; }
     const L = man.layers || [], at = {}; L.forEach((l, i) => { if (at[l.id] === undefined) at[l.id] = i; });
@@ -63,10 +66,10 @@
     // what the shader is told of each layer: its colour on the whole, and which layer takes its place away from the eye, from how
     // many metres to how many (0, 0: none does). The far layers are laid at one size (farSize: cells of a metre and a half to a
     // repeat, a power of two so that it fits the frame), whatever the distance: what they show has a size of its own.
-    const mean = new Float32Array(75).fill(0.5), far = new Float32Array(24), farD = new Float32Array(48), id = {}; GROUND.forEach((k, i) => { id[k] = i; }); let farSize = 512;      // (as long as the shader's lists: twenty-four layers at most, and the shallows)
-    for (let i = 0; i < count; i++) { const l = L[from[i]] || {}, m = l.mean || [0.5, 0.5, 0.5]; for (let k = 0; k < 3; k++) mean[i * 3 + k] = Math.max(0.03, m[k]); const f = id[l.far]; far[i] = f === undefined ? i : f;
+    const mean = new Float32Array(75).fill(0.5), far = new Float32Array(24), farD = new Float32Array(48), cls = new Float32Array(24), id = {}; GROUND.forEach((k, i) => { id[k] = i; }); let farSize = 512;      // (as long as the shader's lists: twenty-four layers at most, and the shallows)
+    for (let i = 0; i < count; i++) { const l = L[from[i]] || {}, m = l.mean || [0.5, 0.5, 0.5]; for (let k = 0; k < 3; k++) mean[i * 3 + k] = Math.max(0.03, m[k]); const f = id[l.far]; far[i] = f === undefined ? i : f; cls[i] = (l.fine === true || l.fine === false ? l.fine : GROUND_FINE[GROUND[i]]) ? 1 : 0;
       if (f !== undefined) { farD[i * 2] = l.farFrom || 2200; farD[i * 2 + 1] = Math.max(farD[i * 2] + 1, l.farTo || 4200); if (l.farSize) farSize = Math.pow(2, Math.round(Math.log2(l.farSize / 1.5))); } }
-    return { albedo: arrayOf(col, C, count + (shallows ? 1 : 0), THREE.RGBAFormat, aniso), relief: arrayOf(rel, C, count, THREE.RGFormat, aniso), size: C, count, mean, far, farD, farSize, shallows: shallows ? count : -1, layers: GROUND.map((k, i) => L[from[i]]), id, made: man.made };
+    return { albedo: arrayOf(col, C, count + (shallows ? 1 : 0), THREE.RGBAFormat, aniso), relief: arrayOf(rel, C, count, THREE.RGFormat, aniso), size: C, count, mean, far, farD, farSize, cls, shallows: shallows ? count : -1, layers: GROUND.map((k, i) => L[from[i]]), id, made: man.made };
   }
   // one cell of an atlas as a plain repeating 2D texture (water, clouds)
   function cellTexture(img, cell, n, idx, anisotropy) {

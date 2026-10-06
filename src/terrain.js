@@ -112,7 +112,7 @@
     precision highp sampler2DArray;
     uniform sampler2DArray uLanduse; uniform float uTexMix;
     #ifdef USE_GROUND
-    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[24], uGndFarN; uniform vec2 uGndFarD[24]; uniform vec3 uGndMean[25]; uniform vec4 uGndK, uGndT; uniform float uGndShow, uGndV, uGndDbg;
+    uniform sampler2DArray uGnd, uGndN; uniform vec2 uLadN, uLadF; uniform float uLadK, uGndShal, uGndFar[24], uGndFarN; uniform vec2 uGndFarD[24]; uniform vec3 uGndMean[25]; uniform vec4 uGndK, uGndT; uniform float uGndShow, uGndV, uGndDbg, uGndCls[24]; uniform vec3 uGndFine;
     #else
     uniform sampler2DArray uGround;
     #ifndef DET_SHALLOWS
@@ -138,30 +138,38 @@
     // The steps are held in two places, the even ones in one and the odd ones in the other: as the eye draws back each place
     // changes its step only while the other has the whole of the picture, so where anything of a place shows, the place the
     // material is looked up at runs on without a break from pixel to pixel. That is what lets the card work out for itself how
-    // large a pixel is in the material (an ordinary lookup): told it for every lookup (textureGrad), the same shader took half as
-    // long again on the build Mac, a millisecond a lookup.
+    // large a pixel is in the material (an ordinary lookup), and need not be told for every one.
     // (uGndDbg leaves parts of this out, to measure what they cost: 1 no relief, 2 nor a second material, 3 nor any colour looked
     //  up, 4 nor the noise that bends the ladder, 5 nothing of it at all. __T.costsGround in tools/testcam.js goes through them.)
-    float gMix, gLv, gFarOn, gDistM, gFk, gFarLow, gFar2, gFarPx, gRelOn, gToneL, gToneH; vec2 gUa, gUb, gUf, gUg, gLoc, gDx, gDy; vec3 gToneB, gToneG;
+    // Two ladders. What a scan shows has a size: a blade of grass, a stone, a face of rock. Laid at the same size on the screen
+    // (a repeat some 600 pixels across), grass is drawn with blades as long as a barn where rock looks like rock. So the fine
+    // kinds (uGndCls: grass, moor, the floor of a wood) stand lower on the ladder than the coarse ones: one step lower from as
+    // close as the game comes (the third step: there a blade is drawn about as much larger than life as a house is, and can be
+    // seen), and more the further the eye draws back, up to three (uGndFine: the least, how fast it grows, the most): from a
+    // mile up a meadow is a grain, not a picture of grass. (c: 0 the coarse ladder, 1 the fine.)
+    float gMixC[2], gLvC[2], gRelC[2], gFarOn, gDistM, gFk, gFarLow, gFar2, gFarPx, gToneL, gToneH; vec2 gUaC[2], gUbC[2], gUf, gUg, gLoc, gDx, gDy; vec3 gToneB, gToneG;
+    #ifdef GND_GRAD
+    vec2 gAxC[2], gAyC[2], gBxC[2], gByC[2], gFx, gFy;      // (how large a pixel is in each place, for lookups that are told: see GTEX)
+    #endif
     // One step: where a material is looked up for it, and the step's share of the noise (for the ragged edge between two steps).
-    // A slow bend from the noise, a few repeats long, so that the repeats do not stand in rows (read coarse, at a sixteenth of the
-    // noise's fineness: bent by its fine grain the ground is drawn out into streaks); each step is moved, and the odd ones laid
-    // the other way round, so that no two of them fall on top of each other.
-    void ladStep(float j, float odd, out vec2 uv, out float pick) {
-      float inv = exp2(-j) * 0.125, invW = inv * 0.0625; vec3 w = vec3(0.0);      // (one over the cells to a repeat, 8 times 2 to the j; the bend's noise is sixteen repeats long)
-      if (uGndDbg < 3.5) w = textureLod(uNoise, fract(uLadN * invW) + (uLadF + gLoc) * invW + j * vec2(0.37, 0.61), 4.0).rgb - vec3(0.5, 0.5, 0.43);
-      vec2 p = fract(uLadN * inv) + (uLadF + gLoc) * inv + w.rg * (2.0 * uGndK.z) + j * vec2(0.618, 0.382);
+    // The repeats are bent a little, slowly, so that they do not stand in rows; each step is moved, and the odd ones laid the other
+    // way round, so that no two of them fall on top of each other. The bend comes from the noise of the place that the shader has
+    // looked up already (n: the one of the four whose grain is a few repeats of this step long; three lookups a pixel less than a
+    // noise of the step's own), by as much as keeps the bend as steep whatever the two sizes are to each other (uGndK.z: how steep).
+    void ladStep(float j, float odd, vec4 nF, vec4 nC, vec4 nD, vec4 nA, float cl, out vec2 uv, out float pick) {
+      float inv = exp2(-j) * 0.125; vec4 n; float per;      // (inv: one over the cells to a repeat, 8 times 2 to the j; per: the noise's grain in metres)
+      // (the noise is the one at least fourteen repeats long: with a shorter one its fine grain wriggles inside a repeat, and what
+      //  the scan shows is drawn out into streaks. The top steps have no noise that long, and are bent the less for it.)
+      if (j < 0.5) { n = nF; per = 159.3; } else if (j < 2.5) { n = nC; per = 707.9; } else if (j < 5.5) { n = nD; per = 5309.0; } else { n = nA; per = 42473.0; }
+      vec3 w = uGndDbg < 3.5 ? n.rgb - vec3(0.5, 0.5, 0.43) : vec3(0.0);
+      float rat = per * inv / (12.0 * cl), short_ = min(rat / 1.7, 1.0);      // (rat: an eighth of how many repeats the noise is long)
+      vec2 p = fract(uLadN * inv) + (uLadF + gLoc) * inv + w.rg * (uGndK.z * rat * short_ * short_) + j * vec2(0.618, 0.382);
       pick = w.r * 2.2 + w.b * 0.9; uv = odd > 0.5 ? p.yx : p;
     }
-    // which two steps, and how much of each: from how many cells a pixel covers across its narrow way (the card's own filtering
-    // has the long way, where the ground runs away from the eye). And the one size at which the far layers are laid.
-    void ladder() {
-      gLoc = vGLf * uLadK; vec2 dx = gDx, dy = gDy;
-      float a = dot(dx, dx), d = dot(dy, dy), b = dot(dx, dy), det = dx.x * dy.y - dx.y * dy.x;
-      float s1 = max(0.5 * (a + d + sqrt(max((a - d) * (a - d) + 4.0 * b * b, 0.0))), 1e-14), s2 = det * det / s1;      // (the long way and the narrow way, squared)
-      float l = clamp(0.5 * log2(max(s2, s1 / 144.0) * uGndK.w * uGndK.w / 64.0), 0.0, 14.0), fl = min(floor(l), 13.0), f = l - fl;
-      float h2 = floor(fl * 0.5); bool lowE = fl - 2.0 * h2 < 0.5; float pE, pO;      // (the lower of the two steps is the even one)
-      ladStep(2.0 * h2 + (lowE ? 0.0 : 2.0), 0.0, gUa, pE); ladStep(2.0 * h2 + 1.0, 1.0, gUb, pO);
+    // one ladder at level l (0..14): its two places, how much of the odd one, and how much a scan's relief counts there
+    void ladAt(int c, float l, vec4 nF, vec4 nC, vec4 nD, vec4 nA, float cl) {
+      float fl = min(floor(l), 13.0), f = l - fl, h2 = floor(fl * 0.5); bool lowE = fl - 2.0 * h2 < 0.5; float pE, pO, jE = 2.0 * h2 + (lowE ? 0.0 : 2.0), jO = 2.0 * h2 + 1.0;      // (the lower of the two steps is the even one)
+      ladStep(jE, 0.0, nF, nC, nD, nA, cl, gUaC[c], pE); ladStep(jO, 1.0, nF, nC, nD, nA, cl, gUbC[c], pO);
       // Between two steps the one gives way to the other: at either end of the span it is all one step, and in the middle they lie
       // over each other, here more of the one and there of the other, in stretches a repeat or so across (uGndT.w: how ragged;
       // a row of the same stones into the distance is what gives a repeat away, and here every other stretch has them at another
@@ -169,21 +177,51 @@
       // two; wide (0.25 and more), all of it changes slowly together. It must stay under 0.5: at a whole step nothing of the
       // other may be left, or the break in the place that changes there would show.
       float m = smoothstep(-uGndT.z, uGndT.z, f - 0.5 + (lowE ? pO : pE) * uGndT.w * f * (1.0 - f));
-      gMix = lowE ? m : 1.0 - m; gLv = fl + m;      // (gMix: the share of the odd step; gLv: how far up the ladder)
-      // the far layers: one size, and two copies of it moved apart, of which the higher shows (two woods laid over each other are
-      // a wood). Which two changes slowly across the country, so the same crowns do not come round every repeat: and they too are
-      // held in an even and an odd place, each changing only while nothing of it shows
-      float invF = 1.0 / uGndFarN, invFw = invF * 0.0625; vec3 w = vec3(0.0);
-      if (uGndDbg < 3.5) w = textureLod(uNoise, fract(uLadN * invFw) + (uLadF + gLoc) * invFw + 0.17, 4.0).rgb - 0.5;
-      float kf = w.g * 9.0 + 4.0, kl = floor(kf), kh = floor(kl * 0.5); bool lowK = kl - 2.0 * kh < 0.5;
-      vec2 pf = fract(uLadN * invF) + (uLadF + gLoc) * invF + w.rg * (1.2 * uGndK.z);
-      gUf = pf + (2.0 * kh + (lowK ? 0.0 : 2.0)) * vec2(0.37, 0.71); gUg = pf + (2.0 * kh + 1.0) * vec2(0.37, 0.71); gFk = kf - kl; gFarLow = lowK ? 1.0 : 0.0;
-      gDistM = length(vViewPos) * ${R_M.toFixed(1)}; gFar2 = 0.0; gFarPx = sqrt(s1) * invF;      // (gFarPx: repeats of the far layer to a pixel)
+      gMixC[c] = lowE ? m : 1.0 - m; float lv = fl + m; gLvC[c] = lv;      // (the share of the odd step; how far up the ladder)
       // A scan's relief is that of ground a few metres across. Laid out a hundred times larger it would be hills that are not
       // there, with faces turned from the sun: from the step of the ladder where a stone would be a house it counts for less
       // and less, and from where it would be a hill for nothing (and is not looked up: half the lookups of ground seen from high up)
-      gRelOn = 0.75 * (1.0 - smoothstep(2.5, 6.5, gLv)) + 0.25 * (1.0 - smoothstep(6.5, 9.0, gLv));
+      gRelC[c] = 0.75 * (1.0 - smoothstep(2.5, 6.5, lv)) + 0.25 * (1.0 - smoothstep(6.5, 9.0, lv));
+      #ifdef GND_GRAD
+      { float iE = exp2(-jE) * 0.125, iO = exp2(-jO) * 0.125; gAxC[c] = gDx * iE; gAyC[c] = gDy * iE; gBxC[c] = gDx.yx * iO; gByC[c] = gDy.yx * iO; }
+      #endif
     }
+    // which steps: from how many cells a pixel covers across its narrow way (the card's own filtering has the long way, where the
+    // ground runs away from the eye). And the one size at which the far layers are laid.
+    void ladder(vec4 nF, vec4 nC, vec4 nD, vec4 nA, float cl) {
+      gLoc = vGLf * uLadK; vec2 dx = gDx, dy = gDy;
+      float a = dot(dx, dx), d = dot(dy, dy), b = dot(dx, dy), det = dx.x * dy.y - dx.y * dy.x;
+      float s1 = max(0.5 * (a + d + sqrt(max((a - d) * (a - d) + 4.0 * b * b, 0.0))), 1e-14), s2 = det * det / s1;      // (the long way and the narrow way, squared)
+      float l = clamp(0.5 * log2(max(s2, s1 / 144.0) * uGndK.w * uGndK.w / 64.0), 0.0, 14.0);
+      ladAt(0, l, nF, nC, nD, nA, cl); ladAt(1, max(l - clamp(uGndFine.x + (l - 3.0) * uGndFine.y, uGndFine.x, uGndFine.z), 0.0), nF, nC, nD, nA, cl);
+      // the far layers: one size, and two copies of it moved apart, of which the higher shows (two woods laid over each other are
+      // a wood). Which two changes slowly across the country, so the same crowns do not come round every repeat: and they too are
+      // held in an even and an odd place, each changing only while nothing of it shows
+      float invF = 1.0 / uGndFarN; vec3 w = uGndDbg < 3.5 ? nD.rgb - 0.5 : vec3(0.0);
+      float kf = w.g * 9.0 + 4.0, kl = floor(kf), kh = floor(kl * 0.5); bool lowK = kl - 2.0 * kh < 0.5;
+      vec2 pf = fract(uLadN * invF) + (uLadF + gLoc) * invF + (uGndDbg < 3.5 ? nA.rg - 0.5 : vec2(0.0)) * (0.6 * uGndK.z * 42473.0 * invF / (12.0 * cl));      // (bent by the longest noise: fifty of its repeats)
+      gUf = pf + (2.0 * kh + (lowK ? 0.0 : 2.0)) * vec2(0.37, 0.71); gUg = pf + (2.0 * kh + 1.0) * vec2(0.37, 0.71); gFk = kf - kl; gFarLow = lowK ? 1.0 : 0.0;
+      gDistM = length(vViewPos) * ${R_M.toFixed(1)}; gFar2 = 0.0; gFarPx = sqrt(s1) * invF;      // (gFarPx: repeats of the far layer to a pixel)
+      #ifdef GND_GRAD
+      gFx = dx * invF; gFy = dy * invF;
+      #endif
+    }
+    // A lookup of a material, three ways (which is quickest differs from card to card; tools/testcam.js: __T.costsWays measures them):
+    //   as it stands: an ordinary lookup, inside a branch wherever its share may be nothing. (Where such a branch begins and ends
+    //     the card's idea of how large a pixel is may be wrong for a pixel's width: but there the share is nothing, or next to it.)
+    //   GND_GRAD: told how large a pixel is (textureGrad), inside the same branches
+    //   GND_FLAT: an ordinary lookup, and no branches round the two places of the ladder: both are always looked up
+    #ifdef GND_GRAD
+    #define GTEXA(T, L, c) textureGrad(T, vec3(gUaC[c], L), gAxC[c], gAyC[c])
+    #define GTEXB(T, L, c) textureGrad(T, vec3(gUbC[c], L), gBxC[c], gByC[c])
+    #define GTEXF(T, uv, L) textureGrad(T, vec3(uv, L), gFx, gFy)
+    #else
+    #define GTEXA(T, L, c) texture(T, vec3(gUaC[c], L))
+    #define GTEXB(T, L, c) texture(T, vec3(gUbC[c], L))
+    #define GTEXF(T, uv, L) texture(T, vec3(uv, L))
+    #endif
+    int gndC(float L) { return uGndCls[int(L + 0.5)] > 0.5 ? 1 : 0; }      // (which ladder a layer stands on)
+    float gndNear(float L) { return 1.0 - smoothstep(2.5, 6.5, gLvC[gndC(L)]); }      // (how much a scan's heights count there: see the block)
     // A material as the ladder shows it: what it adds to its own mean colour (rgb, about 1) and its height (a). Away from the eye
     // another layer may stand for it, at a size of its own (a wood's canopy for its floor; the floor still lends it its light and
     // dark, which is what a wood from high up has of pattern). gndFarK: how much of what is shown is that other layer; gndMean:
@@ -193,16 +231,22 @@
     float gndFarK(float L) { vec2 d = uGndFarD[int(L + 0.5)]; return d.y > 0.0 ? gFarOn * smoothstep(d.x, d.y, gDistM) : 0.0; }
     vec4 gnd(float L) {
       if (uGndDbg > 2.5) return vec4(1.0, 1.0, 1.0, 0.5);
-      int i = int(L + 0.5); vec3 m = uGndMean[i]; float fk = gndFarK(L);
+      int i = int(L + 0.5), k = uGndCls[i] > 0.5 ? 1 : 0; vec3 m = uGndMean[i]; float fk = gndFarK(L);
       // (where the far layer has wholly taken over, the layer under it only lends it light and dark: one step of it will do)
-      float mx = fk > 0.997 ? step(0.5, gMix) : gMix; vec4 c = vec4(m, 0.5);
-      if (mx < 0.996) c = texture(uGnd, vec3(gUa, L));
-      c.rgb /= m;
+      float mx = fk > 0.997 ? step(0.5, gMixC[k]) : gMixC[k];
       // (two sizes over each other: each keeps the share of its light and dark that leaves the whole as rich as one alone. An
       // even mix of two photographs is flatter than either, which is what made a ground laid this way look out of focus)
-      if (mx > 0.004) { vec4 o = texture(uGnd, vec3(gUb, L)); float wa = sqrt(1.0 - mx), wb = sqrt(mx); c = vec4(max(1.0 + (c.rgb - 1.0) * wa + (o.rgb / m - 1.0) * wb, 0.0), 0.5 + (c.a - 0.5) * wa + (o.a - 0.5) * wb); }
+      #ifdef GND_FLAT
+      vec4 c = GTEXA(uGnd, L, k), o = GTEXB(uGnd, L, k); float wa = sqrt(1.0 - mx), wb = sqrt(mx);
+      c = vec4(max(1.0 + (c.rgb / m - 1.0) * wa + (o.rgb / m - 1.0) * wb, 0.0), 0.5 + (c.a - 0.5) * wa + (o.a - 0.5) * wb);
+      #else
+      vec4 c = vec4(m, 0.5);
+      if (mx < 0.996) c = GTEXA(uGnd, L, k);
+      c.rgb /= m;
+      if (mx > 0.004) { vec4 o = GTEXB(uGnd, L, k); float wa = sqrt(1.0 - mx), wb = sqrt(mx); c = vec4(max(1.0 + (c.rgb - 1.0) * wa + (o.rgb / m - 1.0) * wb, 0.0), 0.5 + (c.a - 0.5) * wa + (o.a - 0.5) * wb); }
+      #endif
       if (fk > 0.003) {
-        float Lf = uGndFar[i]; vec4 fE = texture(uGnd, vec3(gUf, Lf)), fO = texture(uGnd, vec3(gUg, Lf));
+        float Lf = uGndFar[i]; vec4 fE = GTEXF(uGnd, gUf, Lf), fO = GTEXF(uGnd, gUg, Lf);
         // (of the two copies the upper comes in where it stands higher, and wholly once the lower has had its turn)
         float hl = gFarLow > 0.5 ? fE.a : fO.a, hu = gFarLow > 0.5 ? fO.a : fE.a, up = smoothstep(-0.12, 0.12, hu - hl + (gFk - 0.5) * 2.3);
         gFar2 = gFarLow > 0.5 ? up : 1.0 - up; vec4 f = mix(fE, fO, gFar2);
@@ -216,15 +260,20 @@
     // A far layer's relief has the size it has (a wood's crowns): it counts until a crown is a pixel.
     vec2 gndN(float L) {
       vec2 a = vec2(0.0); if (uGndDbg > 0.5) return a;
-      if (gRelOn > 0.01) {
-        if (gMix < 0.996) { a = texture(uGndN, vec3(gUa, L)).rg - 0.5; a = vec2(a.x, -a.y) * sqrt(1.0 - gMix); }
-        if (gMix > 0.004) { vec2 c = texture(uGndN, vec3(gUb, L)).rg - 0.5; a += vec2(-c.y, c.x) * sqrt(gMix); }      // (the odd steps lie the other way round)
-        a *= gRelOn;
+      int k = gndC(L); float mx = gMixC[k], on = gRelC[k];
+      if (on > 0.01) {
+        #ifdef GND_FLAT
+        { vec2 e = GTEXA(uGndN, L, k).rg - 0.5, c = GTEXB(uGndN, L, k).rg - 0.5; a = vec2(e.x, -e.y) * sqrt(1.0 - mx) + vec2(-c.y, c.x) * sqrt(mx); }
+        #else
+        if (mx < 0.996) { a = GTEXA(uGndN, L, k).rg - 0.5; a = vec2(a.x, -a.y) * sqrt(1.0 - mx); }
+        if (mx > 0.004) { vec2 c = GTEXB(uGndN, L, k).rg - 0.5; a += vec2(-c.y, c.x) * sqrt(mx); }      // (the odd steps lie the other way round)
+        #endif
+        a *= on;
       }
       float fk = gndFarK(L);
       if (fk > 0.003) {
         float fn = 1.0 - smoothstep(0.06, 0.2, gFarPx); vec2 f = vec2(0.0);
-        if (fn > 0.01) { float Lf = uGndFar[int(L + 0.5)]; f = (mix(texture(uGndN, vec3(gUf, Lf)).rg, texture(uGndN, vec3(gUg, Lf)).rg, gFar2) - 0.5) * fn; }
+        if (fn > 0.01) { float Lf = uGndFar[int(L + 0.5)]; f = (mix(GTEXF(uGndN, gUf, Lf).rg, GTEXF(uGndN, gUg, Lf).rg, gFar2) - 0.5) * fn; }
         a = mix(a, vec2(f.x, -f.y) + a * 0.35, fk);
       }
       return a * 2.0;
@@ -249,7 +298,12 @@
     // n: cells to a repeat (a power of two); swap: the other way round.
     vec3 ltex(float L, float n, float swap) {
       vec2 p = fract(uLadN / n) + (uLadF + gLoc) / n; if (swap > 0.5) p = p.yx;
+      #ifdef GND_GRAD
+      vec2 ddx = gDx / n, ddy = gDy / n; if (swap > 0.5) { ddx = ddx.yx; ddy = ddy.yx; }
+      return textureGrad(uLanduse, vec3(p, L), ddx, ddy).rgb;
+      #else
       return texture(uLanduse, vec3(p, L)).rgb;
+      #endif
     }
     #endif
     // geographic texture coordinate at scale k = m*50 (per radian): tile-centre phase (double precision, CPU) + precise local offset
@@ -317,13 +371,17 @@
       float closeFade = max(clamp(1.0 - texPerPx * 0.25, 0.0, 1.0), smoothstep(0.03, 0.003, uCamAlt));
       // variation noise in geographic space (stable across tiles and LODs)
       #ifdef USE_GROUND
-      // (read three steps coarser than the card would: here they choose which material lies where, and a choice made of grain a
+      // (read three levels coarser than the card would: here they choose which material lies where, and a choice made of grain a
       // pixel or two across is a snow of single pixels. So a patch is never drawn smaller than some eight pixels: before it comes
       // to that it has faded into the mean, and the next coarser of the four carries on)
-      vec4 nMac = texture2D(uNoise, gc(3.0), 3.0);
-      vec4 nMid = texture2D(uNoise, gc(24.0), 3.0);
-      vec4 nMic = texture2D(uNoise, gc(180.0), 3.0);
-      vec4 nFin = texture2D(uNoise, gc(800.0), 3.0);
+      // (Told the level outright, and never finer than the third: asked only to go three coarser than the card would, a noise seen
+      // from close to is still read at its finest, since the card's own answer there is far below nought. The ladder bends its
+      // repeats by these, and bent by a noise's fine grain a scan is drawn out into streaks.)
+      float nLod; { vec2 gx = dFdx(vGL), gy = dFdy(vGL); nLod = 0.5 * log2(max(max(dot(gx, gx), dot(gy, gy)), 1e-30)) + 17.64; }      // (the level the card would take for one repeat a radian, and three more)
+      vec4 nMac = textureLod(uNoise, gc(3.0), max(nLod + 1.585, 3.0));
+      vec4 nMid = textureLod(uNoise, gc(24.0), max(nLod + 4.585, 3.0));
+      vec4 nMic = textureLod(uNoise, gc(180.0), max(nLod + 7.492, 3.0));
+      vec4 nFin = textureLod(uNoise, gc(800.0), max(nLod + 9.644, 3.0));
       #else
       vec4 nMac = noise2(gc(3.0));
       vec4 nMid = noise2(gc(24.0));
@@ -396,7 +454,7 @@
       vec3 land = base * 0.98;
       gDx = dFdx(vGLf) * uLadK; gDy = dFdy(vGLf) * uLadK;
       if (gOn > 0.002) {
-        ladder();
+        ladder(nFin, nMic, nMid, nMac, max(cl, 0.02));
         // settled country is cleared country: most of what would be wood there is pasture with trees standing in it (the game draws
         // those), and what wood is left is open and grazed, with no closed canopy over it
         { float settled = smoothstep(0.03, 0.22, cult); gFarOn = 1.0 - settled; float cleared = wForest * settled * 0.85; wForest -= cleared; wGrass += cleared; }
@@ -447,22 +505,22 @@
         gToneG = mix(vec3(1.0), clamp(gToneB, 0.6, 1.6), 0.6) * mix(vec3(1.0), vec3(1.10, 1.0, 0.82), smoothstep(0.35, 0.65, clim));
         // A scan's heights are those of ground a few metres across. Laid out a hundred times larger they would put patches a mile
         // wide of one material into another's hollows: from the step of the ladder where a stone would be a house they count for
-        // less and less (gNear: 1 near, 0 far), and what is left to say where one ground ends and the next begins is the lie of
-        // the land itself. (The relief goes the same way: gRelOn in ladder().)
-        float gNear = 1.0 - smoothstep(2.5, 6.5, gLv);
+        // less and less (gndNear: 1 near, 0 far), and what is left to say where one ground ends and the next begins is the lie of
+        // the land itself. (The relief goes the same way: gRelC in ladAt().)
         float sage = 1.0 - 0.4 * smoothstep(0.4, 0.7, clim);      // (what grows in dry country is grey with it: sage and straw, not the green-gold of a wet meadow gone dry)
         // (ground that lies wholly under snow is not looked up at all: the snow is)
         float snowW = max(snow, ice * 0.95); bool snowed = snowW > 0.76;
         float hU = 0.5, t2 = w2 / max(w1 + w2, 1e-4), kB = 0.0; vec3 tex = vec3(0.5);
         if (!snowed) {
+          float nearA = gndNear(L1), nearB = gndNear(L2), gNear = min(nearA, nearB);
           vec4 A = gnd(L1); vec3 ca = tone(A.rgb, L1, h1); if (L1 == 1.0) ca = mix(vec3(dot(ca, vec3(0.299, 0.587, 0.114))), ca, sage);
-          hU = mix(0.5, A.a, gNear); tex = ca; dl = 0.45 * dot(A.rgb, vec3(0.299, 0.587, 0.114));
+          hU = mix(0.5, A.a, nearA); tex = ca; dl = 0.45 * dot(A.rgb, vec3(0.299, 0.587, 0.114));
           gRel = gndN(L1);
           // one lies in the hollows of the other: the higher of the two shows, each raised by its share. (The second is looked up
           // only where its share is large enough for any of it to stand above the first: 0.34 far off, 0.13 close to)
           if (t2 > 0.34 - 0.21 * gNear && L2 != L1 && uGndDbg < 1.5) {
             vec4 B = gnd(L2); vec3 cb = tone(B.rgb, L2, h2); if (L2 == 1.0) cb = mix(vec3(dot(cb, vec3(0.299, 0.587, 0.114))), cb, sage);
-            float hB = mix(0.5, B.a, gNear), ha = hU + (1.0 - t2) * 1.6, hb = hB + t2 * 1.6, top = max(ha, hb) - mix(0.5, 0.16, gNear), ba = max(ha - top, 0.0), bb = max(hb - top, 0.0);
+            float hB = mix(0.5, B.a, nearB), ha = hU + (1.0 - t2) * 1.6, hb = hB + t2 * 1.6, top = max(ha, hb) - mix(0.5, 0.16, gNear), ba = max(ha - top, 0.0), bb = max(hb - top, 0.0);
             kB = bb / (ba + bb); tex = mix(ca, cb, kB); hU = mix(hU, hB, kB); dl = mix(dl, 0.45 * dot(B.rgb, vec3(0.299, 0.587, 0.114)), kB);
             if (kB > 0.03) gRel = mix(gRel, gndN(L2), kB);
           }
@@ -483,7 +541,7 @@
         // snow on high cold ground and ice: it fills the hollows first, and what stands up in the ground shows through it longest
         if (snowW > 0.01) {
           // (near: by the hollows of the ground under it; far: by broken stretches, the size the eye can make out)
-          gSnow = gnd(6.0); float sc = snowed ? 1.0 : smoothstep(0.35, 0.65, snowW + ((0.5 - hU) * 0.5 + (gSnow.a - 0.5) * 0.08 * gNear + (nMid.b + nMic.b - 0.87) * 0.22 * (1.0 - gNear)) * (1.0 - snowW));
+          float gNear = gndNear(6.0); gSnow = gnd(6.0); float sc = snowed ? 1.0 : smoothstep(0.35, 0.65, snowW + ((0.5 - hU) * 0.5 + (gSnow.a - 0.5) * 0.08 * gNear + (nMid.b + nMic.b - 0.87) * 0.22 * (1.0 - gNear)) * (1.0 - snowW));
           gSnowN = gndN(6.0); gSnowOn = 1.0;
           land = mix(land, mix(vec3(0.92, 0.94, 0.97), min(gSnow.rgb * vec3(0.9, 0.925, 0.96), vec3(1.02)), gOn), sc); gRel = mix(gRel, gSnowN, sc);
         }
@@ -1171,12 +1229,12 @@
       else if (g.uTexMix) g.uTexMix.value = 0;
       // the ground's own materials, where the pack is there (textures.js): the shader then takes its ground from them, and has no use for the photographs of detail
       const gnd = ok && T.ground && g.uGnd ? T.ground : null;
-      if (gnd) { g.uGnd.value = gnd.albedo; g.uGndN.value = gnd.relief; g.uGndShal.value = gnd.shallows; g.uGndFar.value = gnd.far; g.uGndFarD.value = gnd.farD; g.uGndFarN.value = gnd.farSize; g.uGndMean.value = gnd.mean; }
+      if (gnd) { g.uGnd.value = gnd.albedo; g.uGndN.value = gnd.relief; g.uGndShal.value = gnd.shallows; g.uGndFar.value = gnd.far; g.uGndFarD.value = gnd.farD; g.uGndFarN.value = gnd.farSize; g.uGndMean.value = gnd.mean; if (g.uGndCls) g.uGndCls.value = gnd.cls; }
       this.texDefines = ok ? (gnd ? { USE_TEXARR: 1, USE_GROUND: 1 } : { USE_TEXARR: 1 }) : {}; this.textured = ok; this.grounded = !!gnd;
       for (const t of this.tiles.values()) { const m = t.mesh.material; m.defines = this.defines(); m.needsUpdate = true; }
     }
     // shader switches for every tile material: the detail array when the globals carry one, the generated ground when it has loaded
-    defines() { const d = this.globals.uDet && this.globals.uDet.value; return Object.assign(d ? (d.image.depth >= 5 ? { USE_DETARR: 1, DET_SHALLOWS: 1 } : { USE_DETARR: 1 }) : {}, this.texDefines || {}, this.probe && this.grounded ? { GND_PROBE: this.probe } : {}); }      // (probe: a measuring tool, see GND_PROBE in the shader)
+    defines() { const d = this.globals.uDet && this.globals.uDet.value; return Object.assign(d ? (d.image.depth >= 5 ? { USE_DETARR: 1, DET_SHALLOWS: 1 } : { USE_DETARR: 1 }) : {}, this.texDefines || {}, this.probe && this.grounded ? { GND_PROBE: this.probe } : {}, this.ways === 1 ? { GND_GRAD: 1 } : this.ways === 2 ? { GND_FLAT: 1 } : {}); }      // (probe: a measuring tool, see GND_PROBE in the shader)
     // ----- per frame -----
     update(camera, viewportH) {
       this.frame++; this.queue = [];

@@ -58,6 +58,12 @@ window.__T.costsGround = function () {
     ['and no bending noise', () => { U.uGndDbg.value = 4; }], ['none of it', () => { U.uGndDbg.value = 5; }], ['the old ground', () => { U.uGndDbg.value = 0; TEX.ground = null; T.setTextures(TEX, true); }],
     ['all again', () => { TEX.ground = g; T.setTextures(TEX, true); }]], 3, 2500);
 };
+// the three ways a material can be looked up (GTEX in terrain.js), each for three seconds, twice over (the build Mac's speed wanders)
+window.__T.ways = function (n) { const T = __G.terrain; T.ways = n || 0; for (const t of T.tiles.values()) { const m = t.mesh.material; m.defines = T.defines(); m.needsUpdate = true; } return T.ways; };
+window.__T.costsWays = function () {
+  __T.cost([['as it stands', () => {}], ['told the pixel (GRAD)', () => { __T.ways(1); }], ['no branches (FLAT)', () => { __T.ways(2); }], ['as it stands, again', () => { __T.ways(0); }],
+    ['GRAD again', () => { __T.ways(1); }], ['FLAT again', () => { __T.ways(2); }], ['as it stands, a third time', () => { __T.ways(0); }]], 3, 2500);
+};
 // what a lookup costs on this card, by kind: eight more of them in the ground's shader (GND_PROBE in terrain.js), of each kind in turn
 window.__T.probe = function (n) { const T = __G.terrain; T.probe = n || 0; for (const t of T.tiles.values()) { const m = t.mesh.material; m.defines = T.defines(); m.needsUpdate = true; } return T.probe; };
 window.__T.costsProbe = function () {

@@ -182,7 +182,7 @@ def main():
             print(f"{k:2d} {spec['id']:<12} {spec.get('from', 'polyhaven')}/{spec['asset']:<28} mean {info['mean']} relief {info['rough']} maps {','.join(info['maps'])}")
         except Exception as e:
             info = {'mean': [0.5, 0.5, 0.5], 'failed': repr(e)[:300]}; failed.append(spec['id']); A[y:y + cell, x:x + cell] = 128; print(f"{k:2d} {spec['id']:<12} FAILED {e!r}"[:400])
-        layers.append({'id': spec['id'], 'far': spec.get('far'), 'farFrom': spec.get('farFrom'), 'farTo': spec.get('farTo'), 'farSize': spec.get('farSize'), 'from': spec.get('from', 'polyhaven'), 'asset': spec['asset'], **info})
+        layers.append({'id': spec['id'], 'far': spec.get('far'), 'farFrom': spec.get('farFrom'), 'farTo': spec.get('farTo'), 'farSize': spec.get('farSize'), 'fine': spec.get('fine'), 'from': spec.get('from', 'polyhaven'), 'asset': spec['asset'], **info})
     Image.fromarray(A).save('out/ground_albedo.jpg', quality=90, subsampling=0, optimize=True)
     Image.fromarray(N).save('out/ground_normal.jpg', quality=93, subsampling=0, optimize=True)
     made = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
