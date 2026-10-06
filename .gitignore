@@ -19,3 +19,4 @@ desktop/content.json
 data/w/
 data/.w.new/
 data/.water*
+__pycache__/
