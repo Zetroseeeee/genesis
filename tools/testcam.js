@@ -35,11 +35,11 @@ window.__T.headingTo = function (v) { const f = GEO.enu(__G.mapcam.lon, __G.mapc
 // build Mac's frame rates are the only ones that count. Each setting in turn (a name and what turns it on; they add up, so a later
 // one must undo an earlier one if it should not count) runs for four seconds, and the frame rates are written into the picture with
 // how many quads of ground were drawn. A tour line needs about five seconds a setting and fifteen over.
-window.__T.cost = function (list, secs) {
+window.__T.cost = function (list, secs, settle) {
   const T = __G.terrain, out = [], el = document.createElement('div'); el.style.cssText = 'position:fixed;left:24%;top:8%;z-index:99999;background:#000;color:#fff;font:21px monospace;padding:14px;white-space:pre'; document.body.appendChild(el);
   let i = 0; const next = () => {
     if (i >= list.length) { out.push('tiles ' + T.stats.tiles + ', quads ' + T.stats.quads + ', ratio ' + window.devicePixelRatio + ', canvas ' + __G.renderer.domElement.width + 'x' + __G.renderer.domElement.height); el.textContent = out.join('\n'); return; }
-    list[i][1](); setTimeout(() => { let n = 0; const t0 = performance.now(); const tick = () => { n++; if (performance.now() - t0 < (secs || 4) * 1000) requestAnimationFrame(tick); else { out.push(list[i][0].padEnd(28) + (n / ((performance.now() - t0) / 1000)).toFixed(1) + ' fps  ' + T.stats.quads); el.textContent = out.join('\n'); i++; next(); } }; requestAnimationFrame(tick); }, 800); };
+    list[i][1](); setTimeout(() => { let n = 0; const t0 = performance.now(); const tick = () => { n++; if (performance.now() - t0 < (secs || 4) * 1000) requestAnimationFrame(tick); else { out.push(list[i][0].padEnd(28) + (n / ((performance.now() - t0) / 1000)).toFixed(1) + ' fps  ' + T.stats.quads); el.textContent = out.join('\n'); i++; next(); } }; requestAnimationFrame(tick); }, settle || 800); };
   next();
 };
 // the usual questions, each undone before the next: the picture's last steps, the air, the ground's meshes, the pixels, the ground itself, the houses
@@ -49,9 +49,36 @@ window.__T.costs = function () {
     ['a quarter of the pixels', () => { T.quadPx = q; R.setPixelRatio(r0 / 2); }], ['all pixels, no ground', () => { R.setPixelRatio(r0); T.group.visible = false; }],
     ['ground, no houses', () => { T.group.visible = true; __G.world.buildingGroup.visible = false; MODELS.group.visible = false; }], ['all again', () => { __G.world.buildingGroup.visible = true; MODELS.group.visible = true; POST.off = false; }]]);
 };
+// what the ground's own materials cost, part by part, each left out on top of the one before (uGndDbg in terrain.js): the relief,
+// the second material, every colour looked up, the noise that bends the ladder, all of it; then the ground drawn the old way
+// (two and a half seconds before each: a new shader may have to be made)
+window.__T.costsGround = function () {
+  const T = __G.terrain, g = window.TEX && TEX.ground, U = __G.globals; if (!g) return 'no materials';
+  __T.cost([['all', () => {}], ['no relief', () => { U.uGndDbg.value = 1; }], ['and no second material', () => { U.uGndDbg.value = 2; }], ['and no colours looked up', () => { U.uGndDbg.value = 3; }],
+    ['and no bending noise', () => { U.uGndDbg.value = 4; }], ['none of it', () => { U.uGndDbg.value = 5; }], ['the old ground', () => { U.uGndDbg.value = 0; TEX.ground = null; T.setTextures(TEX, true); }],
+    ['all again', () => { TEX.ground = g; T.setTextures(TEX, true); }]], 3, 2500);
+};
+// how many ways the ground's materials need be looked at where the ground runs away from the eye (the card's own filtering:
+// 16 as the game has them, then 8 and 4), twice over
+window.__T.costsAniso = function () {
+  const g = window.TEX && TEX.ground; if (!g) return 'no materials'; const full = window.GENESIS_ANISO || 16, set = (n) => () => { __T.aniso(n, g.albedo, g.relief); };
+  __T.cost([[full + ' ways', () => {}], ['8 ways', set(8)], ['4 ways', set(4)], [full + ' again', set(full)], ['8 again', set(8)], ['4 again', set(4)], [full + ' a third time', set(full)]], 3, 1200);
+};
+// how fine the ground's meshes need be, now that a pixel of ground costs what it does: quads of 8 pixels (as the game has them), 4, 6, 12
+window.__T.costsMesh = function () {
+  const T = __G.terrain, q = T.quadPx;
+  __T.cost([['quads of ' + q + ' px', () => {}], ['of 4', () => { T.quadPx = 4; }], ['of 6', () => { T.quadPx = 6; }], ['of 12', () => { T.quadPx = 12; }], ['of ' + q + ' again', () => { T.quadPx = q; }], ['of 4 again', () => { T.quadPx = 4; }], ['of ' + q + ' a third time', () => { T.quadPx = q; }]], 3, 2500);
+};
 // how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
 window.__T.aniso = function (n, ...texs) {
   const R = __G.renderer, gl = R.getContext(), ext = gl.getExtension('EXT_texture_filter_anisotropic'); if (!ext) return 0; let k = 0;
   for (const x of texs) { if (!(x && x.isTexture)) continue; const q = R.properties.get(x); if (!q.__webglTexture) continue; const tg = x.isDataTexture2DArray ? gl.TEXTURE_2D_ARRAY : gl.TEXTURE_2D; gl.bindTexture(tg, q.__webglTexture); gl.texParameterf(tg, ext.TEXTURE_MAX_ANISOTROPY_EXT, n); k++; }
   R.state.reset(); return k;
 };
+
+// The ground's shaders, taken anew from src/terrain.js into a page that is running (tools/live.js: /load?file=terrain.js, then
+// __T.reshade()): every tile is given the new ones, and tiles made from now on get them too. Seconds, where a new page takes minutes.
+window.__T.reshade = function (more) { const T = __G.terrain; Object.setPrototypeOf(T, TERRAIN.Terrain.prototype); if (more) for (const k in more) if (!T.globals[k]) T.globals[k] = { value: more[k] };      // (more: uniforms the new shader has and the page's game does not yet know, { name: value })
+  let n = 0; for (const t of T.tiles.values()) { const m = t.mesh.material; for (const k in T.globals) if (!m.uniforms[k]) m.uniforms[k] = T.globals[k]; m.vertexShader = TERRAIN.VERT; m.fragmentShader = TERRAIN.FRAG; m.needsUpdate = true; n++; } return n; };
+// The ground's materials read again from data/tex (a new pack: tools/ground/pack.sh) and put to use; resolves to when the pack was made.
+window.__T.reground = function () { return TEX.reloadGround().then((g) => { __G.terrain.setTextures(TEX, true); return g ? g.made : null; }); };

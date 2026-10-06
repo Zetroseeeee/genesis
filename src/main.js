@@ -68,6 +68,7 @@
   let resizeT = 0; const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(() => { renderer.setSize(stage.clientWidth, stage.clientHeight); camera.aspect = stage.clientWidth / stage.clientHeight; setMode(mode); }, 60); };
   window.addEventListener('resize', onResize); if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
 
+  const GND_PX = 600;      // (how many pixels across a repeat of the ground's materials is laid, on a screen of one device pixel to a pixel)
   const globals = {
     uSun: { value: new THREE.Vector3(1, 0.3, 0.2).normalize() }, uTime: { value: 0 }, uCamAlt: { value: 1 }, uDayMix: { value: 1 },
     uOwner: { value: null }, uPal: { value: null }, uSim: { value: null }, uInfo: { value: null }, uNoise: { value: null },
@@ -78,6 +79,8 @@
     uDecal: { value: null }, uDecalRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uDecalOn: { value: 0 }, uQuality: { value: 1 }, uDecal2: { value: null }, uWaterN: { value: null },
     uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
+    // the ground's materials (textures.js: TEX.ground), laid at a ladder of sizes in a frame of cells a metre and a half across at the equator
+    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 20 }, uGndFar: { value: new Float32Array(24) }, uGndFarD: { value: new Float32Array(48) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(75).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.4, GND_PX) }, uGndT: { value: new THREE.Vector4(1, 1, 0.25, 3) }, uGndShow: { value: -1 }, uGndV: { value: 1 }, uGndDbg: { value: 0 }, uGndFine: { value: new THREE.Vector3(0.75, 0.6, 2.25) }, uGndCls: { value: new Float32Array(24) },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndT: how far a material's brightness follows the photograph of the Earth (0..1), and its hue (a factor), how wide the span in which one step of the ladder gives way to the next (0.1: a patchwork of the two; 0.25 and more: they lie over each other), how ragged its edge; uGndShow: one layer everywhere (to look at it), or -1; uGndV: how much the ground varies from stretch to stretch (lusher, drier); uGndDbg: parts left out, to measure them (terrain.js); uGndFine: how many steps of the ladder lower the fine kinds of ground stand: at the closest, how fast that grows with height, at the most (uGndCls: which they are, from textures.js)
     uGlow: { value: 0 },      // 1 while the picture goes through post.js, which can hold light brighter than white and lets it bleed
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
@@ -143,6 +146,9 @@
       setTimeout(() => { setLoad(100); const L = $('loading'); L.classList.add('gone'); if (mode === 'intro') $('intro').classList.add('enter'); setTimeout(() => { L.hidden = true; afterUpdate(); }, 750); }, 900);
       // generated materials and art arrive after first light; the world recompiles its shaders when they are in
       if (window.MODELS && settings.models !== false) MODELS.load(window.GENESIS_MODELS_URL).then((M) => { if (M.ready) { world.lastBuild.t = -1e9; console.log('models: ' + Object.keys(M.defs).length + ' in the library'); } });
+      // (should the card lose its picture memory and get it back, the ground's materials are read again: their pixels are not kept once the card has them)
+      renderer.domElement.addEventListener('webglcontextrestored', () => { if (window.TEX && TEX.ground && TEX.reloadGround) TEX.reloadGround().then(() => applyTextures()); });
+      if (window.TEX && softGL) { TEX.groundShrink = window.GENESIS_GROUND || 4; TEX.groundAniso = 2; }      // (a software renderer takes the ground's materials at a quarter of their size unless told otherwise, and looks at them two ways, not sixteen)
       if (window.TEX) TEX.load(renderer, TEX_URL).then((T) => { applyArt(); applyTextures(); if (T.unsupported) console.warn('textures need WebGL2'); });
       try { sampleFn = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { sampleFn = null; }
       if (!sampleFn) $('btn-chronicle').textContent = 'Show the record';
@@ -1170,6 +1176,7 @@
     terrain.update(camera, stage.clientHeight);
     if (decal) decal.update(mapcam, sim, now, sim ? sim.year + ':' + world.texVersion : 0, globals.uSun.value, world, trees);
     if (trees) trees.update(mapcam, sim, now);
+    globals.uGndK.value.w = GND_PX * Math.sqrt(renderer.getPixelRatio());      // (the ground's materials: a repeat is so many device pixels across; on a screen of twice the pixels a little more of them, so that what the materials show is neither half the size nor half as sharp there)
     const devH = stage.clientHeight * renderer.getPixelRatio();      // point sprites are sized in device pixels
     world.starUniforms.uPx.value = renderer.getPixelRatio();
     const day = world.updateSky(mapcam, globals.uSun.value, now / 1000);

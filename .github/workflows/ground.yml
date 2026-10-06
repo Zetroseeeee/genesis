@@ -1,6 +1,7 @@
 # Packs the ground's materials (assets/ground/materials.json: colours, relief and heights from the free CC0 libraries)
-# into the two atlases the game loads, and keeps them in the "ground" release. tools/ground/fetch.mjs brings them into
-# data/tex/. (The workspace cannot reach the libraries; GitHub can.) tools/ground/pack.sh runs it.
+# into the two atlases the game loads, and keeps them in the "ground" release, under the name of the list they were made
+# from. tools/ground/fetch.mjs brings them into data/tex/. (The workspace cannot reach the libraries; GitHub can.)
+# tools/ground/pack.sh runs it.
 name: Ground
 on:
   workflow_dispatch:
@@ -32,4 +33,12 @@ jobs:
         run: |
           case "$TAG" in *[!A-Za-z0-9_-]*|'') echo "bad tag"; exit 1;; esac
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "Ground materials" --notes "The ground's materials, packed by tools/ground/build.py from public-domain (CC0) scans: polyhaven.com, ambientcg.com. Fetched by tools/ground/fetch.mjs." --latest=false
-          gh release upload "$TAG" out/* -R "$GITHUB_REPOSITORY" --clobber
+          # The pack is what the list and the packer make of each other: it is kept under their name (the first twelve digits of
+          # their SHA-256 together), and tools/ground/fetch.mjs asks for the pack of the list it finds beside it. So a branch
+          # that tries other materials cannot change the ground of the game that is out. (The plain names are the pack made last,
+          # with its sheets: to look at.)
+          H="$(cat assets/ground/materials.json tools/ground/build.py | sha256sum | cut -c1-12)"
+          mkdir -p named
+          cp out/ground.json "named/ground-$H.json"; cp out/ground_albedo.jpg "named/ground_albedo-$H.jpg"; cp out/ground_normal.jpg "named/ground_normal-$H.jpg"
+          echo "pack $H"
+          gh release upload "$TAG" out/* named/* -R "$GITHUB_REPOSITORY" --clobber

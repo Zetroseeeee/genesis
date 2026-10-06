@@ -39,8 +39,21 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   '<js>'`, `/shot?name=x&pause=3000` (`shots/x.png`), `/load?file=post.js` (reads `src/<file>` again: good for
   `post.js`, then `/eval "POST.init(__G.renderer)"`; a shader that lives in a material needs a new page), `/logs`,
   `/quit`. The switches of `shotn.js`, and `POST=1` (the picture's last steps, which a software renderer goes
-  without), `AIR=1` (every step through the air). One command with one `/shot` in it: a picture takes a minute, a
-  tool call two at most.
+  without), `AIR=1` (every step through the air), `GROUND=<n>` (the ground's materials at 1/n of their size; a
+  software renderer takes 4). One command with one `/shot` in it: a picture takes a minute, a tool call two at
+  most. The ground's shader needs no new page: `/load?file=terrain.js`, then `/eval "__T.reshade()"` gives every
+  tile the new one (`__T.reshade({ uNew: 1 })` when it has a uniform the page's game does not know yet), and
+  `/eval "__T.reground()"` reads the ground's materials again after a new pack.
+- `tools/ground/pack.sh` — packs the ground's materials on GitHub (the Ground workflow: `assets/ground/materials.json`
+  into the `ground` release) and brings the pack here: `data/tex/ground.json` and two atlases, which are fetched
+  (`npm run fetch`), never committed. `REF=<branch>` packs a branch's list; a run that fails fetches nothing. A pack
+  is kept under the name of the list it was made from (twelve digits of the SHA-256 of `materials.json` and
+  `tools/ground/build.py` together), and `tools/ground/fetch.mjs` asks for the pack of the list beside it: packing a
+  branch changes nothing for the game that is out, and **after any change to the list or the packer the pack must
+  be made before `main` is pushed** (the game's build stops if its pack is not there; elsewhere the pack made last is
+  taken, with a warning). Look at `shots/peek/ground_native.jpg` (a piece of every material texel for pixel, the
+  candidates under `try` after them) and `ground_sheet.jpg` before believing a material.
+  `tools/materials.sh` lists what the free libraries have, with a sheet of their previews.
 - `node tools/air/sky.js check | sheet [name] | orbit [name]` — the air without the game, from the same sums the
   shaders use (`src/air.js`): `check` prints how close the quick sums are to slow exact ones (the column of air to
   space; a line of sight in few steps: within a hundredth, or the air is wrong); `sheet` and `orbit` draw
@@ -114,7 +127,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/rule.js` | `RULE` | Forms of government (24), laws (100 in twelve fields), the seven estates, authority; one world's rule: what every realm has chosen, who holds power in it, reforms, demands, risings |
 | `src/diplo.js` | `DIPLO` | What two realms can swear, why they go to war and what a winner may ask; one world's diplomacy: what every realm thinks of every other and why, pacts, vassals, claims, wars with friends on both sides, offers to the player |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
-| `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, biome shader, fields/roads/urban ground |
+| `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
 | `src/buildings.js` | `BKIT` | Procedural building kit (unit archetypes) and its material shader |
 | `src/models.js` | `MODELS` | Real 3D model library: manifest, loading, LODs, instancing (replaces kit archetypes when a model exists) |
@@ -122,7 +135,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/air.js` | `AIR` | The air: one sum along the line of sight for the sky, the haze before far hills, the planet's rim and the edge of night; as GLSL for every shader and as JavaScript |
 | `src/post.js` | `POST` | What a frame goes through between the scene and the screen: shade between things (from the depth), the glow of what is brighter than white, the developed picture |
 | `src/world.js` | `WORLD` | Turns town plans into instances near the camera; sky, clouds, atmosphere |
-| `src/textures.js` | `TEX` | Generated material atlases as texture arrays; UI art |
+| `src/textures.js` | `TEX` | Generated material atlases as texture arrays; the ground's scanned materials (`TEX.ground`); UI art |
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
 | `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
@@ -322,21 +335,84 @@ Conventions that matter:
   (`gridOf`: 128 a side at the deepest level). What costs is not corners but slivers: with four samples a pixel the
   fragment shader runs for every triangle that touches a pixel (and for its three neighbours each time), so country
   seen from the side at full fineness, triangles a tenth of a pixel deep, cost more than the rest of the frame. A
-  tile's quads are therefore `quadPx` (4) pixels or more each way as it lies to the eye (`t.lie`); only where
+  tile's quads are therefore `quadPx` (8) pixels or more each way as it lies to the eye (`t.lie`); only where
   something stands up in it (`t.relief`, measured from the elevation it is drawn with; three pixels tall and more)
-  does it keep quads `quadPx` wide however shallow it lies, for the line it draws against the sky. From far out every tile
+  does it keep quads `quadPx` wide however shallow it lies, for the line it draws against the sky. (A triangle costs
+  its area and half its edge again: at quads of 4 pixels that is nearly twice the area, at 8 less than half as much
+  again. The Alps went from 11 frames a second to 15 by it on the build Mac, and the pictures cannot be told apart:
+  the tour keeps `alps_q4` and `ridge_q4` to hold against `alps` and `ridge`.) From far out every tile
   counts as seen from above (the air is worked out at the corners, and changes fastest along the rim). Whatever
   stands on the ground asks `gpuHeightAt`, which uses the mesh a tile has at the moment (`t.grid`), and
   `meshVersion` follows the meshes as it follows the tiles. A software renderer keeps its two fixed grids.
   `terrain.stats.quads` counts what is drawn; `terrain.quadPx = 0` is the old way (to compare).
-- **The ground's shader is the frame.** It looks into its textures some forty times a pixel, and it is what a view
-  costs: by pixels, not by corners (on the build Mac a view to the horizon took 46 ms, of which the ground 27).
-  Two things were found to count far more than they show, and both are per texture and per tile, not per shader
-  line: slivers (above), and how many ways a texture is looked at where it runs away from the eye (`anisotropy`).
-  The noise (fifteen lookups) has 2 ways and the photographs of detail (sixteen) 4 (`ANISO_NOISE`, `ANISO_SMALL` in
-  `main.js`); at 16 each they cost a fifth of the frame for nothing the eye finds. The ground's own pictures (the
-  generated arrays, the imagery) and the models keep 16: at 8 the grass near a town goes soft. Measure before
-  adding a lookup, and after (`cost_far`).
+- **The ground's shader is the frame.** It is what a view costs: by pixels, not by corners (on the build Mac a
+  view to the horizon takes 37 ms, of which the ground 20 and more: `cost_far`). Two things were found to count far more
+  than they show, and both are per texture and per tile, not per shader line: slivers (above), and how many ways a
+  texture is looked at where it runs away from the eye (`anisotropy`). The noise has 2 ways and, where the ground
+  is drawn the old way, the photographs of detail 4 (`ANISO_NOISE`, `ANISO_SMALL` in `main.js`); at 16 each they
+  cost a fifth of the frame for nothing the eye finds. The ground's materials, the generated arrays, the imagery
+  and the models keep 16 (for the materials 8 and 4 measured no faster: `costa_far`). Measure before adding a
+  lookup, and after.
+- **What the ground is made of** (`USE_GROUND` in `terrain.js`, `TEX.ground` in `textures.js`). Twenty-one
+  materials, each with its colours, its relief and its heights: twenty scans of real ground from the free libraries
+  (public domain: Poly Haven, ambientCG; the list is `assets/ground/materials.json`) and the canopy of a wood, which
+  the packer makes. They come as two texture arrays (colour with the height beside it; relief, two channels) in
+  place of the old detail photographs, so the shader is still at 15 textures. Without the pack the ground is drawn
+  the old way, which stays in the shader (`#else`). The shader knows a material by its number, the loader by its
+  name (`GROUND` in `textures.js`, with the one that stands in where a pack was made before it): a new material is
+  added in both, and in the list.
+  **A ladder of sizes.** A material repeats every 12 m, every 24, and so on doubling, up to 200 km, in a frame of
+  cells a metre and a half across (`uLadN`, `uLadF`, `vGLf * uLadK`: whole cells at the tile's centre, exact, plus
+  the offset). A pixel takes the step at which a repeat is some 600 pixels across its narrow way (`uGndK.w`), so
+  the ground is sharp from every height and a repeat is never seen as one. The steps are held in two places, the
+  even ones and the odd ones: a place changes its step only while the other has the whole picture, so wherever a
+  place shows, where it is looked up runs on unbroken from pixel to pixel, and the lookups are ordinary ones.
+  Between two steps the one gives way to the other over a ragged span (`uGndT.z`, `.w`), each keeping the share of
+  its light and dark that leaves the whole as rich as one alone (an even mix of two photographs is flat: it looked
+  out of focus).
+  **Two ladders.** What a scan shows has a size (`size` in the list: metres of real ground). Most are taken from
+  the air and show fifteen metres and more; seven show a metre or two (`fine`: grass, marsh, scree, shingle, red
+  earth, cracked mud, the gravel of the stony desert). Laid as large on the screen as the others, grass has blades
+  as long as a barn. So the fine ones stand lower on the ladder (`uGndCls`, `uGndFine`): three quarters of a step
+  while the eye is near, so that blades can be seen and stand against a house as hay does, up to two and a quarter
+  from high up, where a meadow is a grain. Not lower: a repeat under a hundred and fifty pixels across is seen as
+  rows of itself, whatever is done to hide it (an aerial scan put on the fine ladder was a field of dots from a
+  mile up).
+  **Which material** comes from what the shader always weighed (wood, grass, dry ground, rock), the climate and the
+  slope. The two that count most are laid one in the other's hollows, by their heights. A material takes the
+  brightness the photograph of the Earth has there, up to a cap of its kind (grass under a bright haze is still
+  grass), and a share of its hue: but only what is as coloured as the material on the whole is tinted (a grey
+  stone in the grass stays grey; tinted with the grass it went blue, and brown earth mauve), and nothing past grey
+  into blue.
+  What each of these cost to learn. The noise of the place (`nMac` ... `nFin`) both *chooses* (which material, where
+  the scree lies) and *bends* the repeats so that they do not stand in rows. It is read at a stated level
+  (`textureLod`), three coarser than the card would take and never finer than the third, and never from its fourth
+  channel, which is single texels: chosen by grain a pixel across, the ground is a snow of single pixels from a
+  mile up; bent by fine grain, a scan is drawn out into streaks. (A bias, `texture(s, p, 3.0)`, does not do it:
+  seen from close to, the card's own level is far below nought and the bias leaves it at the finest.) A step is
+  bent by the noise that is at least fourteen of its repeats long. A scan's heights and relief count for less from
+  the step where a stone would be a house (`gndNear`, `gRelC`), or there are hills that are not there, with faces
+  turned from the sun. What should stay where it is while the eye draws back (lusher and drier stretches of a
+  meadow, stony patches, scree) hangs on the noise of the place, never on the ladder: only the grain may change
+  under the eye. And a scan must be what it is called: the first "meadow" was moss with twigs in it, and from a
+  barn's height the twigs were logs. `shots/peek/ground_native.jpg` shows a piece of every material texel for
+  pixel: look there, not at the small sheet. A repeat is `GND_PX` (600) device pixels across times the root of the
+  screen's pixel ratio: on a screen of twice the pixels the materials are neither half the size nor half as sharp.
+  A wood's floor gives way to its canopy between 2.2 and 4.2 km from the eye (`far` in the list: one size, by
+  distance, because a crown has a size as grass has not), except in settled country, which is cleared to pasture
+  with trees standing in it. What people have made of the ground (crops in their rows, paving) is laid at the size
+  the game draws a village at (`ltex`); between the houses of a town that is not paved the beaten ways are pale and
+  grass holds on beside them. A software renderer takes the pack at a quarter of its size (`GROUND=1`: whole).
+  `uGndShow = <layer>` shows one material everywhere; `uGndV` is how much a meadow varies.
+  **What it costs** (the build Mac, a virtual GPU, 1680 by 1050; `costg_*` holds the materials against the ground
+  drawn the old way in one page): looking down on a town 28 frames a second against 31, on a meadow 29 against
+  31, over a town to the horizon 26 against 38, the Alps from 19 km 15 against 25. Half of it is the lookups
+  (twelve to twenty of them a pixel) and half the arithmetic of choosing and toning, which is why a kind of ground
+  is gone into only where there is any of it, nothing is looked up that cannot show (under water, under snow,
+  under a road, a second material too small to appear, relief from the step where it no longer counts), and the
+  meshes went to quads of 8 pixels. Three things that were tried and measured no faster on that card: lookups
+  told how large a pixel is (`textureGrad`: a tenth slower), branches round the two places of a ladder, fewer ways
+  of filtering. `__T.costsGround()` goes through the parts (`uGndDbg`).
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.

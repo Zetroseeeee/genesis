@@ -5,7 +5,7 @@
 // DataTexture2DArray so each material repeats and mipmaps cleanly (no atlas bleeding). Without WebGL2 (or if the
 // atlases fail to load) nothing is set up and the shaders keep their procedural look.
 (function () {
-  const TEX = { ready: false, unsupported: false, failed: false, ui: {}, arrays: {}, scale: {}, mean: {}, layers: {}, misc: {}, manifest: null, loading: null };
+  const TEX = { ready: false, unsupported: false, failed: false, ui: {}, arrays: {}, scale: {}, mean: {}, layers: {}, misc: {}, manifest: null, loading: null, ground: null };
 
   function loadImg(url) {
     return new Promise((res) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => { console.warn('texture atlas failed', url); res(null); }; im.src = url; });
@@ -27,6 +27,50 @@
     tex.format = THREE.RGBAFormat; tex.type = THREE.UnsignedByteType; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = true; tex.anisotropy = anisotropy || 4; tex.needsUpdate = true;
     return { tex, mean, n: layers, size: C };
+  }
+  // The ground's own materials (the manifest's "pack": a list made by tools/ground/build.py, with two atlases beside it), as two
+  // texture arrays of one layer to a material: the colours with the heights beside them (alpha: for laying one material into the
+  // hollows of another), and the relief (two channels: the normal map's red and green). The shallows' caustics ride along as one
+  // more layer of the colours, so that the ground's shader needs no texture of its own for them. Where the pack is not there,
+  // TEX.ground stays null and the ground is drawn as it was.
+  function cells(img, cols, rows, shrink) {
+    const k = 1 / (shrink || 1), W = Math.round(img.width * k), H = Math.round(img.height * k), C = Math.round(W / cols);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0, W, H);
+    return { C, at: (l) => ctx.getImageData((l % cols) * C, Math.floor(l / cols) * C, C, C).data };
+  }
+  function arrayOf(data, C, layers, format, anisotropy) {
+    const tex = new THREE.DataTexture2DArray(data, C, C, layers);
+    tex.format = format; tex.type = THREE.UnsignedByteType; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; if (format === THREE.RGFormat) tex.internalFormat = 'RG8';
+    tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = true; tex.anisotropy = anisotropy || 4; tex.needsUpdate = true;
+    tex.onUpdate = () => { tex.image.data = null; };      // (the card has it now: a hundred megabytes need not be kept twice)
+    return tex;
+  }
+  // The ground's shader knows its materials by number: this is the order. A pack is read by the names of its layers, not by
+  // where they lie in it, so one laid out otherwise still puts the right ground in the right place; a pack from before a
+  // material was added uses the one named beside it, and one that lacks any of the first sixteen is not used at all.
+  const GROUND = ['meadow', 'steppe', 'scrub', 'sand', 'hamada', 'rock', 'snow', 'forestfloor', 'tundra', 'savanna', 'marsh', 'scree', 'canopy', 'shingle', 'dirt', 'cracked', 'pasture', 'crag', 'heath', 'beach', 'sandstone'];
+  const GROUND_ELSE = { pasture: 'meadow', crag: 'rock', heath: 'scrub', beach: 'sand', sandstone: 'rock' };
+  // which of them are fine: scans of a metre or two of ground (blades of grass, pebbles, cracks in mud), where the others are
+  // taken from the air and show fifteen metres and more. The shader lays the fine ones smaller on the screen. The pack says
+  // which they are ("fine" for a layer, from assets/ground/materials.json); this is for a pack made before it did.
+  const GROUND_FINE = { meadow: 1, marsh: 1, scree: 1, shingle: 1, savanna: 1, cracked: 1, hamada: 1 };
+  async function loadGround(url, aniso, shrink, shallows, fresh) {
+    let man; try { const r = await fetch(url + (fresh ? '?' + fresh : ''), fresh ? { cache: 'no-store' } : undefined); if (!r.ok) return null; man = await r.json(); } catch (e) { return null; }
+    const L = man.layers || [], at = {}; L.forEach((l, i) => { if (at[l.id] === undefined) at[l.id] = i; });
+    const from = GROUND.map((id) => at[id] !== undefined ? at[id] : at[GROUND_ELSE[id]]), lack = GROUND.filter((id, i) => from[i] === undefined);
+    if (lack.length) { console.warn('ground materials: the pack has no ' + lack.join(', ')); return null; }
+    const base = url.replace(/[^/]*$/, ''), q = fresh ? '?' + fresh : ''; const [a, nm] = await Promise.all([loadImg(base + man.albedo + q), loadImg(base + man.normal + q)]); if (!a || !nm) return null;
+    const cols = man.cols || 4, rows = man.rows || 4, count = GROUND.length, A = cells(a, cols, rows, shrink), N = cells(nm, cols, rows, shrink), C = A.C, px = C * C;
+    const col = new Uint8Array(px * 4 * (count + (shallows ? 1 : 0))), rel = new Uint8Array(px * 2 * count);
+    for (let l = 0; l < count; l++) { const c = A.at(from[l]), r = N.at(from[l]), o = l * px * 4, q = l * px * 2; for (let p = 0; p < px; p++) { col[o + p * 4] = c[p * 4]; col[o + p * 4 + 1] = c[p * 4 + 1]; col[o + p * 4 + 2] = c[p * 4 + 2]; col[o + p * 4 + 3] = r[p * 4 + 2]; rel[q + p * 2] = r[p * 4]; rel[q + p * 2 + 1] = r[p * 4 + 1]; } }
+    if (shallows) { const cv = document.createElement('canvas'); cv.width = cv.height = C; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(shallows, 0, 0, C, C); col.set(ctx.getImageData(0, 0, C, C).data, count * px * 4); }
+    // what the shader is told of each layer: its colour on the whole, and which layer takes its place away from the eye, from how
+    // many metres to how many (0, 0: none does). The far layers are laid at one size (farSize: cells of a metre and a half to a
+    // repeat, a power of two so that it fits the frame), whatever the distance: what they show has a size of its own.
+    const mean = new Float32Array(75).fill(0.5), far = new Float32Array(24), farD = new Float32Array(48), cls = new Float32Array(24), id = {}; GROUND.forEach((k, i) => { id[k] = i; }); let farSize = 512;      // (as long as the shader's lists: twenty-four layers at most, and the shallows)
+    for (let i = 0; i < count; i++) { const l = L[from[i]] || {}, m = l.mean || [0.5, 0.5, 0.5]; for (let k = 0; k < 3; k++) mean[i * 3 + k] = Math.max(0.03, m[k]); const f = id[l.far]; far[i] = f === undefined ? i : f; cls[i] = (l.fine === true || l.fine === false ? l.fine : GROUND_FINE[GROUND[i]]) ? 1 : 0;
+      if (f !== undefined) { farD[i * 2] = l.farFrom || 2200; farD[i * 2 + 1] = Math.max(farD[i * 2] + 1, l.farTo || 4200); if (l.farSize) farSize = Math.pow(2, Math.round(Math.log2(l.farSize / 1.5))); } }
+    return { albedo: arrayOf(col, C, count + (shallows ? 1 : 0), THREE.RGBAFormat, aniso), relief: arrayOf(rel, C, count, THREE.RGFormat, aniso), size: C, count, mean, far, farD, farSize, cls, shallows: shallows ? count : -1, layers: GROUND.map((k, i) => L[from[i]]), id, made: man.made };
   }
   // one cell of an atlas as a plain repeating 2D texture (water, clouds)
   function cellTexture(img, cell, n, idx, anisotropy) {
@@ -82,6 +126,11 @@
           TEX.arrays[nm] = arr.tex; TEX.mean[nm] = arr.mean;
           const sc = new Float32Array(16); for (let i = 0; i < 16; i++) sc[i] = (A.layers[i] && A.layers[i].m) || 3; TEX.scale[nm] = sc;
         }
+        // (the ground's materials, where the manifest names them: a software renderer takes them at half size)
+        if (man.pack && TEX.groundOn !== false) { try { const mi = names.indexOf('misc'), sh = mi >= 0 && imgs[mi] ? man.atlases.misc.layers.findIndex((L) => L.id === 'shallows') : -1; let cvS = null;
+          if (sh >= 0) { const im = imgs[mi], C = Math.round(cell * im.width / (n * cell)); cvS = document.createElement('canvas'); cvS.width = cvS.height = C; cvS.getContext('2d').drawImage(im, (sh % n) * C, Math.floor(sh / n) * C, C, C, 0, 0, C, C); }
+          TEX.groundArgs = [man.pack, TEX.groundAniso || aniso, TEX.groundShrink || (half ? 2 : 1), cvS];
+          TEX.ground = await loadGround(...TEX.groundArgs); } catch (e) { console.warn('ground materials unavailable', e); TEX.ground = null; } }
         TEX.ready = !!(TEX.arrays.wall && TEX.arrays.roof);
         if (!TEX.ready) TEX.failed = true;
       } catch (e) { console.warn('textures unavailable', e); TEX.failed = true; }
@@ -89,6 +138,8 @@
     })();
     return TEX.loading;
   };
+  // the ground's materials read again from where they came (for tools: a new pack looked at without a new page); resolves to the pack or null
+  TEX.reloadGround = async function () { if (!TEX.groundArgs) return null; const g = await loadGround(TEX.groundArgs[0], TEX.groundArgs[1], TEX.groundArgs[2], TEX.groundArgs[3], Date.now()); if (g) { const old = TEX.ground; TEX.ground = g; if (old) { old.albedo.dispose(); old.relief.dispose(); } } return g; };
   // handy for the UI: url of a piece of art or ''
   TEX.art = (key) => (TEX.ui && TEX.ui[key]) || '';
   window.TEX = TEX;
