@@ -51,15 +51,23 @@ further off. A WebP without loss, three bytes a texel:
      -3600 m ever more coarsely (58: that deep in and deeper). The shader's twin of this is in terrain.js.
      (Sixteen metres, and no further inland than a texel's diagonal: what a pack weighs is how much of it is not one
      flat value, and how many values there are. The water's edge itself lies between the texels, far finer.)
-  G  what water the nearest water is: 0 the sea ... 255 fresh, in sixteen steps, smoothed over a kilometre or two
-  B  how open the water lies: the share of water round about (within a kilometre or two, and within six: the lesser of
-     the two, doubled), in sixteen steps. 255 on a coast the sea comes straight in on and anywhere out at sea; half that
-     and less in a harbour, a cove, a sound, a fjord, among islands, on a small lake. (Where waves break, and how high
-     they run.)
+  G  two things, four bits each. The upper: what water the nearest water is, 0 the sea ... 15 fresh, smoothed over a
+     kilometre or two. The lower: how open the water lies - the share of water round about (within a kilometre or two,
+     and within six: the lesser of the two, doubled): 15 on a coast the sea comes straight in on and anywhere out at
+     sea; half that and less in a harbour, a cove, a sound, a fjord, among islands, on a small lake. (Where waves
+     break, and how high they run.)
+  B  how high the nearest fresh water stands, by the game's own heights (data/e: the ground is drawn from those, and a
+     lake must lie in the ground the game has, not in the Earth's): metres = 6000 (B / 255)^1.5, a metre and a half to
+     the step by the sea and thirty in Tibet. One level for a lake, taken from the heights under it (the least of
+     them, or a little under their mean where the heights do not know the lake and run downhill along it); the great
+     lakes that no block sees whole take theirs from a smoothed map of the heights far from their shores, so that
+     blocks agree. With it the game lays a lake level and cuts its shores down to it: without, the water climbed
+     every hillside it lay under.
 A pack with no shore in or near it is not written: index.json says what it is instead (L land, S sea, F fresh water).
 
-The pack is kept under the name of what it was made from: twelve digits of the SHA-256 of this file and data/rivers.png
-together (tools/water/fetch.mjs and the workflow reckon the same).
+The pack is kept under the name of what it was made from: twelve digits of the SHA-256 of this file, data/rivers.png and
+data/index.json together (the rivers the game draws and the list of its heights; tools/water/fetch.mjs and the workflow
+reckon the same).
 
     python3 tools/water/build.py --out out [--bbox lon0,lat0,lon1,lat1] [--only 7/36/4,7/37/4] [--jobs 4]
     python3 tools/water/build.py --probe          what the sources look like (the first run on a new machine)
@@ -99,6 +107,9 @@ LAKE_WIDE = 250.0                         # metres: water only the second source
 LAKE_BACK = 350.0                         # ... and for this far round such a place (its coves and corners)
 RIVER_NEAR = 1500.0                       # metres: this near a river the game draws, such water is that river
 OPEN_NEAR, OPEN_FAR = 1500.0, 6000.0      # metres: the two reaches over which the share of water round a place is taken (how open the water lies)
+LEVEL_MAX, LEVEL_POW = 6000.0, 1.5        # a lake's level: metres = LEVEL_MAX (byte / 255)^LEVEL_POW
+LEVEL_SMOOTH = 1500.0                     # metres: over this the heights under a great lake are smoothed for its level
+ELEV = os.path.join(ROOT, 'data', 'e'); ELEV_INDEX = os.path.join(ROOT, 'data', 'index.json')      # the game's own heights
 # the distance's code (see the header): STEP metres to the step out to NEAR on both sides, then ever coarser to DEEP
 STEP, NEAR, DEEP, FAR_N = 16.0, 480.0, 3600.0, 40.0
 C_LAND, C_KNEE = 128.0 + NEAR / STEP, 128.0 - NEAR / STEP          # 158: land, that far and further; 98: where the water's code turns coarse
@@ -287,6 +298,48 @@ def read_wc(cache, lat, lon):
     return np.array(Image.open(path).convert('1'), dtype=bool)
 
 
+_DEM = None; _DEMP = {}
+
+
+def dem_pack(key):
+    """a pack of the game's heights, metres (float32, 2048 x 2048), or None"""
+    global _DEM
+    if _DEM is None:
+        try: _DEM = json.load(open(ELEV_INDEX))['elev']['packs']
+        except Exception: _DEM = {}      # noqa
+    if key not in _DEM: return None
+    if key not in _DEMP:
+        from PIL import Image
+        L, px, py = key.split('/'); f = os.path.join(ELEV, '%s_%s_%s.png' % (L, px, py))
+        if not os.path.exists(f): _DEMP[key] = None
+        else:
+            if len(_DEMP) > 12: _DEMP.pop(next(iter(_DEMP)))
+            mn, sc = _DEM[key]; im = Image.open(f); a = np.asarray(im if im.mode in ('L', 'P') else im.convert('L'), dtype=np.float32)      # (a paletted picture's numbers are the bytes themselves)
+            _DEMP[key] = np.maximum(mn + a * sc, 0.0)
+    return _DEMP[key]
+
+
+def game_heights(lats, lonw):
+    """the game's ground at every working pixel (rows of latitude, columns of longitude): the finest pack that has the place, weighed
+    between its texels as the game weighs them. None where the game's heights are not here."""
+    H, W = len(lats), len(lonw); out = np.zeros((H, W), np.float32); got = False
+    cy = np.floor((90.0 - lats) / DEG).astype(np.int32); cx = np.floor((lonw + 180.0) / DEG).astype(np.int32) % NX7
+    for py in np.unique(cy):
+        rows = np.nonzero(cy == py)[0]
+        for px in np.unique(cx):
+            cols = np.nonzero(cx == px)[0]
+            for lv in (7, 6, 5):
+                f = 1 << (7 - lv); a = dem_pack('%d/%d/%d' % (lv, px // f, py // f))
+                if a is None: continue
+                span = DEG * f; n = a.shape[0]
+                fy = np.clip((90.0 - (py // f) * span - lats[rows]) / span * n - 0.5, 0, n - 1.001); fx = np.clip((lonw[cols] + 180.0 - (px // f) * span) / span * n - 0.5, 0, n - 1.001)
+                y0 = np.floor(fy).astype(np.int64); x0 = np.floor(fx).astype(np.int64); ay = (fy - y0).astype(np.float32)[:, None]; ax = (fx - x0).astype(np.float32)[None, :]
+                top = a[np.ix_(y0, x0)] * (1 - ax) + a[np.ix_(y0, x0 + 1)] * ax; bot = a[np.ix_(y0 + 1, x0)] * (1 - ax) + a[np.ix_(y0 + 1, x0 + 1)] * ax
+                out[rows[0]:rows[-1] + 1, cols[0]:cols[-1] + 1] = top * (1 - ay) + bot * ay; got = True
+                break
+    return out if got else None
+
+
 _RIV = None
 
 
@@ -444,7 +497,7 @@ def process(args):
         del inner, core, wall, wide
     del wc, unk
     # lakes too small for the grid are left out (not those the block's edge cuts: the block beside this one sees them whole)
-    n_small = 0
+    n_small = 0; lab = None; lake_edge = None
     if fresh.any():
         lab = cc3d.connected_components(fresh, connectivity=8)
         cnt = np.bincount(lab.ravel())
@@ -452,8 +505,8 @@ def process(args):
         for e in (lab[0], lab[-1], lab[:, 0], lab[:, -1]): edge[np.unique(e)] = True
         small = (cnt * (dx * dy) < LAKE_MIN) & ~edge; small[0] = False
         n_small = int(small.sum())
-        if n_small: fresh &= ~small[lab]
-        del lab
+        if n_small: fresh &= ~small[lab]; lab[~fresh] = 0
+        edge[0] = False; lake_edge = edge      # (the lakes the block's edge cuts: kept for their levels, below)
     water = sea | fresh
     nw = int(water.sum())
     if nw == 0: return bx, by, {7: 'L', 6: 'L', 5: 'L'}, (len(tiles), n_riv, n_small, time.time() - t0, n_wc)
@@ -479,14 +532,47 @@ def process(args):
         kind = np.repeat(np.repeat(kind7, K, 0), K, 1)
     else:
         kind = np.full((H, W), 1.0 if fresh.any() else 0.0, np.float32)
-    del sea, fresh, river, water, cls
+    # how high the fresh water stands, by the game's own heights
+    lev = None
+    hg = game_heights(lats, lonw) if fresh.any() else None
+    if hg is not None:
+        n = len(lake_edge)
+        m = fresh.ravel(); lf = lab.ravel()[m].astype(np.int64); hf = hg.ravel()[m].astype(np.float64)
+        cnt = np.maximum(np.bincount(lf, minlength=n), 1); mean = np.bincount(lf, weights=hf, minlength=n) / cnt
+        std = np.sqrt(np.maximum(np.bincount(lf, weights=hf * hf, minlength=n) / cnt - mean * mean, 0.0))
+        order = np.argsort(lf, kind='stable'); ls = lf[order]; starts = np.nonzero(np.r_[True, ls[1:] != ls[:-1]])[0]
+        mn = np.zeros(n); mn[ls[starts]] = np.minimum.reduceat(hf[order], starts)
+        # a lake the heights know lies flat in them, and its level is the least of them (its shore's texels are part hill);
+        # one they do not know runs downhill with its valley: a little under the mean, not down at the lowest end
+        lvl = np.maximum(mn, mean - std).astype(np.float32); lvl[0] = 0.0
+        Lp = lvl[lab]
+        del m, lf, hf, order, ls
+        # the lakes this block does not see whole: every block must give them the same level where two meet, so theirs is a
+        # smoothed map of the heights far from their shores
+        if lake_edge.any():
+            big = lake_edge[lab]
+            wgt = np.where(big, np.clip(-d / 400.0, 0.05, 1.0) ** 2, 0.0).astype(np.float32)
+            sg = (LEVEL_SMOOTH / t7, LEVEL_SMOOTH / (t7 * cy))
+            num = ndimage.gaussian_filter(block_mean(wgt * hg, K), sg, mode='nearest'); den = ndimage.gaussian_filter(block_mean(wgt, K), sg, mode='nearest')
+            S = np.where(den > 1e-6, num / np.maximum(den, 1e-6), 0.0).astype(np.float32)
+            Lp = np.where(big, np.repeat(np.repeat(S, K, 0), K, 1), Lp); del big, wgt, num, den, S
+        del hg
+        # a texel with fresh water in it has that water's level; one without, the level of the nearest that has
+        f7 = block_mean(fresh.astype(np.float32), K); L7 = block_mean(np.where(fresh, Lp, 0.0).astype(np.float32), K); del Lp
+        has = f7 > 0; L7 = np.where(has, L7 / np.maximum(f7, 1e-6), 0.0).astype(np.float32)
+        if not has.all():
+            idx = ndimage.distance_transform_edt(~has, return_distances=False, return_indices=True, sampling=(t7, t7 * cy))
+            L7 = L7[idx[0], idx[1]]; del idx
+        lev = np.repeat(np.repeat(L7, K, 0), K, 1)
+    del sea, fresh, river, water, cls, lab
     states = {}
     for lv in LEVELS:
         k = K << (TOP - lv); scale = 1 << (TOP - lv); n = N // k + 2 * APRON
         y0, x0 = MY - k * APRON, mx - k * APRON
         dm = block_mean(d[y0:y0 + n * k, x0:x0 + n * k], k); km = block_mean(kind[y0:y0 + n * k, x0:x0 + n * k], k); om = block_mean(opn[y0:y0 + n * k, x0:x0 + n * k], k)
-        img = np.zeros((n, n, 3), np.uint8); img[..., 0] = enc(dm, float(scale)); img[..., 1] = np.clip(np.rint(km * 15.0) * 17.0, 0, 255); img[..., 2] = np.clip(np.rint(om * 15.0) * 17.0, 0, 255)
-        far = img[..., 0] == int(C_LAND); img[..., 1][far] = 0; img[..., 2][far] = 0      # (far from any water neither says anything: one value packs smaller)
+        img = np.zeros((n, n, 3), np.uint8); img[..., 0] = enc(dm, float(scale)); img[..., 1] = np.clip(np.rint(km * 15.0), 0, 15) * 16 + np.clip(np.rint(om * 15.0), 0, 15)
+        if lev is not None: img[..., 2] = np.clip(np.rint(255.0 * (np.maximum(block_mean(lev[y0:y0 + n * k, x0:x0 + n * k], k), 0.0) / LEVEL_MAX) ** (1.0 / LEVEL_POW)), 0, 255)
+        far = img[..., 0] == int(C_LAND); img[..., 1][far] = 0; img[..., 2][far] = 0      # (far from any water none of it says anything: one value packs smaller)
         st = state_of(img[..., 0], img[..., 1]); states[lv] = st
         if lv == TOP:
             if st == 'P': save(img, os.path.join(out, '%d_%d_%d.webp' % (lv, bx, by)))
@@ -495,7 +581,7 @@ def process(args):
     return bx, by, states, (len(tiles), n_riv, n_small, time.time() - t0, n_wc)
 
 
-CONST = {'L': (int(C_LAND), 0, 0), 'S': (int(C_DEEP), 0, 255), 'F': (int(C_DEEP), 255, 255)}      # (distance, kind, how open)
+CONST = {'L': (int(C_LAND), 0, 0), 'S': (int(C_DEEP), 15, 0), 'F': (int(C_DEEP), 255, 0)}      # (the distance; what water and how open; the level)
 
 
 def assemble(out, lv, parts_state, made):
@@ -528,7 +614,7 @@ def sheet(out, states, picks, path, size=512):
     for (bx, by) in picks:
         p = os.path.join(out, '7_%d_%d.webp' % (bx, by))
         if not os.path.exists(p): continue
-        a = np.array(Image.open(p)); d = dec(a[..., 0], 1.0); k = a[..., 1].astype(np.float32) / 255.0
+        a = np.array(Image.open(p)); d = dec(a[..., 0], 1.0); k = (a[..., 1] >> 4).astype(np.float32) / 15.0
         rgb = np.zeros(a.shape, np.float32)
         land = d > 0; t = np.clip(d / NEAR, 0, 1)
         rgb[land] = (np.stack([0.80 - 0.25 * t, 0.76 - 0.2 * t, 0.62 - 0.2 * t], -1))[land]
@@ -545,9 +631,10 @@ def sheet(out, states, picks, path, size=512):
 
 
 def pack_hash():
-    """what a pack is kept under: this builder and the rivers the game draws, together"""
+    """what a pack is kept under: this builder, the rivers the game draws and the list of its heights, together"""
     h = hashlib.sha256(open(os.path.abspath(__file__), 'rb').read())
-    if os.path.exists(RIVERS): h.update(open(RIVERS, 'rb').read())
+    for f in (RIVERS, ELEV_INDEX):
+        if os.path.exists(f): h.update(open(f, 'rb').read())
     return h.hexdigest()[:12]
 
 
@@ -640,7 +727,7 @@ def main():
 
     index = {'made': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'hash': pack_hash(), 'source': NOTICE + (' / ' + WC_NOTICE if have_wc else ''),
              'tile': TILE, 'packTiles': PACK_TILES, 'apron': APRON, 'partial': partial,
-             'ext': 'webp', 'open': {'near': OPEN_NEAR, 'far': OPEN_FAR}, 'code': {'step': STEP, 'near': NEAR, 'deep': DEEP, 'quad': B_QUAD, 'land': C_LAND, 'knee': C_KNEE, 'water': C_DEEP}, 'levels': {}}
+             'ext': 'webp', 'open': {'near': OPEN_NEAR, 'far': OPEN_FAR}, 'level': {'max': LEVEL_MAX, 'pow': LEVEL_POW}, 'code': {'step': STEP, 'near': NEAR, 'deep': DEEP, 'quad': B_QUAD, 'land': C_LAND, 'knee': C_KNEE, 'water': C_DEEP}, 'levels': {}}
     index['levels']['7'] = {'scale': 1, 'nx': NX7, 'ny': NY7, 'packs': ''.join(states.get((x, y), '?') for y in range(NY7) for x in range(NX7))}
     for lv in (6, 5):
         f = 1 << (TOP - lv); nx, ny = NX7 // f, NY7 // f

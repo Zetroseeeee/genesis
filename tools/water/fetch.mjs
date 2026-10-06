@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Brings the water's edge (the "water" release: made by the Water workflow, tools/water/build.py) into data/w/: index.json
 // and the packs it names. The pack is kept in the release under the name of what it was made from (the first twelve
-// digits of the SHA-256 of tools/water/build.py and data/rivers.png together), and this asks for the pack of what lies here: a branch that
+// digits of the SHA-256 of tools/water/build.py, data/rivers.png and data/index.json together), and this asks for the pack of what lies here: a branch that
 // changes the builder gets its own, and the game that is out keeps the shores it was built with. Where that pack has not
 // been made (tools/water/pack.sh makes it: about an hour) what is here is kept, with a warning; with WATER_STRICT=1 (the
 // build of the game) that is an error. PART=1 takes the trial made last instead (water-part.tar: some blocks only).
@@ -16,8 +16,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const DIR = path.join(ROOT, 'data/w');
 const repo = process.env.GITHUB_REPOSITORY || JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/models/models.json'), 'utf8')).repo;
 const base = `https://github.com/${repo}/releases/download/${process.env.TAG || 'water'}`;
-const riv = path.join(ROOT, 'data/rivers.png');      // (the rivers the game draws itself go into the making: build.py's pack_hash reckons the same)
-const H = (() => { const h = crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, 'tools/water/build.py'))); if (fs.existsSync(riv)) h.update(fs.readFileSync(riv)); return h.digest('hex').slice(0, 12); })();
+const riv = path.join(ROOT, 'data/rivers.png');      // (the rivers the game draws itself go into the making, and its heights: build.py's pack_hash reckons the same)
+const H = (() => { const h = crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, 'tools/water/build.py'))); for (const f of [riv, path.join(ROOT, 'data/index.json')]) if (fs.existsSync(f)) h.update(fs.readFileSync(f)); return h.digest('hex').slice(0, 12); })();
 const strict = process.env.WATER_STRICT === '1', part = process.env.PART === '1';
 const pull = (name, to) => { const tmp = to + '.part'; try { execFileSync('curl', ['-fsSL', '--retry', '3', '-o', tmp, `${base}/${name}`], { stdio: 'ignore' }); } catch (e) { fs.rmSync(tmp, { force: true }); throw e; } fs.renameSync(tmp, to); };
 let had = null; try { had = JSON.parse(fs.readFileSync(path.join(DIR, 'index.json'), 'utf8')); } catch (e) {}

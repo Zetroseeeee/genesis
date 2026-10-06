@@ -1,7 +1,7 @@
 # Makes the water's edge of the real Earth (tools/water/build.py: a field of distances to the nearest shore, from the
 # water masks of the Copernicus DEM and the water of ESA WorldCover, both on AWS Open Data - hosts the cloud workspace
-# cannot reach) and keeps it in the "water" release, under the name of what it was made from (the builder and the
-# rivers the game draws: twelve digits of their SHA-256). tools/water/fetch.mjs brings it into data/w/.
+# cannot reach) and keeps it in the "water" release, under the name of what it was made from (the builder, the rivers
+# the game draws and the list of its heights: twelve digits of their SHA-256). tools/water/fetch.mjs brings it into data/w/.
 # tools/water/pack.sh runs it.
 name: Water
 on:
@@ -75,10 +75,10 @@ jobs:
           gh release upload "$TAG" out/water_build.log -R "$GITHUB_REPOSITORY" --clobber
           [ "$MODE" = "probe" ] && exit 0
           [ -s out/water_sheet.jpg ] && gh release upload "$TAG" out/water_sheet.jpg -R "$GITHUB_REPOSITORY" --clobber
-          # The whole Earth is kept under the name of what it was made from (twelve digits of the SHA-256 of the builder and
-          # the game's rivers together): the game's build asks for the one its own files make. A trial of some blocks is kept as water-part.tar, and is nobody's pack.
+          # The whole Earth is kept under the name of what it was made from (twelve digits of the SHA-256 of the builder, the
+          # game's rivers and the list of its heights together): the game's build asks for the one its own files make. A trial of some blocks is kept as water-part.tar, and is nobody's pack.
           if [ -n "$PART" ]; then cp out/water.tar water-part.tar; gh release upload "$TAG" water-part.tar -R "$GITHUB_REPOSITORY" --clobber; exit 0; fi
-          H="$(cat tools/water/build.py data/rivers.png | sha256sum | cut -c1-12)"
+          H="$(cat tools/water/build.py data/rivers.png data/index.json | sha256sum | cut -c1-12)"
           cp out/water.tar "water-$H.tar"; cp out/index.json "water-$H.json"
           echo "pack $H"
           gh release upload "$TAG" "water-$H.tar" "water-$H.json" -R "$GITHUB_REPOSITORY" --clobber
