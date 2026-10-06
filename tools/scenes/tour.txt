@@ -203,3 +203,7 @@ delta        | tools/scenes/forest.js | null | const f = () => __forest(30.37, 3
 lagoon       | tools/scenes/forest.js | null | const f = () => __forest(-151.74, -16.5, 6000, 0.9, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
 tundra       | tools/scenes/forest.js | null | const f = () => __forest(100.5, 72.5, 4000, 0.9, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
 sea_region   | tools/scenes/forest.js | null | const f = () => __forest(25.0, 37.5, 300000, 0.5, 0.0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 32
+# (what the water costs: __T.costsWater)
+costw_sea    | tools/scenes/forest.js | null | setTimeout(() => { __forest(27.40, 37.00, 400, 1.3, 0.5, 0.5); }, 3000); setTimeout(() => { __forest(27.40, 37.00, 400, 1.3, 0.5, 0.5); __T.costsWater(); }, 30000); | 72
+costw_air    | tools/scenes/forest.js | null | setTimeout(() => { __forest(27.40, 37.00, 3000, 1.1, 0.5, 0.5); }, 3000); setTimeout(() => { __forest(27.40, 37.00, 3000, 1.1, 0.5, 0.5); __T.costsWater(); }, 30000); | 72
+costw_lake   | tools/scenes/forest.js | null | setTimeout(() => { __forest(25.80, 62.075, 180, 1.3, 3.0, 0.5); }, 3000); setTimeout(() => { __forest(25.80, 62.075, 180, 1.3, 3.0, 0.5); __T.costsWater(); }, 30000); | 72

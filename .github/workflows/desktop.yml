@@ -51,10 +51,13 @@ jobs:
       - name: Fetch art and models
         env:
           GROUND_STRICT: '1'      # (the ground's materials must be the pack of the list in this commit, or the build stops)
+          WATER_STRICT: '1'       # (and the water's edge the pack of this commit's builder and rivers: tools/water/pack.sh makes it, in about an hour)
         run: |
           npm run fetch
           # (built without the ground's materials the game would draw the ground the old way, and nobody would be told)
           node -e "const fs = require('fs'), j = JSON.parse(fs.readFileSync('data/tex/ground.json', 'utf8')); for (const f of [j.albedo, j.normal]) if (!(fs.statSync('data/tex/' + f).size > 1e6)) throw new Error('ground: ' + f + ' is missing'); console.log('ground: ' + j.layers.length + ' materials, made ' + j.made);"
+          # (and without the water's edge it would draw its coasts from the picture of the Earth, five kilometres to a texel)
+          node -e "const fs = require('fs'), j = JSON.parse(fs.readFileSync('data/w/index.json', 'utf8')); if (j.partial) throw new Error('water: a trial of some blocks, not the whole Earth'); let n = 0; for (const [lv, l] of Object.entries(j.levels)) for (let i = 0; i < l.packs.length; i++) { if (l.packs[i] === '?') throw new Error('water: level ' + lv + ' has blocks that were not made'); if (l.packs[i] === 'P') { n++; if (!(fs.statSync('data/w/' + lv + '_' + (i % l.nx) + '_' + Math.floor(i / l.nx) + '.webp').size > 0)) throw new Error('water: a pack is missing'); } } if (n < 800) throw new Error('water: only ' + n + ' packs'); console.log('water: ' + n + ' packs, made ' + j.made + ' (' + j.hash + ')');"
       - name: Package
         run: npm run pack:mac
         env:

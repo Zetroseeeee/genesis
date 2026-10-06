@@ -120,7 +120,7 @@
         const L = TOWN.layout(sim, i, c, { coarse });
         const items = L.items; const n = items.length;
         // a harbour belongs on the shore: found once the coast is on screen, and again when finer terrain arrives
-        if (L.harbour && !coarse && L.shoreKey !== T.meshVersion + ':' + T.stats.packsI) { L.shoreKey = T.meshVersion + ':' + T.stats.packsI; this.placeHarbour(L, cLon, cLat, cl); L.hts = null; L.mask = null; L.fitEra = null; }
+        if (L.harbour && !coarse && L.shoreKey !== T.meshVersion + ':' + T.stats.packsI + ':' + (T.stats.packsW || 0)) { L.shoreKey = T.meshVersion + ':' + T.stats.packsI + ':' + (T.stats.packsW || 0); this.placeHarbour(L, cLon, cLat, cl); L.hts = null; L.mask = null; L.fitEra = null; }
         // per-plan caches: ground heights (refreshed when finer elevation arrives) and river masks (once)
         if (!L.hts || L.meshV !== T.meshVersion || L.dispOn !== T.dispOn) {
           // ground heights per item; a town re-planned while it grows keeps the heights of the plots it already had
@@ -128,7 +128,8 @@
           L.hts = new Float32Array(n); L.meshV = T.meshVersion; L.dispOn = T.dispOn; const vc = new Map(); const hmap = hm.map;
           for (let k = 0; k < n; k++) { const it = items[k]; const key = ((it.x * 0.2) | 0) * 100003 + ((it.z * 0.2) | 0); let h = hmap.get(key); if (h === undefined) { h = T.meshHeightAt(cLon + it.x / (R_M * cl * GEO.D2R), cLat + it.z / (R_M * GEO.D2R), vc); if (hmap.size < 40000) hmap.set(key, h); } L.hts[k] = h; }
         }
-        if ((!L.mask || L.maskI !== T.stats.packsI) && this.decal && this.decal.rivers && this.decal.rivers.length) { L.mask = new Uint8Array(n); L.maskI = T.stats.packsI; for (let k = 0; k < n; k++) { const it = items[k]; if (it.kind === 'pier' || it.kind === 'boat' || it.kind === 'ship') continue;
+        if ((!L.mask || L.maskI !== T.stats.packsI + 1000 * (T.stats.packsW || 0)) && this.decal && this.decal.rivers && this.decal.rivers.length) { L.mask = new Uint8Array(n); L.maskI = T.stats.packsI + 1000 * (T.stats.packsW || 0);      // (what is water is the picture's to say, and the field's of the water's edge: whenever either has more to say, ask again)
+          for (let k = 0; k < n; k++) { const it = items[k]; if (it.kind === 'pier' || it.kind === 'boat' || it.kind === 'ship') continue;
           // a long thing (a stretch of wall, a longhouse) is tried along its length, so one that only runs near the river stays
           const long = Math.max(it.w, it.d), short = Math.min(it.w, it.d); const ns = long > short * 1.8 ? Math.min(7, Math.ceil(long / short)) : 1; const ax = it.w >= it.d ? Math.cos(it.yaw) : Math.sin(it.yaw), az = it.w >= it.d ? Math.sin(it.yaw) : -Math.cos(it.yaw);
           let wet = 0, mid = false;
@@ -245,7 +246,7 @@
     }
     // which lengths of a run stand in water (kept on the plan item with the heights)
     wetLengths(it, tag, lon, lat, cy, sy, len, n, oneM, cl) {
-      const T = this.terrain; const store = it._rw || (it._rw = {}); const e = store[tag]; const key = T.stats.packsI + ':' + n;
+      const T = this.terrain; const store = it._rw || (it._rw = {}); const e = store[tag]; const key = T.stats.packsI + ':' + (T.stats.packsW || 0) + ':' + n;
       if (e && e.key === key) return e.w;
       const w = new Uint8Array(n);
       for (let j = 0; j < n; j++) { const o = (j - (n - 1) / 2) * (len / n); const lo = lon + o * cy / (R_M * cl * GEO.D2R), la = lat + o * sy / (R_M * GEO.D2R);
