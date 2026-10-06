@@ -362,10 +362,13 @@ Conventions that matter:
   Between two steps the one gives way to the other over a ragged span (`uGndT.z`, `.w`), each keeping the share of
   its light and dark that leaves the whole as rich as one alone (an even mix of two photographs is flat: it looked
   out of focus).
-  **Two ladders.** What a scan shows has a size. Laid as large on the screen as a face of rock, grass has blades as
-  long as a barn. The fine kinds (`GROUND_FINE`: grass, moor, the floor of a wood; `uGndCls`) stand lower on the
-  ladder (`uGndFine`): three quarters of a step while the eye is near, so that blades can be seen and stand against
-  a house as hay does, up to three steps from high up, where a meadow is a grain.
+  **Two ladders.** What a scan shows has a size (`size` in the list: metres of real ground). Most are taken from
+  the air and show fifteen metres and more; six show a metre or two (`fine`: grass, marsh, scree, shingle, red
+  earth, cracked mud). Laid as large on the screen as the others, grass has blades as long as a barn. So the fine
+  ones stand lower on the ladder (`uGndCls`, `uGndFine`): three quarters of a step while the eye is near, so that
+  blades can be seen and stand against a house as hay does, up to two and a quarter from high up, where a meadow
+  is a grain. Not lower: a repeat under a hundred and fifty pixels across is seen as rows of itself, whatever is
+  done to hide it (an aerial scan put on the fine ladder was a field of dots from a mile up).
   **Which material** comes from what the shader always weighed (wood, grass, dry ground, rock), the climate and the
   slope. The two that count most are laid one in the other's hollows, by their heights. A material takes the
   brightness the photograph of the Earth has there, up to a cap of its kind (grass under a bright haze is still
@@ -384,7 +387,8 @@ Conventions that matter:
   meadow, stony patches, scree) hangs on the noise of the place, never on the ladder: only the grain may change
   under the eye. And a scan must be what it is called: the first "meadow" was moss with twigs in it, and from a
   barn's height the twigs were logs. `shots/peek/ground_native.jpg` shows a piece of every material texel for
-  pixel: look there, not at the small sheet.
+  pixel: look there, not at the small sheet. A repeat is `GND_PX` (600) device pixels across times the root of the
+  screen's pixel ratio: on a screen of twice the pixels the materials are neither half the size nor half as sharp.
   A wood's floor gives way to its canopy between 2.2 and 4.2 km from the eye (`far` in the list: one size, by
   distance, because a crown has a size as grass has not), except in settled country, which is cleared to pasture
   with trees standing in it. What people have made of the ground (crops in their rows, paving) is laid at the size
