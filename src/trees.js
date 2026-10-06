@@ -14,12 +14,14 @@
   // stood on like mushrooms.)
   // The last is what grows under and between the trees, near the eye: young trees and bushes in a wood (its floor is not bare),
   // scrub on open ground where the climate grows any. It has no pictures of its own: a bush is the crown of one of the place's
-  // trees without its trunk, small, on the ground (CROWN: how far up its picture a tree's crown begins).
+  // trees without its trunk, small, on the ground (CROWN: how far up its picture a tree's crown begins). It has no edge:
+  // from a third of its reach outward ever fewer of the plots carry anything, and as the eye rises, ever fewer everywhere
+  // (in open country the scrub stopped at a circle about the eye, and went out all at once at a certain height).
   const TIERS = [
     { R: 3200, s: 40, k: 2.2, max: 41000 },
     { R: 12000, s: 110, k: 3.0, max: 76000 },
     { R: 36000, s: 380, k: 6.0, max: 57000 },
-    { R: 1150, s: 15, k: 2.2, max: 24000, under: true },
+    { R: 2000, s: 15, k: 2.2, max: 24000, under: true },
   ];
   const BAND = 0.5;      // degrees of latitude over which the plots of a tier keep one spacing along their parallels
   const CROWN = { tree_oak_a: 0.3, tree_beech_a: 0.28, tree_birch_a: 0.3, tree_spruce_a: 0.1, tree_pine_a: 0.52, tree_stonepine_a: 0.55, tree_cypress_a: 0.06, tree_olive_a: 0.34, tree_acacia_a: 0.42, tree_palm_a: 0.56, tree_rain_a: 0.45, tree_kapok_a: 0.6, tree_bamboo_a: 0.25, tree_baobab_a: 0.62 };
@@ -159,7 +161,7 @@
       // softly lit from the front: a wood of them unshaded is a table of model trees.)
       // (wood: for the light from below; a tree that stands alone has a third of it: its own crown shades its trunk and its under side)
       float deep = vTree.x, wood = max(deep, 0.34), low = mix(smoothstep(0.02, 0.62, vUv.y), 1.0, vTop), under = step(0.01, vTree.z) * deep;      // (under: a bush under the trees of a wood is in their shade altogether)
-      col *= mix(vec3(1.08, 1.0, 0.82), vec3(0.9, 1.0, 1.1), vTree.y) * mix(1.0, 0.84, deep) * mix(1.0, 0.7, under);
+      col *= mix(vec3(1.08, 1.0, 0.82), vec3(0.93, 1.0, 1.05), vTree.y) * mix(1.0, 0.84, deep) * mix(1.0, 0.7, under);
       float lum = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(lum), col, mix(0.94, 0.86, deep));
       float shade = mix(1.0, 0.2 + 0.8 * low, wood) * mix(1.0, 0.4, under);
       float sky = (0.5 + 0.5 * dot(n, uUpV)) * mix(1.0, 0.35 + 0.65 * low, wood);
@@ -306,9 +308,9 @@
       for (let ti = 0; ti < TIERS.length && !this._job; ti++) {
         const t = TIERS[ti], L = this.last[ti], near = ti === 0 || t.under, soft = near ? nearby : far;
         // (what grows under the trees is only there to be seen from close to: from higher up it is not placed at all)
-        if (t.under && cam.alt > 0.00042) { if (this.modelCount[ti]) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; L.t = -1e9; } continue; }
+        if (t.under && (cam.agl === undefined ? cam.alt : cam.agl) > 0.00042) { if (this.modelCount[ti]) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; L.t = -1e9; } continue; }
         const moved = GEO.distKm(cam.lon, cam.lat, L.lon, L.lat) * 1000 > t.R * 0.18;
-        const zoomed = ti === 0 && Math.abs(Math.log((cam.dist || 1) / (L.dist || 1))) > 0.25;     // closer or farther: the near trees change their level of detail
+        const zoomed = near && Math.abs(Math.log((cam.dist || 1) / (L.dist || 1))) > 0.25;     // closer or farther: the near trees change their level of detail, what grows under them thins out
         const age = now - L.t, stale = L.sig !== sig || (L.soft !== soft && age > (near ? 1500 : 4000));
         if (!moved && !zoomed && !stale && age < (L.partial ? 2500 : 60000)) continue;
         this._job = this.buildSteps(ti, cam, now, sig, soft);
@@ -380,6 +382,7 @@
       const casters = ti === 0 ? [] : null; const vc = new Map(); let steps = 0, waiting = false, sn = 0;
       const under = !!t.under, near = ti === 0 || under;      // (near: stands on the ground as its mesh has it)
       const fades = !under && ti + 1 < TIERS.length && !TIERS[ti + 1].under && !!this.flora();
+      const thin = 1 - smooth(0.00022, 0.00042, cam.agl === undefined ? cam.alt : cam.agl);
       const inner = ti > 0 && !under ? TIERS[ti - 1].R : 0;   // the inner disc is the finer tier's (the cards leave it in the shader: uHole; the kit's trees here)
       // what the pass places goes into one store first, whatever the kind of tree, and is handed out when the pass is whole
       const St = this._stage[ti] || (this._stage[ti] = { m: new Float32Array(maxN * 16), c: new Float32Array(maxN * 3), t: new Float32Array(maxN * 3), k: new Uint8Array(maxN) });
@@ -393,15 +396,16 @@
       // behind nearer ones costs next to nothing (a forest seen from low down is many trees deep at every pixel)
       const order = (this._orders || (this._orders = []))[ti] || (this._orders[ti] = new Float64Array(span * span));
       const eye = camPos ? GEO.fromVec(camPos) : [lon0, lat0]; const ex = (((eye[0] - lon0 + 540) % 360) - 180) / dLon, ey = (eye[1] - lat0) / dLat;
-      { let o = 0; for (let jy = -n; jy <= n; jy++) for (let jx = -n; jx <= n; jx++) { const ddx = jx - ex, ddy = jy - ey; order[o] = Math.round((ddx * ddx + ddy * ddy) * 16) * 65536 + o; o++; } order.sort(); }
+      { let o = 0; for (let jy = -n; jy <= n; jy++) for (let jx = -n; jx <= n; jx++) { const ddx = jx - ex, ddy = jy - ey; order[o] = Math.round((ddx * ddx + ddy * ddy) * 16) * 131072 + o; o++; } order.sort(); }      // (a tier has up to seventy thousand plots)
       for (let oi = 0; oi < order.length && count + countB + countM < maxN; oi++) {
         if ((++steps & 63) === 0) yield;
-        { const cellIdx = order[oi] % 65536, row = Math.floor(cellIdx / span); const gy = gy0 - n + row, rowD = rows[row * 2], gx = rows[row * 2 + 1] - n + (cellIdx % span);
+        { const cellIdx = order[oi] % 131072, row = Math.floor(cellIdx / span); const gy = gy0 - n + row, rowD = rows[row * 2], gx = rows[row * 2 + 1] - n + (cellIdx % span);
           const h1 = hash2(gx, gy, 3 + ti);
           const lat = gy * dLat + (hash2(gx, gy, 11) - 0.5) * dLat * 0.9, lon = gx * rowD + (hash2(gx, gy, 12) - 0.5) * rowD * 0.9;
           const dxm = (lon - lon0) * D2R * cl * R_M, dym = (lat - lat0) * D2R * R_M; const d2 = dxm * dxm + dym * dym;
           if (d2 > t.R * t.R) continue;
-          if (fades) { const rr = t.R * (0.8 + 0.2 * hash2(gx, gy, 93)); if (d2 > rr * rr) continue; }      // (it thins out over the last fifth of its reach, as the next tier comes in: uHole)
+          if (fades) { const rr = t.R * (0.8 + 0.2 * hash2(gx, gy, 93)); if (d2 > rr * rr) continue; }
+          if (under && hash2(gx, gy, 94) > thin * (1 - smooth(0.3, 1.0, Math.sqrt(d2) / t.R))) continue;      // (it thins out over the last fifth of its reach, as the next tier comes in: uHole)
           const i = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W);
           if (sim && !sim.land[i]) continue;
           const h = near ? T.meshHeightAt(lon, lat, vc) : T.heightAt(lon, lat); if (h <= 0.5) continue;

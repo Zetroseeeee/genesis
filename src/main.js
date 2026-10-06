@@ -1162,7 +1162,7 @@
       else { sunAngle += dt * 0.012; const cd = Math.sqrt(1 - decl * decl); _sun.set(Math.cos(sunAngle) * cd, decl, Math.sin(sunAngle) * cd).normalize(); }
       if (sunEase > 0) { sunEase -= real; globals.uSun.value.lerp(_sun, 1 - Math.exp(-real * 3.5)).normalize(); } else globals.uSun.value.copy(_sun);
     }
-    globals.uTime.value = now / 1000; globals.uCamAlt.value = mapcam.alt;
+    globals.uTime.value = now / 1000; globals.uCamAlt.value = mapcam.agl === undefined ? mapcam.alt : mapcam.agl;      // (above the ground looked at: camera.js)
     const sp = speed();
     if (sim && mode === 'play' && sp > 0) {
       acc += sp * dt; const t0 = performance.now(); let n = 0;

@@ -126,6 +126,10 @@
       const alt = pos.length() - 1; // approx altitude (units)
       cam.near = Math.max(alt * 0.05, 2e-6); cam.far = pos.length() + 3; cam.updateProjectionMatrix();
       this.alt = alt; this.target = target; this.forward = forward;
+      // How high the eye is above the ground it looks at. This, not its height above the sea, says how near it is to things:
+      // on a high plain (the ground is drawn twice as tall: a town at 1,600 m stands three kilometres up) everything that
+      // is shown only from close to went by the height above the sea, and was never shown.
+      this.agl = Math.max(pos.length() - target.length(), 4e-6);
     }
   }
   window.MAPCAM = { MapCamera };
