@@ -169,7 +169,7 @@
       float diff = mix(0.45, 0.16, wood) + mix(0.55, 0.92, wood) * sunSide + 0.25 * max(dot(uUpV, uSunV), 0.0) * mix(1.0, low, wood);     // the photograph is already softly lit: the sun adds a bright side
       diff *= (1.0 - 0.6 * vHid * mix(1.0, 1.0 - 0.8 * low, deep)) * shade;      // (in a wood the neighbours' shadow is on a tree's foot, which is dark by 'shade' already: its top is in the sun)
       vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky) * mix(1.0, 0.4, wood), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
-      vec3 lit = col * (amb * mix(1.0, 0.3 + 0.7 * low, wood) + diff * 0.72 * uSunCol) * (1.0 + 0.25 * vTop);      // (from above it is the lit top of the crown that is seen, not the side the picture was taken from)
+      vec3 lit = col * (amb * mix(1.0, 0.3 + 0.7 * low, wood) + diff * 0.72 * uSunCol) * (1.0 + 0.25 * vTop) * mix(vec3(1.0), vec3(1.03, 1.0, 0.9), vTop);      // (from above it is the lit top of the crown that is seen, not the side the picture was taken from: lighter, and a little yellower, as the canopy on the ground has it)
       gl_FragColor = vec4(airOver(lit, vAirT, vAirL), mix(1.0, cover, uCover));                     // the air between (air.js)
     }`;
   const IMP_DEPTH = `
@@ -228,6 +228,7 @@
       this.scene = scene; this.terrain = terrain; this.exag = terrain.exag; this.sim = null; this.renderer = renderer || null;
       this.veg = null; this.noise = null; this.ready = false; this.enabled = true;
       this.uCover = { value: 0 };      // 1 while the picture is drawn with several samples a pixel (main.js says so each frame)
+      this.stretch = 1;      // how much of the country's lusher and drier stretches the trees have (1: as the ground)
       this.slice = 4; this._job = null;        // milliseconds a frame for placing trees (main.js gives a software renderer all it needs: its frames are long anyway)
       this.imps = TIERS.map(() => new Map()); this.modelCount = TIERS.map(() => 0);   // real trees: picture cards per tier and species
       this.holes = TIERS.map(() => ({ value: new THREE.Vector4(0, 0, 0, -1) }));      // where the tier inside each has its trees (uHole)
@@ -255,6 +256,10 @@
       const img = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => { const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(im, 0, 0); res(ctx.getImageData(0, 0, im.width, im.height)); }; im.onerror = () => rej(new Error('failed ' + url)); im.src = url; });
       const [v, n] = await Promise.all([img(vegUrl), img(noiseUrl)]);
       this.veg = v; this.noise = n; this.ready = true;
+      // (the noise as the ground's shader reads it for what lies where: its third level, eight texels to one)
+      { const k = 8, w = (n.width / k) | 0, h = (n.height / k) | 0, d = new Uint8ClampedArray(w * h * 4);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 4; c++) { let sum = 0; for (let yy = 0; yy < k; yy++) for (let xx = 0; xx < k; xx++) sum += n.data[((y * k + yy) * n.width + x * k + xx) * 4 + c]; d[(y * w + x) * 4 + c] = sum / (k * k); }
+        this.noiseLo = { width: w, height: h, data: d }; }
       if (climateUrl) img(climateUrl).then((c) => { this.climate = c; for (const L of this.last) L.t = -1e9; }).catch((e) => console.warn('climate', e));
     }
     // bilinear sample of an ImageData channel at fractional pixel coords (wrapping x)
@@ -265,6 +270,7 @@
       return ((d[(yy0 * w + x0) * 4 + ch] * (1 - ax) + d[(yy0 * w + x1) * 4 + ch] * ax) * (1 - ay) + (d[(yy1 * w + x0) * 4 + ch] * (1 - ax) + d[(yy1 * w + x1) * 4 + ch] * ax) * ay) / 255;
     }
     noiseAt(gx, gy, k, ch) { const n = this.noise; return this.samp(n, fr(gx * k) * n.width, (1 - fr(gy * k)) * n.height, ch); }   // flipY, as the GPU sees it
+    noiseLoAt(gx, gy, k, ch) { const n = this.noiseLo; return this.samp(n, fr(gx * k) * n.width, (1 - fr(gy * k)) * n.height, ch); }
     // forest weight at a point: mirrors the terrain shader's biome rules (weights are dithered with the same noise)
     forestAt(lon, lat, h) {
       const v = this.veg; const fx = (lon + 180) / 360 * v.width, fy = (90 - lat) / 180 * v.height;
@@ -460,6 +466,17 @@
             let r = hash2(gx, gy, 61) * tot; for (let k = 0; k < Z.length; k++) { const e = Z[k]; if (e.region && !inBox(e.region, lon, lat)) continue; def = e.def; r -= e.w * fav(k); if (r <= 0) break; } }
           if (under && (!def || !MODELS.card(def))) continue;      // (no pictures yet: no bushes)
           const v = 0.85 + hash2(gx, gy, 41) * 0.3;
+          // The country has its stretches, lusher here and drier and yellower there, from a stone's throw to a mile across:
+          // the ground's shader lays them on whatever the ground is made of, the canopy that stands for a far wood too
+          // (terrain.js, at 'lush'). They are the trees' as well, from the same noise: a wood that kept one green while the
+          // ground under and beyond it changed from stretch to stretch showed, from high up, exactly where its trees ended.
+          let kl = 1, kr = 1, kb = 1;
+          if (this.noiseLo) { const lush = (this.noiseLoAt(sx, sy, 9000, 1) - 0.5) * 0.5 + (this.noiseLoAt(sx, sy, 40000, 0) - 0.5) * 0.35 + (this.noiseLoAt(sx, sy, 1200, 2) - 0.43) * 0.35, dryish = (this.noiseLoAt(sx, sy, 9000, 0) - 0.5) * 0.6 + (this.noiseLoAt(sx, sy, 40000, 1) - 0.5) * 0.4;
+            kl = 1 + lush * 0.8 * this.stretch; kr = 1 + dryish * 0.45 * this.stretch; kb = 1 - dryish * 0.6 * this.stretch; }
+          // And a wood is as light or as dark as the photograph of the Earth has it there, as the ground is (the canopy that
+          // stands for it from afar is given the photograph's brightness: the trees of the Black Forest and of Brandenburg were
+          // one green, and from high up the trees round the eye lay on the lighter woods of the plain as a dark plate).
+          kl *= 1 + (Math.min(1.3, Math.max(0.75, Math.pow(Math.max(fw.lum, 0.05) / 0.40, 0.8))) - 1) * smooth(0.2, 0.6, fw.f) * this.stretch;
           // seasons, for the trees that shed: autumn colour, then bare crowns in winter (each tree in its own week)
           let fall = 0, bare = 0;
           if (this.season && (def ? def.flora.deciduous : zone === 'temperate' || zone === 'easia')) { const north = lat > 0; const off = this.bareness ? (north ? this.bareness.x : this.bareness.y) : 0, autumn = north ? this.season.y : this.season.w; const decid = smooth(0.26, 0.4, fw.latN); fall = autumn * decid * (1 - off); bare = off * decid; }
@@ -497,6 +514,7 @@
               // scale, is a tree on a green: it keeps its light)
               const wood = (kEff > kTier * 1.05 ? 0 : smooth(0.3, 0.72, fw.f)) * (leafless ? 0.4 : 1), dice = 0.55 * stB + 0.45 * hash2(gx, gy, 43);      // (a bare wood lets the light through)
               St.t[sn * 3] = wood; St.t[sn * 3 + 1] = dice; St.t[sn * 3 + 2] = crop;
+              col.setRGB(col.r * kl * kr, col.g * kl, col.b * kl * kb);
               col.toArray(St.c, sn * 3); St.k[sn++] = ki; kinds[ki].n++; countM++;
               if (casters && !(window.SHADOWS && SHADOWS.ready && SHADOWS.enabled)) casters.push(lon, lat, hgt * aspect * 0.8, hgt);   // with the depth map on, the card throws its own true shadow
               // slender trees stand closer than broad ones: a spruce or a birch brings a neighbour, so a wood of them closes its canopy too

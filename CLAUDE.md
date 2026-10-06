@@ -471,15 +471,20 @@ Conventions that matter:
   in the shader (`uHole`: the outer one draws nothing where the inner one's trees stand now; placed at different
   times with a hole left at placing, a moving eye had a bare crescent of wood behind it), and not at a line: each
   thins out over the last fifth of its reach as the next comes in, and what grows under the trees thins from a
-  third of its reach and as the eye rises. A kind of tree has room for what a pass placed of it and is given more
-  when it needs more (`impMesh`; with room for a whole tier each, the trees of a journey held hundreds of
-  megabytes).
+  third of its reach and as the eye rises. The nearest tier draws in as the eye rises from six kilometres to
+  twelve, and from there the next has all the ground. A pass that places what stands already (most do: the ground
+  was looked at again, a year went by) hands nothing over: nothing is sent to the card and the sun's shadows are
+  not drawn again (`_sums`). A kind of tree has room for what a pass placed of it and is given more when it needs
+  more (`impMesh`; with room for a whole tier each, the trees of a journey held hundreds of megabytes).
   **From above** a tree is its crown (`uCrown`, `vTop`): the pictures are of trees from the side, and laid under
   the eye whole they showed the trunk and the dark under side of every crown, so that from a mile up the trees
   round the eye were a black plate on the country. The higher the eye, the more of the picture's foot is left off,
   the more the crown is lit as its top is, and the wider a tree in a wood is drawn (half again: from the side the
-  trees of a wood stand one behind another, from above each has only its own ground to cover). Look at a wood
-  from 3 and 5 km (`woods_high`, `woods_top`) after touching how trees are shaded.
+  trees of a wood stand one behind another, from above each has only its own ground to cover). And a wood is as
+  light or as dark as the photograph of the Earth has it there, with the ground's own lusher and drier stretches
+  (`trees.stretch`): the canopy that stands for a wood from afar is toned so, and trees of one green everywhere
+  lay on the lighter woods of the plain as a dark patch about the eye. Look at a wood from 3, 5, 7 and 9 km
+  (`woods_high`, `woods_top`, `woods_7k`, `woods_9k`) after touching how trees are shaded.
 - **Climate.** `data/climate.png` is the Köppen-Geiger class of every eighth of a degree, and `data/info.png`
   carries two fields made from it: alpha = how dry the country is (the ground shader blends sand, stony plain,
   scrub, steppe and savanna by it; the photograph only says where the ground is bare), blue = how hard the winters
