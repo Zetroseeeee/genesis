@@ -215,8 +215,11 @@
           n = Math.max(1, n); r = r / n * 0.86; g = g / n * 0.86; b = b / n * 0.86;
           for (let y = 0; y < h; y++) { const so = (h - 1 - y) * w * 4, o = y * w * 4;      // (the picture's top row last: as a loaded image would lie)
             for (let x = 0; x < w * 4; x += 4) { const a = src[so + x + 3]; let k = a >= 250 ? 1 : (a / 255) * (a / 255);
-              // (and where the screen itself shows through a crown, a speck of it that the cut left in: no leaf is that turquoise)
-              const sr = src[so + x], sg = src[so + x + 1], sb = src[so + x + 2]; if (Math.min(sg, sb) - sr > 34 && sb > 0.7 * sg) k = 0;
+              // (and where the screen itself shows through a crown, a speck of it that the cut left in: no leaf is that turquoise,
+              //  a bright green with next to no red in it and half as much blue)
+              const sr = src[so + x], sg = src[so + x + 1], sb = src[so + x + 2];
+              if (Math.min(sg, sb) - sr > 34 && sb > 0.7 * sg) k = 0;
+              else if (sg > 60) k *= 1 - Math.min(1, Math.max(0, (0.55 - sr / sg) / 0.25)) * Math.min(1, Math.max(0, (sb / sg - 0.4) / 0.15));
               out[o + x] = r + (sr - r) * k; out[o + x + 1] = g + (sg - g) * k; out[o + x + 2] = b + (sb - b) * k; out[o + x + 3] = a; } }
           t = new THREE.DataTexture(out, w, h, THREE.RGBAFormat, THREE.UnsignedByteType);
         } catch (e) { t = new THREE.Texture(im); }      // (a picture that may not be read: as it was)

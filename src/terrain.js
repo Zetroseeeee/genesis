@@ -59,10 +59,9 @@
         vec2 c1 = fract(uPhaseB * 30.0) + gl0 * 1500.0, c2 = fract(uPhaseB * 180.0) + gl0 * 9000.0;
         float n1 = texture2D(uNoise, c1).r - 0.5, n2 = texture2D(uNoise, c2).g - 0.5;
         float amp = 0.55 + 0.9 * (texture2D(uNoise, fract(uPhaseB * 3.0) + gl0 * 150.0).r);
-        // Still water lies level: the small relief ends where the picture of the Earth has a lake, and the shore runs down
-        // to it. (A lake heaved as the land is was a sheet of bumps under a flat picture of water; seen from low down some of
-        // its triangles stood edge-on to the eye, and what was looked up for those was a hundred kilometres of country at
-        // once, which is not a lake: a lattice of dark dashes over the water. WET in the height queries below is the same.)
+        // Still water lies level: the small relief ends where the picture of the Earth has water, and the shore runs down
+        // to it. (A lake heaved as the land is was a sheet of bumps, ten metres up and down, under a flat picture of
+        // water. WET in the height queries below is the same.)
         float wet = smoothstep(0.66, 0.96, texture2D(uImg, uImgRect.xy + vec2(u, v) * uImgRect.zw).a);
         h += (n1 * 90.0 * (0.08 + st) + n2 * 9.0 * (0.08 + 1.2 * st)) * amp * dispOn * wet;
         h = max(h, 0.5);
@@ -313,11 +312,12 @@
       float closeFade0 = max(clamp(1.0 - texPerPx0 * 0.25, 0.0, 1.0), smoothstep(0.03, 0.003, uCamAlt));
       float a = img.a;                                   // 1 land, 0.75 raster river band, 0.5 lake, 0 sea
       float aw = fwidth(a);
-      // The water's mask between the texels of the picture. From close to a texel of it is hundreds of pixels wide, and a card
-      // does not weigh four texels finely: it gives what lies between them in a few dozen steps (sixty-four on Apple's).
+      // The water's mask between the texels of the picture. A texel of it is five kilometres: from close to, thousands of
+      // pixels wide, and a card does not weigh four texels finely: it gives what lies between two of them in 256 steps.
       // A coast was a flight of stairs; and since a lake is told from a shore by how level the mask lies (aw), with every
       // tread of the stairs dead level and every riser a cliff, a lake near its shore was crossed by a lattice of lines of
       // dry land, nine metres by nineteen. Magnified, the four texels are fetched and weighed here, and the slope is theirs.
+      // (texPerPx0 counts 4096 texels to a pack, which has 1024: it is four times the texels to a pixel.)
       { vec2 isz = vec2(textureSize(uImg, 0)), tx = dFdx(vUV) * uImgRect.zw * isz, ty = dFdy(vUV) * uImgRect.zw * isz;
         if (texPerPx0 < 0.6 && a > 0.004 && a < 0.996) {
           vec2 t0 = uImgRect.xy * isz, ti = floor(t0), q = (t0 - ti) + (vUV * uImgRect.zw + warp) * isz - 0.5, qi = floor(q), f = q - qi;

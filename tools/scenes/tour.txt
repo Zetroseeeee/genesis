@@ -167,6 +167,8 @@ jungle       | tools/scenes/forest.js | null | const f = () => __forest(22.0, 0.
 #  and water from low down: a lake's shore and a coast are where the mask of the picture of the Earth is magnified most)
 woods_high   | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 3000, 0.75, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
 woods_top    | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 5200, 0.4, 0.0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+woods_7k     | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 7000, 0.6, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
+woods_9k     | tools/scenes/forest.js | null | const f = () => __forest(10.5, 51.2, 9000, 0.6, 0.4, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 45
 lake_low     | tools/scenes/forest.js | null | const f = () => __forest(26.47, 63.03, 120, 1.3, 1.2, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
 coast_low    | tools/scenes/forest.js | null | const f = () => __forest(-0.325, 39.45, 150, 1.25, 0.3, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 38
 # (a town on a high plain: what is shown only from close to goes by the eye's height above the ground it looks at, not above the sea)

@@ -413,6 +413,25 @@ Conventions that matter:
   meshes went to quads of 8 pixels. Three things that were tried and measured no faster on that card: lookups
   told how large a pixel is (`textureGrad`: a tenth slower), branches round the two places of a ladder, fewer ways
   of filtering. `__T.costsGround()` goes through the parts (`uGndDbg`).
+- **A card does not weigh four texels finely.** Between two texels a GPU gives 256 steps and no more (the software
+  renderer here weighs finely and shows none of this). The picture of the Earth is 1024 pixels to 45 degrees
+  (`data/i`: five kilometres to a texel; the `4096` in the shader's `texPerPx0` is four times the truth), so from
+  close to a texel is thousands of pixels wide and what is looked up between two of them is a flight of stairs,
+  dead level on every tread: nine metres by nineteen in Finland. Never take `fwidth` of such a lookup for its
+  slope, and put no threshold on one: a lake is told from a shore by how level the water's mask lies, and every
+  riser of the stairs was a line of dry land across the water (a lattice over every lake near its shore, in every
+  release up to 0.19). Where the picture is magnified the mask's four texels are fetched and weighed in the shader
+  and its slope is theirs (`terrain.js`, at `img`). Look at water from low down on the Mac (`taiga_shore`,
+  `lake_low`, `coast_low`, `port`) after touching the mask. Still to do, for the water: a coast's texels are
+  mixtures (64, 96, 128 ...), and 128 is also what a lake is, so a coast's ramp passes through the lake's value:
+  the blue band and the bar of sand off many coasts are that (the shader's sea begins at 0.36 of the mask, a
+  lake's shore and `isWater` at 0.62).
+- **Still water lies level.** The ground's small relief (`dispAt`, the vertex shader) ends where the picture of the
+  Earth has water (`WET`): a lake heaved as the land is was a sheet of bumps under a flat picture of water.
+- **How near the eye is** is `mapcam.agl`, its height above the ground it looks at; `mapcam.alt` is its height above
+  the sea. `uCamAlt` and whatever is shown only from close to go by the first: the ground is drawn twice as tall, a
+  town at 1,600 m stands three kilometres up, and by the height above the sea the high plains of Iran, Ethiopia,
+  Mexico and the Andes never showed a field's plots, the scrub or anything else that is for near.
 - **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
   sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.
@@ -442,6 +461,25 @@ Conventions that matter:
   small a picture is an average of its texels, so far trees were pale and haloed), and where the frame has several
   samples a pixel the cut-out's edge is drawn by coverage (`alphaToCoverage`, `uCover`), not pixel by pixel. Trees
   stand up to the water (the water mask climbs over a kilometre: only its lower half is shore).
+  **How they are placed.** A tier is tens of thousands of plots, each asking the country what grows there: a tenth
+  of a second and more. It is done a slice a frame (`trees.slice`, milliseconds; a software renderer does it at
+  once) into a store the picture does not see, and shown when it is whole; and only when the eye has moved or what
+  the trees stand in has changed (season and leaves at once; the ground's heights and water, which arrive piece by
+  piece, and the years of the world no oftener than every second or two). The plots are the world's, not the eye's:
+  rows along the parallels, spaced by their own latitude in bands of half a degree (spaced by the eye's latitude,
+  every tree of a wood changed places each time the eye had gone a few hundred metres north). The tiers hand over
+  in the shader (`uHole`: the outer one draws nothing where the inner one's trees stand now; placed at different
+  times with a hole left at placing, a moving eye had a bare crescent of wood behind it), and not at a line: each
+  thins out over the last fifth of its reach as the next comes in, and what grows under the trees thins from a
+  third of its reach and as the eye rises. A kind of tree has room for what a pass placed of it and is given more
+  when it needs more (`impMesh`; with room for a whole tier each, the trees of a journey held hundreds of
+  megabytes).
+  **From above** a tree is its crown (`uCrown`, `vTop`): the pictures are of trees from the side, and laid under
+  the eye whole they showed the trunk and the dark under side of every crown, so that from a mile up the trees
+  round the eye were a black plate on the country. The higher the eye, the more of the picture's foot is left off,
+  the more the crown is lit as its top is, and the wider a tree in a wood is drawn (half again: from the side the
+  trees of a wood stand one behind another, from above each has only its own ground to cover). Look at a wood
+  from 3 and 5 km (`woods_high`, `woods_top`) after touching how trees are shaded.
 - **Climate.** `data/climate.png` is the Köppen-Geiger class of every eighth of a degree, and `data/info.png`
   carries two fields made from it: alpha = how dry the country is (the ground shader blends sand, stony plain,
   scrub, steppe and savanna by it; the photograph only says where the ground is bare), blue = how hard the winters

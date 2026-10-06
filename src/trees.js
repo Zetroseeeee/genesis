@@ -231,7 +231,7 @@
       this.slice = 4; this._job = null;        // milliseconds a frame for placing trees (main.js gives a software renderer all it needs: its frames are long anyway)
       this.imps = TIERS.map(() => new Map()); this.modelCount = TIERS.map(() => 0);   // real trees: picture cards per tier and species
       this.holes = TIERS.map(() => ({ value: new THREE.Vector4(0, 0, 0, -1) }));      // where the tier inside each has its trees (uHole)
-      this._stage = TIERS.map(() => null);
+      this._stage = TIERS.map(() => null); this._sums = TIERS.map(() => null);      // (_sums: what each tier's last pass came to)
       const mk = (detail, max) => {
         const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x10190a, emissiveIntensity: 0.6 });
         const m = new THREE.InstancedMesh(treeGeometry(detail), mat, max); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -308,8 +308,8 @@
       for (let ti = 0; ti < TIERS.length && !this._job; ti++) {
         const t = TIERS[ti], L = this.last[ti], near = ti === 0 || t.under, soft = near ? nearby : far;
         // (what grows under the trees is only there to be seen from close to: from higher up it is not placed at all)
-        if (t.under && (cam.agl === undefined ? cam.alt : cam.agl) > 0.00042) { if (this.modelCount[ti]) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; L.t = -1e9; } continue; }
-        const moved = GEO.distKm(cam.lon, cam.lat, L.lon, L.lat) * 1000 > t.R * 0.18;
+        if (t.under && (cam.agl === undefined ? cam.alt : cam.agl) > 0.00042) { if (this.modelCount[ti]) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; this._sums[ti] = null; L.t = -1e9; } continue; }
+        const moved = GEO.distKm(cam.lon, cam.lat, L.lon, L.lat) * 1000 > Math.max(100, (L.R === undefined ? t.R : L.R) * 0.18);
         const zoomed = near && Math.abs(Math.log((cam.dist || 1) / (L.dist || 1))) > 0.25;     // closer or farther: the near trees change their level of detail, what grows under them thins out
         const age = now - L.t, stale = L.sig !== sig || (L.soft !== soft && age > (near ? 1500 : 4000));
         if (!moved && !zoomed && !stale && age < (L.partial ? 2500 : 60000)) continue;
@@ -320,7 +320,7 @@
     clear() {
       this._job = null;
       for (const m of this.meshes) m.count = 0; this.broad.count = 0; this.count = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1;
-      for (let ti = 0; ti < TIERS.length; ti++) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; this.holes[ti].value.w = -1; }
+      for (let ti = 0; ti < TIERS.length; ti++) { for (const I of this.imps[ti].values()) I.count = 0; this.modelCount[ti] = 0; this.holes[ti].value.w = -1; this._sums[ti] = null; }
     }
     // ----- real trees: the photograph of each species on a card -----
     // The trees of each flora zone that have a card: { zone: [{ def, w, region }] }, or null while the library has none
@@ -369,21 +369,24 @@
     buildTier(ti, cam, now) { const it = this.buildSteps(ti, cam, now, '', ''); while (!it.next().done) { /* all at once (tools) */ } }
     *buildSteps(ti, cam, now, sig, soft) {
       const t = TIERS[ti]; const mesh = this.meshes[ti]; const T = this.terrain; const sim = this.sim;
-      this.last[ti] = { lon: cam.lon, lat: cam.lat, t: now, dist: cam.dist, sig, soft, partial: false };
+      // (The nearest tier draws in as the eye rises, from six kilometres up to twelve, and from there the next has all the
+      //  ground: its trees are a few pixels each by then, and a patch of finer ones in the middle of the picture is no gain.)
+      const agl = cam.agl === undefined ? cam.alt : cam.agl, R = t.R * (ti === 0 ? 1 - smooth(0.00095, 0.0019, agl) : 1);
+      this.last[ti] = { lon: cam.lon, lat: cam.lat, t: now, dist: cam.dist, sig, soft, partial: false, R };
       const lat0 = cam.lat, lon0 = cam.lon; const cl = Math.max(0.15, Math.cos(lat0 * D2R));
       // The plots are the world's, not the eye's: a row of them runs along its parallel at the spacing its own latitude gives
       // (by bands of half a degree), wherever the eye is. (Spaced by the eye's latitude, every tree of a wood changed
       // places each time the eye had gone a few hundred metres north.)
-      const dLat = t.s / R_M / D2R, dLon = dLat / cl; const n = Math.ceil(t.R / t.s);
-      const gy0 = Math.round(lat0 / dLat), span = 2 * n + 1; const rows = (this._rows || (this._rows = []))[ti] || (this._rows[ti] = new Float64Array(span * 2));
+      const dLat = t.s / R_M / D2R, dLon = dLat / cl; const n = Math.ceil(R / t.s);
+      const gy0 = Math.round(lat0 / dLat), span = 2 * n + 1, spanMax = 2 * Math.ceil(t.R / t.s) + 1; const rows = (this._rows || (this._rows = []))[ti] || (this._rows[ti] = new Float64Array(spanMax * 2));
       for (let r = 0; r < span; r++) { const d = dLat / Math.max(0.15, Math.cos((Math.floor((gy0 - n + r) * dLat / BAND) + 0.5) * BAND * D2R)); rows[r * 2] = d; rows[r * 2 + 1] = Math.round(lon0 / d); }
       const m = this._m, q = this._q, s = this._s, p = this._p, col = this._c, basis = this._basis;
       let count = 0, countB = 0, countM = 0; const maxN = t.max; const exag = this.exag; const broad = this.broad;
       const casters = ti === 0 ? [] : null; const vc = new Map(); let steps = 0, waiting = false, sn = 0;
       const under = !!t.under, near = ti === 0 || under;      // (near: stands on the ground as its mesh has it)
       const fades = !under && ti + 1 < TIERS.length && !TIERS[ti + 1].under && !!this.flora();
-      const thin = 1 - smooth(0.00022, 0.00042, cam.agl === undefined ? cam.alt : cam.agl);
-      const inner = ti > 0 && !under ? TIERS[ti - 1].R : 0;   // the inner disc is the finer tier's (the cards leave it in the shader: uHole; the kit's trees here)
+      const thin = 1 - smooth(0.00022, 0.00042, agl);
+      const inner = ti > 0 && !under ? (this.last[ti - 1].R === undefined ? TIERS[ti - 1].R : this.last[ti - 1].R) : 0;   // the inner disc is the finer tier's (the cards leave it in the shader: uHole; the kit's trees here)
       // what the pass places goes into one store first, whatever the kind of tree, and is handed out when the pass is whole
       const St = this._stage[ti] || (this._stage[ti] = { m: new Float32Array(maxN * 16), c: new Float32Array(maxN * 3), t: new Float32Array(maxN * 3), k: new Uint8Array(maxN) });
       const kinds = [], kindOf = new Map(); const imps = this.imps[ti]; const flora = this.flora();
@@ -394,7 +397,7 @@
       const budget = this.budget === undefined ? 1 : this.budget; const towns = new Map();       // the towns near the trees of this pass: where each stands, how large, its plan
       // the plots nearest the eye first: within each kind of tree the cards are then drawn front to back, and a card
       // behind nearer ones costs next to nothing (a forest seen from low down is many trees deep at every pixel)
-      const order = (this._orders || (this._orders = []))[ti] || (this._orders[ti] = new Float64Array(span * span));
+      const order = ((this._orders || (this._orders = []))[ti] || (this._orders[ti] = new Float64Array(spanMax * spanMax))).subarray(0, span * span);
       const eye = camPos ? GEO.fromVec(camPos) : [lon0, lat0]; const ex = (((eye[0] - lon0 + 540) % 360) - 180) / dLon, ey = (eye[1] - lat0) / dLat;
       { let o = 0; for (let jy = -n; jy <= n; jy++) for (let jx = -n; jx <= n; jx++) { const ddx = jx - ex, ddy = jy - ey; order[o] = Math.round((ddx * ddx + ddy * ddy) * 16) * 131072 + o; o++; } order.sort(); }      // (a tier has up to seventy thousand plots)
       for (let oi = 0; oi < order.length && count + countB + countM < maxN; oi++) {
@@ -403,9 +406,9 @@
           const h1 = hash2(gx, gy, 3 + ti);
           const lat = gy * dLat + (hash2(gx, gy, 11) - 0.5) * dLat * 0.9, lon = gx * rowD + (hash2(gx, gy, 12) - 0.5) * rowD * 0.9;
           const dxm = (lon - lon0) * D2R * cl * R_M, dym = (lat - lat0) * D2R * R_M; const d2 = dxm * dxm + dym * dym;
-          if (d2 > t.R * t.R) continue;
-          if (fades) { const rr = t.R * (0.8 + 0.2 * hash2(gx, gy, 93)); if (d2 > rr * rr) continue; }
-          if (under && hash2(gx, gy, 94) > thin * (1 - smooth(0.3, 1.0, Math.sqrt(d2) / t.R))) continue;      // (it thins out over the last fifth of its reach, as the next tier comes in: uHole)
+          if (d2 > R * R) continue;
+          if (fades) { const rr = R * (0.8 + 0.2 * hash2(gx, gy, 93)); if (d2 > rr * rr) continue; }      // (it thins out over the last fifth of its reach, as the next tier comes in: uHole)
+          if (under && hash2(gx, gy, 94) > thin * (1 - smooth(0.3, 1.0, Math.sqrt(d2) / R))) continue;
           const i = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W);
           if (sim && !sim.land[i]) continue;
           const h = near ? T.meshHeightAt(lon, lat, vc) : T.heightAt(lon, lat); if (h <= 0.5) continue;
@@ -529,19 +532,29 @@
       }
       mesh.count = count; GEO.touch(mesh.instanceMatrix, count); GEO.touch(mesh.instanceColor, count);
       if (ti === 0) { broad.count = countB; GEO.touch(broad.instanceMatrix, countB); GEO.touch(broad.instanceColor, countB); }
-      // The pass is whole: every kind of tree is handed what was placed of it, in the order it was placed (nearest first).
-      for (const K of kinds) { K.I = this.impMesh(ti, K.def, K.n); K.o = 0; }
-      for (let a = 0; a < sn; a++) {
-        const K = kinds[St.k[a]], I = K.I; if (!I) continue; const o = K.o++, dm = I.instanceMatrix.array, dc = I.instanceColor.array, dt = I.userData.tree.array;
-        for (let b = 0, a16 = a * 16, o16 = o * 16; b < 16; b++) dm[o16 + b] = St.m[a16 + b];
-        dc[o * 3] = St.c[a * 3]; dc[o * 3 + 1] = St.c[a * 3 + 1]; dc[o * 3 + 2] = St.c[a * 3 + 2]; dt[o * 3] = St.t[a * 3]; dt[o * 3 + 1] = St.t[a * 3 + 1]; dt[o * 3 + 2] = St.t[a * 3 + 2];
+      // The pass is whole. Most passes place what stands already (the ground under the trees was looked at again, a year
+      // went by): then nothing is handed over, nothing is sent to the card and the sun's shadows are not drawn again.
+      let sum = sn | 0; { const mi = St.mi || (St.mi = new Int32Array(St.m.buffer)), ci = St.ci || (St.ci = new Int32Array(St.c.buffer)), tI = St.ti || (St.ti = new Int32Array(St.t.buffer));
+        for (let a = 0, e = sn * 16; a < e; a++) sum = (Math.imul(sum, 31) + mi[a]) | 0;
+        for (let a = 0, e = sn * 3; a < e; a++) sum = (Math.imul(sum, 31) + ci[a] + Math.imul(tI[a], 7)) | 0;
+        for (let a = 0; a < sn; a++) sum = (Math.imul(sum, 31) + St.k[a]) | 0;
+        for (const K of kinds) for (let a = 0; a < K.def.id.length; a++) sum = (Math.imul(sum, 31) + K.def.id.charCodeAt(a)) | 0; }
+      const same = !count && !countB && this._sums[ti] === sum; this._sums[ti] = count || countB ? null : sum;
+      if (!same) {
+        // every kind of tree is handed what was placed of it, in the order it was placed (nearest first)
+        for (const K of kinds) { K.I = this.impMesh(ti, K.def, K.n); K.o = 0; }
+        for (let a = 0; a < sn; a++) {
+          const K = kinds[St.k[a]], I = K.I; if (!I) continue; const o = K.o++, dm = I.instanceMatrix.array, dc = I.instanceColor.array, dt = I.userData.tree.array;
+          for (let b = 0, a16 = a * 16, o16 = o * 16; b < 16; b++) dm[o16 + b] = St.m[a16 + b];
+          dc[o * 3] = St.c[a * 3]; dc[o * 3 + 1] = St.c[a * 3 + 1]; dc[o * 3 + 2] = St.c[a * 3 + 2]; dt[o * 3] = St.t[a * 3]; dt[o * 3 + 1] = St.t[a * 3 + 1]; dt[o * 3 + 2] = St.t[a * 3 + 2];
+        }
+        for (const [id, I] of Array.from(imps)) { const ki = kindOf.get(id), nI = ki === undefined || kinds[ki].I !== I ? 0 : kinds[ki].o;
+          I.count = nI; GEO.touch(I.instanceMatrix, nI); GEO.touch(I.instanceColor, nI); GEO.touch(I.userData.tree, nI);
+          if (nI) I.userData.idle = 0; else if (++I.userData.idle > 12) this.dropMesh(ti, id); }
+        if (casters) { this.casters = casters; this.castersVersion = (this.castersVersion || 0) + 1; }
       }
-      for (const [id, I] of Array.from(imps)) { const ki = kindOf.get(id), nI = ki === undefined || kinds[ki].I !== I ? 0 : kinds[ki].o;
-        I.count = nI; GEO.touch(I.instanceMatrix, nI); GEO.touch(I.instanceColor, nI); GEO.touch(I.userData.tree, nI);
-        if (nI) I.userData.idle = 0; else if (++I.userData.idle > 12) this.dropMesh(ti, id); }
       // (and the tier outside this one draws nothing where these stand)
-      if (!under && ti + 1 < TIERS.length && !TIERS[ti + 1].under) { const c = GEO.enu(lon0, lat0).up; this.holes[ti + 1].value.set(c.x, c.y, c.z, (t.R / R_M) * (t.R / R_M)); }
-      if (casters) { this.casters = casters; this.castersVersion = (this.castersVersion || 0) + 1; }
+      if (!under && ti + 1 < TIERS.length && !TIERS[ti + 1].under) { const c = GEO.enu(lon0, lat0).up; this.holes[ti + 1].value.set(c.x, c.y, c.z, (R / R_M) * (R / R_M)); }
       this.modelCount[ti] = countM; this.last[ti].partial = waiting;
     }
   }
