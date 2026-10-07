@@ -25,7 +25,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   `SHADOW=4096` turns the shadow map on at its real size (software GL goes without), `TREES=1` and `LOD=1` give full forests and the finest models, `GRID=1` the terrain mesh at its real fineness, `DIST=<dir>` serves a snapshot build.
   What the software renderer gets less of, so that a frame takes a second and not a minute: a quarter of the pixels
   (not for screenshots), a terrain mesh a quarter as fine each way (the vertex shader's texture lookups run on the
-  CPU), few trees and none that fill the picture (`trees.coverCap`), coarser models, no shadow map. Instance buffers
+  CPU), few trees and none that fill the picture (`trees.coverCap`), coarser models, no shadow map, plain water
+  (no waves or surf; all of it with `POST=1`). With `TREES=1` and `GRID=1` together a frame down in a wood takes
+  minutes: ask for full forests only where the trees are the question. Instance buffers
   are sent with `GEO.touch(attr, n)` (the used part only): whole-buffer uploads stalled it for half a minute at a time.
 - `tools/peek.sh <name> <url> ...` — contact sheet of generated images via the Peek workflow (`shots/peek/<name>.jpg`).
 - `node tools/coverage.js [eras] [--all] [--wonder]` — which planned buildings are real models and which still fall
@@ -493,6 +495,10 @@ Conventions that matter:
   `sea_region` and `planet` on the Mac after touching any of it; here, start the live page with `GRID=1` (the
   mesh at its real fineness: with the coarse one the shore's flat strip is as wide as the field allows and no
   wider than a quad, and the sea stands up the shore again).
+  A software renderer runs both arms of every branch at every pixel, so what a real card skips (the sixteen
+  texels away from a shore, waves and surf on dry land) it pays for everywhere: the frame took twice as long. The
+  test suite's pages (a software renderer without `POST`) therefore compile the water plain (`WATER_PLAIN`: the
+  shore from four texels, no waves, no surf, the bed falling evenly); the harnesses with `POST=1` have all of it.
 - **Still water lies level.** The ground's small relief (`dispAt`, the vertex shader) begins `WET_RISE` metres
   inland of the flat strip along every shore (by the picture's mask where there is no field: `WET`): a lake heaved
   as the land is was a sheet of bumps under a flat picture of water.

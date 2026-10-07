@@ -420,7 +420,7 @@
           // plot lies (the ground is drawn by it): a wood comes down to a lake's shore, and stands back from the sea behind
           // its beach, thinly at first. Elsewhere the simulation's own half-degree cells say what is land, and the picture's mask.
           const sd = T.shoreAt(lon, lat);
-          if (sd === null) { if (sim && !sim.land[i]) continue; }
+          if (sd === null) { if (T.wPending || (sim && !sim.land[i])) continue; }      // (a shore whose pack is still on its way: no tree until it is known where the water is)
           else if (sd < (T.wKind > 0.5 ? 26 : 55 + 110 * hash2(gx, gy, 96) * hash2(gx, gy, 97))) continue;
           const h = near ? T.meshHeightAt(lon, lat, vc) : T.heightAt(lon, lat); if (h <= 0.5) continue;
           let rv = null;
