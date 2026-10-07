@@ -96,13 +96,15 @@ window.__T.costsPlanet = function () {
 window.__T.watch = function () {
   const T = __G.terrain, el = document.createElement('div'); el.style.cssText = 'position:fixed;left:14%;top:40%;z-index:99999;background:#000;color:#fff;font:17px monospace;padding:10px;white-space:pre'; document.body.appendChild(el);
   const t0 = performance.now(); let frames = 0, last = t0; const tick = () => { frames++; requestAnimationFrame(tick); }; requestAnimationFrame(tick);
-  const j = (o) => Object.keys(o).sort().map((k) => k + ':' + o[k]).join(' ');
+  const j = (o) => Object.keys(o).sort().map((k) => k + ':' + o[k]).join(' '); let busy = 0, was = '', grown = 0, wasT = '';
   setInterval(() => {
     const now = performance.now(), fps = frames / ((now - last) / 1000); frames = 0; last = now;
     const st = {}; for (const p of T.packs.values()) { const k = p.kind + ' ' + p.state; st[k] = (st[k] || 0) + 1; }
     const w = [0, 0, 0], iL = {}, eL = {}, wL = {}; let n = 0;
     for (const t of T.tiles.values()) { if (!t.inScene) continue; n++; w[Math.round(t.uniforms.uWaterP.value.x)]++; const a = t.iPack && !t.iPack.absent ? t.iPack.level : '-', b = t.ePack && !t.ePack.absent ? t.ePack.level : '-', c = t.wPack ? (t.wPack.pack ? t.wPack.level : 'f') : '-'; iL[a] = (iL[a] || 0) + 1; eL[b] = (eL[b] || 0) + 1; wL[c] = (wL[c] || 0) + 1; }
-    el.textContent = ((now - t0) / 1000).toFixed(0) + ' s  ' + fps.toFixed(1) + ' fps  tiles ' + n + '  loading ' + T.loading + '  bundles ' + T.bundles.size + '\npacks  ' + j(st) + '\nthe picture by level  ' + j(iL) + '\nthe heights by level  ' + j(eL) + '\nthe water: the mask ' + w[0] + ', a pack ' + w[1] + ', no shore near ' + w[2] + '; by level  ' + j(wL);
+    const sec = (now - t0) / 1000, sig = j(iL) + j(eL) + j(wL), Tr = __G.trees, trees = Tr ? Tr.modelCount.join(' ') : '-';
+    if (T.loading > 0 || sig !== was) busy = sec; was = sig; if (trees !== wasT) grown = sec; wasT = trees;      // (the last second in which something was on its way or changed)
+    el.textContent = sec.toFixed(0) + ' s  ' + fps.toFixed(1) + ' fps  tiles ' + n + '  loading ' + T.loading + '  bundles ' + T.bundles.size + '   the ground whole since ' + busy.toFixed(0) + ' s' + '\npacks  ' + j(st) + '\nthe picture by level  ' + j(iL) + '\nthe heights by level  ' + j(eL) + '\nthe water: the mask ' + w[0] + ', a pack ' + w[1] + ', no shore near ' + w[2] + '; by level  ' + j(wL) + '\ntrees ' + trees + ', unchanged since ' + grown.toFixed(0) + ' s';
   }, 1000);
 };
 // how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
