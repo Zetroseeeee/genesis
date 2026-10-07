@@ -1141,7 +1141,7 @@
       // (And where the sea beside it freezes, as that sea does, whichever is the longer: from far out a strait is a lake to the
       //  picture's map. Not one in place of the other: forty kilometres in from a freezing sea, where its ice gives out on the
       //  map, the lakes of Karelia had open rings in them.)
-      float iceIn = natv.g * 1.2 - 0.1 - iceOff;
+      float iceIn = natv.g * 1.1 - 0.06 - iceOff;
       // (High dry country has its hard winters without the snow: the lakes of Tibet freeze under a sky that brings none. And a
       //  lake freezes from its shores: out in a great one the ice comes weeks later and goes weeks sooner.)
       float coldShare = smoothstep(0.85, 1.0, info.b) * smoothstep(0.27, 0.36, latN0) * 0.55;
@@ -1161,9 +1161,8 @@
       //  there is ice (tools/planet/snow.py, from the Sea Ice Index). By the latitude alone, in winter there was ice off
       //  Scotland, where the sea never freezes, as in Hudson Bay, where it does for seven months. The sea is slow: its ice is
       //  widest eleven weeks behind the sun (uIceCold), and ice of so many months lies for just so many about that time:
-      //  iceOff is how far the year is from it, 0 at the end of winter and 1 half a year on. A month and more is asked
-      //  before there is any (a radiometer's cell on a shore sees the land with the sea and takes it for some ice: the
-      //  Danish straits froze every March), and what is ice all the year stays.)
+      //  iceOff is how far the year is from it, 0 at the end of winter and 1 half a year on. What is ice all the year
+      //  stays.)
       float seaIce = smoothstep(0.01, 0.05, iceIn) * seaW;
       float floe = smoothstep(0.35, 0.65, mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) + 0.3 * nMic.a) * smoothstep(0.02, 0.22, iceIn);
       #else

@@ -133,7 +133,7 @@ print('the game\'s own heights: %s, to %.0f m; land on the whole %.0f m' % ('x'.
 # and Ice Data Center has: how much of the sea is ice, month by month since 1979, from microwave radiometers that see by
 # night and through cloud, on a grid of 25 km about each pole (Fetterer, Knowles, Meier, Savoie and Windnagel: Sea Ice Index,
 # Version 4, NSIDC, doi:10.7265/a98x-0f50). Its first ten years are taken, which are the nearest it has to a sea nobody had
-# warmed: for each month the middle year of the ten, and a month has ice where four tenths of the sea and more is ice.
+# warmed: for each month the middle year of the ten, and a month has ice where three tenths of the sea and more is ice.
 import rasterio
 from rasterio.warp import transform as reproject
 from concurrent.futures import ThreadPoolExecutor
@@ -165,8 +165,13 @@ for hemi in 'NS':
         # hardest of the century in the Baltic, and by the mean the Danish straits froze every March: a white patch by itself
         # in an open sea. In a usual year they do not freeze.) nan: land.
         with warnings.catch_warnings(): warnings.simplefilter('ignore'); conc = np.nanmedian(np.stack(stack), 0)
-        has = ss(0.25, 0.55, conc); share = has if share is None else share + has      # (not less: a radiometer's cell of 25 km on a shore sees the land with the sea, and takes it for a little ice)
+        has = ss(0.15, 0.45, conc); share = has if share is None else share + has
     share = share / 12.0; sea_ = ~np.isnan(share)
+    # (A radiometer's cell of 25 km on a shore sees the land with the sea, and takes it for some ice all winter: the Danish
+    #  straits, all shore, froze every March - in the middle year as in the mean. So a cell beside the land says nothing,
+    #  and takes what the nearest cell clear of it has: a strait or a fjord freezes as the sea outside it does.)
+    clear = binary_erosion(sea_, iterations=1, border_value=1)
+    ixc = distance_transform_edt(~clear, return_distances=False, return_indices=True); share = np.where(sea_, share[ixc[0], ixc[1]], np.nan); del ixc
     ix, dist = distance_transform_edt(~sea_, return_distances=True, return_indices=True)[::-1]      # (land takes the nearest sea's, within some four hundred kilometres)
     share = np.where(sea_, share, np.where(dist < 16, share[ix[0], ix[1]], 0.0)); share = np.nan_to_num(share)
     rows = np.where(lat2 > 30)[0] if hemi == 'N' else np.where(lat2 < -40)[0]
