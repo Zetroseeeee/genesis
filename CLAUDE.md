@@ -560,9 +560,13 @@ Conventions that matter:
   pole, nine in Baffin Bay, seven in Hudson Bay, four in the Gulf of Bothnia, none off Norway. By the latitude alone,
   in winter there was ice off Scotland. Ice of so many months lies for just that many about the end of winter (the
   sea runs eleven weeks behind the sun); a month and more is asked before there is any (a radiometer's cell on a
-  shore sees the land with the sea, and the Danish straits froze every March). Lakes and rivers freeze where the
-  climate's winters are hard (`info.b`) by the snow of their shores, counted three quarters as long and on the
-  sea's slower clock (`frozen`: by the snow lying at the moment Ladoga was open water in March); the Caspian is the
+  shore sees the land with the sea, and the Danish straits froze every March). Lakes and rivers freeze by the snow of their shores, three quarters as long as it lies and on the
+  sea's slower clock (`frozen`, `lakeSeason`: by the snow lying at the moment Ladoga was open water in March),
+  where the climate's winters are hard (`info.b` from 0.6) or snow lies four months and more (a tarn of the Alps);
+  in high dry country by the climate alone (`coldShare`: the lakes of Tibet freeze under a sky that brings no
+  snow); from their shores first, the middle of a great lake weeks later; and as the sea beside them does wherever
+  the Index has any ice (from far out a strait is a lake to the picture's map). So: Great Bear seven months, Winnipeg
+  and Ladoga five, Baikal four and a half, Erie two, Geneva never. The Caspian is the
   sea's, and has no ice in the Index. Both notices are in the game's menu.
   Look at Europe and North America from 2,500 km and more, Poland from 600, the Alps from 300 and 80 and low, a
   town in the snow, and the seas (`winter_*`, `thaw_europe`, `ice_*` in the tour) after touching any of it.
