@@ -1,0 +1,60 @@
+# The planet's own pictures, made where their sources can be reached (NASA's servers: the cloud workspace cannot reach
+# them, GitHub can): the picture of the Earth (tools/planet/imagery.py, from NASA's Blue Marble Next Generation), its
+# clouds and its night sky. What a run makes is kept in the "planet" release; tools/planet/pack.sh runs it and brings
+# the result here. "probe" only looks at the sources and says what is there.
+name: Planet
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'probe | imagery | clouds | sky'
+        required: false
+        default: 'probe'
+      args:
+        description: 'What the mode is told (letters, digits, and . , / = _ : - and blanks)'
+        required: false
+        default: ''
+      tag:
+        description: 'Release to keep it in'
+        required: false
+        default: 'planet'
+permissions:
+  contents: write
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: What it needs
+        run: python3 -m pip install --quiet --disable-pip-version-check --break-system-packages numpy scipy pillow || python3 -m pip install --quiet --disable-pip-version-check numpy scipy pillow
+      - name: Make
+        env:
+          MODE: ${{ github.event.inputs.mode }}
+          ARGS: ${{ github.event.inputs.args }}
+        run: |
+          set -euo pipefail
+          case "$MODE" in probe|imagery|clouds|sky) ;; *) echo "bad mode"; exit 1;; esac
+          case "$ARGS" in *[!A-Za-z0-9.,/=_:\ -]*) echo "bad args"; exit 1;; esac
+          mkdir -p out work
+          df -h . | tail -1; nproc; free -g | sed -n 2p
+          # shellcheck disable=SC2086
+          python3 "tools/planet/$MODE.py" --out out --work work $ARGS 2>&1 | tee "out/planet_$MODE.log"
+          echo "$(ls out | wc -l) files in out"; du -sh out work
+      - name: Keep
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -uo pipefail
+          case "$TAG" in *[!A-Za-z0-9_-]*|'') echo "bad tag"; exit 1;; esac
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "The planet" --notes "The picture of the Earth, its clouds and its sky as the game uses them, made by tools/planet/ from NASA's Blue Marble Next Generation and other pictures of NASA's (public domain; credits in the game's menu)." --latest=false
+          # (twelve files to a call, a pause between: a release takes many files, but not all at once)
+          ls out | sort > names.txt; n=0; set --
+          while read -r f; do set -- "$@" "out/$f"; n=$((n + 1)); if [ "$n" -ge 12 ]; then gh release upload "$TAG" "$@" -R "$GITHUB_REPOSITORY" --clobber || gh release upload "$TAG" "$@" -R "$GITHUB_REPOSITORY" --clobber; set --; n=0; sleep 3; fi; done < names.txt
+          [ "$n" -gt 0 ] && { gh release upload "$TAG" "$@" -R "$GITHUB_REPOSITORY" --clobber || gh release upload "$TAG" "$@" -R "$GITHUB_REPOSITORY" --clobber; }
+          echo "kept $(wc -l < names.txt) files in $TAG"
