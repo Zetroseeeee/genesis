@@ -923,7 +923,7 @@
       #endif
       float depthSea = wOn > 0.5 ? min(off * max(bedFall, mix(0.09, 0.0, shelf2)) + off * off * mix(4e-4, 8e-6, shelf2), depthFar) : depthFar;
       float clear = uSeaK.z * mix(1.0, 0.5, smoothstep(0.42, 0.62, abs(vLat) / (0.5 * PI)));      // (warm seas are clear; the green seas of the north are not)
-      float sandy = wOn > 0.5 ? clamp(0.62 + wBend * 260.0, 0.12, 1.0) : 0.8;
+      float sandy = wOn > 0.5 ? mix(clamp(0.62 + wBend * 260.0, 0.12, 1.0), 0.62, smoothstep(4.0, 12.0, depthSea)) : 0.8;      // (sand in a bay, rock under a headland - where the bed can be seen. Deeper, one bed for all: a shelf sea is tinted by its bed everywhere, and round every islet the rock's tint was a dark stain a quarter of a mile wide)
       vec3 seaDeep = mix(vec3(0.016, 0.070, 0.165), vec3(0.030, 0.150, 0.215), pow(shelf, 1.5)) * mix(1.0, 0.82, 1.0 - clear);
       vec3 seaBed = mix(vec3(0.15, 0.18, 0.15), vec3(0.66, 0.63, 0.47), sandy);      // (wet sand under water is no longer the pale of a beach)
       #ifdef USE_TEXARR
@@ -1208,7 +1208,7 @@
         lit = mix(lit, fc * (0.35 + 0.65 * day), uFertView * landW * 0.6);
       }
       // ---------- the air between (air.js): what it takes from the ground's light on the way to the eye, and the light of its own it adds ----------
-      gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0);
+      gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0 - 0.85 * wetAll * (1.0 - iced));      // (the fourth: how much of the pixel is not open water. post.js shades by it: the shade between things is not laid on water, where an island stood in a dark stain. Nothing else reads it.)
     }`;
 
   // ---------- pack loading ----------

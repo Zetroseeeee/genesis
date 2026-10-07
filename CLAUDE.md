@@ -346,7 +346,8 @@ Conventions that matter:
 - **The picture's last steps** (`post.js`; on a real GPU at full quality, `POST=1` in the harnesses). The scene is
   drawn into a target that holds light brighter than white (half floats, four samples) and its depth, then: shade
   (ambient occlusion from the depth alone, two reaches, a share of the distance wide so it reads at every height;
-  fades with the haze and with height), glow (what is above white bleeds, the wider rings weighed more: `POST.wide`),
+  fades with the haze and with height; not laid on open water, which the ground's shader marks in the picture's
+  fourth channel - an island stood in a dark stain), glow (what is above white bleeds, the wider rings weighed more: `POST.wide`),
   develop (a little contrast and colour, a shoulder into white, darker corners, grain). 0 to 1 is the picture as the
   shaders made it; only what they write above 1 is "more than white", and they write it where `uGlow` is 1 (the sun's
   image on water, flames, lit windows, a fire front; the sun's disc is thousands). Depth here is ordinary perspective
@@ -468,6 +469,9 @@ Conventions that matter:
   negative: sand gathers in the one and is washed off the other) and the way to the nearest land (`wLand`). The
   noise of the place roughens the line (a beach runs smooth, a steep shore ragged) and the sea's edge comes and
   goes a few metres. `wD`, `wK`, `wOpen`, `wCov` (the pixel's share of water) are what everything after reads.
+  A pixel far inland by its nearest texel stops there (one lookup, not four: most pixels of most pictures), and a
+  tile whose piece of its pack is nothing but far land or open sea is told so once (`waterFlat`; `uWaterP.x = 2`)
+  and looks nothing up at all.
   *In the mesh.* The sea lies at nought and a lake at its level, and the ground comes up from the water's own
   level, beginning a little inland (`uShoreQ`: a quad and a half of the tile's mesh as it is, never under 60 m): a
   triangle with one corner in the water and one on a hill carried the water up the hill. Without the levels a lake
@@ -500,16 +504,22 @@ Conventions that matter:
   is rougher within the pixel (`wRough`), which spreads the sun's image into a path and lifts what the horizon's
   sea mirrors above the horizon. *Surf*: where the sea comes in from the open (`wOpen`, and more under a headland
   than in a bay) lines of white run in along the shore, 34 m apart, each breaking along a stretch of itself; a
-  pale fringe from too far to tell them apart; great lakes a little, small ones none. *The mirror*: Fresnel, the
+  pale fringe from too far to tell them apart; great lakes a little, small ones none. And only on shores that face
+  the swell, which comes as the winds of the Earth blow (out of the west between thirty and sixty degrees, with
+  the trades out of the east in the tropics, turned some way by the noise of the place): all round an islet the
+  lines were rings, like a target. *The mirror*: Fresnel, the
   sky from a table of fifteen colours made once a frame where the camera stands (`skyMirror` in `main.js`: the
   air's own sum at five heights, toward the sun, across and away), the sun by a lobe as wide as `wRough`; in
   light, as the air is (`lit` is a root of light: mixed as squares). A river of the decal and a flood mirror too.
   `uSeaK`: x how high the waves run, y how much surf, z how clear the water (w: 1 no waves, 2 nothing mirrored, to
   ask what they cost: `__T.costsWater()`, `costw_*` in the tour). Look at `sea_air`, `sea_cove`, `sea_low`, `surf`,
   `sea_dusk`, `sea_glint`, `lakes`, `lake_fin`, `lakes_radar`, `lake_alp`, `fjord`, `delta`, `lagoon`, `tundra`,
-  `sea_region` and `planet` on the Mac after touching any of it; here, start the live page with `GRID=1` (the
+  `sea_region`, `river_bend`, `river_wide` and `planet` on the Mac after touching any of it; here, start the live page with `GRID=1` (the
   mesh at its real fineness: with the coarse one the shore's flat strip is as wide as the field allows and no
   wider than a quad, and the sea stands up the shore again).
+  *What it costs* (the build Mac, 1680 by 1050, each in one page: `costw_*`): down at the sea 30 frames a second,
+  31 without the waves, 32 with nothing mirrored either; from three kilometres 28.5, 30 and 31; low by a lake in
+  the taiga 33, 36 and 37; over a town inland to the horizon 25.5, 26, 27, and 27.5 without the field at all.
   A software renderer runs both arms of every branch at every pixel, so what a real card skips (the sixteen
   texels away from a shore, waves and surf on dry land) it pays for everywhere: the frame took twice as long. The
   test suite's pages (a software renderer without `POST`) therefore compile the water plain (`WATER_PLAIN`: the

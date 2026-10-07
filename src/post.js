@@ -127,11 +127,11 @@ window.POST = (function () {
     }
     void main() {
       if (uShow > 0.5) { gl_FragColor = vec4(uShow < 1.5 ? vec3(uShade > 0.0 ? shadeAt() : 1.0) : texture2D(tGlow, vUv).rgb, 1.0); return; }      // (to look at a part by itself: POST.show = 1 the shade, 2 the glow)
-      vec3 c = max(texture2D(tScene, vUv).rgb, 0.0);
+      vec4 sc = texture2D(tScene, vUv); vec3 c = max(sc.rgb, 0.0);
       // shade: what is in shade loses some of its light, and a little more of its red than of its blue (it is lit by the sky alone)
       // (it is the sky's light that is hidden, not the sun's: what stands in full sun keeps most of its brightness)
       if (uShade > 0.0) {
-        float sh = shadeAt(); sh = mix(sh, 1.0, 0.5 * smoothstep(0.45, 0.95, dot(c, vec3(0.3, 0.6, 0.1)))); sh = mix(1.0, sh, uShade);
+        float sh = shadeAt(); sh = mix(sh, 1.0, 0.5 * smoothstep(0.45, 0.95, dot(c, vec3(0.3, 0.6, 0.1)))); sh = mix(1.0, sh, uShade * smoothstep(0.1, 0.6, sc.a));      // (not on open water: the ground's shader says where that is in the picture's fourth channel)
         c *= mix(vec3(sh), vec3(sh * sh, sh * sqrt(sh), sqrt(sh)), 0.22);
       }
       c += texture2D(tGlow, vUv).rgb * uGlow;
