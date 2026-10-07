@@ -478,9 +478,19 @@ Conventions that matter:
   a flat coast the shallows run a furlong), never deeper than the shelf allows (`info.r`; far from any shore and
   where there is no field the shelf alone says). *Colour*: the bed (sand in a bay, dark rock under a headland,
   the photograph of sunlit shallows from close) seen through that much water, red going first, then the deep's own
-  blue; lakes blue-green, dark as tea where the winters are hard, milky high in the mountains. *Waves*: one
+  blue; lakes blue-green, dark as tea where the winters are hard and wet (`peat`), milky high in wet mountains,
+  clear and very blue on the high dry plateaus. A lake's bed falls as the land above its shore rises above the
+  water's own level (`vH` there), never more gently than a floor (the heights come in steps of seven metres and
+  more); peat hides the bed within a step from the shore. A great river is in the field as fresh water too, often
+  in pieces (where it is 1.2 km wide), with the game's own ribbon of it beside them and between them: narrow water
+  between flat banks (`riverish`) is therefore given a river's water as the decal's rivers have it, shallows a
+  furlong wide, pale and green, over a blue channel, brown with silt in dry country; a small lake of the plain
+  likewise. *Waves*: one
   picture of a ruffled surface at four sizes (repeats of 40 m, 160 m, 640 m, 2.5 km), each drifting its own way,
-  less in the lee of a shore and in sheltered water, in patches as the wind lies. What the card averages away as a
+  less in the lee of a shore and in sheltered water, in patches as the wind lies. Each size is bent by the noise
+  of the place that is some four of its repeats long and more, by half a repeat or so (bent by grain as small as
+  itself the waves are smeared; laid straight, or one size alone, they are a lattice from a mile up: a lake keeps
+  a little of the two large sizes for that). What the card averages away as a
   size grows small in the picture is not thrown away: the averaged normal is shorter, and by that much the water
   is rougher within the pixel (`wRough`), which spreads the sun's image into a path and lifts what the horizon's
   sea mirrors above the horizon. *Surf*: where the sea comes in from the open (`wOpen`, and more under a headland
@@ -566,7 +576,15 @@ Conventions that matter:
   class (`zoneOf`, `Trees.THIN`). Rebuild both with `tools/climate/build.py` (the source and its licence are in the
   file's header). The year: `uSeason` (sun), `uBare` (leaves down N/S, the cold of the year N/S, a month behind the sun).
 - **Rivers** are drawn wider than life (`drawnWidth()` in `decal.js`: brooks four times, great rivers twice), like
-  roads and towns. The decal's red channel is a distance to the water (1 centre line, 0.5 the water's edge, 0 the end
+  roads and towns. A river's ribbon is one strip, mitred at every point of its line (as boxes run on past their
+  ends, a great river's two kilometres of ribbon threw a corner out at every least turn: its banks were saws).
+  Where a river is wide enough to be water in the field of the water's edge (1.2 km) and the line of it held here
+  runs in that water, the ribbon lay out over both banks as a second river's shallows: a line that keeps in the
+  field's water, or within 150 m of it, for 1.5 km either way is left to the field (`ALONG_*` in `decal.js`;
+  `stats.along` counts the pieces), one that only comes down to a shore or leaves one is drawn to the water's
+  edge. A line that runs beside the field's water is drawn: the field has such a river in pieces, and there is no
+  telling its own water from a lake it passes (asked for a mile to either side, the Yangtze at Nanjing was cut in
+  two). The cure is in the builder: a river kept whole or not at all. `nearestRiver` answers by the line. The decal's red channel is a distance to the water (1 centre line, 0.5 the water's edge, 0 the end
   of the bank), from which the ground shader draws the water, a green bank and, where a road crosses, a deck.
   Everything that asks where the water is (`decal.nearestRiver`) gets the drawn width; walls are cut at the bank.
 - **After dark** (`life.js`): open fires burn from dusk till morning in towns that have no lamps yet (style era ≤ 5):

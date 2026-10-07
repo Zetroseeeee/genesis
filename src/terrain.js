@@ -911,7 +911,7 @@
       //  coast one can wade for a furlong. The ground's height a little way inland of the nearest shore tells which.)
       float bedFall = 0.03;
       #ifndef WATER_PLAIN
-      if (wOn > 0.5 && uWaterP.x < 1.5 && off > 0.0 && off < 900.0) bedFall = clamp(hAt(vUV + wLand * (off + 260.0)) / 260.0 * 0.7, 0.016, 0.45);
+      if (wOn > 0.5 && uWaterP.x < 1.5 && off > 0.0 && off < (wK > 0.5 ? 1800.0 : 900.0)) bedFall = clamp((hAt(vUV + wLand * (off + 260.0)) - vH) / 260.0 * 0.7, 0.016, 0.45);      // (above the water's own level, which is what the mesh has here: a lake a mile up is not deep at once for standing high)
       #endif
       float depthSea = wOn > 0.5 ? min(off * max(bedFall, mix(0.09, 0.0, shelf2)) + off * off * mix(4e-4, 8e-6, shelf2), depthFar) : depthFar;
       float clear = uSeaK.z * mix(1.0, 0.5, smoothstep(0.42, 0.62, abs(vLat) / (0.5 * PI)));      // (warm seas are clear; the green seas of the north are not)
@@ -946,9 +946,18 @@
       vec3 water = mix(seaDeep, seaBed, exp(-vec3(0.46, 0.095, 0.060) * depthSea / max(clear, 0.05)));
       // lakes: clear and blue-green where the summers are warm, dark as tea in the north (peat, and depth); high in the
       // mountains milky with what the ice grinds. Their shallows are a few metres of mud and stones.
-      float depthLake = wOn > 0.5 ? off * clamp(bedFall * 0.8, 0.03, 0.3) : 30.0;
-      vec3 lakeDeep = mix(mix(vec3(0.030, 0.125, 0.160), vec3(0.034, 0.082, 0.090), smoothstep(0.2, 0.9, info.b)), vec3(0.085, 0.300, 0.330), smoothstep(1500.0, 3000.0, vH) * (1.0 - smoothstep(0.2, 0.9, info.b) * 0.5));
-      vec3 inland = mix(lakeDeep, vec3(0.40, 0.38, 0.27), exp(-vec3(0.60, 0.20, 0.16) * depthLake) * 0.85);
+      float depthLake = wOn > 0.5 ? off * clamp(bedFall * 0.8, 0.045, 0.3) : 30.0;      // (never shallower than that: the heights are in steps of seven metres and more, and by them alone the shallows of a river through flat country came and went in scallops)
+      float highDry = max(arid, smoothstep(2600.0, 3600.0, vH));      // (the lakes of the high plateaus, Tibet's and the Altiplano's, and of dry mountains: clear and very blue, where a taiga lake is dark with peat and a lake under a glacier milky)
+      float peat = smoothstep(0.2, 0.9, info.b) * (1.0 - highDry);
+      vec3 lakeDeep = mix(mix(vec3(0.030, 0.125, 0.160), vec3(0.034, 0.082, 0.090), peat), mix(vec3(0.085, 0.300, 0.330), vec3(0.040, 0.205, 0.410), highDry), smoothstep(1500.0, 3000.0, vH) * (1.0 - peat * 0.5));
+      // (A great river is in the field as fresh water too, bank to bank, and often in pieces, where it is wide enough: narrow
+      //  water between flat banks. It is given a river's water, as the game's own rivers have it beside it and between its
+      //  pieces: shallows a furlong wide, pale and green, over a blue channel; brown with silt in dry country. A small lake of
+      //  the plain is the same water. Not the peat lakes of the north, nor a lake between mountains, deep from the shore.)
+      float riverish = wOn * (1.0 - smoothstep(0.30, 0.62, wOpen)) * (1.0 - smoothstep(0.03, 0.10, bedFall)) * (1.0 - peat);
+      lakeDeep = mix(lakeDeep, mix(vec3(0.03, 0.15, 0.25), vec3(0.36, 0.34, 0.24), arid * 0.4), riverish);
+      depthLake = mix(depthLake, off * 0.015, riverish);
+      vec3 inland = mix(lakeDeep, mix(vec3(0.40, 0.38, 0.27), vec3(0.23, 0.41, 0.36), riverish), exp(-vec3(0.60, 0.20, 0.16) * (depthLake * (1.0 + 3.0 * peat))) * 0.85);      // (peat water hides its bed within a step from the shore)
       // ---------- waves ----------
       // Four sizes of one picture of a ruffled surface, each drifting its own way (repeats of 40 m, 160 m, 640 m and 2.5 km:
       // ripples, waves, the swell, the wind's patches). The card averages each as it grows small in the picture, and what is
@@ -963,15 +972,17 @@
       vec2 gdx = dFdx(vGL) * 50.0, gdy = dFdy(vGL) * 50.0;      // (how the place runs across the pixel: taken here, where every pixel passes; the lookups below are only made on water)
       #ifndef WATER_PLAIN
       if (max(max(seaW, lakeW), max(vecRiver, floodW)) > 0.003 && uSeaK.w < 0.5) {
-        // (Each size is laid a little askew by the noise of the place, as the ground's materials are: one picture repeated
-        //  straight across twenty miles of sea showed in the sun's path as a lattice.)
+        // (Each size is laid askew by the noise of the place, as the ground's materials are: one picture repeated straight
+        //  across twenty miles of sea showed in the sun's path as a lattice, and on a lake from a mile up as rows of dots.
+        //  A size is bent by noise some four of its repeats long and more, and by half a repeat or so: bent by grain as
+        //  small as itself the waves are smeared, by less than that the rows stay rows.)
         #define WAVES(m, M, drift) (textureGrad(uWaterN, gc(m) * M + drift, (gdx * m) * M, (gdy * m) * M).rgb * 2.0 - 1.0)
-        vec3 o1 = WAVES(3200.0, mat2(1.0, 0.0, 0.0, 1.0), vec2(uTime * 0.046, uTime * 0.021));
-        vec3 o2 = WAVES(800.0, mat2(0.8, 0.6, -0.6, 0.8), (nMic.rg - 0.5) * 0.22 - vec2(uTime * 0.017, -uTime * 0.009));
-        vec3 o3 = WAVES(200.0, mat2(0.6, -0.8, 0.8, 0.6), (nMid.gb - 0.5) * 0.45 + vec2(uTime * 0.0061, uTime * 0.0034));
-        vec3 o4 = WAVES(50.0, mat2(-0.28, 0.96, -0.96, -0.28), (nMac.rb - 0.5) * 0.6 - vec2(uTime * 0.0019, uTime * 0.0011));
+        vec3 o1 = WAVES(3200.0, mat2(1.0, 0.0, 0.0, 1.0), (nMid.bg - 0.5) * 1.2 + (nMic.bg - 0.5) * 0.2 + vec2(uTime * 0.046, uTime * 0.021));
+        vec3 o2 = WAVES(800.0, mat2(0.8, 0.6, -0.6, 0.8), (nMid.gb - 0.5) * 1.3 + (nMic.rg - 0.5) * 0.12 - vec2(uTime * 0.017, -uTime * 0.009));
+        vec3 o3 = WAVES(200.0, mat2(0.6, -0.8, 0.8, 0.6), (nMac.rb - 0.5) * 1.6 + (nMid.rg - 0.5) * 0.2 + vec2(uTime * 0.0061, uTime * 0.0034));
+        vec3 o4 = WAVES(50.0, mat2(-0.28, 0.96, -0.96, -0.28), (nMac.gr - 0.5) * 0.7 - vec2(uTime * 0.0019, uTime * 0.0011));
         #undef WAVES
-        vec4 ak = vec4(0.55, 0.62, 0.50, 0.34) * amp; ak.zw *= seaShare;      // (a lake has no swell)
+        vec4 ak = vec4(0.55, 0.62, 0.50, 0.34) * amp; ak.zw *= mix(0.4, 1.0, seaShare);      // (a lake has little swell: but one size alone on the water is a lattice)
         wSlope = o1.xy / max(o1.z, 0.4) * ak.x + (o2.xy / max(o2.z, 0.4)) * mat2(0.8, -0.6, 0.6, 0.8) * ak.y + (o3.xy / max(o3.z, 0.4)) * mat2(0.6, 0.8, -0.8, 0.6) * ak.z + (o4.xy / max(o4.z, 0.4)) * mat2(-0.28, -0.96, 0.96, -0.28) * ak.w;
         vec4 lost = clamp(1.0 - vec4(dot(o1, o1), dot(o2, o2), dot(o3, o3), dot(o4, o4)) - 0.03, 0.0, 0.07);
         wRough += dot(lost, ak * ak);
@@ -1006,9 +1017,9 @@
       float rdepth = smoothstep(0.52, 0.95, rivR) * (0.5 + 0.5 * dec.g);
       vec3 riverCol = mix(vec3(0.20, 0.37, 0.34), vec3(0.03, 0.15, 0.25), rdepth);
       riverCol = mix(riverCol, vec3(0.36, 0.34, 0.24), arid * 0.4 * (1.0 - rdepth * 0.5));        // the rivers of dry countries run brown with silt
-      // (a great river is in the field as fresh water, bank to bank, and the game's own line of it runs down its middle: where
-      //  the two lie together the water has the river's colour, not a lake's)
-      inland = mix(inland, riverCol, max(vecRiver * (1.0 - lakeW), lakeW * smoothstep(0.1, 0.5, rivR)));
+      // (where the field has the water, a lake or a great river, it has its colour too: the game's own line of a river runs the
+      //  length of Lake Geneva, and with a river's pale banks about it that was a stripe of shallows down the middle of the lake)
+      inland = mix(inland, riverCol, wOn > 0.5 ? vecRiver * (1.0 - lakeW) : vecRiver);
       inland = mix(inland, vec3(0.36, 0.33, 0.22), floodW * 0.85);
       // where the snow lies long, still water freezes: lakes and rivers under white ice (blown clear in places), and in
       // the hardest winters the sea stands fast along the shore
