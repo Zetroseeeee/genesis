@@ -85,8 +85,12 @@ def about(sig): b = gaussian_filter(w0, sig, mode=('nearest', 'wrap')); return g
 filled = np.maximum(snow, np.where(b1 > 0.08, m1, m2) * wood * 0.95)
 print('woods given the snow of the open ground about them: %.1f%% of the land, its mean share of the season %.2f -> %.2f' % (100.0 * (wood > 0.5).sum() / max(1, (sea < 0.5).sum()), snow[wood > 0.5].mean(), filled[wood > 0.5].mean()))
 snow = filled; del m1, m2, b1, b2, w0, filled
-# (water takes the snow of the land nearest to it: a card weighs between a shore's texels, and a lake freezes with its shores)
-ix = distance_transform_edt(sea, return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]; del ix
+# (Water takes the snow of the land nearest to it: a card weighs between a shore's texels, and a lake freezes with its shores.
+#  Water is the game's own, tools/planet/mask.png, and the Blue Marble's with it: Great Bear Lake in July is half ice and
+#  no dark blue sea, and as "land that is white in summer too" it had no winter - the lakes of the north lay open in January.)
+mask = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mask.png')).resize((W * 2, H * 2), Image.BOX))
+wet = mask < 160                                      # the game's water: the sea (0), a lake (128) and what a shore mixes of them
+ix = distance_transform_edt(sea | wet, return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]; del ix
 
 # ---------- ice on the sea ----------
 # The Blue Marble has no ice on its sea (its ocean is one dark blue the year round). The Sea Ice Index of the US National Snow
@@ -136,8 +140,6 @@ for hemi in 'NS':
     print('  %s: %s cells of 25 km, %s; ice all the year on %.1f million km2, in some month on %.1f' % (hemi, 'x'.join(map(str, share.shape)), crs, (share[sea_] > 0.96).sum() * 625e-6, (share[sea_] > 0.04).sum() * 625e-6))
 # only the game's own water speaks, a texel clear of any shore; the land takes its nearest water's (a card weighs between a
 # shore's texels: it must find the sea's ice there, not nothing)
-mask = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mask.png')).resize((W * 2, H * 2), Image.BOX))
-wet = mask < 160                                      # the game's water: the sea (0), a lake (128) and what a shore mixes of them
 open_water = binary_erosion(wet, iterations=1, border_value=1)
 ix = distance_transform_edt(~open_water, return_distances=False, return_indices=True); ice = np.where(open_water, ice, ice[ix[0], ix[1]]); del ix
 ice = np.array(Image.fromarray(np.rint(ice * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.0))).astype(np.float32) / 255.0
