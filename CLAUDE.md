@@ -518,8 +518,9 @@ Conventions that matter:
   tells snow from cloud. Three things that were tried and looked wrong: January alone (a yes or no: the snow of
   Europe was a white sheet with a ruled edge through Poland); noise the size of a country added to the map, or
   the map looked up a little way off by it (white puffs on green, and the snow of the Alps lying beside the Alps);
-  the place's finer noise from far out (read that coarse a noise is a lattice: the snow's edge was a row of
-  scallops - `snowL` fades each size out before then). A wood under snow is dark from above (`wForest` hides four
+  the place's own noise from far out (it repeats every forty kilometres and less: the thinning snow of Poland was
+  a wallpaper of dark dots from six hundred up - `snowL` fades each size out long before its repeat is small in
+  the picture). A wood under snow is dark from above (`wForest` hides four
   tenths of it, two under bare boughs), and snow lights its own shade (the ambient light is up to twice as much
   and bluer on it: shaded as other ground, a winter's mountains were white and navy). Roofs and boughs ask
   `trees.lyingAt(lon, lat, cold, height)`, the same sum without the grain. Look at Europe and North America from

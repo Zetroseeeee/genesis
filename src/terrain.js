@@ -930,11 +930,11 @@
         //  there (snowMap, above). By the climate's class alone a cold desert lay white from the Tarim to the Namib and a tundra
         //  from Siberia to the Puna of the Andes, and Tibet, dry and all but bare in winter, was an ice cap.
         //  And it does not end at a line: it thins out over a hundred kilometres and more, lying on open ground long
-        //  after the woods show dark through it. The noise of the place roughens its edge from close to, and is left out from
-        //  where its grain is too small to see: read that coarse a noise is a lattice, and the snow's edge was a row of
-        //  scallops. (Nor is there any noise the size of a country in it: thinning out by that, the snow of a plain seen from
-        //  far out was white puffs on green, like cloud.)
-        float rag = (nMac.g - 0.512) * 0.5 * (1.0 - smoothstep(3.0, 5.5, snowL + 7.23)) + (nMid.g - 0.512) * 0.3 * (1.0 - smoothstep(3.0, 5.5, snowL + 10.23));
+        //  after the woods show dark through it. The noise of the place roughens its edge from close to, and is left out
+        //  long before a repeat of it is small in the picture (the largest repeats every forty kilometres: from six hundred
+        //  up, the thinning snow of Poland was a wallpaper of dark dots). Nor is there any noise the size of a country in
+        //  it: thinning out by that, the snow of a plain seen from far out was white puffs on green, like cloud.)
+        float rag = (nMac.g - 0.512) * 0.5 * (1.0 - smoothstep(0.0, 1.5, snowL + 7.23)) + (nMid.g - 0.512) * 0.3 * (1.0 - smoothstep(0.0, 1.5, snowL + 10.23)) + (nMic.g - 0.512) * 0.2 * (1.0 - smoothstep(0.0, 1.5, snowL + 13.13)) + (nFin.g - 0.512) * 0.12 * (1.0 - smoothstep(0.0, 1.5, snowL + 15.29));
         float sn = snowHere + rag * smoothstep(0.0, 0.15, snowMap);
         float lying = clamp((sn - 0.07 - (1.0 - coldNow) * 1.15) / (0.45 * max(1.0, snowUp * 0.8)), 0.0, 1.0); snowLying = lying;      // (on high ground the map counts for more, and would thin out over less of itself: the snow of Tibet lay in white pancakes)
         #else
@@ -950,10 +950,14 @@
           //  field by field - and from close to in the hollows of the ground, in patches, as the snow of the heights does. That
           //  grain is what tells snow from cloud: laid on evenly as it thinned, the snow of a plain seen from far out was a white
           //  haze over the country.)
-          float open = clamp((lum0 - 0.2) * 3.0, -0.3, 0.4) * smoothstep(0.2, 0.6, green) * (1.0 - lying) * smoothstep(0.0, 0.25, lying);      // (in green country: bare ground is light and says nothing by it)
-          float cover = mix(smoothstep(0.35, 0.65, lying + ((0.5 - gHU) * 0.6 + (nFin.b - 0.43) * 0.3) * (1.0 - lying) * smoothstep(0.0, 0.25, lying) + open * 0.5), smoothstep(0.3, 0.7, lying + open * 0.7), smoothstep(0.004, 0.03, uCamAlt));
+          // (How sharply a patch ends goes by how large the grain is in the picture: where a field of the photograph is a pixel, the
+          //  snow fades as it thins; where it is many - from a hundred kilometres down - a patch has an edge, or thinning snow is
+          //  a white mist over the country.)
+          float open = clamp((lum0 - 0.2) * 3.0, -0.3, 0.4) * smoothstep(0.2, 0.6, green);      // (in green country: bare ground is light and says nothing by it)
+          float edgeW = mix(0.05, 0.2, smoothstep(-7.5, -4.5, snowL));
+          float cover = smoothstep(0.5 - edgeW, 0.5 + edgeW, lying + ((0.5 - gHU) * 0.6 + open * 0.6) * (1.0 - lying) * smoothstep(0.0, 0.25, lying));
           // (a wood under snow is dark from above: the snow is on its floor, and the eye sees the trees - through bare boughs more of it)
-          cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * mix(0.38, 0.2, bare));
+          cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * (1.0 - smoothstep(0.14, 0.32, lum0)) * mix(0.55, 0.3, bare));      // (the darker the photograph has it, the more of a wood it is)
           vec3 snowCol = vec3(0.92, 0.94, 0.97) * (0.82 + dl2 * 0.2);
           #ifdef USE_TEXARR
           #ifdef USE_GROUND
