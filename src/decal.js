@@ -310,6 +310,15 @@
       if (what) this.rebuild(cam, sim, now, simStamp, what);
       this.sim = sim;
       if (world && cam.alt < 0.03) this.updateShadows(cam, sun, world, trees, now, what === 2);
+      // (From higher up they are not drawn - and what was drawn from low down must not stay: this picture is laid out over the
+      //  decal's place, which grows with the eye's height and goes where the eye goes. Kept, a town's shadows, its burnt ground
+      //  and its floods lay over the country as dark blocks a hundred kilometres long, from 190 km up to 290, wherever the
+      //  eye went next.)
+      else if (this.shadowed) {
+        const rd = this.renderer, oldRT = rd.getRenderTarget(), oldClear = rd.getClearColor(new THREE.Color()), oldAlpha = rd.getClearAlpha();
+        rd.setRenderTarget(this.rt2); rd.setClearColor(0x000000, 0); rd.clear(true, false, false); rd.setRenderTarget(oldRT); rd.setClearColor(oldClear, oldAlpha);
+        this.shadowed = false; this.lastShadow.t = -1e9; this.lastShadow.b = -1; this.stats.shadows = 0;
+      }
     }
     // ground shadows: every building and near tree drops a sharp shadow along the sun direction
     updateShadows(cam, sun, world, trees, now, force) {
@@ -379,7 +388,7 @@
       const rd = this.renderer; const oldRT = rd.getRenderTarget(); const oldClear = rd.getClearColor(new THREE.Color()); const oldAlpha = rd.getClearAlpha();
       rd.setRenderTarget(this.rt2); rd.setClearColor(0x000000, 0); rd.clear(true, false, false); rd.render(this.scene2, this.cam);
       rd.setRenderTarget(oldRT); rd.setClearColor(oldClear, oldAlpha);
-      this.stats.shadows = vi / 4;
+      this.stats.shadows = vi / 4; this.shadowed = true;
     }
   }
   window.DECAL = { Decal };

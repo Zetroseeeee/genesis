@@ -748,6 +748,12 @@ Conventions that matter:
 - **Shadows.** The sun's depth map holds what stands still (models, kit, near trees) and is redrawn only when the
   camera, the sun or the placements change (`castersVersion` follows a signature of everything placed). Things
   that move get their own cheap shadow (walkers: a streak on the ground in `movers.js`).
+  The ground's own marks (`decal.js`, the second picture of the decal: the shadows things throw on the ground from
+  far, burnt ground, flood water) are drawn only below 190 km, and **cleared above it** (`shadowed`): that picture
+  is laid out over the decal's place, which grows with the eye's height and goes where the eye goes, and what was
+  drawn low down over a town lay stretched over the country as dark blocks a hundred kilometres long, from 190 km
+  up to 290, wherever the eye went next. (Found by a picture of Tibet taken in a page that had looked at a town
+  first: when a picture shows something the place cannot have, ask where the page had been.)
 
 ## The home screen
 
