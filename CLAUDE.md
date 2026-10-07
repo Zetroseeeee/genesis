@@ -527,8 +527,9 @@ Conventions that matter:
   cell's own height on the whole accounts for (the game's heights, smoothed as the snow is), `(share + 3) / 4` in
   red - and every place adds its own height back: `snowHere = clamp(map x 4 - 3 + height x 0.0005, 0, 1.25)`. A
   valley of the Alps is green for most of its winter under white mountains; the high ranges of a dry plateau have
-  snow while the plateau has none. A cell without snow counts as if it began 600 m above itself, and 2,000 m where
-  there is none for a hundred kilometres round (the Hoggar has no winter). The same number brings the snow line of
+  snow while the plateau has none. Country without any snow for a hundred kilometres round counts as if it began
+  2,000 m above itself (the Hoggar has no winter) - by the snow round a place, smooth, never by the cell's own (the
+  snow of a high plain ended at a cliff: white pancakes on Qinghai). The same number brings the snow line of
   the mountains down in winter (`winterSnow`).
   *The season.* Snow of so much of the cold season lies for just so long about the depth of winter: `snowOff =
   acos(2 x cold - 1) / pi` is how far the year is from that (`uBare.z/.w`: 0 late in January, 1 half a year on),

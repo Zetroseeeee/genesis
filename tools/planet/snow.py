@@ -185,12 +185,13 @@ ice = np.array(Image.fromarray(np.rint(ice * 255).astype(np.uint8)).resize((W, H
 snow = np.array(Image.fromarray(np.rint(snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.6))).astype(np.float32) / 255.0
 snow = np.clip((snow - 0.03) / 0.94, 0.0, 1.0)
 high = gaussian_filter(high.reshape(H, 2, W, 2).mean((1, 3)), 1.6, mode=('nearest', 'wrap'))      # (the heights as the snow is: to the map's cells, and as smooth)
-# (Where a cell has no snow at all, all that is known is that its own height on the whole is too low for any: ground a good
-#  deal higher may have none either. So a cell without snow is counted as if it began six hundred metres above itself - and
-#  two thousand where there is none for a hundred kilometres round: the Hoggar stands 1,700 m above the Sahara about it
-#  and has no winter, nor have the ridges of the Puna.)
-near = gaussian_filter(snow, 5.0, mode=('nearest', 'wrap'))      # (smooth and round: by the most within a square of cells, the margin's edge was a row of boxes)
-margin = (0.3 + 0.7 * (1.0 - ss(0.0, 0.02, near))) * (1.0 - ss(0.0, 0.1, snow))
+# (Where there is no snow at all for a hundred kilometres round, all that is known is that the country's height on the whole
+#  is too low for any, and ground a good deal higher may have none either: such country is counted as if it began two
+#  thousand metres above itself - the Hoggar stands 1,700 m above the Sahara about it and has no winter, nor have the
+#  ridges of the Puna. By how much snow there is round a place, smooth over a hundred kilometres, never by the cell's
+#  own: taken off wherever a cell had none, the snow of a high plain ended at a cliff - white pancakes on Qinghai.)
+near = gaussian_filter(snow, 5.0, mode=('nearest', 'wrap'))
+margin = 1.0 - ss(0.0, 0.02, near)
 sealevel = snow - PER_KM * high / 1000.0 - margin      # how long it would lie at the level of the sea: 1 all the cold season, below nought never there
 lat = 90.0 - (np.arange(H) + 0.5) * 180.0 / H
 print('snow in winter by latitude (the share of the land that has it; 10 degrees at a time, from the north):')
