@@ -199,7 +199,8 @@ margin = 1.0 - ss(0.0, 0.02, near)
 # taken as the middle value within some seventy kilometres, which keeps an edge where there is one and lets go of holes and
 # islands smaller than that, and then smoothed a little.
 yy, xx = np.mgrid[-4:5, -4:5]
-sealevel = median_filter(snow - PER_KM * high / 1000.0, footprint=(yy * yy + xx * xx <= 16), mode=('nearest', 'wrap'))
+sealevel = snow - PER_KM * high / 1000.0
+sealevel = median_filter(np.concatenate([sealevel[:, -4:], sealevel, sealevel[:, :4]], 1), footprint=(yy * yy + xx * xx <= 16), mode='nearest')[:, 4:-4]      # (round the Earth by hand: a filter of ranks takes one way of ending for both ways)
 sealevel = gaussian_filter(sealevel, 1.2, mode=('nearest', 'wrap')) - margin
 lat = 90.0 - (np.arange(H) + 0.5) * 180.0 / H
 print('snow in winter by latitude (the share of the land that has it; 10 degrees at a time, from the north):')
