@@ -67,6 +67,10 @@ then `wKind` 0 sea .. 1 fresh, `wOpen` how open the water lies, `wLevel` a lake'
 nothing mirrored), `uWaterK.value` (x how ragged the shore, y how wide a beach), `uSkyR.value` (the fifteen colours the water
 mirrors). `__T.costsWater()` writes frame rates with its parts left out one by one. A shader that does not compile leaves the
 ground undrawn and says nothing loud: ask `__G.renderer.info.programs` for those whose `diagnostics.runnable` is false.
+The packs of the water's edge lie in bundles (`data/w/<level>_b<x>_<y>.bin`; `node tools/water/fetch.mjs check` says whether
+they are whole; `WATER_DIR=<folder>` tries the fetching and bundling on a copy). `__G.terrain.wBundles` are those in hand; a
+drawn tile's `wPack` is `{ pack, level, rect }`, or `{ flat: 'L' | 'S' }` where its piece of the pack is nothing but land
+far from a shore or open sea (the shader looks nothing up there), or null (no field: the picture's mask).
 The rivers: `__G.world.decal.stats` (`rivers` drawn, `along`: pieces left to the field's own water), `nearestRiver(lon, lat)`
 (`d` metres to the line, `hw` half the drawn width); `decal.rect = null` draws them again. The tour's `river_bend` (a great
 river's ribbon through a bend: its banks must be smooth), `river_wide` (a river the field has in pieces beside the ribbon: one

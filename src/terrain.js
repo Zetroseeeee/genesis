@@ -1006,14 +1006,14 @@
       #ifndef WATER_PLAIN
       if (wOn > 0.5 && uWaterP.x < 1.5 && surfK > 0.01 && wD > -260.0 && wD < 14.0) {
         float open = clamp(0.85 - wBend * 200.0, 0.25, 1.5) * (1.0 - 0.75 * smoothstep(0.0045, 0.009, -wBend)) * (0.55 + 0.8 * nMac.b) * uSeaK.y * surfK;      // (round a rock a few steps across the lines of surf were rings of chain)
-        // (The swell comes from one side: a shore that looks toward it has the surf, a lee shore next to none - lines of surf
+        // (The swell comes from one side: a shore that looks toward it has the surf, a lee shore a third of it - lines of surf
         //  all round an islet were rings, like a target. It comes as the winds of the Earth blow: out of the west between
         //  thirty and sixty degrees, with the trades out of the east in the tropics, a little toward the equator in both,
         //  and turned some way by the noise of the place.)
         { float la = abs(vLat) * 57.2958, hs = vLat >= 0.0 ? 1.0 : -1.0, wst = smoothstep(24.0, 34.0, la) * (1.0 - smoothstep(60.0, 68.0, la)), sa = (nMac.r - 0.5) * 1.6;
           vec2 sw = normalize(mix(vec2(-0.8, 0.5 * hs), vec2(0.9, 0.3 * hs), wst)); sw = vec2(sw.x * cos(sa) - sw.y * sin(sa), sw.x * sin(sa) + sw.y * cos(sa));      // the way the swell goes: east, south
           vec2 toLand = wLand * vec2(tileWm, tileHm);
-          open *= mix(0.1, 1.0, smoothstep(-0.25, 0.55, dot(toLand, sw))); }
+          open *= mix(0.3, 1.0, smoothstep(-0.4, 0.5, dot(toLand, sw))); }      // (a lee shore keeps a third: the east coasts of the continents have their surf too, only less)
         float zone = mix(48.0, 125.0, shelf2) * (0.7 + 0.6 * nMid.b);                // how far out they begin to break, metres
         float inZone = (1.0 - smoothstep(zone * 0.35, zone, off)) * step(0.0, off - 0.01);
         float lam = 34.0, ph = off / lam + uTime * 0.11 + (nMic.g - 0.5) * 1.6 + (nMid.b - 0.5) * 4.0, f = fract(ph);
@@ -1306,13 +1306,20 @@
           // the water's edge: red the distance's code, green what water it is (0 the sea .. 255 fresh). Looked at between its
           // texels as it is: there is a coarser level for the eye further off.
           p.scale = this.water.levels[p.L].scale;
-          const cv = document.createElement('canvas'); cv.width = p.w; cv.height = p.h; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0);
           // (Three bytes a texel, the same store for the card and for whoever asks here where the water is: the distance; what
           //  water and how open it lies, four bits each; how high a lake stands. Packs made before the last two were reckoned
           //  are brought to the same shape: all water open, no levels.)
-          const d = ctx.getImageData(0, 0, p.w, p.h).data, n = p.w * p.h, three = new Uint8Array(n * 3), W = this.water;
-          if (W.level) for (let i = 0; i < n; i++) { three[i * 3] = d[i * 4]; three[i * 3 + 1] = d[i * 4 + 1]; three[i * 3 + 2] = d[i * 4 + 2]; }
-          else for (let i = 0; i < n; i++) { three[i * 3] = d[i * 4]; three[i * 3 + 1] = (Math.round(d[i * 4 + 1] / 17) << 4) | (W.open ? Math.round(d[i * 4 + 2] / 17) : 15); }
+          // (Read out of the picture a strip at a time, with the frame let through between two: a pack is four million texels,
+          //  and drawn, read and copied in one piece it held a frame up for a twentieth of a second and more each time one came.)
+          const ROWS = 256, cv = document.createElement('canvas'); cv.width = p.w; cv.height = Math.min(ROWS, p.h); const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.globalCompositeOperation = 'copy';      // (each strip in place of the one before, not over it)
+          const three = new Uint8Array(p.w * p.h * 3), W = this.water;
+          for (let y0 = 0; y0 < p.h; y0 += ROWS) {
+            const hh = Math.min(ROWS, p.h - y0), m = p.w * hh; ctx.drawImage(bmp, 0, y0, p.w, hh, 0, 0, p.w, hh);
+            const d = ctx.getImageData(0, 0, p.w, hh).data; let o = y0 * p.w * 3;
+            if (W.level) for (let i = 0; i < m; i++, o += 3) { three[o] = d[i * 4]; three[o + 1] = d[i * 4 + 1]; three[o + 2] = d[i * 4 + 2]; }
+            else for (let i = 0; i < m; i++, o += 3) { three[o] = d[i * 4]; three[o + 1] = (Math.round(d[i * 4 + 1] / 17) << 4) | (W.open ? Math.round(d[i * 4 + 2] / 17) : 15); }
+            if (y0 + ROWS < p.h) await new Promise((r) => setTimeout(r, 0));
+          }
           p.dist = three;
           if (bmp.close) bmp.close();
           tex = new THREE.DataTexture(three, p.w, p.h, THREE.RGBFormat, THREE.UnsignedByteType); tex.flipY = false; tex.unpackAlignment = 1; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
