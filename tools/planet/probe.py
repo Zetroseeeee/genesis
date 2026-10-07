@@ -9,7 +9,10 @@
   sheet   a sheet of pictures to look at: the game's picture beside the months that might take its place
   tiff    one piece of the Blue Marble at its finest (500 m): how the file is laid out, how long it takes to fetch and to read,
           what colour its sea is, how far its JPEG is from it, and how many bytes a pack of it takes squeezed this way and that
-Nothing told: all three.
+  ice     where the sea's ice is to be had month by month (the Sea Ice Index of the US National Snow and Ice Data Center):
+          what lies in its folders, and what one month's file is
+Nothing told: urls. (months and sheet were asked of the picture the game had until 0.21, which the repository no longer holds:
+it was the Blue Marble Next Generation's July.)
 """
 import os, sys, re, io, json, time, urllib.request, urllib.error
 import numpy as np
@@ -19,7 +22,9 @@ Image.MAX_IMAGE_PIXELS = None
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
 OUT, WORK = arg('out', 'out'), arg('work', 'work')
-what = [a for a in sys.argv[1:] if a in ('urls', 'months', 'sheet', 'tiff')] or ['urls', 'months', 'sheet']
+what = [a for a in sys.argv[1:] if a in ('urls', 'months', 'sheet', 'tiff', 'ice')] or ['urls']
+if not os.path.exists(os.path.join(ROOT, 'data', 'i', '3_0_0.webp')) and ('months' in what or 'sheet' in what):
+    print('months, sheet: the picture they were asked about (the one the game had until 0.21) is no longer in the repository'); what = [a for a in what if a not in ('months', 'sheet')]
 UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) holocene-planet-probe'}
 EO = 'https://eoimages.gsfc.nasa.gov/images/imagerecords/'
 # Blue Marble Next Generation (NASA Earth Observatory; R. Stockli): the land's surface month by month through 2004, 500 m to a
@@ -202,3 +207,26 @@ if 'tiff' in what:
     for k, t in enumerate(tiles): sh.paste(t, ((k % 3) * 704, (k // 3) * 704))
     sh.save(os.path.join(OUT, 'planet_tiff.jpg'), quality=90); print('planet_tiff.jpg: the Alps, Paris, the Nile\'s delta / the Po, Delhi, Moscow at 500 m')
 print('done')
+
+
+if 'ice' in what:
+    print('== ice on the sea: the Sea Ice Index (NSIDC G02135) ==')
+    hosts = ['https://noaadata.apl.washington.edu/DATASETS/NOAA/G02135/', 'https://masie_web.apps.nsidc.org/pub/DATASETS/NOAA/G02135/']
+    got = None
+    for base in hosts:
+        for sub in ['', 'north/', 'north/monthly/', 'north/monthly/geotiff/', 'north/monthly/geotiff/03_Mar/', 'south/monthly/geotiff/09_Sep/', 'north/monthly/shapefiles/', 'north/monthly/shapefiles/shp_median/']:
+            l, n = links(base + sub)
+            if l is None: print('  %s%s: %s' % (base, sub, n)); continue
+            l = [x for x in l if not x.startswith(('/', 'http', '..'))]
+            print('  %s%s: %d entries: %s%s' % (base, sub, len(l), ' '.join(l[:10]), (' ... ' + ' '.join(l[-6:])) if len(l) > 16 else ''), flush=True)
+            if sub.endswith('03_Mar/') and l and not got: got = (base + sub, [x for x in l if x.endswith('.tif')])
+    if got:
+        folder, tifs = got; conc = [x for x in tifs if 'concentration' in x]; print('  concentration files in March: %d, first %s, last %s' % (len(conc), conc[:2], conc[-2:]))
+        if conc:
+            import rasterio
+            f = fetch(folder + conc[0], conc[0])
+            with rasterio.open(f) as r:
+                a = r.read(1); v, c = np.unique(a, return_counts=True)
+                print('  %s: %s, %s, crs %s, transform %s, nodata %s' % (conc[0], a.shape, a.dtype, r.crs, tuple(round(x, 1) for x in r.transform)[:6], r.nodata))
+                print('  values: %s' % ', '.join('%d x%d' % (int(x), int(n)) for x, n in list(zip(v, c))[:8]), '...', ', '.join('%d x%d' % (int(x), int(n)) for x, n in list(zip(v, c))[-8:]))
+
