@@ -21,6 +21,7 @@ winters are white"; Trees.lyingAt is its twin for boughs and roofs).
 import os, sys, time, urllib.request
 import numpy as np
 from PIL import Image, ImageFilter
+from scipy.ndimage import gaussian_filter
 
 Image.MAX_IMAGE_PIXELS = None
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
@@ -62,6 +63,17 @@ for k in range(7):
     need = 0.03 + 0.25 * ls
     snow += ss(need, need + 0.11, lw - ls) * grey(a) * ss(0.16, 0.30, lw) * (1.0 - sea) / 7.0
     del a, lw
+# A wood keeps its own counsel: the larch of Yakutia under a low sun is as dark in January as in July, and the woods of
+# Minnesota little lighter - by their own look they had no winter, and lay as dark holes in the snow of a continent. Snow
+# lies in a wood when it lies on the open ground about it: a wood (dark and green in summer) takes what the open ground
+# within some eighty kilometres has, or within three hundred where there is none so near.
+wood = ss(0.24, 0.14, ls) * ss(0.0, 0.03, summer[..., 1] - np.maximum(summer[..., 0], summer[..., 2]) * 0.92) * (1.0 - sea)
+w0 = (1.0 - sea) * (1.0 - wood)
+def about(sig): b = gaussian_filter(w0, sig, mode=('nearest', 'wrap')); return gaussian_filter(snow * w0, sig, mode=('nearest', 'wrap')) / np.maximum(b, 1e-4), b
+(m1, b1), (m2, b2) = about(8.0), about(30.0)
+filled = np.maximum(snow, np.where(b1 > 0.08, m1, m2) * wood * 0.95)
+print('woods given the snow of the open ground about them: %.1f%% of the land, its mean share of the season %.2f -> %.2f' % (100.0 * (wood > 0.5).sum() / max(1, (sea < 0.5).sum()), snow[wood > 0.5].mean(), filled[wood > 0.5].mean()))
+snow = filled; del m1, m2, b1, b2, w0, filled
 # (to the map's own cells, then smoothed over some sixty kilometres: what is left of a month's yes or no is how likely it is)
 snow = np.array(Image.fromarray(np.rint(snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.6))).astype(np.float32) / 255.0
 snow = np.clip((snow - 0.03) / 0.94, 0.0, 1.0)

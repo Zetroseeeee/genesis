@@ -554,7 +554,7 @@
       float snowMap = natv.a, snowL = 0.5 * log2(max(max(dot(dFdx(vGL), dFdx(vGL)), dot(dFdy(vGL), dFdy(vGL))), 1e-30)) + 9.0;      // (snowL: the level the card would take of the noise at one repeat a radian)
       // (it comes first to the heights and leaves them last: by the map alone, of cells twenty kilometres across, the snow of the
       //  Alps ended at one line over ridge and valley alike, and the ranges at a snowy country's edge stood bare beside it)
-      float snowHere = snowMap * (0.8 + min(max(vH, 0.0), 2400.0) * 0.0008);
+      float snowUp = 0.8 + min(max(vH, 0.0), 2400.0) * 0.0008, snowHere = snowMap * snowUp;
       float winterSnow = winter * mix(0.12, 1.0, smoothstep(0.05, 0.5, snowHere));
       float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winterSnow - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0));
       float ice = max(info.g, white * max(smoothstep(snowLine0 - 900.0, snowLine0 + 200.0, vH), smoothstep(0.7, 0.8, latN0)));
@@ -936,7 +936,7 @@
         //  far out was white puffs on green, like cloud.)
         float rag = (nMac.g - 0.512) * 0.5 * (1.0 - smoothstep(3.0, 5.5, snowL + 7.23)) + (nMid.g - 0.512) * 0.3 * (1.0 - smoothstep(3.0, 5.5, snowL + 10.23));
         float sn = snowHere + rag * smoothstep(0.0, 0.15, snowMap);
-        float lying = clamp((sn - 0.07 - (1.0 - coldNow) * 1.15) / 0.45, 0.0, 1.0); snowLying = lying;
+        float lying = clamp((sn - 0.07 - (1.0 - coldNow) * 1.15) / (0.45 * max(1.0, snowUp * 0.8)), 0.0, 1.0); snowLying = lying;      // (on high ground the map counts for more, and would thin out over less of itself: the snow of Tibet lay in white pancakes)
         #else
         // (Snow lies on low ground only well away from the tropics. By the climate's map a cold desert is the Namib too, and a tundra
         //  the Puna of the Andes: each lay under a white sheet all its winter. Climates of mild winters keep snow from some forty
@@ -950,7 +950,7 @@
           //  field by field - and from close to in the hollows of the ground, in patches, as the snow of the heights does. That
           //  grain is what tells snow from cloud: laid on evenly as it thinned, the snow of a plain seen from far out was a white
           //  haze over the country.)
-          float open = clamp((lum0 - 0.2) * 3.0, -0.3, 0.4) * (1.0 - lying) * smoothstep(0.0, 0.25, lying);
+          float open = clamp((lum0 - 0.2) * 3.0, -0.3, 0.4) * smoothstep(0.2, 0.6, green) * (1.0 - lying) * smoothstep(0.0, 0.25, lying);      // (in green country: bare ground is light and says nothing by it)
           float cover = mix(smoothstep(0.35, 0.65, lying + ((0.5 - gHU) * 0.6 + (nFin.b - 0.43) * 0.3) * (1.0 - lying) * smoothstep(0.0, 0.25, lying) + open * 0.5), smoothstep(0.3, 0.7, lying + open * 0.7), smoothstep(0.004, 0.03, uCamAlt));
           // (a wood under snow is dark from above: the snow is on its floor, and the eye sees the trees - through bare boughs more of it)
           cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * mix(0.38, 0.2, bare));

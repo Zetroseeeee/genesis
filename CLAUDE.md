@@ -122,6 +122,11 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   builder - a comment too - the pack must be made before `main` is pushed** (the game's build stops without it:
   `PLANET_STRICT`; elsewhere the pack made last is taken, with a warning). `MODE=probe tools/planet/pack.sh [urls |
   months | sheet | tiff]` looks at the sources.
+- `REF=<branch> MODE=snow PICS="planet_snow.jpg snow.png" tools/planet/pack.sh` — makes the map of the Earth's own
+  winters (`tools/planet/snow.py`, two minutes): `shots/peek/snow.png`, which is copied to `data/snow.png` by hand and
+  committed (it is small), and `planet_snow.jpg` to look at (the summer with the map's snow on it, over the Blue
+  Marble's own January). Its log prints the share of the land that has snow by latitude and the value at some
+  thirty places (Moscow 0.7, Winnipeg 0.55, Berlin 0, Tibet 0): look at them after touching its rule.
 - `tools/water/pack.sh` — makes the water's edge on GitHub (the Water workflow runs `tools/water/build.py`: its sources
   are on AWS, out of reach from here) and brings it here: `data/w/` (`index.json` and 1,484 packs, kept in 157
   bundles of sixteen: `<level>_b<x>_<y>.bin`, a table and then the packs' own files; `fetch.mjs` makes them, always
@@ -496,7 +501,29 @@ Conventions that matter:
   **The planet's own maps are one texture of two layers** (`uInfo`, a `sampler2DArray`: `planetMaps` in `main.js`):
   `info.png` and under it `veg.jpg` at the same size - the ground's shader has all sixteen textures, and a layer
   costs none. `info.png` is read back through the card (`pixelsOf`): a 2D canvas keeps colour multiplied by alpha,
-  and its alpha is how dry the country is.
+  and its alpha is how dry the country is. The second layer's alpha is the snow of the Earth's own winters (below).
+- **Winter** (`data/snow.png`, `tools/planet/snow.py`; `snowMap` in `terrain.js`, `Trees.lyingAt`). Where snow lies,
+  and for how much of the year, is the Earth's own: the Blue Marble has every month, and the map is the share of a
+  cold season's seven months (October to April in the north, April to October in the south) in which a place was
+  white or grey and had not been in summer - all of them in Siberia, five at Moscow, four at Winnipeg, one in the
+  Ukraine, none at Berlin, none in Tibet (which is dry: by the climate's class it was an ice cap half the year, and
+  a cold desert from the Tarim to the Namib lay white). A wood's winter is measured as a wood's: under snow it is
+  grey, not white. Snow lies where `map x height > 0.07 + 1.15 x (1 - the cold of the year)` (`uBare.z/.w`, a month
+  behind the sun): deep winter takes in every place that has any, and the edges of the season only where it lies
+  all winter; the height counts for much (0.8 at the sea, 2.7 from 2,400 m), so that at its edge the snow keeps to
+  the hills, and comes to them first and leaves them last. The same number brings the snow line of the mountains
+  down in winter (`winterSnow`). **It does not end at a line.** It thins out over half the map's range, and where
+  it thins it lies on open ground before the woods: the photograph's own light and dark, field by field (`lum0`),
+  say which is which, and from close to the hollows of the ground's own material do (`gHU`). That grain is what
+  tells snow from cloud. Three things that were tried and looked wrong: January alone (a yes or no: the snow of
+  Europe was a white sheet with a ruled edge through Poland); noise the size of a country added to the map, or
+  the map looked up a little way off by it (white puffs on green, and the snow of the Alps lying beside the Alps);
+  the place's finer noise from far out (read that coarse a noise is a lattice: the snow's edge was a row of
+  scallops - `snowL` fades each size out before then). A wood under snow is dark from above (`wForest` hides four
+  tenths of it, two under bare boughs), and snow lights its own shade (the ambient light is up to twice as much
+  and bluer on it: shaded as other ground, a winter's mountains were white and navy). Roofs and boughs ask
+  `trees.lyingAt(lon, lat, cold, height)`, the same sum without the grain. Look at Europe and North America from
+  2,500 km and more, Poland from 600, the Alps from 300 and 80 and a town in the snow after touching any of it.
 - **The water's edge** (`data/w`, `tools/water/build.py`; `uWater` in `terrain.js`). A field of distances: how
   many metres it is from every place to the nearest shore (land positive), 305 m to a texel at level 7 and the
   same at half and a quarter the fineness (levels 6 and 5), in packs of 2052 texels with a rim of two. Its nought
@@ -637,7 +664,7 @@ Conventions that matter:
 - **Climate.** `data/climate.png` is the Köppen-Geiger class of every eighth of a degree, and `data/info.png`
   carries two fields made from it: alpha = how dry the country is (the ground shader blends sand, stony plain,
   scrub, steppe and savanna by it; the photograph only says where the ground is bare), blue = how hard the winters
-  are (snow lies on the ground and on roofs by it, in season). Trees take their zone and their density from the
+  are (still water freezes by it; where snow lies is no longer the climate's to say: see "Winter"). Trees take their zone and their density from the
   class (`zoneOf`, `Trees.THIN`). Rebuild both with `tools/climate/build.py` (the source and its licence are in the
   file's header). The year: `uSeason` (sun), `uBare` (leaves down N/S, the cold of the year N/S, a month behind the sun).
 - **Rivers** are drawn wider than life (`drawnWidth()` in `decal.js`: brooks four times, great rivers twice), like
