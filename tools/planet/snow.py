@@ -35,7 +35,7 @@ snow's twin for boughs and roofs).
 import os, sys, time, urllib.request, urllib.error
 import numpy as np
 from PIL import Image, ImageFilter
-from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion
+from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion, binary_dilation
 
 Image.MAX_IMAGE_PIXELS = None
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
@@ -93,7 +93,10 @@ snow = filled; del m1, m2, b1, b2, w0, filled
 #  no dark blue sea, and as "land that is white in summer too" it had no winter - the lakes of the north lay open in January.)
 mask = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mask.png')).resize((W * 2, H * 2), Image.BOX))
 wet = mask < 160                                      # the game's water: the sea (0), a lake (128) and what a shore mixes of them
-ix = distance_transform_edt(sea | wet, return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]
+# (And the land's last ten kilometres with it: the Blue Marble paints every water one dark blue in every month, so a shore's
+#  cell, half water, is half as white in winter as the country behind it - and that was the "nearest land" a lake took its
+#  snow from: Ladoga had two months of it between shores that have five.)
+ix = distance_transform_edt(binary_dilation(sea | wet, iterations=1), return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]
 
 # ---------- how high the country lies ----------
 # The map is of cells twenty kilometres across, and what it has for the Alps is the Alps on the whole: the valleys with the
