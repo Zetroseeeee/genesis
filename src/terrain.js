@@ -525,7 +525,8 @@
       // own fields show. Only where woods would stand (a steppe is tan of its own, and so is a Mediterranean
       // summer), below the trees' line, and not on rock faces or snow.
       float ploughed = smoothstep(0.05, 0.4, cult + (nMid.r - 0.5) * 0.2);
-      { float l0 = dot(base, vec3(0.299, 0.587, 0.114));
+      float lum0 = dot(base, vec3(0.299, 0.587, 0.114));      // (the photograph's own light and dark, before anything is made of it)
+      { float l0 = lum0;
         // (Where woods would stand: by the map the trees are planted by - green by nature and not warm-coloured, which a steppe, a
         //  prairie and a savanna are. A climate's class cannot say it: the wheat of Kansas and the wheat of Picardy grow under
         //  the same letters, and the plains were a green wall from Texas to the Dakotas with a ruled edge where the class
@@ -945,14 +946,14 @@
         float lying = smoothstep(thr, thr + 0.1, coldNow) * smoothstep(0.08, 0.5, cold); snowLying = lying;
         #endif
         if (lying > 0.003) {
-          // (where it thins out it lies on open ground before the woods - the photograph's own light and dark say which is which -
-          //  and from close to in the hollows of the ground, in patches, as the snow of the heights does. From far there is no
-          //  grain to make patches of: cut off at a line there, the thinning snow of a plain was white pancakes on green; it
-          //  fades as it thins.)
-          float open = clamp((lum - 0.17) * 3.0, -0.45, 0.45) * (1.0 - lying) * smoothstep(0.0, 0.25, lying);
-          float cover = mix(smoothstep(0.35, 0.65, lying + ((0.5 - gHU) * 0.6 + (nFin.b - 0.43) * 0.3) * (1.0 - lying) * smoothstep(0.0, 0.25, lying) + open * 0.5), smoothstep(0.0, 1.0, lying + open * 0.6), smoothstep(0.004, 0.03, uCamAlt));
+          // (where it thins out it lies on open ground before the woods - the photograph's own light and dark say which is which,
+          //  field by field - and from close to in the hollows of the ground, in patches, as the snow of the heights does. That
+          //  grain is what tells snow from cloud: laid on evenly as it thinned, the snow of a plain seen from far out was a white
+          //  haze over the country.)
+          float open = clamp((lum0 - 0.2) * 3.0, -0.3, 0.4) * (1.0 - lying) * smoothstep(0.0, 0.25, lying);
+          float cover = mix(smoothstep(0.35, 0.65, lying + ((0.5 - gHU) * 0.6 + (nFin.b - 0.43) * 0.3) * (1.0 - lying) * smoothstep(0.0, 0.25, lying) + open * 0.5), smoothstep(0.3, 0.7, lying + open * 0.7), smoothstep(0.004, 0.03, uCamAlt));
           // (a wood under snow is dark from above: the snow is on its floor, and the eye sees the trees - through bare boughs more of it)
-          cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * mix(0.45, 0.2, bare));
+          cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * mix(0.38, 0.2, bare));
           vec3 snowCol = vec3(0.92, 0.94, 0.97) * (0.82 + dl2 * 0.2);
           #ifdef USE_TEXARR
           #ifdef USE_GROUND
