@@ -77,7 +77,8 @@
       else if (uWaterP.x > 0.5) { vec2 wc = uWaterRect.xy + vec2(u, v) * uWaterRect.zw, wsz = vec2(textureSize(uWater, 0)); vec3 wt = texture2D(uWater, wc).rgb; wdv = wDec(wt.r) * uWaterP.y; if (uWaterL > 0.5) wlv = wLev(wt.b); wkv = wKO(texelFetch(uWater, ivec2(clamp(floor(wc * wsz), vec2(0.0), wsz - 1.0)), 0).g).x; }      // (the distance and the level weighed between texels by the card; what water it is from the nearest texel: its byte holds two things)
       // The sea lies at nought and a lake at its level, and the ground comes up from the water's own level, a little way in
       // from the shore (SHORE_FLAT, uShoreQ). Where the packs carry no levels a lake lies as the heights have it.
-      if (uWaterP.x > 0.5) h = mix(wlv * wkv, h, smoothstep(uShoreQ, uShoreQ + ${SHORE_RISE.toFixed(1)}, wdv));
+      // (not for fresh water where the tile's lakes are smaller than its quads, uWaterP.z: see update())
+      if (uWaterP.x > 0.5 && !(uWaterP.x < 1.5 && uWaterP.z > 0.5 && wkv > 0.5)) h = mix(wlv * wkv, h, smoothstep(uShoreQ, uShoreQ + ${SHORE_RISE.toFixed(1)}, wdv));
       float cl0 = cos(lat);
       vec2 gl0 = vec2(lon * cl0 - uGeoC.x, lat - uGeoC.y);
       // micro-relief displacement: the same two noise octaves the fragment shader shades with, so silhouettes match
@@ -137,7 +138,7 @@
     }
     uniform sampler2D uWater; uniform vec4 uWaterRect, uWaterP;      // the water's edge (data/w): P = 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; for 2 the distance and the kind
     uniform float uDLon, uDLat, uLevel;
-    uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason; uniform vec4 uBare;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
+    uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason; uniform vec4 uBare; uniform vec2 uIceCold;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
     uniform sampler2D uOwner, uPal, uSim, uNoise;
     // (the planet's own maps travel as one texture of two layers where they could be made one: info.png, and what grows there by
     //  nature - the map the trees are planted by)
@@ -486,7 +487,7 @@
       vec2 geo = vec2((vLon / PI + 1.0) * 0.5, 0.5 - vLat / PI);   // global equirect uv (v down)
       #ifdef INFO2
       vec4 info = texture(uInfo, vec3(geo, 0.0));                    // r shelf, g ice, b how hard the winters are, a how humid the climate (tools/climate/build.py)
-      vec4 natv = texture(uInfo, vec3(geo, 1.0));                    // by nature: how green the country is, how light, how warm-coloured (data/veg.jpg: what the trees are planted by); a: how much snow its winters bring (data/snow.png)
+      vec4 natv = texture(uInfo, vec3(geo, 1.0));                    // by nature: how green the country is and how warm-coloured (r, b: data/veg.jpg, what the trees are planted by); for how much of its winter the sea is ice (g) and snow lies (a: data/snow.png)
       #else
       vec4 info = texture2D(uInfo, geo); vec4 natv = vec4(0.0, 0.5, 1.0, 1.0);
       #endif
@@ -551,7 +552,7 @@
       // (and a winter brings the snow line down only where it brings snow: natv.a, the Earth's own winter. Tibet is high, dry
       //  and all but bare in January; by the latitude's rule alone it was an ice cap for half the year.)
       // How much of its cold season snow lies here (natv.a: tools/planet/snow.py).
-      float snowMap = natv.a, snowL = 0.5 * log2(max(max(dot(dFdx(vGL), dFdx(vGL)), dot(dFdy(vGL), dFdy(vGL))), 1e-30)) + 9.0;      // (snowL: the level the card would take of the noise at one repeat a radian)
+      float snowMap = natv.a, noiseL = 0.5 * log2(max(max(dot(dFdx(vGL), dFdx(vGL)), dot(dFdy(vGL), dFdy(vGL))), 1e-30)) + 9.0;      // (noiseL: the level the card would take of the noise at one repeat a radian)
       // (it comes first to the heights and leaves them last: by the map alone, of cells twenty kilometres across, the snow of the
       //  Alps ended at one line over ridge and valley alike, and the ranges at a snowy country's edge stood bare beside it)
       float snowUp = 0.8 + min(max(vH, 0.0), 2400.0) * 0.0008, snowHere = snowMap * snowUp;
@@ -934,9 +935,13 @@
         //  long before a repeat of it is small in the picture (the largest repeats every forty kilometres: from six hundred
         //  up, the thinning snow of Poland was a wallpaper of dark dots). Nor is there any noise the size of a country in
         //  it: thinning out by that, the snow of a plain seen from far out was white puffs on green, like cloud.)
-        float rag = (nMac.g - 0.512) * 0.5 * (1.0 - smoothstep(0.0, 1.5, snowL + 7.23)) + (nMid.g - 0.512) * 0.3 * (1.0 - smoothstep(0.0, 1.5, snowL + 10.23)) + (nMic.g - 0.512) * 0.2 * (1.0 - smoothstep(0.0, 1.5, snowL + 13.13)) + (nFin.g - 0.512) * 0.12 * (1.0 - smoothstep(0.0, 1.5, snowL + 15.29));
+        float rag = (nMac.g - 0.512) * 0.5 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23)) + (nMid.g - 0.512) * 0.3 * (1.0 - smoothstep(0.0, 1.5, noiseL + 10.23)) + (nMic.g - 0.512) * 0.2 * (1.0 - smoothstep(0.0, 1.5, noiseL + 13.13)) + (nFin.g - 0.512) * 0.12 * (1.0 - smoothstep(0.0, 1.5, noiseL + 15.29));
         float sn = snowHere + rag * smoothstep(0.0, 0.15, snowMap);
-        float lying = clamp((sn - 0.07 - (1.0 - coldNow) * 1.15) / (0.45 * max(1.0, snowUp * 0.8)), 0.0, 1.0); snowLying = lying;      // (on high ground the map counts for more, and would thin out over less of itself: the snow of Tibet lay in white pancakes)
+        // (what the season asks: little in the depth of winter, more than a plain ever has by the spring, and from then more than
+        //  any height has: with the heights counting for as much as they do, the Alps, Norway and Armenia lay white all July.
+        //  What stays the year round is the snow line's to say, and the photograph's.)
+        float warmNow = 1.0 - coldNow, snowAsk = 0.07 + warmNow * 1.15 + 2.0 * smoothstep(0.55, 1.0, warmNow);
+        float lying = clamp((sn - snowAsk) / (0.45 * max(1.0, snowUp * 0.8)), 0.0, 1.0); snowLying = lying;      // (on high ground the map counts for more, and would thin out over less of itself: the snow of Tibet lay in white pancakes)
         #else
         // (Snow lies on low ground only well away from the tropics. By the climate's map a cold desert is the Namib too, and a tundra
         //  the Puna of the Andes: each lay under a white sheet all its winter. Climates of mild winters keep snow from some forty
@@ -954,7 +959,7 @@
           //  snow fades as it thins; where it is many - from a hundred kilometres down - a patch has an edge, or thinning snow is
           //  a white mist over the country.)
           float open = clamp((lum0 - 0.2) * 3.0, -0.3, 0.4) * smoothstep(0.2, 0.6, green);      // (in green country: bare ground is light and says nothing by it)
-          float edgeW = mix(0.05, 0.2, smoothstep(-7.5, -4.5, snowL));
+          float edgeW = mix(0.05, 0.2, smoothstep(-7.5, -4.5, noiseL));
           float cover = smoothstep(0.5 - edgeW, 0.5 + edgeW, lying + ((0.5 - gHU) * 0.6 + open * 0.6) * (1.0 - lying) * smoothstep(0.0, 0.25, lying));
           // (a wood under snow is dark from above: the snow is on its floor, and the eye sees the trees - through bare boughs more of it)
           cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * (1.0 - smoothstep(0.14, 0.32, lum0)) * mix(0.55, 0.3, bare));      // (the darker the photograph has it, the more of a wood it is)
@@ -1050,7 +1055,10 @@
       // averaged away is not gone: it is how rough the water is within a pixel (the shorter the averaged normal, the more),
       // which is what spreads the sun's image into a path and lifts what the sea mirrors at the horizon above the horizon.
       float seaShare = seaW / max(seaW + lakeW + vecRiver * (1.0 - seaW), 1e-3);
-      float gust = mix(0.45, 1.15, smoothstep(0.25, 0.75, nMid.g * 0.65 + nMac.g * 0.35));        // (the wind does not lie evenly on the water)
+      // (the wind does not lie evenly on the water. Its patches are the noise of the place, which repeats every forty kilometres
+      //  and every five: from far out they were a lattice of dots in the sun's path, so each size gives way to its mean
+      //  before its repeat is small in the picture)
+      float gust = mix(0.45, 1.15, smoothstep(0.25, 0.75, mix(nMid.g, 0.512, smoothstep(0.0, 1.5, noiseL + 10.23)) * 0.65 + mix(nMac.g, 0.512, smoothstep(0.0, 1.5, noiseL + 7.23)) * 0.35));
       float lee = smoothstep(0.25, 0.9, wOpen);                                                     // (0 in a harbour, a cove, a narrow sound; 1 where the water lies open)
       float fetch = wOn > 0.5 ? mix(0.35, 1.0, smoothstep(40.0, 900.0, off)) * mix(0.4, 1.0, lee) : 1.0;      // (nor do waves grow in the lee of a shore)
       float amp = uSeaK.x * gust * mix(mix(0.14, 0.5, smoothstep(0.5, 1.0, wOpen)), fetch, seaShare);      // (a pond lies still, a great lake has its waves)
@@ -1117,18 +1125,46 @@
       inland = mix(inland, vec3(0.36, 0.33, 0.22), floodW * 0.85);
       // where the snow lies long, still water freezes: lakes and rivers under white ice (blown clear in places), and in
       // the hardest winters the sea stands fast along the shore
+      #ifdef INFO2
+      // (by the snow of its shores, counted for half as much again - a lake freezes where snow would lie on open ground, and the
+      //  map has too little of it among woods - and on the sea's slower clock: a lake freezes weeks after the first snow and
+      //  is open weeks after the last. By the snow lying at the moment, Ladoga was open water in March.)
+      float warmIce = 1.0 - mix(uIceCold.y, uIceCold.x, hemi);
+      float frozen = smoothstep(0.0, 0.15, snowHere * 1.5 - (0.17 + warmIce * 1.15 + 2.0 * smoothstep(0.55, 1.0, warmIce))) * smoothstep(0.5, 0.85, info.b);      // (0.17: not where a month of snow is all the winter there is - from far out the Danish straits are a lake to the picture's map)
+      #else
       float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
-      vec3 lakeIce = mix(vec3(0.70, 0.78, 0.84), vec3(0.90, 0.93, 0.96), smoothstep(0.3, 0.7, nMac.b * 0.6 + nMid.b * 0.25 + nMic.a * 0.15)) * (0.86 + 0.2 * dl);
+      #endif
+      // (blown clear in places, of a size the eye can make out: each size of the noise gives way to its mean before its repeat is
+      //  small in the picture - from forty kilometres up Ladoga's ice was a wallpaper of blots)
+      vec3 lakeIce = mix(vec3(0.70, 0.78, 0.84), vec3(0.90, 0.93, 0.96), smoothstep(0.3, 0.7, mix(nMac.b, 0.434, smoothstep(0.0, 1.5, noiseL + 7.23)) * 0.6 + mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) * 0.25 + nMic.a * 0.15)) * (0.86 + 0.2 * dl);
       inland = mix(inland, lakeIce, frozen * 0.94);
       nWater = normalize(mix(nWater, vec3(0.0, 0.0, 1.0), frozen * 0.85));       // ice does not ripple
-      // polar sea ice
+      // ice on the sea
+      #ifdef INFO2
+      // (Where, and for how much of the year: the sea's own - natv.g is the share of the year's twelve months in which the sea
+      //  there is ice (tools/planet/snow.py, from the Sea Ice Index). By the latitude alone, in winter there was ice off
+      //  Scotland, where the sea never freezes, as in Hudson Bay, where it does for seven months. The sea is slow: its ice is
+      //  widest eleven weeks behind the sun (uIceCold), and ice of so many months lies for just so many about that time:
+      //  yearOff is how far the year is from it, 0 at the end of winter and 1 half a year on. A month and more is asked
+      //  before there is any (a radiometer's cell on a shore sees the land with the sea and takes it for some ice: the
+      //  Danish straits froze every March), and what is ice all the year stays.)
+      float yearOff = acos(clamp(2.0 * mix(uIceCold.y, uIceCold.x, hemi) - 1.0, -1.0, 1.0)) * 0.31831;
+      float iceIn = natv.g * 1.2 - 0.1 - yearOff;
+      float seaIce = smoothstep(0.01, 0.05, iceIn) * seaW;
+      float floe = smoothstep(0.35, 0.65, mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) + 0.3 * nMic.a) * smoothstep(0.02, 0.22, iceIn);
+      #else
       float iceEdge = 0.86 - 0.22 * winter;                               // the pack ice spreads toward the equator in the hemisphere's winter
-      float seaIce = smoothstep(iceEdge - 0.08, iceEdge + 0.04, latN0 + (nMac.r - 0.5) * 0.08) * seaW;
+      float seaIce = smoothstep(iceEdge - 0.08, iceEdge + 0.04, latN0 + (nMac.r - 0.5) * 0.08 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23))) * seaW;
       float floe = smoothstep(0.35, 0.65, nMid.b + 0.3 * nMic.a) * smoothstep(0.0, 0.08, latN0 - iceEdge + 0.1);
+      #endif
       vec3 iceCol = mix(vec3(0.74, 0.82, 0.9), vec3(0.9, 0.93, 0.96), floe);
       water = mix(water, iceCol, seaIce * mix(0.55, 1.0, floe));
+      #ifdef INFO2
+      float seaFast = 0.0;      // (the sea's ice is the sea's own now: none along a shore because the land beside it is white)
+      #else
       float seaFast = frozen * (wOn > 0.5 ? 1.0 - smoothstep(300.0, 1500.0, off) : smoothstep(0.86, 0.97, shelf));
       water = mix(water, lakeIce, seaFast * 0.94);
+      #endif
       float iced = max(max(seaIce * mix(0.55, 1.0, floe), seaFast) * seaShare, frozen * (1.0 - seaShare));      // how much of the water here is ice (it mirrors nothing)
       foam *= 1.0 - iced;
       land = mix(land, land * vec3(0.66, 0.68, 0.72), wetSand * beach);          // the sand the last wave wetted
@@ -1196,8 +1232,11 @@
       #endif
       // (snow lights its own shade: what a white slope across the valley and the blue sky throw into it. Shaded as other ground
       //  is, the mountains of a winter were white and navy, like marbled paper.)
-      ambC *= mix(vec3(1.0), vec3(1.55, 1.75, 2.15), max(max(snow, ice * 0.95), snowCov) * landW * day);
-      vec3 lit = col * (ambC + diff * 1.05 * sunCol * mix(1.0, 0.5, seaW * 0.3));
+      // (and the eye closes a little to it: under a high sun every slope of a snowfield was past white, and the Himalaya a sheet
+      //  of paper with no hills in it)
+      float snowAll = max(max(snow, ice * 0.95), snowCov) * landW * day;
+      ambC *= mix(vec3(1.0), vec3(1.55, 1.75, 2.15), snowAll * (1.0 - 0.6 * diff));
+      vec3 lit = col * (ambC + diff * (1.05 - 0.16 * snowAll) * sunCol * mix(1.0, 0.5, seaW * 0.3));
       // ---------- what the water mirrors ----------
       // Still water is a mirror, dark looked down into and bright along the eye's level (Fresnel): it shows the sky that
       // stands where its light comes from, and the sun as a path of sparks as wide as the water is rough. Reckoned in
@@ -1459,7 +1498,11 @@
     evictPacks() {
       const limits = { i: 40, e: 56, w: 10 };
       for (const kind of ['i', 'e', 'w']) {
-        const list = [...this.packs.values()].filter(p => p.kind === kind && p.state === 'ready' && p.users === 0);
+        // (The three coarsest levels of the picture and of the heights are kept whatever happens: they are what a tile shows while
+        //  its own pack is on its way, and nothing asks for them by name while finer ones are here - so they were the first to
+        //  go, and a tile that then found no pack at all went on drawing from the one it had last, which was closed. With
+        //  forty-three packs of the picture in all that hardly ever came up; with seventeen hundred it did at once.)
+        const list = [...this.packs.values()].filter(p => p.kind === kind && p.state === 'ready' && p.users === 0 && (kind === 'w' || p.L > 2));
         if (list.length <= limits[kind]) continue;
         list.sort((a, b) => a.lastUsed - b.lastUsed);
         const n = list.length - limits[kind];
@@ -1521,6 +1564,15 @@
       const i0 = (y0 * w + x0) * 3, land = d[i0] >= WCODE.land; if (!land && (d[i0] > WCODE.water || (d[i0 + 1] >> 4) !== 0)) return '';
       for (let y = y0; y <= y1; y++) { let i = (y * w + x0) * 3; for (let x = x0; x <= x1; x++, i += 3) if (land ? d[i] < WCODE.land : (d[i] > WCODE.water || (d[i + 1] >> 4) !== 0)) return ''; }
       return land ? 'L' : 'S';
+    }
+    // How wide is the widest fresh water in a pack's piece under a tile? Metres from its shore to its middle (0: none there).
+    // A tarn among mountains is a few hundred metres across, and from far off the mesh's quads are kilometres: see update().
+    waterWide(p, rect) {
+      const d = p.dist, w = p.w, h = p.h; if (!d) return 0;
+      const x0 = Math.max(0, Math.floor(rect[0] * w)), x1 = Math.min(w - 1, Math.ceil((rect[0] + rect[2]) * w)), y0 = Math.max(0, Math.floor(rect[1] * h)), y1 = Math.min(h - 1, Math.ceil((rect[1] + rect[3]) * h));
+      let low = 255;      // (the lowest code of the distance among the fresh water there: the lower, the further from any shore)
+      for (let y = y0; y <= y1; y++) { let i = (y * w + x0) * 3; for (let x = x0; x <= x1; x++, i += 3) if (d[i] < low && d[i] < 128 && (d[i + 1] >> 4) > 7) low = d[i]; }
+      return low > 127 ? 0 : Math.max(0.5 * WCODE.step, -wDecF(low)) * p.scale;
     }
     // ----- tiles -----
     tileKey(L, tx, ty) { return `${L}/${tx}/${ty}`; }
@@ -1650,14 +1702,17 @@
           if (eb.absent) { u.uElev.value = this.flatTex; u.uElevMin.value = 0; u.uElevScale.value = 0; u.uElevRect.value.set(0, 0, 1, 1); u.uElevTexel.value.set(1, 1); t.minH = 0; t.maxH = 0; }
           else { const p = eb.pack; p.users++; u.uElev.value = p.texture; u.uElevMin.value = p.min; u.uElevScale.value = p.scale; u.uElevRect.value.set(eb.rect[0], eb.rect[1], eb.rect[2], eb.rect[3]); u.uElevTexel.value.set(1 / p.w, 1 / p.h); t.minH = Math.max(0, p.min); t.maxH = Math.max(0, p.min + 255 * p.scale); }
           t.ePack = eb;
-        }
+        } else if (t.ePack) { u.uElev.value = this.flatTex; u.uElevMin.value = 0; u.uElevScale.value = 0; u.uElevRect.value.set(0, 0, 1, 1); u.uElevTexel.value.set(1, 1); t.ePack = null; }      // (as with the picture, below)
         if (ib) { const p = ib.pack; if (!ib.absent) { p.users++; u.uImg.value = p.texture; u.uImgRect.value.set(ib.rect[0], ib.rect[1], ib.rect[2], ib.rect[3]); u.uImgK.value.set(ib.k[0], ib.k[1]); } t.iPack = ib; }
+        // (no pack of the picture here at any level, not the coarsest: the tile must not go on showing the one it had - that one may
+        //  have been let go since, its picture closed, and a card asked to draw from it answers with an error at every frame)
+        else if (t.iPack) { u.uImg.value = this.blankImg; u.uImgRect.value.set(0, 0, 1, 1); t.iPack = null; }
         if (this.water) {
           let wb = this.waterOff ? null : this.bindWater(t.L, t.tx, t.ty, pri);
           // (Most of the land of the Earth is far from any shore, and so is most of the sea: where a tile's piece of its pack says
           //  nothing but that, the tile is told so and the shader looks nothing up - four lookups at every pixel, which over
           //  open country was a tenth of the frame and more. Asked once of each pack a tile is given; the pack stays in use.)
-          if (wb && wb.pack) { const p = wb.pack; p.users++; if (t.wScan !== p.key) { t.wScan = p.key; t.wFlat = this.waterFlat(p, wb.rect); } if (t.wFlat) wb = { flat: t.wFlat, level: wb.level, of: p }; }
+          if (wb && wb.pack) { const p = wb.pack; p.users++; if (t.wScan !== p.key) { t.wScan = p.key; t.wFlat = this.waterFlat(p, wb.rect); t.wWide = t.wFlat ? 0 : this.waterWide(p, wb.rect); } if (t.wFlat) wb = { flat: t.wFlat, level: wb.level, of: p }; }
           if (wb && wb.pack) { const p = wb.pack; u.uWater.value = p.texture; u.uWaterRect.value.set(wb.rect[0], wb.rect[1], wb.rect[2], wb.rect[3]); u.uWaterP.value.set(1, p.scale, 0, 0); }
           else if (wb) { u.uWater.value = this.waterTex; u.uWaterP.value.set(2, 1, wb.flat === 'L' ? 480 : -3600, wb.flat === 'F' ? 1 : 0); }
           else { u.uWater.value = this.waterTex; u.uWaterP.value.set(0, 1, 0, 0); }
@@ -1671,6 +1726,11 @@
         // (how far in the ground keeps to the water's level: a quad and a half of this mesh - but the field knows the land only so far
         //  from the shore, 480 m by the finest level and twice and four times that by the coarser, and the rise must end inside that)
         u.uShoreQ.value = Math.min(Math.max(SHORE_FLAT, 1.5 * t.quadM / t.grid), Math.max(SHORE_FLAT, (WCODE.near * (t.wPack && t.wPack.pack ? t.wPack.pack.scale : 1) - SHORE_RISE) * 0.9));
+        // (And where the tile's lakes are smaller than its quads, the ground is left as the heights have it: a tarn among
+        //  mountains is a few hundred metres across, the quads from far off are kilometres, and every corner within a quad
+        //  and a half of it was taken down to its level - a pit miles wide with walls in shadow, dark blue dots all over
+        //  the snows of the Himalaya. A lake that small may lie a little aslant on its triangle: nobody can see that.)
+        if (t.wPack && t.wPack.pack) u.uWaterP.value.z = t.wWide > 0 && t.wWide < 0.75 * t.quadM / t.grid ? 1 : 0;
         if (!t.inScene) { this.group.add(t.mesh); t.inScene = true; }
       }
       // remove tiles not visible; dispose stale
@@ -1764,7 +1824,7 @@
           if (this.uWaterL.value) wlv = wLevF((d[i + 2] * (1 - ax) + d[i + 5] * ax) * (1 - ay) + (d[j + 2] * (1 - ax) + d[j + 5] * ax) * ay);
           { const xn = Math.max(0, Math.min(p.w - 1, Math.floor((r[0] + u * r[2]) * p.w))), yn = Math.max(0, Math.min(p.h - 1, Math.floor((r[1] + v * r[3]) * p.h))); wkv = (d[(yn * p.w + xn) * 3 + 1] >> 4) / 15; } }
         else if (wb) { wdv = wb.flat === 'L' ? 480 : -3600; wkv = wb.flat === 'F' ? 1 : 0; } }
-      const sq = U.uShoreQ.value; if (wdv !== null) { const sh = sm01(sq, sq + SHORE_RISE, wdv); h = wlv * wkv * (1 - sh) + h * sh; }
+      const sq = U.uShoreQ.value; if (wdv !== null && !(t.wPack && t.wPack.pack && U.uWaterP.value.z > 0.5 && wkv > 0.5)) { const sh = sm01(sq, sq + SHORE_RISE, wdv); h = wlv * wkv * (1 - sh) + h * sh; }
       const camAlt = this.globals.uCamAlt.value; const q = this.globals.uQuality.value;
       const t1 = Math.min(1, Math.max(0, (camAlt - 0.06) / (0.004 - 0.06))); const dispOn = t1 * t1 * (3 - 2 * t1) * (q > 0.5 ? 1 : 0);
       if (h > 1 && dispOn > 0.001 && this.noiseData) {

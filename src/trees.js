@@ -271,7 +271,8 @@
       if (!this.snow) { const cold = Trees.COLD[this.climateAt(lon, lat)] || 0, thr = 1.02 - 0.55 * cold; return smooth(thr, thr + 0.1, coldYear) * smooth(0.08, 0.5, cold); }
       const sn = this.snow, real = this.samp(sn, (lon + 180) / 360 * sn.width, (90 - lat) / 180 * sn.height, 0);
       const up = 0.8 + Math.min(Math.max(h || 0, 0), 2400) * 0.0008;
-      return Math.min(1, Math.max(0, (real * up - 0.07 - (1 - coldYear) * 1.15) / (0.45 * Math.max(1, up * 0.8))));
+      const warm = 1 - coldYear;
+      return Math.min(1, Math.max(0, (real * up - 0.07 - warm * 1.15 - 2 * smooth(0.55, 1, warm)) / (0.45 * Math.max(1, up * 0.8))));
     }
     // bilinear sample of an ImageData channel at fractional pixel coords (wrapping x)
     samp(id, fx, fy, ch) {

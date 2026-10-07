@@ -241,3 +241,17 @@ winter_alps     | tools/scenes/forest.js | null | __G.world.cloudsOn = false; co
 winter_alps_low | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(9.6, 46.2, 60000, 0.7, 0, 0.08); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
 winter_south    | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(-68.0, -40.0, 3500000, 0.0, 0, 0.58); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
 thaw_europe     | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(12.0, 50.0, 2500000, 0.0, 0, 0.24); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
+# (ice on the sea, as the sea has it: the north at the end of its winter and of its summer, Hudson Bay, the Baltic, the south)
+ice_north_mar   | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(0.0, 62.0, 9000000, 0.0, 0, 0.21); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+ice_north_sep   | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(0.0, 62.0, 9000000, 0.0, 0, 0.71); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+ice_hudson_mar  | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(-80.0, 58.0, 5000000, 0.0, 0, 0.21); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
+ice_hudson_jun  | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(-80.0, 58.0, 5000000, 0.0, 0, 0.47); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
+ice_baltic_mar  | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(22.0, 61.0, 2000000, 0.0, 0, 0.21); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
+ice_okhotsk_mar | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(150.0, 52.0, 5000000, 0.0, 0, 0.21); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
+ice_south_sep   | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(0.0, -70.0, 9000000, 0.0, 0, 0.71); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+ice_south_mar   | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(0.0, -70.0, 9000000, 0.0, 0, 0.21); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 40
+ice_edge_low    | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(22.5, 63.6, 30000, 1.0, 0.5, 0.21); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
+# (what the picture costs: __T.costsPlanet)
+costp_alps      | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); }, 3000); setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsPlanet(); }, 30000); | 86
+costp_far       | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); }, 9000); setTimeout(() => { __T.costsPlanet(); }, 30000); | 86
+costp_region    | tools/scenes/forest.js | null | setTimeout(() => { __forest(10.0, 46.3, 300000, 0.0, 0, 0.5); }, 3000); setTimeout(() => { __forest(10.0, 46.3, 300000, 0.0, 0, 0.5); __T.costsPlanet(); }, 30000); | 86

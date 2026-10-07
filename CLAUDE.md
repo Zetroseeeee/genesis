@@ -123,10 +123,14 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   `PLANET_STRICT`; elsewhere the pack made last is taken, with a warning). `MODE=probe tools/planet/pack.sh [urls |
   months | sheet | tiff]` looks at the sources.
 - `REF=<branch> MODE=snow PICS="planet_snow.jpg snow.png" tools/planet/pack.sh` — makes the map of the Earth's own
-  winters (`tools/planet/snow.py`, two minutes): `shots/peek/snow.png`, which is copied to `data/snow.png` by hand and
-  committed (it is small), and `planet_snow.jpg` to look at (the summer with the map's snow on it, over the Blue
-  Marble's own January). Its log prints the share of the land that has snow by latitude and the value at some
-  thirty places (Moscow 0.7, Winnipeg 0.55, Berlin 0, Tibet 0): look at them after touching its rule.
+  winters (`tools/planet/snow.py`, two minutes): `shots/peek/snow.png` (red: snow on the land; green: ice on the
+  sea), which is copied to `data/snow.png` by hand and committed (it is small), and `planet_snow.jpg` to look at
+  (the summer with the map's snow and ice on it, over the Blue Marble's own January). Its log prints the share of
+  the land that has snow by latitude, the value at some thirty places (Moscow 0.7, Winnipeg 0.55, Berlin 0, Tibet
+  0) and the months of ice at thirty more (Hudson Bay 7, the Norwegian Sea 0): look at them after touching its rule.
+- `node tools/glerr.js "<script>" [wait ms]` — which call to the card fails: a page of the built game in which
+  every call that can raise a GL error is asked at once whether it did (WebGL keeps its errors until somebody
+  asks; the end-to-end suite asks once, late, and can only say "GL error 1281").
 - `tools/water/pack.sh` — makes the water's edge on GitHub (the Water workflow runs `tools/water/build.py`: its sources
   are on AWS, out of reach from here) and brings it here: `data/w/` (`index.json` and 1,484 packs, kept in 157
   bundles of sixteen: `<level>_b<x>_<y>.bin`, a table and then the packs' own files; `fetch.mjs` makes them, always
@@ -191,6 +195,12 @@ Conventions that matter:
   a rim of two texels of their neighbours all round (`apron` in their lists; `bindPack` and `bindWater` leave it out
   of a tile's rectangle): a lookup at a pack's edge is as good as one inside it, and nothing has to be matched by
   hand. The elevation's packs have no rim and their edges are not matched (a step of a texel's worth of height).
+  **A pack that is let go must not be drawn from again** (`evictPacks`: its texture is disposed and its picture
+  closed). A tile shows the finest pack that is here, down to the coarsest; the three coarsest levels of the
+  picture and of the heights are never let go (nothing asks for them by name while finer ones are here, so they
+  went first), and a tile that finds no pack at all is given the blank one. Left with the texture it had last, a
+  tile had the card upload a closed picture at every frame: `GL error 1281` and `1282`, and a black tile. With
+  forty-three packs of the picture that hardly ever came up; with seventeen hundred it did in the first minute.
 - **Representational scale.** Towns are planned at true scale and drawn `scaleOf(Rt) = 20/(1+Rt/1200)` times larger
   (a village ~19×, a metropolis ~3×) so they read from region height. Shader patterns divide by that factor.
 - **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
@@ -508,10 +518,13 @@ Conventions that matter:
   white or grey and had not been in summer - all of them in Siberia, five at Moscow, four at Winnipeg, one in the
   Ukraine, none at Berlin, none in Tibet (which is dry: by the climate's class it was an ice cap half the year, and
   a cold desert from the Tarim to the Namib lay white). A wood's winter is measured as a wood's: under snow it is
-  grey, not white. Snow lies where `map x height > 0.07 + 1.15 x (1 - the cold of the year)` (`uBare.z/.w`, a month
-  behind the sun): deep winter takes in every place that has any, and the edges of the season only where it lies
-  all winter; the height counts for much (0.8 at the sea, 2.7 from 2,400 m), so that at its edge the snow keeps to
-  the hills, and comes to them first and leaves them last. The same number brings the snow line of the mountains
+  grey, not white, and takes the snow of the open ground about it (by their own look the larch of Yakutia and the
+  woods of Minnesota had no winter). Snow lies where `map x height > 0.07 + 1.15 x (1 - the cold of the year)`
+  (`uBare.z/.w`, a month behind the sun; `snowAsk`): deep winter takes in every place that has any, and the edges
+  of the season only where it lies all winter; the height counts for much (0.8 at the sea, 2.7 from 2,400 m), so
+  that at its edge the snow keeps to the hills, and comes to them first and leaves them last - and what the season
+  asks rises past anything a height has from late spring (or the Alps lay white all July: what stays the year
+  round is the snow line's to say, and the photograph's). The same number brings the snow line of the mountains
   down in winter (`winterSnow`). **It does not end at a line.** It thins out over half the map's range, and where
   it thins it lies on open ground before the woods: the photograph's own light and dark, field by field (`lum0`),
   say which is which, and from close to the hollows of the ground's own material do (`gHU`). That grain is what
@@ -519,10 +532,22 @@ Conventions that matter:
   Europe was a white sheet with a ruled edge through Poland); noise the size of a country added to the map, or
   the map looked up a little way off by it (white puffs on green, and the snow of the Alps lying beside the Alps);
   the place's own noise from far out (it repeats every forty kilometres and less: the thinning snow of Poland was
-  a wallpaper of dark dots from six hundred up - `snowL` fades each size out long before its repeat is small in
+  a wallpaper of dark dots from six hundred up - `noiseL` fades each size out long before its repeat is small in
   the picture). A wood under snow is dark from above (`wForest` hides four
-  tenths of it, two under bare boughs), and snow lights its own shade (the ambient light is up to twice as much
-  and bluer on it: shaded as other ground, a winter's mountains were white and navy). Roofs and boughs ask
+  half of it at most, a third under bare boughs, by how dark the photograph has it), and snow lights its own shade
+  (the ambient light is up to twice as much and bluer on it: shaded as other ground, a winter's mountains were
+  white and navy) while the sun's own light counts for a little less on it (under a high sun every slope of a
+  snowfield was past white, a sheet of paper with no hills in it).
+  **Ice on the sea** is the sea's own too (`natv.g`, the map's green; `uIceCold`): the share of the year's twelve
+  months in which the sea there is ice, from the Sea Ice Index of the US National Snow and Ice Data Center (the
+  mean of its first ten years; the Blue Marble's sea is one dark blue the year round) - twelve at the pole, seven
+  in Hudson Bay, five in the Gulf of Bothnia, none off Norway. By the latitude alone, in winter there was ice off
+  Scotland. Ice of so many months lies while `yearOff = acos(2 x cold - 1) / pi` is less than its share, which is
+  just that many months about the end of winter (the sea runs eleven weeks behind the sun); a month and more is
+  asked before there is any (a radiometer's cell on a shore sees the land with the sea, and the Danish straits froze
+  every March). Lakes and rivers freeze where the climate's winters are hard (`info.b`) by the snow of their shores,
+  counted half as much again and on the sea's slower clock (`frozen`: by the snow lying at the moment Ladoga was open
+  water in March); the Caspian is the sea's, and has no ice in the Index. Roofs and boughs ask
   `trees.lyingAt(lon, lat, cold, height)`, the same sum without the grain. Look at Europe and North America from
   2,500 km and more, Poland from 600, the Alps from 300 and 80 and a town in the snow after touching any of it.
 - **The water's edge** (`data/w`, `tools/water/build.py`; `uWater` in `terrain.js`). A field of distances: how

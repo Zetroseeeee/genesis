@@ -78,7 +78,7 @@
     uFertView: { value: 0 }, uPolitical: { value: 1 }, uLens: { value: 0 }, uLabelsOn: { value: 1 },
     uClouds: { value: null }, uCloudShift: { value: 0 }, uCloudVis: { value: 0 },
     uDecal: { value: null }, uDecalRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uDecalOn: { value: 0 }, uQuality: { value: 1 }, uDecal2: { value: null }, uWaterN: { value: null },
-    uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) }, uIceCold: { value: new THREE.Vector2(1, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
     // the ground's materials (textures.js: TEX.ground), laid at a ladder of sizes in a frame of cells a metre and a half across at the equator
     uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 20 }, uGndFar: { value: new Float32Array(24) }, uGndFarD: { value: new Float32Array(48) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(75).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.4, GND_PX) }, uGndT: { value: new THREE.Vector4(1, 1, 0.25, 3) }, uWaterK: { value: new THREE.Vector4(1, 1, 1, 1) }, uSkyR: { value: new Float32Array(45).fill(0.3) }, uSeaK: { value: new THREE.Vector4(1, 1, 1, 0) }, uGndShow: { value: -1 }, uGndV: { value: 1 }, uWild: { value: 1 }, uGndDbg: { value: 0 }, uGndFine: { value: new THREE.Vector3(0.75, 0.6, 2.25) }, uGndCls: { value: new Float32Array(24) },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndT: how far a material's brightness follows the photograph of the Earth (0..1), and its hue (a factor), how wide the span in which one step of the ladder gives way to the next (0.1: a patchwork of the two; 0.25 and more: they lie over each other), how ragged its edge; uGndShow: one layer everywhere (to look at it), or -1; uGndV: how much the ground varies from stretch to stretch (lusher, drier); uGndDbg: parts left out, to measure them (terrain.js); uGndFine: how many steps of the ladder lower the fine kinds of ground stand: at the closest, how fast that grows with height, at the most (uGndCls: which they are, from textures.js)
@@ -109,14 +109,15 @@
   // The planet's own maps as one texture of two layers (a fragment shader has sixteen textures on an Apple GPU, and the ground's
   // has them all): info.png (the sea's shelf, the ice, how hard the winters are, how dry the country is: tools/climate/build.py)
   // and under it veg.jpg, what grows there by nature (how green, how light, how warm-coloured: the map the trees are planted
-  // by), at info's size, with snow.png in its alpha (where snow lies in winter, as the Earth has it). Where that cannot be
-  // made, info.png alone, as it was.
+  // by), at info's size, with snow.png in its alpha and its green (where snow lies in winter and where the sea freezes, as
+  // the Earth has it; the map's own green, how light the country is by nature, is not used by the shader). Where that cannot
+  // be made, info.png alone, as it was.
   async function planetMaps() {
     const W = 2048, H = 1024;
     try {
       if (!renderer.capabilities.isWebGL2 || !THREE.DataTexture2DArray) throw new Error('no texture arrays');
       const [a, b, c] = [await pixelsOf('data/info.png', W, H), await pixelsOf('data/veg.jpg', W, H), await pixelsOf('data/snow.png', W, H)], data = new Uint8Array(W * H * 8); data.set(a, 0); data.set(b, W * H * 4);
-      for (let i = 0, o = W * H * 4 + 3; i < W * H; i++, o += 4) data[o] = c[i * 4];      // (the second layer's alpha: how much snow the Earth's own winter has there, tools/planet/snow.py)
+      for (let i = 0, o = W * H * 4 + 3; i < W * H; i++, o += 4) { data[o] = c[i * 4]; data[o - 2] = c[i * 4 + 1]; }      // (the second layer's alpha: for how much of its winter snow lies there; its green, which the map of what grows has no use for here: for how much of it the sea is ice - tools/planet/snow.py)
       const t = new THREE.DataTexture2DArray(data, W, H, 2); t.format = THREE.RGBAFormat; t.type = THREE.UnsignedByteType; t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true;
       return t;
     } catch (e) { console.warn('the planet\'s maps as one texture: ' + e.message + '; info.png alone'); const t = await loadTex('data/info.png', { flipY: false }); t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; return t; }
@@ -1207,6 +1208,8 @@
       // and the cold of the year runs a month behind the sun: the depth of winter is late January, not the solstice
       const coldN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.08) * Math.PI * 2);
       globals.uBare.value.set(leafOff(seasonPhase), leafOff((seasonPhase + 0.5) % 1), coldN, 1 - coldN);
+      // (and the sea is slower still: its ice is at its widest when winter ends, early in March and in September, eleven weeks behind the sun)
+      { const iceN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.21) * Math.PI * 2); globals.uIceCold.value.set(iceN, 1 - iceN); }
       if (trees) { trees.season = globals.uSeason.value; trees.bareness = globals.uBare.value; } }
     const real = Math.min(1.5, (now - lastReal) / 1000); lastReal = now;      // (the step above is capped for the simulation's sake; these go by the clock, so a slow machine is not left with a half-moved picture)
     { const want = mode === 'intro' ? 1 : 0; if (Math.abs(want - homeK) > 0.0005) { homeK += (want - homeK) * (1 - Math.exp(-real * 3)); if (Math.abs(want - homeK) < 0.004) homeK = want; frameHome(); camera.updateProjectionMatrix(); } }

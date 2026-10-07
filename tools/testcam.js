@@ -82,6 +82,14 @@ window.__T.costsMesh = function () {
   const T = __G.terrain, q = T.quadPx;
   __T.cost([['quads of ' + q + ' px', () => {}], ['of 4', () => { T.quadPx = 4; }], ['of 6', () => { T.quadPx = 6; }], ['of 12', () => { T.quadPx = 12; }], ['of ' + q + ' again', () => { T.quadPx = q; }], ['of 4 again', () => { T.quadPx = 4; }], ['of ' + q + ' a third time', () => { T.quadPx = q; }]], 3, 2500);
 };
+// what the picture of the Earth costs now that it is eight times as fine: looked at in fewer ways where the ground runs away from
+// the eye (the card's own filtering: 16 as the game has it, then 4 and 2), and no finer than it used to be (level 3, five kilometres
+// to a texel: what the game had until 0.21) - each undone before the next
+window.__T.costsPlanet = function () {
+  const T = __G.terrain, full = T.opts.anisotropy || 16, top = T.imgMax, packs = () => [...T.packs.values()].filter((p) => p.kind === 'i' && p.texture).map((p) => p.texture), set = (n) => () => { __T.aniso(n, ...packs()); };
+  __T.cost([['all (' + packs().length + ' packs, ' + full + ' ways)', () => {}], ['the picture 4 ways', set(4)], ['2 ways', set(2)], [full + ' ways again', set(full)], ['no finer than level 3', () => { T.imgMax = 3; }],
+    ['and 2 ways', set(2)], ['all again (' + top + ', ' + full + ')', () => { T.imgMax = top; setTimeout(set(full), 1500); }], ['all a third time', set(full)]], 3, 3000);
+};
 // how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
 window.__T.aniso = function (n, ...texs) {
   const R = __G.renderer, gl = R.getContext(), ext = gl.getExtension('EXT_texture_filter_anisotropic'); if (!ext) return 0; let k = 0;
