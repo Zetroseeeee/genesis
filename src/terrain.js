@@ -523,6 +523,8 @@
       #else
       { float v = max(wRock   + (nMid.a - 0.5) * 0.4 + (nMic.a - 0.5) * 0.25 + (nFin.a - 0.5) * 0.2, 0.0); wRock = v * v * v; }
       #endif
+      // (the trees stand back from the sea behind its beach, thinly at first: the ground there is the grass of the dunes, not the dark floor of a wood without its wood)
+      if (wOn > 0.5) { float back = wForest * (1.0 - wK) * (1.0 - smoothstep(50.0, 170.0, wD)); wForest -= back; wGrass += back; }
       float ws = wForest + wGrass + wDesert + wRock + 1e-4;
       wForest /= ws; wGrass /= ws; wDesert /= ws; wRock /= ws;
       #ifdef USE_GROUND
@@ -949,12 +951,12 @@
       float depthLake = wOn > 0.5 ? off * clamp(bedFall * 0.8, 0.045, 0.3) : 30.0;      // (never shallower than that: the heights are in steps of seven metres and more, and by them alone the shallows of a river through flat country came and went in scallops)
       float highDry = max(arid, smoothstep(2600.0, 3600.0, vH));      // (the lakes of the high plateaus, Tibet's and the Altiplano's, and of dry mountains: clear and very blue, where a taiga lake is dark with peat and a lake under a glacier milky)
       float peat = smoothstep(0.2, 0.9, info.b) * (1.0 - highDry);
-      vec3 lakeDeep = mix(mix(vec3(0.030, 0.125, 0.160), vec3(0.034, 0.082, 0.090), peat), mix(vec3(0.085, 0.300, 0.330), vec3(0.040, 0.205, 0.410), highDry), smoothstep(1500.0, 3000.0, vH) * (1.0 - peat * 0.5));
+      vec3 lakeDeep = mix(mix(vec3(0.030, 0.125, 0.160), vec3(0.032, 0.090, 0.120), peat), mix(vec3(0.085, 0.300, 0.330), vec3(0.040, 0.205, 0.410), highDry), smoothstep(1500.0, 3000.0, vH) * (1.0 - peat * 0.5));
       // (A great river is in the field as fresh water too, bank to bank, and often in pieces, where it is wide enough: narrow
       //  water between flat banks. It is given a river's water, as the game's own rivers have it beside it and between its
       //  pieces: shallows a furlong wide, pale and green, over a blue channel; brown with silt in dry country. A small lake of
       //  the plain is the same water. Not the peat lakes of the north, nor a lake between mountains, deep from the shore.)
-      float riverish = wOn * (1.0 - smoothstep(0.30, 0.62, wOpen)) * (1.0 - smoothstep(0.03, 0.10, bedFall)) * (1.0 - peat);
+      float riverish = wOn * (1.0 - smoothstep(0.30, 0.62, wOpen)) * (1.0 - smoothstep(0.06, 0.16, bedFall)) * (1.0 - peat);      // (flat: not turned by one step of the heights, seven to twenty-seven metres - by those alone a pool had the two waters in patches, cut where its nearest bank changes)
       lakeDeep = mix(lakeDeep, mix(vec3(0.03, 0.15, 0.25), vec3(0.36, 0.34, 0.24), arid * 0.4), riverish);
       depthLake = mix(depthLake, off * 0.015, riverish);
       vec3 inland = mix(lakeDeep, mix(vec3(0.40, 0.38, 0.27), vec3(0.23, 0.41, 0.36), riverish), exp(-vec3(0.60, 0.20, 0.16) * (depthLake * (1.0 + 3.0 * peat))) * 0.85);      // (peat water hides its bed within a step from the shore)
@@ -998,6 +1000,14 @@
       #ifndef WATER_PLAIN
       if (wOn > 0.5 && uWaterP.x < 1.5 && surfK > 0.01 && wD > -260.0 && wD < 14.0) {
         float open = clamp(0.85 - wBend * 200.0, 0.25, 1.5) * (1.0 - 0.75 * smoothstep(0.0045, 0.009, -wBend)) * (0.55 + 0.8 * nMac.b) * uSeaK.y * surfK;      // (round a rock a few steps across the lines of surf were rings of chain)
+        // (The swell comes from one side: a shore that looks toward it has the surf, a lee shore next to none - lines of surf
+        //  all round an islet were rings, like a target. It comes as the winds of the Earth blow: out of the west between
+        //  thirty and sixty degrees, with the trades out of the east in the tropics, a little toward the equator in both,
+        //  and turned some way by the noise of the place.)
+        { float la = abs(vLat) * 57.2958, hs = vLat >= 0.0 ? 1.0 : -1.0, wst = smoothstep(24.0, 34.0, la) * (1.0 - smoothstep(60.0, 68.0, la)), sa = (nMac.r - 0.5) * 1.6;
+          vec2 sw = normalize(mix(vec2(-0.8, 0.5 * hs), vec2(0.9, 0.3 * hs), wst)); sw = vec2(sw.x * cos(sa) - sw.y * sin(sa), sw.x * sin(sa) + sw.y * cos(sa));      // the way the swell goes: east, south
+          vec2 toLand = wLand * vec2(tileWm, tileHm);
+          open *= mix(0.1, 1.0, smoothstep(-0.25, 0.55, dot(toLand, sw))); }
         float zone = mix(48.0, 125.0, shelf2) * (0.7 + 0.6 * nMid.b);                // how far out they begin to break, metres
         float inZone = (1.0 - smoothstep(zone * 0.35, zone, off)) * step(0.0, off - 0.01);
         float lam = 34.0, ph = off / lam + uTime * 0.11 + (nMic.g - 0.5) * 1.6 + (nMid.b - 0.5) * 4.0, f = fract(ph);
@@ -1273,8 +1283,9 @@
       p.state = 'loading'; this.loading++;
       const url = this.base + (p.kind === 'e' ? `e/${p.L}_${p.px}_${p.py}.png` : p.kind === 'w' ? `w/${p.L}_${p.px}_${p.py}.${this.water.ext || 'webp'}` : `i/${p.L}_${p.px}_${p.py}.webp`);
       try {
-        const r = await fetch(url); if (!r.ok) throw new Error('http ' + r.status);
-        const blob = await r.blob();
+        let blob;
+        if (p.kind === 'w' && this.water.bundle) blob = await this.waterBlob(p);
+        else { const r = await fetch(url); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); }
         const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
         p.w = bmp.width; p.h = bmp.height;
         let tex = new THREE.Texture(bmp);
@@ -1308,6 +1319,24 @@
       } catch (e) { console.warn('pack failed', url, e); p.state = 'error'; }
       this.loading--;
     }
+    // A pack of the water's edge out of its bundle (tools/water/fetch.mjs: sixteen packs' own files end to end behind a table of
+    // where each begins, data/w/<level>_b<x>_<y>.bin - fifteen hundred small files were more than an update can carry). A
+    // bundle is fetched whole, once, and kept while its packs are being asked for: the eye seldom needs one pack alone.
+    waterBlob(p) {
+      const n = this.water.bundle, url = this.base + `w/${p.L}_b${Math.floor(p.px / n)}_${Math.floor(p.py / n)}.bin`, B = this.wBundles || (this.wBundles = new Map());
+      let b = B.get(url);
+      if (!b) {
+        b = { url, used: 0, ready: fetch(url).then((r) => { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); }).then(async (blob) => {
+          const head = new DataView(await blob.slice(0, 8 + n * n * 8).arrayBuffer());
+          if (head.byteLength < 8 + n * n * 8 || head.getUint32(0, true) !== 0x31425748 || head.getUint32(4, true) !== n * n) throw new Error('not a bundle');      // ('HWB1')
+          return { blob, head };
+        }) };
+        b.ready.catch(() => { if (B.get(url) === b) B.delete(url); });      // (one that did not come is asked for again by the next pack that needs it)
+        B.set(url, b);
+      }
+      b.used = this.frame;
+      return b.ready.then(({ blob, head }) => { const at = 8 + ((p.py % n) * n + p.px % n) * 8, off = head.getUint32(at, true), len = head.getUint32(at + 4, true); if (!len || off + len > blob.size) throw new Error('no such pack in its bundle'); return blob.slice(off, off + len, 'image/' + (this.water.ext || 'webp')); });
+    }
     pumpQueue() {
       if (!this.queue.length) return;
       this.queue.sort((a, b) => (b.priority || 0) - (a.priority || 0));
@@ -1323,6 +1352,8 @@
         const n = list.length - limits[kind];
         for (let i = 0; i < n; i++) { const p = list[i]; if (this.frame - p.lastUsed < 30) break; p.texture.dispose(); if (p.texture.image && p.texture.image.close) p.texture.image.close(); this.packs.delete(p.key); }
       }
+      // (the bundles the water's packs came out of: a few megabytes each, let go when none of their packs has been asked for in a while)
+      if (this.wBundles && this.wBundles.size > 4) { const old = [...this.wBundles.values()].sort((a, b) => a.used - b.used); for (let i = 0; i < old.length - 4; i++) if (this.frame - old[i].used > 600) this.wBundles.delete(old[i].url); }
     }
     // best available pack for tile (L,tx,ty); requests the ideal one. Returns {pack, rect} or null
     bindPack(kind, L, tx, ty, priority) {
@@ -1362,6 +1393,15 @@
         }
       }
       return null;
+    }
+    // Is a pack's piece under a tile (rect: its place in the pack) nothing but land far from any shore ('L') or nothing but the
+    // open sea ('S')? '' where there is a shore in it or near it, or fresh water (a lake has a level of its own).
+    waterFlat(p, rect) {
+      const d = p.dist, w = p.w, h = p.h; if (!d) return '';
+      const x0 = Math.max(0, Math.floor(rect[0] * w - 1.5)), x1 = Math.min(w - 1, Math.ceil((rect[0] + rect[2]) * w + 1.5)), y0 = Math.max(0, Math.floor(rect[1] * h - 1.5)), y1 = Math.min(h - 1, Math.ceil((rect[1] + rect[3]) * h + 1.5));
+      const i0 = (y0 * w + x0) * 3, land = d[i0] >= WCODE.land; if (!land && (d[i0] > WCODE.water || (d[i0 + 1] >> 4) !== 0)) return '';
+      for (let y = y0; y <= y1; y++) { let i = (y * w + x0) * 3; for (let x = x0; x <= x1; x++, i += 3) if (land ? d[i] < WCODE.land : (d[i] > WCODE.water || (d[i + 1] >> 4) !== 0)) return ''; }
+      return land ? 'L' : 'S';
     }
     // ----- tiles -----
     tileKey(L, tx, ty) { return `${L}/${tx}/${ty}`; }
@@ -1494,8 +1534,12 @@
         }
         if (ib) { const p = ib.pack; if (!ib.absent) { p.users++; u.uImg.value = p.texture; u.uImgRect.value.set(ib.rect[0], ib.rect[1], ib.rect[2], ib.rect[3]); } t.iPack = ib; }
         if (this.water) {
-          const wb = this.waterOff ? null : this.bindWater(t.L, t.tx, t.ty, pri);
-          if (wb && wb.pack) { const p = wb.pack; p.users++; u.uWater.value = p.texture; u.uWaterRect.value.set(wb.rect[0], wb.rect[1], wb.rect[2], wb.rect[3]); u.uWaterP.value.set(1, p.scale, 0, 0); }
+          let wb = this.waterOff ? null : this.bindWater(t.L, t.tx, t.ty, pri);
+          // (Most of the land of the Earth is far from any shore, and so is most of the sea: where a tile's piece of its pack says
+          //  nothing but that, the tile is told so and the shader looks nothing up - four lookups at every pixel, which over
+          //  open country was a tenth of the frame and more. Asked once of each pack a tile is given; the pack stays in use.)
+          if (wb && wb.pack) { const p = wb.pack; p.users++; if (t.wScan !== p.key) { t.wScan = p.key; t.wFlat = this.waterFlat(p, wb.rect); } if (t.wFlat) wb = { flat: t.wFlat, level: wb.level, of: p }; }
+          if (wb && wb.pack) { const p = wb.pack; u.uWater.value = p.texture; u.uWaterRect.value.set(wb.rect[0], wb.rect[1], wb.rect[2], wb.rect[3]); u.uWaterP.value.set(1, p.scale, 0, 0); }
           else if (wb) { u.uWater.value = this.waterTex; u.uWaterP.value.set(2, 1, wb.flat === 'L' ? 480 : -3600, wb.flat === 'F' ? 1 : 0); }
           else { u.uWater.value = this.waterTex; u.uWaterP.value.set(0, 1, 0, 0); }
           t.wPack = wb;

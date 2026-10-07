@@ -67,6 +67,12 @@ then `wKind` 0 sea .. 1 fresh, `wOpen` how open the water lies, `wLevel` a lake'
 nothing mirrored), `uWaterK.value` (x how ragged the shore, y how wide a beach), `uSkyR.value` (the fifteen colours the water
 mirrors). `__T.costsWater()` writes frame rates with its parts left out one by one. A shader that does not compile leaves the
 ground undrawn and says nothing loud: ask `__G.renderer.info.programs` for those whose `diagnostics.runnable` is false.
+The rivers: `__G.world.decal.stats` (`rivers` drawn, `along`: pieces left to the field's own water), `nearestRiver(lon, lat)`
+(`d` metres to the line, `hw` half the drawn width); `decal.rect = null` draws them again. The tour's `river_bend` (a great
+river's ribbon through a bend: its banks must be smooth), `river_wide` (a river the field has in pieces beside the ribbon: one
+water), `river_pool`, `lake_geneva` (a river's line runs the length of the lake: no stripe), `lake_garda`, `lake_andes`.
+A software renderer's sine is rough: its tiles do not meet to the metre, and with `POST=1` the shade between things draws a
+soft dark line along a tile's edge across still water (the skirt behind the gap). Not on a real card; nothing to chase here.
 
 The trees: `__G.trees` (`modelCount`: how many of each tier stand; `imps[ti]`: a tier's kinds, each a mesh with `count` and `userData.cap`; `last[ti]`: where and when a tier was last placed, `partial` while a picture was still coming; `holes`: where the tier inside each has its trees; `slice`: milliseconds a frame for placing, `1e9` on a software renderer; `buildTier(ti, cam, now)` places one at once, for measuring; `coverOff`: cut-outs' edges pixel by pixel). `__T.costsTrees()` writes into the picture what the frame rate is with all of them, without what grows under them, without the far ones, without any (the tour's `costt_*`: in a wood the trees are cheaper than the ground they hide). `TREES=1` gives a software renderer whole forests. The tour's woods: `woods`, `woods_edge`, `taiga_shore`, `maquis`, `jungle` from low down, `woods_high` and `woods_top` from 3 and 5 km (the trees round the eye must not show as a plate, nor the tiers' meeting as a circle); water from low down: `lake_low`, `coast_low` (a software renderer weighs texels finely: what a real card makes of the magnified water mask can only be seen there); `high_town`, a town on a high plain.
 `node shot2.js <name> "<script>" <t1> <t2>` takes two screenshots (`shots/<name>_a.png`, `_b.png`).

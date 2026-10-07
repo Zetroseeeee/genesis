@@ -114,8 +114,13 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
   their neighbours begin with (they must: see "A pack is a texture of its own"); `fix` makes them.
 - `tools/water/pack.sh` — makes the water's edge on GitHub (the Water workflow runs `tools/water/build.py`: its sources
-  are on AWS, out of reach from here) and brings it here: `data/w/` (`index.json` and some 1,100 packs), fetched
-  (`npm run fetch`), never committed. About an hour and a quarter for the whole Earth. `ONLY=7/36/4,7/31/8` or
+  are on AWS, out of reach from here) and brings it here: `data/w/` (`index.json` and 1,484 packs, kept in 157
+  bundles of sixteen: `<level>_b<x>_<y>.bin`, a table and then the packs' own files; `fetch.mjs` makes them, always
+  the same bytes, and `terrain.waterBlob` reads a pack out of its bundle), fetched (`npm run fetch`), never
+  committed. In bundles because of the updates: a game that is out fetches what changed file by file, and past 400
+  files that differ `tools/update/publish.js` begins a new line (everybody fetches the whole app again); 1,500
+  small files were that at once. **Data that comes in many small files goes into bundles.** `node
+  tools/water/fetch.mjs check` says whether what is here is whole (the game's build asks). About an hour and a quarter for the whole Earth. `ONLY=7/36/4,7/31/8` or
   `BBOX=lon0,lat0,lon1,lat1` makes some blocks only (a trial: a minute or two; it comes here as it is and is nobody's
   pack), `MODE=probe` only looks at the sources, `REF=<branch>` runs a branch's builder. A pack is kept under the
   name of what it was made from (twelve digits of the SHA-256 of `tools/water/build.py`, `data/rivers.png` and

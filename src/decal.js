@@ -167,7 +167,7 @@
             //  telling a river's own water there from a lake the river passes. Only lines of rivers wide enough to be in the
             //  field are asked.)
             let along = null; const T = this.terrain;
-            if (T && T.water && T.shoreAt && line.width >= ALONG_MIN) {
+            if (T && T.water && T.shoreAt && line.width >= ALONG_MIN && mpp < 250) {      // (from far out the ribbon's lap over a bank is under a pixel of the decal: not worth the asking)
               const n = pts.length >> 1, wet = new Uint8Array(n), run = new Float32Array(n), mw = mg + ALONG_M * 1.5 / R_M; let any = 0;
               for (let k = 0; k < n; k++) {
                 const x = pts[k * 2], y = pts[k * 2 + 1]; if (k) run[k] = run[k - 1] + Math.hypot((x - pts[k * 2 - 2]) * r.cl, y - pts[k * 2 - 1]) * R_M;
