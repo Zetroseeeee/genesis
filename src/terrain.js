@@ -408,14 +408,19 @@
       // roughens it at the scale of a cove or a rock is the noise of the place (a beach runs smooth, a steep shore ragged).
       float wOn = step(0.5, uWaterP.x), wD = 0.0, wK = 0.0, wPx = 1.0, wCov = 0.0, wBend = 0.0, wOpen = 1.0; vec2 wLand = vec2(0.0);      // (wLand: the way to the nearest land, in the tile's own measure for a metre)
       if (wOn > 0.5) {
-        if (uWaterP.x > 1.5) { wD = uWaterP.z; wK = uWaterP.w; wPx = 1e3; }
+        if (uWaterP.x > 1.5) { wD = uWaterP.z; wK = uWaterP.w; }      // (all land or all water, and wPx one metre: with a pixel called a kilometre wide, a fiftieth of every pixel of far land was sea, and had its waves reckoned)
         else {
           vec2 wsz = vec2(textureSize(uWater, 0)), wq = (uWaterRect.xy + vUV * uWaterRect.zw) * wsz - 0.5, wi = floor(wq), wf = wq - wi;
           ivec2 iLast = ivec2(wsz) - 1, i0 = ivec2(wi), i1 = min(i0 + 1, iLast); i0 = max(i0, ivec2(0));
-          vec2 t00 = texelFetch(uWater, i0, 0).rg, t10 = texelFetch(uWater, ivec2(i1.x, i0.y), 0).rg, t01 = texelFetch(uWater, ivec2(i0.x, i1.y), 0).rg, t11 = texelFetch(uWater, i1, 0).rg;
+          vec2 t00 = texelFetch(uWater, i0, 0).rg, wx = dFdx(vUV) * uWaterRect.zw * wsz, wy = dFdy(vUV) * uWaterRect.zw * wsz;      // (how the field's texels run across the pixel: asked here, before the ways part)
+          // (Far inland by its nearest texel - most pixels of most pictures - a pixel needs neither that texel's neighbours nor
+          //  anything reckoned from them: the field says no more there than "land, and no shore within reach".)
+          if (t00.r > ${((WCODE.land - 0.5) / 255).toFixed(5)}) wD = ${WCODE.near.toFixed(1)} * uWaterP.y;
+          else {
+          vec2 t10 = texelFetch(uWater, ivec2(i1.x, i0.y), 0).rg, t01 = texelFetch(uWater, ivec2(i0.x, i1.y), 0).rg, t11 = texelFetch(uWater, i1, 0).rg;
           float d00 = wDec(t00.r), d10 = wDec(t10.r), d01 = wDec(t01.r), d11 = wDec(t11.r);
           wD = mix(mix(d00, d10, wf.x), mix(d01, d11, wf.x), wf.y); { vec2 ko = mix(mix(wKO(t00.g), wKO(t10.g), wf.x), mix(wKO(t01.g), wKO(t11.g), wf.x), wf.y); wK = ko.x; wOpen = ko.y; }
-          vec2 wg = vec2(mix(d10 - d00, d11 - d01, wf.y), mix(d01 - d00, d11 - d10, wf.x)), wx = dFdx(vUV) * uWaterRect.zw * wsz, wy = dFdy(vUV) * uWaterRect.zw * wsz;
+          vec2 wg = vec2(mix(d10 - d00, d11 - d01, wf.y), mix(d01 - d00, d11 - d10, wf.x));
           // Weighed between four texels the shore is a run of straight pieces, a texel long each. Near it, and from close enough
           // to see that, sixteen texels give a line that curves (Catmull-Rom: it still passes where the field has it, so a rock
           // a texel across stays), and how the shore bends there (wBend, 1/m: a bay positive, a headland negative; from the
@@ -444,6 +449,7 @@
           wD += ((nMic.b - 0.5) * 2.0 + (nFin.b - 0.5) * 0.6) * rough * (1.0 - smoothstep(300.0, 480.0, abs(wD)));
           // the sea's edge comes up the beach and runs back (a few metres; a lake's lies still)
           wD += sin(uTime * 0.55 + nMid.r * 31.0 + nMic.g * 5.0) * 3.5 * (1.0 - wK) * smoothstep(0.3, 0.9, wOpen) * uSeaK.y * (1.0 - smoothstep(60.0, 160.0, abs(wD))) * (1.0 - smoothstep(4.0, 14.0, wPx));
+          }
         }
         wCov = clamp(0.5 - wD / wPx, 0.0, 1.0);
         seaW = wCov * (1.0 - wK); landW = 1.0 - seaW; lakeW = wCov * wK; bandW *= 1.0 - wCov;
