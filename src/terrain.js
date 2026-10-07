@@ -1138,14 +1138,15 @@
       //  is open weeks after the last. By the snow lying at the moment, Ladoga was open water in March. Not where a month of
       //  snow is all the winter there is: from far out the Danish straits are a lake to the picture's map.)
       float iceOff = acos(clamp(2.0 * mix(uIceCold.y, uIceCold.x, hemi) - 1.0, -1.0, 1.0)) * 0.31831;      // (how far the year is from the end of winter: 0 early in March, 1 half a year on)
-      // (Where the sea beside it freezes, a water freezes as that sea does and not by this rule: from far out a strait is a lake to
-      //  the picture's map, and by the snow of Sweden the Danish belts were ice into April.)
+      // (And where the sea beside it freezes, as that sea does, whichever is the longer: from far out a strait is a lake to the
+      //  picture's map. Not one in place of the other: forty kilometres in from a freezing sea, where its ice gives out on the
+      //  map, the lakes of Karelia had open rings in them.)
       float iceIn = natv.g * 1.2 - 0.1 - iceOff;
       // (High dry country has its hard winters without the snow: the lakes of Tibet freeze under a sky that brings none. And a
       //  lake freezes from its shores: out in a great one the ice comes weeks later and goes weeks sooner.)
       float coldShare = smoothstep(0.85, 1.0, info.b) * smoothstep(0.27, 0.36, latN0) * 0.55;
       float lakeSeason = max(snowHere, coldShare) * 0.75 - 0.08 - (wOn > 0.5 ? 0.07 * smoothstep(300.0, 3000.0, off) : 0.0);
-      float frozen = max(smoothstep(0.0, 0.06, lakeSeason - iceOff) * max(smoothstep(0.3, 0.6, info.b), smoothstep(0.5, 0.8, snowHere)) * (1.0 - smoothstep(0.02, 0.06, natv.g)), smoothstep(0.01, 0.05, iceIn));      // (hard winters from 0.6 by the climate's class - Winnipeg's are 0.72 - or wherever snow lies for four months and more: a tarn of the Alps, a lake of the Qilian)
+      float frozen = max(smoothstep(0.0, 0.06, lakeSeason - iceOff) * max(smoothstep(0.3, 0.6, info.b), smoothstep(0.5, 0.8, snowHere)), smoothstep(0.01, 0.05, iceIn));      // (hard winters from 0.6 by the climate's class - Winnipeg's are 0.72 - or wherever snow lies for four months and more: a tarn of the Alps, a lake of the Qilian)
       #else
       float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
       #endif
@@ -1420,6 +1421,7 @@
       let p = this.packs.get(key);
       if (!p) { p = new Pack(kind, L, px, py); const info = this.packInfo(kind, L, px, py); if (info === undefined || info === 0) { p.state = 'absent'; } else if (kind === 'w' && info !== 1) { p.state = 'absent'; p.flat = info === '?' ? null : info; } else { p.info = info; } this.packs.set(key, p); }
       p.lastUsed = this.frame; if (priority !== undefined) p.priority = Math.max(p.priority || 0, priority);
+      if (p.state === 'error' && p.failed < 6 && performance.now() > p.retryAt) p.state = 'new';
       if (p.state === 'new') this.queue.push(p);
       return p;
     }
@@ -1480,7 +1482,11 @@
           }
         }
         tex.needsUpdate = true; p.texture = tex; p.state = 'ready';
-      } catch (e) { console.warn('pack failed', url, e); p.state = 'error'; }
+      } catch (e) {
+        // (asked for again after a while, a few times: a file that did not come once - a bundle is megabytes, and sixteen or
+        //  sixty-four packs hang on it - left its packs dead for as long as the game ran: no lakes in a country, or a blurred one)
+        console.warn('pack failed', url, e); p.state = 'error'; p.failed = (p.failed || 0) + 1; p.retryAt = performance.now() + 4000 * p.failed;
+      }
       this.loading--;
     }
     // A pack out of its bundle (the water's edge: tools/water/fetch.mjs, sixteen packs to a file; the picture of the Earth:

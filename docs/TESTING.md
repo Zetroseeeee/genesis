@@ -78,7 +78,11 @@ a planet.
 `node tools/glerr.js "<script>" [wait ms]` says which call to the card fails (the suite's "GL error 1281" names none): every
 call that can raise one is asked at once, and the first twelve are printed with their arguments, the picture last handed to the
 card and where the call came from. `__T.costsPlanet()` writes frame rates with the picture looked at in fewer ways and no finer
-than it used to be (`costp_*` in the tour).
+than it used to be (`costp_*` in the tour). `__T.watch()` writes into the picture, once a second, the frame rate, the packs by kind and
+state and what every tile in view is drawn with (the picture, the heights and the water's edge by level): a view is whole
+when nothing is loading and the levels stand still (`load_*` in the tour; on the build Mac a view from 300 km is whole in
+about half a minute). The frame rate the smoke run reports is of the three seconds before its picture: where packs are still
+arriving then it is far too low (11 for a view that holds 20) - believe the `cost*` scenes, which wait.
 The packs of the water's edge lie in bundles (`data/w/<level>_b<x>_<y>.bin`; `node tools/water/fetch.mjs check` says whether
 they are whole; `WATER_DIR=<folder>` tries the fetching and bundling on a copy). `__G.terrain.wBundles` are those in hand; a
 drawn tile's `wPack` is `{ pack, level, rect }`, or `{ flat: 'L' | 'S' }` where its piece of the pack is nothing but land

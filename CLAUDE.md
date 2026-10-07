@@ -201,6 +201,10 @@ Conventions that matter:
   went first), and a tile that finds no pack at all is given the blank one. Left with the texture it had last, a
   tile had the card upload a closed picture at every frame: `GL error 1281` and `1282`, and a black tile. With
   forty-three packs of the picture that hardly ever came up; with seventeen hundred it did in the first minute.
+  **A pack that did not come is asked for again** (`p.failed`, `retryAt` in `loadPack` and `getPack`: after 4 s, 8,
+  12 ... five times). Sixteen or sixty-four packs hang on one bundle of megabytes: a fetch that failed once left them
+  in `error` for as long as the game ran - a country without its lakes, or blurred. `__T.watch()` writes into the
+  picture what every tile is drawn with and what is still on its way (`load_*` in the tour).
 - **Representational scale.** Towns are planned at true scale and drawn `scaleOf(Rt) = 20/(1+Rt/1200)` times larger
   (a village ~19×, a metropolis ~3×) so they read from region height. Shader patterns divide by that factor.
 - **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
