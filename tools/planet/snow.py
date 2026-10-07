@@ -15,22 +15,21 @@ month alone says yes or no: by January's the snow of Europe was a white sheet wi
 is white the year round (ice, salt, bright sand) is no winter's snow and is left out: the game has its own rule for
 ice. Water takes the snow of the land nearest to it: a lake freezes with its shores.
 
-Ice on the sea (green): the share of the seven months about the end of winter (December to June in the north, June to
-December in the south) in which the water was white, times 0.8 - all of them in Baffin Bay, six in Hudson Bay, four in
-the Gulf of Bothnia and the Sea of Okhotsk, none off Norway - and 1 where it is white in summer too (the pack of the
-Arctic Ocean, the Weddell Sea). Water is the game's own (tools/planet/mask.png), and only water a
-texel clear of any shore speaks: the Blue Marble's shore is not the game's to the texel, and a snowy coast would be ice.
+Ice on the sea (green): the share of the year's twelve months in which the sea there is ice - all of them in the
+Arctic Ocean, eight in Hudson Bay, five in the Gulf of Bothnia, four in the Sea of Okhotsk, none off Norway. From the
+Sea Ice Index of the US National Snow and Ice Data Center (the mean of its first ten years, 1979 to 1988): the Blue
+Marble's own sea is one dark blue the year round.
 
     python3 tools/planet/snow.py --out out --work work      (the Planet workflow: mode "snow")
         out/snow.png           2048 x 1024; red: 0 no snow in any month ... 255 it lies all the cold season;
-                               green: 0 the sea never freezes ... 204 it is ice for seven months ... 255 all the year
+                               green: 0 the sea never freezes ... 255 it is ice all the year
         out/planet_snow.jpg    the same over the summer's picture, to look at, and midwinter as the Blue Marble has it
 The game reads it into the second layer of its planet's maps (planetMaps in src/main.js: the snow into its alpha, the
 ice into its green); the ground's shader lets snow lie and the sea freeze only where the map has some, and for as much
 of the year as it says (terrain.js, at "winter where winters are white" and "ice on the sea"; Trees.lyingAt is the
 snow's twin for boughs and roofs).
 """
-import os, sys, time, urllib.request
+import os, sys, time, urllib.request, urllib.error
 import numpy as np
 from PIL import Image, ImageFilter
 from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion
@@ -90,23 +89,58 @@ snow = filled; del m1, m2, b1, b2, w0, filled
 ix = distance_transform_edt(sea, return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]; del ix
 
 # ---------- ice on the sea ----------
+# The Blue Marble has no ice on its sea (its ocean is one dark blue the year round). The Sea Ice Index of the US National Snow
+# and Ice Data Center has: how much of the sea is ice, month by month since 1979, from microwave radiometers that see by
+# night and through cloud, on a grid of 25 km about each pole (Fetterer, Knowles, Meier, Savoie and Windnagel: Sea Ice Index,
+# Version 4, NSIDC, doi:10.7265/a98x-0f50). Its first ten years are taken, which are the nearest it has to a sea nobody had
+# warmed: for each month the mean of them, and a month has ice where three tenths of the sea and more is ice.
+import rasterio
+from rasterio.warp import transform as reproject
+from concurrent.futures import ThreadPoolExecutor
+SII, MON, YEARS = 'https://noaadata.apps.nsidc.org/NOAA/G02135/', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], range(1979, 1989)
+def sii(job):
+    hemi, y, m = job; name = '%s_%d%02d_concentration_v4.0.tif' % (hemi, y, m); f = os.path.join(WORK, name)
+    if not os.path.exists(f):
+        try:
+            with urllib.request.urlopen(urllib.request.Request('%s%s/monthly/geotiff/%02d_%s/%s' % (SII, 'north' if hemi == 'N' else 'south', m, MON[m - 1], name), headers=UA), timeout=120) as r: open(f, 'wb').write(r.read())
+        except Exception as e: return job, None      # (some months of 1987 and 1988 were never measured)
+    return job, f
+os.makedirs(WORK, exist_ok=True)
+with ThreadPoolExecutor(8) as ex: got = dict(ex.map(sii, [(h, y, m) for h in 'NS' for y in YEARS for m in range(1, 13)]))
+print('the Sea Ice Index, %d to %d: %d months in hand of %d' % (YEARS[0], YEARS[-1], sum(1 for f in got.values() if f), len(got)))
+lat2 = 90.0 - (np.arange(H * 2) + 0.5) * 90.0 / H; lon2 = -180.0 + (np.arange(W * 2) + 0.5) * 180.0 / W
+ice = np.zeros((H * 2, W * 2), np.float32)
+for hemi in 'NS':
+    share, tf, crs = None, None, None
+    for m in range(1, 13):
+        acc, n = None, None
+        for y in YEARS:
+            f = got[(hemi, y, m)]
+            if not f: continue
+            with rasterio.open(f) as r: a = r.read(1).astype(np.float32); tf, crs = r.transform, r.crs
+            a = np.where(a == 2510, 1000.0, a)                       # (the hole at the pole no satellite sees is ice)
+            ok = a <= 1000; acc = np.where(ok, a, 0.0) if acc is None else acc + np.where(ok, a, 0.0); n = ok.astype(np.float32) if n is None else n + ok
+        if acc is None: continue
+        conc = np.where(n > 0, acc / np.maximum(n, 1.0) / 1000.0, np.nan)      # the mean of the years; nan: land
+        has = ss(0.15, 0.5, conc); share = has if share is None else share + has
+    share = share / 12.0; sea_ = ~np.isnan(share)
+    ix, dist = distance_transform_edt(~sea_, return_distances=True, return_indices=True)[::-1]      # (land takes the nearest sea's, within some four hundred kilometres)
+    share = np.where(sea_, share, np.where(dist < 16, share[ix[0], ix[1]], 0.0)); share = np.nan_to_num(share)
+    rows = np.where(lat2 > 30)[0] if hemi == 'N' else np.where(lat2 < -40)[0]
+    LO, LA = np.meshgrid(lon2, lat2[rows]); xs, ys = reproject('EPSG:4326', crs, LO.ravel().tolist(), LA.ravel().tolist())
+    c = (np.array(xs) - tf.c) / tf.a - 0.5; r_ = (np.array(ys) - tf.f) / tf.e - 0.5
+    c0, r0 = np.floor(c).astype(int), np.floor(r_).astype(int); fc, fr = c - c0, r_ - r0; hh, ww = share.shape
+    def at(rr, cc): inb = (rr >= 0) & (rr < hh) & (cc >= 0) & (cc < ww); return np.where(inb, share[np.clip(rr, 0, hh - 1), np.clip(cc, 0, ww - 1)], 0.0)
+    v = (at(r0, c0) * (1 - fc) + at(r0, c0 + 1) * fc) * (1 - fr) + (at(r0 + 1, c0) * (1 - fc) + at(r0 + 1, c0 + 1) * fc) * fr
+    ice[rows] = v.reshape(len(rows), W * 2).astype(np.float32)
+    print('  %s: %s cells of 25 km, %s; ice all the year on %.1f million km2, in some month on %.1f' % (hemi, 'x'.join(map(str, share.shape)), crs, (share[sea_] > 0.96).sum() * 625e-6, (share[sea_] > 0.04).sum() * 625e-6))
+# only the game's own water speaks, a texel clear of any shore; the land takes its nearest water's (a card weighs between a
+# shore's texels: it must find the sea's ice there, not nothing)
 mask = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mask.png')).resize((W * 2, H * 2), Image.BOX))
 wet = mask < 160                                      # the game's water: the sea (0), a lake (128) and what a shore mixes of them
-ICE = {True: (12, 1, 2, 3, 4, 5, 6), False: (6, 7, 8, 9, 10, 11, 12)}      # the seven months about the end of winter
-def white(a, la): return ss(0.40, 0.58, la) * grey(a)
-ice, lit = np.zeros((H * 2, W * 2), np.float32), np.zeros((H * 2, W * 2), np.float32)
-for k in range(7):
-    a = half(ICE[True][k], ICE[False][k]); la = lum(a); ok = (la > 0.012).astype(np.float32)      # (a month without light says nothing)
-    ice += white(a, la) * ok; lit += ok
-    del a, la, ok
-# (0.8 is ice for all seven months; above it, what is white in summer too, which is white all the year: the game lets the one
-#  melt and the other stay)
-ice = np.maximum(0.8 * ice / np.maximum(lit, 1.0), white(summer, ls))
-print('months with light, of the seven: at the pole %.1f, at 80 N %.1f, at 70 N %.1f, at 70 S %.1f, at 80 S %.1f' % tuple(float(lit[int((90 - la) / 180 * H * 2)].mean()) for la in (89.5, 80, 70, -70, -80)))
-open_water = binary_erosion(wet, iterations=1, border_value=1)          # water a texel clear of any shore
+open_water = binary_erosion(wet, iterations=1, border_value=1)
 ix = distance_transform_edt(~open_water, return_distances=False, return_indices=True); ice = np.where(open_water, ice, ice[ix[0], ix[1]]); del ix
 ice = np.array(Image.fromarray(np.rint(ice * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.0))).astype(np.float32) / 255.0
-ice = np.clip((ice - 0.03) / 0.94, 0.0, 1.0)
 # (to the map's own cells, then smoothed over some sixty kilometres: what is left of a month's yes or no is how likely it is)
 snow = np.array(Image.fromarray(np.rint(snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.6))).astype(np.float32) / 255.0
 snow = np.clip((snow - 0.03) / 0.94, 0.0, 1.0)
@@ -117,9 +151,9 @@ for a in range(90, -90, -10):
     m = (lat <= a) & (lat > a - 10); l = landm[m]; print('  %4d..%4d: %5.1f%%' % (a, a - 10, 100.0 * snow[m][l].mean() if l.any() else 0.0))
 for name, lon, la in [('Tibet', 88, 33), ('Tarim', 83, 39), ('Mongolia', 104, 47), ('Kazakh steppe', 68, 49), ('Moscow', 37, 56), ('Paris', 2.3, 48.8), ('Berlin', 13.4, 52.5), ('Kyiv', 30.5, 50.4), ('Beijing', 116.4, 39.9), ('Harbin', 126.6, 45.8), ('Chicago', -87.6, 41.9), ('Denver', -105, 39.7), ('Winnipeg', -97, 50), ('Great Basin', -116, 40), ('Anatolia', 33, 39), ('Iran plateau', 54, 33), ('Namib', 15, -23), ('Karoo', 24, -32), ('Patagonia 45S', -69, -45), ('Patagonia 50S', -70, -50), ('Puna', -67, -22), ('Santiago Andes', -70.1, -33.5), ('NZ Alps', 170, -43.8), ('Alps', 9.5, 46.6), ('Sahara Hoggar', 5.5, 23.3), ('Hokkaido', 143, 43.5)]:
     x, y = int((lon + 180) / 360 * W), int((90 - la) / 180 * H); print('  %-16s %.2f   (winter %s, summer %s)' % (name, snow[y, x], np.rint(winter[y * 2, x * 2] * 255).astype(int), np.rint(summer[y * 2, x * 2] * 255).astype(int)))
-print('ice on the sea (the share of seven months; above 1, ice in summer too):')
+print('ice on the sea (months of the year):')
 for name, lon, la in [('North Pole', 0, 88), ('Baffin Bay', -65, 73), ('Hudson Bay', -85, 60), ('Labrador coast', -57, 56), ('Gulf of St Lawrence', -62, 48), ('Lake Superior', -87.5, 47.7), ('Greenland Sea', -5, 76), ('Norwegian Sea', 5, 68), ('North Sea', 3, 56), ('Barents Sea', 35, 73), ('White Sea', 38, 65.5), ('Gulf of Bothnia', 21, 64), ('Gulf of Finland', 26, 59.9), ('Baltic proper', 19, 56), ('Kara Sea', 70, 75), ('Laptev Sea', 125, 75), ('Sea of Okhotsk', 148, 55), ('Bering Sea north', -170, 62), ('Bering Sea south', -170, 55), ('Sea of Japan north', 139, 46), ('Caspian north', 50.5, 46), ('Lake Baikal', 108, 53.5), ('Black Sea', 34, 43.5), ('Weddell Sea', -40, -72), ('Ross Sea', -175, -75), ('Southern Ocean 60 S', 0, -60), ('Southern Ocean 66 S', 0, -66), ('Drake Passage', -65, -58)]:
-    x, y = int((lon + 180) / 360 * W), int((90 - la) / 180 * H); print('  %-20s %.2f   (midwinter %s, summer %s)' % (name, ice[y, x] / 0.8, np.rint(winter[y * 2, x * 2] * 255).astype(int), np.rint(summer[y * 2, x * 2] * 255).astype(int)))
+    x, y = int((lon + 180) / 360 * W), int((90 - la) / 180 * H); print('  %-20s %4.1f months' % (name, ice[y, x] * 12))
 os.makedirs(OUT, exist_ok=True)
 Image.fromarray(np.dstack([np.rint(snow * 255), np.rint(ice * 255), np.zeros((H, W))]).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'snow.png'), optimize=True)
 s2 = np.array(Image.fromarray(np.rint(summer * 255).astype(np.uint8)).resize((W, H), Image.BOX)).astype(np.float32)
