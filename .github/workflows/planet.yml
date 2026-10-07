@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: 20
       - name: What it needs
-        run: python3 -m pip install --quiet --disable-pip-version-check --break-system-packages numpy scipy pillow || python3 -m pip install --quiet --disable-pip-version-check numpy scipy pillow
+        run: python3 -m pip install --quiet --disable-pip-version-check --break-system-packages numpy scipy pillow rasterio || python3 -m pip install --quiet --disable-pip-version-check numpy scipy pillow rasterio
       - name: Make
         env:
           MODE: ${{ github.event.inputs.mode }}

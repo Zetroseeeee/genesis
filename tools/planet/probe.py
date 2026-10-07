@@ -7,6 +7,8 @@
   months  holds the game's picture of the Earth (data/i) against every month of NASA's Blue Marble Next Generation, to
           find which it was made from (the picture's origin was never written down)
   sheet   a sheet of pictures to look at: the game's picture beside the months that might take its place
+  tiff    one piece of the Blue Marble at its finest (500 m): how the file is laid out, how long it takes to fetch and to read,
+          what colour its sea is, how far its JPEG is from it, and how many bytes a pack of it takes squeezed this way and that
 Nothing told: all three.
 """
 import os, sys, re, io, json, time, urllib.request, urllib.error
@@ -17,7 +19,7 @@ Image.MAX_IMAGE_PIXELS = None
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
 OUT, WORK = arg('out', 'out'), arg('work', 'work')
-what = [a for a in sys.argv[1:] if a in ('urls', 'months', 'sheet')] or ['urls', 'months', 'sheet']
+what = [a for a in sys.argv[1:] if a in ('urls', 'months', 'sheet', 'tiff')] or ['urls', 'months', 'sheet']
 UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) holocene-planet-probe'}
 EO = 'https://eoimages.gsfc.nasa.gov/images/imagerecords/'
 # Blue Marble Next Generation (NASA Earth Observatory; R. Stockli): the land's surface month by month through 2004, 500 m to a
@@ -142,4 +144,61 @@ if 'sheet' in what and months:
         for t in row: sheet.paste(t, (x, y)); x += t.size[0] + 4
         y += row[0].size[1] + 4
     sheet.save(os.path.join(OUT, 'planet_probe.jpg'), quality=88); print('planet_probe.jpg', sheet.size, 'columns:', ', '.join(n for n, _ in cols), '; rows:', ', '.join(n for n, _ in tiles))
+
+if 'tiff' in what:
+    import shutil
+    print('== the machine ==')
+    print('cores', os.cpu_count(), '; memory', [l.strip() for l in open('/proc/meminfo') if l.startswith(('MemTotal', 'MemAvailable'))])
+    for d in ('.', WORK, '/mnt', '/tmp'):
+        try: u = shutil.disk_usage(d); print('disk %-6s free %.1f GB of %.1f' % (d, u.free / 1e9, u.total / 1e9), '(writable)' if os.access(d, os.W_OK) else '(not writable)')
+        except Exception as e: print('disk', d, e)
+    import PIL; from PIL import features
+    try: avif = features.check('avif')
+    except Exception as e: avif = 'unknown to this pillow'
+    print('pillow', PIL.__version__, 'webp', features.check('webp'), 'avif', avif)
+    os.makedirs(WORK, exist_ok=True)
+    print('== a piece of the Blue Marble at 500 m: C1 (0-90 E, 0-90 N) ==')
+    t0 = time.time(); ftif = fetch(bmng(7, '3x21600x21600', '_geo.tif', 'C1'), 'jul.C1.tif'); print('  the GeoTIFF: %.0f s to fetch' % (time.time() - t0))
+    t0 = time.time(); fjpg = fetch(bmng(7, '3x21600x21600', 'jpg', 'C1'), 'jul.C1.jpg'); print('  the JPEG: %.0f s to fetch' % (time.time() - t0))
+    try:
+        import rasterio
+        with rasterio.open(ftif) as src:
+            print('rasterio', rasterio.__version__, {k: str(v) for k, v in src.profile.items()}, 'blocks', src.block_shapes[:1], 'bounds', tuple(src.bounds), 'overviews', src.overviews(1))
+            for name, win in (('200 rows across', ((9000, 9200), (0, 21600))), ('a column 200 wide', ((0, 21600), (21400, 21600))), ('a block 10992 a side', ((0, 10992), (0, 10992)))):
+                t0 = time.time(); a = src.read(window=win); print('  read %-22s %s in %.1f s' % (name, a.shape, time.time() - t0), flush=True)
+            del a
+    except Exception as e: print('rasterio:', repr(e)[:300])
+    t0 = time.time(); T = np.array(Image.open(ftif).convert('RGB')); print('pillow reads the GeoTIFF whole in %.1f s: %s' % (time.time() - t0, T.shape), flush=True)
+    t0 = time.time(); J = np.array(Image.open(fjpg).convert('RGB')); print('pillow reads the JPEG whole in %.1f s: %s' % (time.time() - t0, J.shape), flush=True)
+    def psnr(a, b): d = a.astype(np.float32) - b.astype(np.float32); return 10 * np.log10(255.0 ** 2 / max(float((d * d).mean()), 1e-9))
+    px = lambda lon, lat: (int(lon * 240), int((90 - lat) * 240))      # (C1: its left edge is the meridian of Greenwich, its top the pole)
+    def crop(A, lon, lat, n=1028): x, y = px(lon, lat); return A[y:y + n, x:x + n]
+    print('the JPEG against the GeoTIFF: %.1f dB over the Alps, %.1f dB over the Sahara, %.1f dB over India' % (psnr(crop(T, 6, 49), crop(J, 6, 49)), psnr(crop(T, 10, 28), crop(J, 10, 28)), psnr(crop(T, 76, 26), crop(J, 76, 26))))
+    del J
+    print('-- the colour of the sea --')
+    for name, lon, lat in (('Arabian Sea', 62, 14), ('Bay of Bengal', 88, 14), ('Mediterranean', 18.5, 35), ('Black Sea', 34, 44), ('Caspian', 51, 41), ('Barents Sea', 40, 75), ('the pole', 45, 89.9), ('Kara Sea', 75, 78), ('Lake Victoria (its north)', 32.6, 0.9), ('Lake Balkhash', 75, 46.8)):
+        c = crop(T, lon, lat, 240).reshape(-1, 3); u, n = np.unique(c, axis=0, return_counts=True); o = np.argsort(-n)[:4]
+        print('  %-30s mean %s  std %s  most often: %s' % (name, c.mean(0).round(1), c.std(0).round(1), '  '.join('%s x%d' % (tuple(int(v) for v in u[i]), n[i]) for i in o)))
+    print('-- across a coast (the Nile\'s delta at 31 E, from 32.0 N to 31.2 N, every 2nd pixel: r g b) --')
+    x, y = px(31, 32.0); print('  ' + ' '.join('%d,%d,%d' % tuple(T[y + k, x]) for k in range(0, 192, 4)))
+    print('-- across a coast (Liguria at 9 E, from 43.9 N to 44.5 N going north) --')
+    x, y = px(9, 44.5); print('  ' + ' '.join('%d,%d,%d' % tuple(T[y + k, x]) for k in range(143, -1, -3)))
+    print('-- a pack squeezed (1028 x 1028 at the source\'s own fineness): bytes, dB against the source, seconds --')
+    for name, lon, lat in (('Alps', 6, 49), ('Sahara', 10, 28), ('India', 76, 26), ('Siberia', 60, 62), ('Nile delta coast', 29.5, 32.5)):
+        a = crop(T, lon, lat); im = Image.fromarray(a); row = []
+        def one(label, **kw):
+            b = io.BytesIO(); t0 = time.time()
+            try: im.save(b, **kw)
+            except Exception as e: row.append('%s: %s' % (label, str(e)[:40])); return
+            dt = time.time() - t0; back = np.array(Image.open(io.BytesIO(b.getvalue())).convert('RGB')); row.append('%s %d KB %.1f dB %.1fs' % (label, len(b.getvalue()) // 1000, psnr(a, back), dt))
+        for q in (80, 85, 90, 95): one('webp%d' % q, format='WEBP', quality=q, method=4)
+        one('webp90m6', format='WEBP', quality=90, method=6); one('webp-lossless', format='WEBP', lossless=True, quality=60, method=4)
+        for q in (60, 70, 80): one('avif%d' % q, format='AVIF', quality=q, speed=6)
+        one('avif80-444', format='AVIF', quality=80, speed=6, subsampling='4:4:4'); one('jpeg92-444', format='JPEG', quality=92, subsampling=0)
+        print('  %-18s %s' % (name, ' | '.join(row)), flush=True)
+    # what it looks like: a few places at the source's own fineness
+    tiles = [Image.fromarray(crop(T, lon, lat, 700)) for lon, lat in ((6.5, 46.6), (2.0, 49.2), (30.2, 31.6), (8.2, 45.2), (76.5, 29.0), (36.0, 56.2))]
+    sh = Image.new('RGB', (700 * 3 + 8, 700 * 2 + 4), (12, 16, 26))
+    for k, t in enumerate(tiles): sh.paste(t, ((k % 3) * 704, (k // 3) * 704))
+    sh.save(os.path.join(OUT, 'planet_tiff.jpg'), quality=90); print('planet_tiff.jpg: the Alps, Paris, the Nile\'s delta / the Po, Delhi, Moscow at 500 m')
 print('done')
