@@ -77,26 +77,31 @@ for k in range(7):
     need = 0.03 + 0.25 * ls
     snow += ss(need, need + 0.11, lw - ls) * grey(a) * ss(0.16, 0.30, lw) * (1.0 - sea) / 7.0
     del a, lw
+# The game's water (tools/planet/mask.png: the sea 0, a lake 128 and what a shore mixes of them) and the Blue Marble's, and the
+# land's last ten kilometres with them: the Blue Marble paints every water one dark blue in every month, so a shore's cell,
+# half water, is half as white in winter as the country behind it, and says nothing of snow.
+mask = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mask.png')).resize((W * 2, H * 2), Image.BOX))
+wet = mask < 160
+shore = binary_dilation(sea | wet, iterations=1)
 # A wood keeps its own counsel: the larch of Yakutia under a low sun is as dark in January as in July, and the woods of
 # Minnesota little lighter - by their own look they had no winter, and lay as dark holes in the snow of a continent. Snow
 # lies in a wood when it lies on the open ground about it: a wood (dark and green in summer) takes what the open ground
-# within some eighty kilometres has, or within three hundred where there is none so near.
+# within some eighty kilometres has, and where there is next to none so near, what the nearest of it has. (Taken from
+# within three hundred kilometres there instead, a great wood in Poland was a window in the snow, its frame where the open
+# ground within eighty gave out.)
 wood = ss(0.24, 0.14, ls) * ss(0.0, 0.03, summer[..., 1] - np.maximum(summer[..., 0], summer[..., 2]) * 0.92) * (1.0 - sea)
-w0 = (1.0 - sea) * (1.0 - wood)
-def about(sig): b = gaussian_filter(w0, sig, mode=('nearest', 'wrap')); return gaussian_filter(snow * w0, sig, mode=('nearest', 'wrap')) / np.maximum(b, 1e-4), b
-(m1, b1), (m2, b2) = about(8.0), about(30.0)
-filled = np.maximum(snow, np.where(b1 > 0.08, m1, m2) * wood * 0.95)
+w0 = (1.0 - shore) * (1.0 - wood)
+b1 = gaussian_filter(w0, 8.0, mode=('nearest', 'wrap')); m1 = gaussian_filter(snow * w0, 8.0, mode=('nearest', 'wrap')) / np.maximum(b1, 1e-4)
+ix = distance_transform_edt(w0 < 0.5, return_distances=False, return_indices=True); m2 = gaussian_filter(snow[ix[0], ix[1]], 3.0, mode=('nearest', 'wrap')); del ix
+k = ss(0.03, 0.15, b1)
+filled = np.maximum(snow, (m1 * k + m2 * (1.0 - k)) * wood * 0.95)
 print('woods given the snow of the open ground about them: %.1f%% of the land, its mean share of the season %.2f -> %.2f' % (100.0 * (wood > 0.5).sum() / max(1, (sea < 0.5).sum()), snow[wood > 0.5].mean(), filled[wood > 0.5].mean()))
-snow = filled; del m1, m2, b1, b2, w0, filled
-# (Water takes the snow of the land nearest to it: a card weighs between a shore's texels, and a lake freezes with its shores.
-#  Water is the game's own, tools/planet/mask.png, and the Blue Marble's with it: Great Bear Lake in July is half ice and
-#  no dark blue sea, and as "land that is white in summer too" it had no winter - the lakes of the north lay open in January.)
-mask = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mask.png')).resize((W * 2, H * 2), Image.BOX))
-wet = mask < 160                                      # the game's water: the sea (0), a lake (128) and what a shore mixes of them
-# (And the land's last ten kilometres with it: the Blue Marble paints every water one dark blue in every month, so a shore's
-#  cell, half water, is half as white in winter as the country behind it - and that was the "nearest land" a lake took its
-#  snow from: Ladoga had two months of it between shores that have five.)
-ix = distance_transform_edt(binary_dilation(sea | wet, iterations=1), return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]
+snow = filled; del m1, m2, b1, w0, filled, k
+# (Water takes the snow of the land nearest to it, from behind its shore: a card weighs between a shore's texels, and a lake
+#  freezes with its shores. By the shore's own cells Ladoga had two months of snow between shores that have five; and
+#  by the Blue Marble's water alone Great Bear Lake, half ice in July and no dark blue sea, was "land that is white in
+#  summer too" and had no winter at all.)
+ix = distance_transform_edt(shore, return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]
 
 # ---------- how high the country lies ----------
 # The map is of cells twenty kilometres across, and what it has for the Alps is the Alps on the whole: the valleys with the
