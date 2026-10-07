@@ -520,8 +520,9 @@ Conventions that matter:
   *What it costs* (the build Mac; `costp_*`, `__T.costsPlanet()`): nothing that can be measured. In one page, the
   picture looked at in four ways or two where the ground runs away from the eye, or no finer than level 3 as it used
   to be: 12.8 frames a second for the Alps from 19 km every time; and the game before it and with it, each in its own
-  start on the same day: 13 and 13 there, 26 and 26 over a town to the horizon. What it does cost is loading: a view
-  needs some fifty packs where it needed four, and lakes and fine heights come in a little later than they did.
+  start on the same day: 13 and 13 there, 26 and 26 over a town to the horizon. Nor does it load more slowly: a
+  view from 300 km needs some forty packs of the picture where it needed sixteen, and its ground is whole six
+  seconds after the start, where the game before it took nine (`load_*`, `__T.watch()`).
 - **Winter** (`data/snow.png`, `tools/planet/snow.py`; `snowHere` in `terrain.js`, `Trees.lyingAt`). Where snow lies,
   and for how much of the year, is the Earth's own: the Blue Marble has every month, and the builder reads from it
   the share of a cold season's seven months (October to April in the north, April to October in the south) in which
