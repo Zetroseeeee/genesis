@@ -127,6 +127,7 @@
     uniform vec4 uWaterK;      // (x: how ragged the shore; y, z, w: to try things by)
     // The sky as still water would mirror it: its light at five heights above the horizon (the root of the height's sine: 0, a
     // quarter .. 1) toward the sun, across and away from it, worked out once a frame where the camera stands (main.js: skyMirror).
+    uniform float uWild;      // (how far the country nobody farms is given back the colours it had before the plough: 1 wholly, 0 the photograph as it is)
     uniform vec3 uSkyR[15]; uniform vec4 uSeaK;      // (uSeaK: x how high the waves run, y how much surf, z how clear the water; w to ask what things cost: 1 no waves, 2 no waves and nothing mirrored)
     vec3 skyAt(float sinE, float cosAz) {
       float x = sqrt(clamp(sinE, 0.0, 1.0)) * 4.0, i = min(floor(x), 3.0); int k = int(i) * 3;
@@ -137,7 +138,15 @@
     uniform sampler2D uWater; uniform vec4 uWaterRect, uWaterP;      // the water's edge (data/w): P = 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; for 2 the distance and the kind
     uniform float uDLon, uDLat, uLevel;
     uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason; uniform vec4 uBare;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
-    uniform sampler2D uOwner, uPal, uSim, uInfo, uNoise;
+    uniform sampler2D uOwner, uPal, uSim, uNoise;
+    // (the planet's own maps travel as one texture of two layers where they could be made one: info.png, and what grows there by
+    //  nature - the map the trees are planted by)
+    #ifdef INFO2
+    precision highp sampler2DArray;
+    uniform sampler2DArray uInfo;
+    #else
+    uniform sampler2D uInfo;
+    #endif
     // the four photographic detail textures (forest, dunes, rock, grass) travel as one array where the GPU has arrays:
     // Apple's GPUs allow a fragment shader 16 textures, and this one needs every unit it can spare
     #ifndef USE_GROUND
@@ -475,7 +484,12 @@
       vecRiver *= 1.0 - bridgeW;
       float inlandW = max(lakeW, max(riverLine, max(vecRiver, floodW * 0.95)));
       vec2 geo = vec2((vLon / PI + 1.0) * 0.5, 0.5 - vLat / PI);   // global equirect uv (v down)
-      vec4 info = texture2D(uInfo, geo);                             // r shelf, g ice, b how hard the winters are, a how humid the climate (tools/climate/build.py)
+      #ifdef INFO2
+      vec4 info = texture(uInfo, vec3(geo, 0.0));                    // r shelf, g ice, b how hard the winters are, a how humid the climate (tools/climate/build.py)
+      vec3 natv = texture(uInfo, vec3(geo, 1.0)).rgb;                // by nature: how green the country is, how light, how warm-coloured (data/veg.jpg: what the trees are planted by)
+      #else
+      vec4 info = texture2D(uInfo, geo); vec3 natv = vec3(0.0, 0.5, 1.0);
+      #endif
       // magnification: how many screen pixels per imagery texel (approx via derivatives)
       vec2 duv = fwidth(vUV * uImgRect.zw * uImgK);
       float texPerPx = max(duv.x, duv.y);                            // >1 minified, <1 magnified
@@ -495,30 +509,51 @@
       }
       // ---------- land colour: biome splatting driven by imagery + terrain ----------
       vec3 base = img.rgb;
+      float latN0 = abs(vLat) / (0.5 * PI);
+      float treeLine = 4100.0 - 3900.0 * pow(latN0, 1.4);
+      vec4 sim = texture2D(uSim, geo);
+      float cult = sim.b;
+      // the climate of the place (info.a, from the Koppen-Geiger map): how dry the country really is, whatever today's
+      // photograph shows. 1 true desert, ~0.6 steppe, ~0.3 savanna and the lands of dry summers, 0 humid.
+      float clim = clamp(1.0 - info.a + (nMac.b - 0.5) * 0.12 + (nMid.a - 0.5) * 0.06, 0.0, 1.0);
+      // ---------- the country before the plough ----------
+      // The photograph is of our own day. In the lands where woods would stand, half of what it shows is field and pasture:
+      // tan with stubble under a July sun, and from the photograph alone that is dry ground. The world begins in 10,000 BC.
+      // So where nobody farms (the simulation knows who does), ground that is lighter than a wood is given back the colour of
+      // the woods and glades that stood there, and keeps a share of its own light and dark (the grain of the country stays:
+      // it is a remapping of each texel, not a smoothing); where the game's people have cleared the land, the photograph's
+      // own fields show. Only where woods would stand (a steppe is tan of its own, and so is a Mediterranean
+      // summer), below the trees' line, and not on rock faces or snow.
+      float ploughed = smoothstep(0.05, 0.4, cult + (nMid.r - 0.5) * 0.2);
+      { float l0 = dot(base, vec3(0.299, 0.587, 0.114));
+        // (Where woods would stand: by the map the trees are planted by - green by nature and not warm-coloured, which a steppe, a
+        //  prairie and a savanna are. A climate's class cannot say it: the wheat of Kansas and the wheat of Picardy grow under
+        //  the same letters, and the plains were a green wall from Texas to the Dakotas with a ruled edge where the class
+        //  changes. Not in the taiga or beyond it, where what is light in the photograph is bog, burn and tundra, and was so then.)
+        float woods = smoothstep(0.55, 0.9, natv.r) * (1.0 - smoothstep(0.3, 0.6, natv.b)) * (1.0 - smoothstep(0.78, 0.92, info.b)) * (1.0 - smoothstep(treeLine - 500.0, treeLine - 100.0, vH));
+        float field = smoothstep(0.13, 0.24, l0) * (1.0 - smoothstep(0.5, 0.7, l0)) * (1.0 - smoothstep(0.25, 0.5, slope));
+        float ln = mix(0.15, l0, 0.45);          // (a glade is lighter than the wood round it, as the field was: by less)
+        vec3 nat = mix(vec3(0.78, 1.20, 0.40), vec3(0.96, 1.12, 0.44), smoothstep(0.16, 0.30, ln)) * ln;
+        base = mix(base, nat, woods * field * (1.0 - ploughed) * uWild); }
       float lum = dot(base, vec3(0.299, 0.587, 0.114));
       float green = clamp((base.g - max(base.r, base.b) * 0.92) * 6.0 + 0.25, 0.0, 1.0);
       float warm = clamp((base.r - base.b) * 4.0, 0.0, 1.0);
       float white = smoothstep(0.66, 0.9, lum) * (1.0 - warm) * (1.0 - green);
-      float latN0 = abs(vLat) / (0.5 * PI);
       // seasons: the hemisphere's winter pulls the snow line down (to the coast in the far north), autumn colours the deciduous belt
       float hemi = smoothstep(-0.03, 0.03, vLat);
       float winter = mix(uSeason.z, uSeason.x, hemi) * smoothstep(0.18, 0.4, latN0);
       float autumn = mix(uSeason.w, uSeason.y, hemi);
       float decid = smoothstep(0.26, 0.4, latN0) * (1.0 - smoothstep(0.56, 0.74, latN0)) * (1.0 - smoothstep(1200.0, 2400.0, vH));
       float seasonK = 900.0 + 5200.0 * pow(latN0, 1.5);
-      float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winter - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35);
-      float treeLine = 4100.0 - 3900.0 * pow(latN0, 1.4);
+      // (dry air keeps its mountains bare far higher: the hills of the Altiplano, three hundred metres under a snow line reckoned
+      //  by latitude alone, were white the year round)
+      float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winter - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0));
       float ice = max(info.g, white * max(smoothstep(snowLine0 - 900.0, snowLine0 + 200.0, vH), smoothstep(0.7, 0.8, latN0)));
       // biome weights
       float aboveTree = smoothstep(treeLine - 300.0, treeLine + 200.0, vH);
       float steep = smoothstep(0.12, 0.42, slope);
       // the wildwood: land that is green and not dry was forest until somebody cleared it; today's pictures show the
       // fields that came later. So where nobody farms, the lighter greens count as forest too.
-      vec4 sim = texture2D(uSim, geo);
-      float cult = sim.b;
-      // the climate of the place (info.a, from the Koppen-Geiger map): how dry the country really is, whatever today's
-      // photograph shows. 1 true desert, ~0.6 steppe, ~0.3 savanna and the lands of dry summers, 0 humid.
-      float clim = clamp(1.0 - info.a + (nMac.b - 0.5) * 0.12 + (nMid.a - 0.5) * 0.06, 0.0, 1.0);
       float desertK = smoothstep(0.7, 0.86, clim), steppeK = smoothstep(0.44, 0.56, clim) * (1.0 - desertK);
       float wild = (1.0 - smoothstep(0.22, 0.48, warm)) * (1.0 - clamp(cult * 1.4, 0.0, 1.0)) * (1.0 - smoothstep(0.35, 0.6, clim));
       float wForest = green * (1.0 - smoothstep(0.32 + 0.2 * wild, 0.6 + 0.3 * wild, lum)) * (1.0 - aboveTree) * (1.0 - steep * 0.7);
@@ -880,10 +915,18 @@
       // winter where winters are white: snow lies over the country for as long as the climate keeps it (weeks in a mild
       // one, and then in patches; half the year in the taiga). Beaten tracks and trodden town ground show through.
       float snowLying = 0.0;
-      { float cold = info.b; float thr = 1.02 - 0.55 * cold;
+      { float cold = info.b;
+        // (Snow lies on low ground only well away from the tropics. By the climate's map a cold desert is the Namib too, and a tundra
+        //  the Puna of the Andes: each lay under a white sheet all its winter. Climates of mild winters keep snow from some forty
+        //  degrees, or high up; the hard ones wherever they are found outside the tropics.)
+        cold *= smoothstep(0.30, 0.42, latN0) * mix(smoothstep(0.34, 0.46, latN0 + max(vH - 800.0, 0.0) / 7000.0), 1.0, smoothstep(0.55, 0.72, cold));
+        float thr = 1.02 - 0.55 * cold;
         float lying = smoothstep(thr, thr + 0.1, mix(uBare.w, uBare.z, hemi)) * smoothstep(0.08, 0.5, cold); snowLying = lying;
         if (lying > 0.003) {
           float cover = smoothstep(1.0 - lying * 1.15, 1.15 - lying * 1.15, nMid.r * 0.55 + nMic.g * 0.3 + nFin.b * 0.15);
+          // (from far out the grain that breaks the snow's edge up is too small to see, and where the snow thins out by the climate
+          //  or the latitude it ended at a ruled line across a continent: from there it thins as it is told to)
+          cover = mix(cover, smoothstep(0.15, 0.9, lying) * (0.75 + 0.5 * (nMac.g - 0.5)), smoothstep(0.03, 0.12, uCamAlt));
           cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - 0.4 * wForest * (1.0 - bare));
           vec3 snowCol = vec3(0.92, 0.94, 0.97) * (0.82 + dl2 * 0.2);
           #ifdef USE_TEXARR
@@ -1530,7 +1573,7 @@
     // shader switches for every tile material: the detail array when the globals carry one, the generated ground when it has loaded
     // (WATER_PLAIN: the water without what is dear to a software renderer, which runs both arms of every branch at every pixel: the
     //  sixteen texels of the shore, the bed's fall, waves and surf. The test suite's pages; the shore, the depths' colours and the mirror stay.)
-    defines() { const d = this.globals.uDet && this.globals.uDet.value; return Object.assign(d ? (d.image.depth >= 5 ? { USE_DETARR: 1, DET_SHALLOWS: 1 } : { USE_DETARR: 1 }) : {}, this.texDefines || {}, this.opts.plainWater ? { WATER_PLAIN: 1 } : {}); }
+    defines() { const d = this.globals.uDet && this.globals.uDet.value, i = this.globals.uInfo && this.globals.uInfo.value; return Object.assign(d ? (d.image.depth >= 5 ? { USE_DETARR: 1, DET_SHALLOWS: 1 } : { USE_DETARR: 1 }) : {}, this.texDefines || {}, this.opts.plainWater ? { WATER_PLAIN: 1 } : {}, i && i.isDataTexture2DArray ? { INFO2: 1 } : {}); }
     // ----- per frame -----
     update(camera, viewportH) {
       this.frame++; this.queue = [];

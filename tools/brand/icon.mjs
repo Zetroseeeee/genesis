@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { openPicture } from '../planet/packs.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(path.join(ROOT, 'tools/models/'));
 const sharp = require('sharp');
@@ -20,18 +21,19 @@ const SUN = { lon: -65, lat: 15 };                 // the sun stands over the At
 const FIRE = { lon: 44.4, lat: 32.5 };             // where the first village lights its fire
 const PLANET = { cx: 0.5, cy: 0.503, r: 0.342 };   // of the whole picture
 
-// ---- the game's imagery: level 3 packs, each 1024 x 1024 for 45 x 45 degrees (alpha: 1 land, 0.5 lake, 0 sea) ----
+// ---- the game's imagery: level 3 packs, each 1024 x 1024 for 45 x 45 degrees with a rim of texels round it (alpha: 1 land, 0.5 lake, 0 sea) ----
 const GW = 8192, GH = 4096;
+const earth = openPicture(path.join(ROOT, 'data/i')), AP = earth.ix.apron || 0;
 const packs = new Map();
 for (let py = 0; py < 4; py++) for (let px = 0; px < 8; px++) {
-  const { data, info } = await sharp(path.join(ROOT, 'data/i', `3_${px}_${py}.webp`)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await sharp(earth.pack(3, px, py)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   packs.set(px + '_' + py, { data, w: info.width });
 }
 function sample(lon, lat) {       // bilinear, across pack edges
   const gx = ((lon + 180) / 360 * GW - 0.5 + GW) % GW, gy = Math.min(GH - 1, Math.max(0, (90 - lat) / 180 * GH - 0.5));
   const x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0; const out = [0, 0, 0, 0];
   for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
-    const x = (x0 + i) % GW, y = Math.min(GH - 1, y0 + j); const p = packs.get((x >> 10) + '_' + (y >> 10)); const o = ((y & 1023) * p.w + (x & 1023)) * 4; const w = (i ? fx : 1 - fx) * (j ? fy : 1 - fy);
+    const x = (x0 + i) % GW, y = Math.min(GH - 1, y0 + j); const p = packs.get((x >> 10) + '_' + (y >> 10)); const o = (((y & 1023) + AP) * p.w + (x & 1023) + AP) * 4; const w = (i ? fx : 1 - fx) * (j ? fy : 1 - fy);
     out[0] += p.data[o] * w; out[1] += p.data[o + 1] * w; out[2] += p.data[o + 2] * w; out[3] += p.data[o + 3] * w;
   }
   return out;
@@ -47,7 +49,7 @@ async function plane(file, channel) {
   };
 }
 const CLOUDS = 1;
-const nearLand = await (async () => { const { data, info } = await sharp(path.join(ROOT, 'data/i/0_0_0.webp')).ensureAlpha().blur(3).raw().toBuffer({ resolveWithObject: true }); return (lon, lat) => { const x = Math.min(info.width - 1, Math.max(0, Math.floor((lon + 180) / 360 * info.width))), y = Math.min(info.height - 1, Math.max(0, Math.floor((90 - lat) / 180 * info.height))); return data[(y * info.width + x) * 4 + 3] / 255; }; })();
+const nearLand = await (async () => { const { data, info } = await sharp(earth.pack(0, 0, 0)).ensureAlpha().extract({ left: AP, top: AP, width: 1024, height: 512 }).blur(3).raw().toBuffer({ resolveWithObject: true }); return (lon, lat) => { const x = Math.min(info.width - 1, Math.max(0, Math.floor((lon + 180) / 360 * info.width))), y = Math.min(info.height - 1, Math.max(0, Math.floor((90 - lat) / 180 * info.height))); return data[(y * info.width + x) * 4 + 3] / 255; }; })();
 const shelfAt = await plane('data/info.png', 0);      // 1 at the shore, 0 over the deep
 const cloudAt = await plane('data/clouds.jpg', 0);
 

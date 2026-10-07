@@ -98,13 +98,12 @@ async function worldGrid() {
   return { name: 'grid', land: (lon, lat) => data[(Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W) + W) % W) * C + 2] & 1, raw: (lon, lat) => data[(Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W) + W) % W) * C], at(z, lon, lat) { return Math.max(0, (byte(lon, lat) - 23) * 30); } };
 }
 
-// the sea, as the game draws it: the alpha of the finest imagery (1 land, 0 sea; the ground shader's shore is at 0.36)
+// the sea, as the game draws it from far out: the map of land and water its picture of the Earth has in its alpha (1 land,
+// 0 sea; the ground shader's shore is at 0.36), which tools/planet/mask.png keeps (8192 x 4096)
 async function landMask() {
-  const L = index.img.maxLevel, n = index.img.packTiles, td = 360 / (2 << L); const mem = new Map();
-  const load = async (px, py) => { const k = px + '/' + py; if (!mem.has(k)) { const f = path.join(ROOT, 'data/i', `${L}_${px}_${py}.webp`); mem.set(k, fs.existsSync(f) ? await sharp(f).ensureAlpha().extractChannel(3).raw().toBuffer({ resolveWithObject: true }) : null); } return mem.get(k); };
-  const nx = (2 << L) / n, ny = (1 << L) / n; for (let py = 0; py < ny; py++) for (let px = 0; px < nx; px++) await load(px, py);
-  const px1 = (X, Y) => { const W = TILE * n; const gx = ((X % (W * nx)) + W * nx) % (W * nx), gy = Math.min(W * ny - 1, Math.max(0, Y)); const p = mem.get(Math.floor(gx / W) + '/' + Math.floor(gy / W)); return p ? p.data[(gy % W) * p.info.width + (gx % W)] / 255 : 1; };
-  return { at(lon, lat) { const gx = (lon + 180) / td * TILE - 0.5, gy = (90 - lat) / td * TILE - 0.5; const x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0; return px1(x0, y0) * (1 - fx) * (1 - fy) + px1(x0 + 1, y0) * fx * (1 - fy) + px1(x0, y0 + 1) * (1 - fx) * fy + px1(x0 + 1, y0 + 1) * fx * fy; } };
+  const { data, info } = await sharp(path.join(ROOT, 'tools/planet/mask.png')).raw().toBuffer({ resolveWithObject: true }); const W = info.width, H = info.height, C = info.channels;
+  const px1 = (X, Y) => data[(Math.min(H - 1, Math.max(0, Y)) * W + ((X % W) + W) % W) * C] / 255;
+  return { at(lon, lat) { const gx = (lon + 180) / 360 * W - 0.5, gy = (90 - lat) / 180 * H - 0.5; const x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0; return px1(x0, y0) * (1 - fx) * (1 - fy) + px1(x0 + 1, y0) * fx * (1 - fy) + px1(x0, y0 + 1) * (1 - fx) * fy + px1(x0 + 1, y0 + 1) * fx * fy; } };
 }
 // The rim: how far the ground that was there stands above the half-degree grid, along the edge of the holes filled
 // from the grid, carried into the holes and dying away over REACH km (a screened diffusion on a coarse raster: holes

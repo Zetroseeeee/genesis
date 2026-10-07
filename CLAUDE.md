@@ -111,8 +111,17 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   must go on fighting about as often as it did, and keep about as many realms.
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
-- `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
-  their neighbours begin with (they must: see "A pack is a texture of its own"); `fix` makes them.
+- `MODE=imagery tools/planet/pack.sh [bbox=lon0,lat0,lon1,lat1 | blocks=4/0,4/1]` — makes the picture of the Earth on
+  GitHub (the Planet workflow runs `tools/planet/imagery.py`: NASA's and Amazon's hosts are out of reach from here) and
+  brings back its log and its pictures to look at (`shots/peek/planet_imagery.jpg`: places side by side, as the source
+  has them and as the game gets them; `planet_world.jpg`). Eight minutes for the whole Earth; with a box or blocks a
+  trial of some of the 32 blocks in three (kept as `planet-part.tar`, nobody's pack). `REF=<branch>` runs a branch's
+  builder. `node tools/planet/fetch.mjs` (in `npm run fetch`) brings the pack into `data/i/`: `index.json` and 46
+  bundles of 8 x 8 packs, fetched, never committed. A pack is kept under the name of what it was made from (twelve
+  digits of the SHA-256 of `tools/planet/imagery.py` and `tools/planet/mask.png` together): **after any change to the
+  builder - a comment too - the pack must be made before `main` is pushed** (the game's build stops without it:
+  `PLANET_STRICT`; elsewhere the pack made last is taken, with a warning). `MODE=probe tools/planet/pack.sh [urls |
+  months | sheet | tiff]` looks at the sources.
 - `tools/water/pack.sh` — makes the water's edge on GitHub (the Water workflow runs `tools/water/build.py`: its sources
   are on AWS, out of reach from here) and brings it here: `data/w/` (`index.json` and 1,484 packs, kept in 157
   bundles of sixteen: `<level>_b<x>_<y>.bin`, a table and then the packs' own files; `fetch.mjs` makes them, always
@@ -130,9 +139,6 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   with a warning). Look at `shots/peek/water_sheet.jpg` and the end of `shots/peek/water_build.log`. In a workflow
   never write `ls | head` under `pipefail`: with more files than `head` takes, `ls` fails on the closed pipe (the
   first whole build was thrown away by its own listing, after 33 minutes).
-- `python3 tools/imagery/under.py` — carries the land's colour on under the water in the picture of the Earth
-  (`data/i`) and the land's green in `data/veg.jpg`: the true shore runs a texel or two inside and outside the
-  picture's own. Run it after anything that remakes `data/i`, then `seams.mjs check`.
 - `node tools/terrain/voids.mjs scan` — holes in the elevation packs (`data/e`): ground at zero where the simulation's
   grid has land well above the sea. It must report none. `fix` fills them (real heights from the Terrain Tiles on AWS;
   Antarctica from the half-degree grid, made to meet the ice beside it); that host is out of reach from here, so the
@@ -149,7 +155,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/rule.js` | `RULE` | Forms of government (24), laws (100 in twelve fields), the seven estates, authority; one world's rule: what every realm has chosen, who holds power in it, reforms, demands, risings |
 | `src/diplo.js` | `DIPLO` | What two realms can swear, why they go to war and what a winner may ask; one world's diplomacy: what every realm thinks of every other and why, pacts, vassals, claims, wars with friends on both sides, offers to the player |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
-| `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
+| `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
 | `src/buildings.js` | `BKIT` | Procedural building kit (unit archetypes) and its material shader |
 | `src/models.js` | `MODELS` | Real 3D model library: manifest, loading, LODs, instancing (replaces kit archetypes when a model exists) |
@@ -176,10 +182,10 @@ Conventions that matter:
   as tall again (`exag: 2.0`). Ground put into a pack must be raised the same (`TALL` in `tools/terrain/voids.mjs`),
   or it meets the old ground in a step.
 - **A pack is a texture of its own** and is not smoothed across its edge: whatever is in two packs' facing texels
-  shows as a line if it differs. Edges of packs are every 45° in the picture of the Earth (`data/i`), 22.5° and finer
-  in the elevation. The picture's facing texels are therefore kept equal in the data (and the packs written without
-  loss, so that they stay equal): `node tools/imagery/seams.mjs check` must say every edge meets; after anything that
-  rewrites `data/i`, run `seams.mjs fix`. The elevation's edges are not matched (a step of a texel's worth of height).
+  shows as a line if it differs. The picture of the Earth (`data/i`) and the water's edge (`data/w`) therefore carry
+  a rim of two texels of their neighbours all round (`apron` in their lists; `bindPack` and `bindWater` leave it out
+  of a tile's rectangle): a lookup at a pack's edge is as good as one inside it, and nothing has to be matched by
+  hand. The elevation's packs have no rim and their edges are not matched (a step of a texel's worth of height).
 - **Representational scale.** Towns are planned at true scale and drawn `scaleOf(Rt) = 20/(1+Rt/1200)` times larger
   (a village ~19×, a metropolis ~3×) so they read from region height. Shader patterns divide by that factor.
 - **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
@@ -437,8 +443,8 @@ Conventions that matter:
   told how large a pixel is (`textureGrad`: a tenth slower), branches round the two places of a ladder, fewer ways
   of filtering. `__T.costsGround()` goes through the parts (`uGndDbg`).
 - **A card does not weigh four texels finely.** Between two texels a GPU gives 256 steps and no more (the software
-  renderer here weighs finely and shows none of this). The picture of the Earth is 1024 pixels to 45 degrees
-  (`data/i`: five kilometres to a texel; the `4096` in the shader's `texPerPx0` is four times the truth), so from
+  renderer here weighs finely and shows none of this). The picture's map of land and water is 1024 texels to 45
+  degrees (five kilometres to a texel, at every level of `data/i`: see "The picture of the Earth"), so from
   close to a texel is thousands of pixels wide and what is looked up between two of them is a flight of stairs,
   dead level on every tread: nine metres by nineteen in Finland. Never take `fwidth` of such a lookup for its
   slope, and put no threshold on one: a lake is told from a shore by how level the water's mask lies, and every
@@ -449,6 +455,48 @@ Conventions that matter:
   mixtures (64, 96, 128 ...), and 128 is also what a lake is, so off many coasts there was a blue band and a bar
   of sand. Since 0.21 the water's edge is the field's (below); the mask draws the coasts only from far out (tiles
   under level 5) and while a pack is on its way.
+- **The picture of the Earth** (`data/i`, `tools/planet/imagery.py`; `uImg` in `terrain.js`). NASA's Blue Marble
+  Next Generation (2004, 500 m; public domain, credited in the menu) at 611 m to a texel (level 6: 65,536 texels
+  round), every level below it half the one above, each hemisphere in its summer: July north of the equator, January
+  south of it, the one going over into the other between twelve degrees either side. (The game had July 2004 alone,
+  at five kilometres: the picture's origin had never been written down; `probe.py months` found it.) Packs are two
+  tiles of 512 texels a side with a rim of two (1028 x 1028), WebP: the colour squeezed (quality 92; 96 at the four
+  levels the old picture had), the mask without loss, the colour under clear texels kept (`exact`). 1,740 packs in 46
+  bundles of 8 x 8 (`<level>_b<x>_<y>.bin`, as the water's edge has them: `terrain.bundleBlob` reads both), 166 MB;
+  `index.json` says which packs there are (`P`; `S`: nothing but sea, drawn without a picture).
+  *What the builder does to the photograph.* Its sea is one dark blue and its lakes are black, and the game draws
+  all water itself: a texel that is not plainly dry land - by ESA WorldCover read at 160 m (nine tenths land, and
+  no water in the texels beside it: a shore's texel has the water's dark in it; an islet too small for that keeps
+  what it has), south of sixty by the old mask - takes the colour of the land beside it, pulled together to ever
+  coarser pictures and pushed back down (smooth: no stripes), and far out at sea the colour land of that climate has
+  on the whole. Water the photograph has where WorldCover has land is told by its colour (the Aral Sea of 2004 was
+  green with algae over what is desert now; reefs; glacier milk). What is built over takes the colour of the country
+  round it and then the grain of open country some way off (painted plain, a town was a smear among the fields):
+  the towns of 2004 are gone from a world that begins in 10,000 BC. Fields stay in the picture: see below.
+  A block is 45 degrees (a bundle of the finest level) with a margin of 128 texels, and every block begins on a
+  multiple of the coarsest cell it pulls itself together to: two blocks work the ground they share out alike, and
+  no seam runs along a block's edge.
+  *The mask.* The alpha is the map of land and water the picture always had (`tools/planet/mask.png`: 255 land, 191
+  the band of a great river, 128 a lake, 0 the sea), as it was at the four coarsest levels and weighed between its
+  texels above them - which is what a card did with it before. The game draws its coasts with it from far out and
+  while a pack of the water's edge is on its way. **`uImgK`**: the shader's measure of how near the eye is was "how
+  many of the picture's texels to a pixel" (`texPerPx0`, `detailFade`, `closeFade`, the mask's `plateau`), fitted to
+  texels of five kilometres. It is kept in those texels whatever level is bound (4096 to a pack at levels 0 to 3,
+  halved with every level above): change it and everything that fades with the distance moves.
+  *Before the plough* (`uWild`, at "the country before the plough" in the shader). The photograph is of our own day:
+  where woods would stand, half of what it shows is field and pasture, tan with stubble in July, and from the
+  photograph alone that is dry ground. Where nobody farms (`sim.b`: the simulation knows who does), ground lighter
+  than a wood is given back the colour of the woods and glades that stood there, keeping a share of its own light
+  and dark (a remapping of each texel, not a smoothing: the grain of the country stays); where the game's people
+  have cleared the land, the photograph's own fields show - a realm's farmland is seen from orbit, and grows with
+  it. "Where woods would stand" is the map the trees are planted by (`data/veg.jpg`: green by nature and not
+  warm-coloured, which a steppe, a prairie and a savanna are), not the climate's class: by the class the wheat of
+  Kansas and of Picardy are one, and the plains were a green wall with a ruled edge. Not in the taiga or beyond.
+  Doing the same in the builder, as a filling-in from the woods near by, was tried first and was a blur.
+  **The planet's own maps are one texture of two layers** (`uInfo`, a `sampler2DArray`: `planetMaps` in `main.js`):
+  `info.png` and under it `veg.jpg` at the same size - the ground's shader has all sixteen textures, and a layer
+  costs none. `info.png` is read back through the card (`pixelsOf`): a 2D canvas keeps colour multiplied by alpha,
+  and its alpha is how dry the country is.
 - **The water's edge** (`data/w`, `tools/water/build.py`; `uWater` in `terrain.js`). A field of distances: how
   many metres it is from every place to the nearest shore (land positive), 305 m to a texel at level 7 and the
   same at half and a quarter the fineness (levels 6 and 5), in packs of 2052 texels with a rim of two. Its nought
