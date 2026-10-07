@@ -90,6 +90,21 @@ window.__T.costsPlanet = function () {
   __T.cost([['all (' + packs().length + ' packs, ' + full + ' ways)', () => {}], ['the picture 4 ways', set(4)], ['2 ways', set(2)], [full + ' ways again', set(full)], ['no finer than level 3', () => { T.imgMax = 3; }],
     ['and 2 ways', set(2)], ['all again (' + top + ', ' + full + ')', () => { T.imgMax = top; setTimeout(set(full), 1500); }], ['all a third time', set(full)]], 3, 3000);
 };
+// What the ground has to show and what it is still waiting for, written into the picture once a second: __T.watch(). The frame
+// rate of the last second, the packs by kind and state, and what every tile in the picture is drawn with: the picture, the heights
+// and the water's edge by level ('-' none, 'f' no shore near). A view is whole when nothing is loading and the levels stand still.
+window.__T.watch = function () {
+  const T = __G.terrain, el = document.createElement('div'); el.style.cssText = 'position:fixed;left:14%;top:40%;z-index:99999;background:#000;color:#fff;font:17px monospace;padding:10px;white-space:pre'; document.body.appendChild(el);
+  const t0 = performance.now(); let frames = 0, last = t0; const tick = () => { frames++; requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+  const j = (o) => Object.keys(o).sort().map((k) => k + ':' + o[k]).join(' ');
+  setInterval(() => {
+    const now = performance.now(), fps = frames / ((now - last) / 1000); frames = 0; last = now;
+    const st = {}; for (const p of T.packs.values()) { const k = p.kind + ' ' + p.state; st[k] = (st[k] || 0) + 1; }
+    const w = [0, 0, 0], iL = {}, eL = {}, wL = {}; let n = 0;
+    for (const t of T.tiles.values()) { if (!t.inScene) continue; n++; w[Math.round(t.uniforms.uWaterP.value.x)]++; const a = t.iPack && !t.iPack.absent ? t.iPack.level : '-', b = t.ePack && !t.ePack.absent ? t.ePack.level : '-', c = t.wPack ? (t.wPack.pack ? t.wPack.level : 'f') : '-'; iL[a] = (iL[a] || 0) + 1; eL[b] = (eL[b] || 0) + 1; wL[c] = (wL[c] || 0) + 1; }
+    el.textContent = ((now - t0) / 1000).toFixed(0) + ' s  ' + fps.toFixed(1) + ' fps  tiles ' + n + '  loading ' + T.loading + '  bundles ' + T.bundles.size + '\npacks  ' + j(st) + '\nthe picture by level  ' + j(iL) + '\nthe heights by level  ' + j(eL) + '\nthe water: the mask ' + w[0] + ', a pack ' + w[1] + ', no shore near ' + w[2] + '; by level  ' + j(wL);
+  }, 1000);
+};
 // how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
 window.__T.aniso = function (n, ...texs) {
   const R = __G.renderer, gl = R.getContext(), ext = gl.getExtension('EXT_texture_filter_anisotropic'); if (!ext) return 0; let k = 0;

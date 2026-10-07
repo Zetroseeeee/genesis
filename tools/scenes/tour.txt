@@ -255,3 +255,9 @@ ice_edge_low    | tools/scenes/forest.js | null | __G.world.cloudsOn = false; co
 costp_alps      | tools/scenes/forest.js | null | setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); }, 3000); setTimeout(() => { __forest(7.9, 46.0, 19000, 1.25, 0.6, 0.5); __T.costsPlanet(); }, 30000); | 86
 costp_far       | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); }, 9000); setTimeout(() => { __T.costsPlanet(); }, 30000); | 86
 costp_region    | tools/scenes/forest.js | null | setTimeout(() => { __forest(10.0, 46.3, 300000, 0.0, 0, 0.5); }, 3000); setTimeout(() => { __forest(10.0, 46.3, 300000, 0.0, 0, 0.5); __T.costsPlanet(); }, 30000); | 86
+# (what a view is drawn with and what it still waits for: __T.watch)
+load_region     | tools/scenes/forest.js | null | __G.world.cloudsOn = false; __T.watch(); const f = () => __forest(10.0, 46.3, 300000, 0.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
+load_region_90  | tools/scenes/forest.js | null | __G.world.cloudsOn = false; __T.watch(); const f = () => __forest(10.0, 46.3, 300000, 0.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 90
+load_himalaya   | tools/scenes/forest.js | null | __G.world.cloudsOn = false; __T.watch(); const f = () => __forest(86.9, 28.0, 250000, 0.7, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
+load_town       | tools/scenes/town.js | {lon:10,lat:52,tech:0.1,pop:5,walls:2,special:14,alt:620,tilt:1.25,out:1.0} | __T.watch(); | 34
+costw_region    | tools/scenes/forest.js | null | __G.world.cloudsOn = false; setTimeout(() => { __forest(10.0, 46.3, 300000, 0.0, 0, 0.5); }, 3000); setTimeout(() => { __forest(10.0, 46.3, 300000, 0.0, 0, 0.5); __T.costsWater(); }, 50000); | 92
