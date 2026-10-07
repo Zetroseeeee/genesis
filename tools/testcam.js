@@ -90,6 +90,17 @@ window.__T.costsPlanet = function () {
   __T.cost([['all (' + packs().length + ' packs, ' + full + ' ways)', () => {}], ['the picture 4 ways', set(4)], ['2 ways', set(2)], [full + ' ways again', set(full)], ['no finer than level 3', () => { T.imgMax = 3; }],
     ['and 2 ways', set(2)], ['all again (' + top + ', ' + full + ')', () => { T.imgMax = top; setTimeout(set(full), 1500); }], ['all a third time', set(full)]], 3, 3000);
 };
+// what the Earth's own winter costs (the second layer of the planet's maps: where snow lies and for how long, where the sea
+// freezes, the country before the plough): the ground's shader as it is, and as it is compiled without that layer (one lookup
+// fewer a pixel, and the rules the game had until 0.21: snow by the climate's class, ice by the latitude) - turn and turn about,
+// because one measurement of four seconds is within an eighth of the next of the very same thing on the build Mac
+window.__T.costsWinter = function () {
+  const T = __G.terrain, G = T.globals, arr = G.uInfo.value; if (!(arr && arr.isDataTexture2DArray)) return 'the planet\'s maps are one layer here';
+  const im = arr.image, flat = new THREE.DataTexture(im.data.subarray(0, im.width * im.height * 4), im.width, im.height, THREE.RGBAFormat);
+  flat.wrapS = THREE.RepeatWrapping; flat.wrapT = THREE.ClampToEdgeWrapping; flat.minFilter = flat.magFilter = THREE.LinearFilter; flat.generateMipmaps = false; flat.needsUpdate = true;
+  const use = (tex) => () => { G.uInfo.value = tex; for (const t of T.tiles.values()) { const m = t.mesh.material; m.defines = T.defines(); m.needsUpdate = true; } };
+  __T.cost([['as it is', () => {}], ['the old rules', use(flat)], ['as it is again', use(arr)], ['the old rules again', use(flat)], ['as it is, a third time', use(arr)], ['the old rules, a third', use(flat)], ['as it is, a fourth', use(arr)]], 4, 5000);
+};
 // What the ground has to show and what it is still waiting for, written into the picture once a second: __T.watch(). The frame
 // rate of the last second, the packs by kind and state, and what every tile in the picture is drawn with: the picture, the heights
 // and the water's edge by level ('-' none, 'f' no shore near). A view is whole when nothing is loading and the levels stand still.
