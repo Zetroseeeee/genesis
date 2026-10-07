@@ -35,7 +35,7 @@ snow's twin for boughs and roofs).
 import os, sys, time, urllib.request, urllib.error
 import numpy as np
 from PIL import Image, ImageFilter
-from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion, binary_dilation
+from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion, binary_dilation, median_filter
 
 Image.MAX_IMAGE_PIXELS = None
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
@@ -192,7 +192,15 @@ high = gaussian_filter(high.reshape(H, 2, W, 2).mean((1, 3)), 1.6, mode=('neares
 #  own: taken off wherever a cell had none, the snow of a high plain ended at a cliff - white pancakes on Qinghai.)
 near = gaussian_filter(snow, 5.0, mode=('nearest', 'wrap'))
 margin = 1.0 - ss(0.0, 0.02, near)
-sealevel = snow - PER_KM * high / 1000.0 - margin      # how long it would lie at the level of the sea: 1 all the cold season, below nought never there
+# How long it would lie at the level of the sea: 1 all the cold season, below nought never there. With the heights taken out
+# of it this is climate, which is smooth over a hundred kilometres, and what is left that is not smooth is one year's weather
+# and the Blue Marble's own patchwork (a month's picture is pieced together from its clearest days: a hole in the snow of
+# Mazovia a hundred kilometres across, with the edges of a tile, was a dark window in the white of every winter). So it is
+# taken as the middle value within some seventy kilometres, which keeps an edge where there is one and lets go of holes and
+# islands smaller than that, and then smoothed a little.
+yy, xx = np.mgrid[-4:5, -4:5]
+sealevel = median_filter(snow - PER_KM * high / 1000.0, footprint=(yy * yy + xx * xx <= 16), mode=('nearest', 'wrap'))
+sealevel = gaussian_filter(sealevel, 1.2, mode=('nearest', 'wrap')) - margin
 lat = 90.0 - (np.arange(H) + 0.5) * 180.0 / H
 print('snow in winter by latitude (the share of the land that has it; 10 degrees at a time, from the north):')
 landm = ~np.array(Image.fromarray(sea).resize((W, H), Image.NEAREST))
