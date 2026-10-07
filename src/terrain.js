@@ -1310,15 +1310,16 @@
           //  water and how open it lies, four bits each; how high a lake stands. Packs made before the last two were reckoned
           //  are brought to the same shape: all water open, no levels.)
           // (Read out of the picture a strip at a time, with the frame let through between two: a pack is four million texels,
-          //  and drawn, read and copied in one piece it held a frame up for a twentieth of a second and more each time one came.)
-          const ROWS = 256, cv = document.createElement('canvas'); cv.width = p.w; cv.height = Math.min(ROWS, p.h); const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.globalCompositeOperation = 'copy';      // (each strip in place of the one before, not over it)
+          //  and drawn, read and copied in one piece it held a frame up for a twentieth of a second and more each time one came.
+          //  Not on a software renderer, whose frames take a second each: there the waiting between strips was the longer.)
+          const ROWS = 512, cv = document.createElement('canvas'); cv.width = p.w; cv.height = Math.min(ROWS, p.h); const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.globalCompositeOperation = 'copy';      // (each strip in place of the one before, not over it)
           const three = new Uint8Array(p.w * p.h * 3), W = this.water;
           for (let y0 = 0; y0 < p.h; y0 += ROWS) {
             const hh = Math.min(ROWS, p.h - y0), m = p.w * hh; ctx.drawImage(bmp, 0, y0, p.w, hh, 0, 0, p.w, hh);
             const d = ctx.getImageData(0, 0, p.w, hh).data; let o = y0 * p.w * 3;
             if (W.level) for (let i = 0; i < m; i++, o += 3) { three[o] = d[i * 4]; three[o + 1] = d[i * 4 + 1]; three[o + 2] = d[i * 4 + 2]; }
             else for (let i = 0; i < m; i++, o += 3) { three[o] = d[i * 4]; three[o + 1] = (Math.round(d[i * 4 + 1] / 17) << 4) | (W.open ? Math.round(d[i * 4 + 2] / 17) : 15); }
-            if (y0 + ROWS < p.h) await new Promise((r) => setTimeout(r, 0));
+            if (y0 + ROWS < p.h && !this.opts.slow) await new Promise((r) => setTimeout(r, 0));
           }
           p.dist = three;
           if (bmp.close) bmp.close();

@@ -72,7 +72,7 @@ if (process.argv[2] === 'check') {
   catch (e) { console.error('water: ' + e.message); process.exit(1); }
 }
 if (had) { try { had = bundle(DIR); whole(DIR); } catch (e) { console.log('water: what is here is not whole (' + e.message + '): fetching it again'); had = null; } }      // (packs fetched before there were bundles are put into them here)
-const tmp = DIR + '.new';
+const tmp = process.env.WATER_DIR ? DIR + '.new' : path.join(ROOT, 'data', '.w.new');      // (a name git does not see, should a fetch stop half way: two hundred megabytes that an "add everything" must not pick up)
 const unpack = (tar) => {
   fs.rmSync(tmp, { recursive: true, force: true }); fs.mkdirSync(tmp, { recursive: true });
   execFileSync('tar', ['-xf', tar, '-C', tmp]); fs.rmSync(tar, { force: true });
