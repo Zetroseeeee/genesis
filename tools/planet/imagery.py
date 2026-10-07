@@ -24,11 +24,16 @@ Sources (the Planet workflow runs this on GitHub: neither host can be reached fr
    finer levels (which is what a card did with it before).
 
 What is done to the picture. Its sea is one dark blue and its lakes are black, and the game draws all water itself: a
-texel that is not plainly dry land (by WorldCover: nine tenths land and more; south of sixty, where WorldCover has
-nothing, by the old mask) takes the colour of the land beside it, carried on under the water smoothly (pulled together
-to ever coarser pictures and pushed back down: no stripes), and far out at sea the colour land of that climate has on
-the whole. The same for what is built over: the towns of 2004 are grey stains on a world that begins in 10,000 BC, and
-are painted over with the country round them. Land keeps its own colour to the texel.
+texel that is not plainly dry land (by WorldCover: nine tenths land and more, and no water in the texels beside it; south
+of sixty, where WorldCover has nothing, by the old mask) takes the colour of the land beside it, carried on under the
+water smoothly (pulled together to ever coarser pictures and pushed back down: no stripes), and far out at sea the
+colour land of that climate has on the whole. Water the picture has where WorldCover has land (the Aral Sea of 2004
+was green with algae over what is desert now) is told by its colour and treated likewise.
+The same for what is built over: the towns of 2004 are grey stains on a world that begins in 10,000 BC. They take the
+colour of the country round them, and then the grain of open country some way off (what a texel there has of light
+and dark against the country round it: painted plain, a town was a smear among the fields). Land keeps its own colour
+to the texel. Fields stay as they are: painted over as woods they were a blur (it was tried), and it is the ploughland
+of the photograph that makes the Earth look like the Earth.
 
 Packs: as the game's always were (two tiles of 512 texels a side to a pack), now with a rim of two texels all round
 (1028 x 1028), so that a lookup at a pack's edge is as good as one inside it and no seam has to be matched by hand; WebP,
@@ -41,7 +46,7 @@ The pack is kept under the name of what it was made from (twelve digits of the S
 together): planet-<hash>.tar and planet-<hash>.json in the "planet" release, planet.json for whoever asks for the pack
 made last. tools/planet/fetch.mjs brings it into data/i/.
 
-    python3 tools/planet/imagery.py --out out --work work [bbox=lon0,lat0,lon1,lat1] [blocks=4/0,4/1] [jobs=4] [q=90] [places=...]
+    python3 tools/planet/imagery.py --out out --work work [bbox=lon0,lat0,lon1,lat1] [blocks=4/0,4/1] [jobs=4] [q=92] [places=...]
         bbox / blocks   a trial: only the blocks (45 degrees a side, 8 x 4 of them) that touch the box; kept as
                         planet-part.tar, which is nobody's pack. Look at planet_imagery.jpg and the log.
         nowc=1          without WorldCover (the old mask alone says what is land)
@@ -337,8 +342,9 @@ def climate_means(work):
 def sea_like(r, g, b):
     """the Blue Marble's own water: its sea is (2, 5, 20), its shallows dark and blue before anything, its lakes next to black
     (a dark wood is (13, 27, 2): no bluer than it is red, and not that dark); and water green with algae, greener than any
-    land is (the Aral Sea of 2004 is (54, 111, 39); the pastures of Ireland (39, 61, 18))"""
-    return ((b > r + 10) & (b > g - 2) & (0.299 * r + 0.587 * g + 0.114 * b < 80)) | (r + g + b < 22) | ((r < 10) & (r + g + b < 60)) | ((g > 80) & (g > 1.75 * r) & (g > 1.75 * b))
+    land is (the Aral Sea of 2004 is (54, 111, 39); the pastures of Ireland (39, 61, 18)); and the turquoise of a reef or of
+    glacier milk, green and blue alike far above its red"""
+    return ((b > r + 10) & (b > g - 2) & (0.299 * r + 0.587 * g + 0.114 * b < 80)) | (r + g + b < 22) | ((r < 10) & (r + g + b < 60)) | ((g > 80) & (g > 1.75 * r) & (g > 1.75 * b)) | ((np.minimum(g, b) > r + 25) & (b > 0.75 * g))
 
 
 def fallback_cells(X0, Y0, n, mean, cl):
@@ -378,26 +384,23 @@ def psnr(a, b):
 
 
 # ---------------------------------------------------------------- a block ----------------------------------------------
-def whose(rgb, alpha, acc, wild=None):
+def whose(rgb, alpha, acc):
     """what each texel of a window is, as planes of bytes:
       keep  how far its colour is the land's own (255: wholly)
-      src   how much it counts for the texels that take their colour from others (only what is plainly open country counts whole)
-      tex   how far it is land that is painted over (a town; with wild, a field): it is given its own light and dark back
+      src   how much it counts for the texels that take their colour from others (open country counts whole, the edge of a town less)
+      tex   how far it is land that is painted over (a town): it is given the grain of open country afterwards
+    and how many of its texels WorldCover has seen.
     A shore is taken strictly: a texel beside one with water in it has the water's dark in its own colour (the source is
     weighed among its neighbours), so it takes the colour from further in - but an islet too small to have a "further in"
-    keeps what it has. wild: how far a ploughed texel is to be painted over there (0..1), or None."""
+    keeps what it has."""
     from scipy import ndimage
     n = rgb.shape[0]; lf8 = np.empty((n, n), np.uint8); bw8 = np.zeros((n, n), np.uint8); pure8 = np.full((n, n), 255, np.uint8); seen = 0; STRIP = 1024
     for r in range(0, n, STRIP):
         sl = slice(r, r + STRIP); lf = ss(0.85, 0.98, alpha[sl].astype(np.float32) * (1.0 / 255.0))
         if acc is not None:
             cov = acc['cov'][sl].astype(np.float32); inv = 1.0 / np.maximum(cov, 1.0); ok = cov >= 128; seen += int(ok.sum()); bf = acc['built'][sl] * inv
-            lf = np.where(ok, acc['land'][sl] * inv, lf); bw = np.where(ok, ss(0.08, 0.30, bf), 0.0); pure = np.where(ok, 1.0 - ss(0.01, 0.05, bf), 1.0)
-            if wild is not None:
-                cf_ = acc['crop'][sl] * inv; tf = acc['tree'][sl] * inv; h = wild[sl]
-                bw = np.where(ok, np.maximum(bw, ss(0.25, 0.6, cf_) * h), bw)
-                pure = np.where(ok, pure * (1.0 - ss(0.05, 0.2, cf_) * h) * (1.0 - h * 0.9 * (1.0 - ss(0.5, 0.85, tf))), pure)      # (where woods would stand, what is wood today counts most)
-            bw8[sl] = np.rint(bw * 255.0).astype(np.uint8); pure8[sl] = np.rint(pure * 255.0).astype(np.uint8)
+            lf = np.where(ok, acc['land'][sl] * inv, lf)
+            bw8[sl] = np.rint(np.where(ok, ss(0.08, 0.30, bf), 0.0) * 255.0).astype(np.uint8); pure8[sl] = np.rint(np.where(ok, 1.0 - ss(0.05, 0.20, bf), 1.0) * 255.0).astype(np.uint8)
         lf8[sl] = np.rint(np.clip(lf, 0.0, 1.0) * 255.0).astype(np.uint8)
     lmin = ndimage.minimum_filter(lf8, size=3, mode='nearest'); strict8 = np.empty((n, n), np.uint8)
     for r in range(0, n, STRIP): strict8[r:r + STRIP] = np.rint(ss(0.70, 0.95, lmin[r:r + STRIP].astype(np.float32) * (1.0 / 255.0)) * 255.0).astype(np.uint8)
@@ -454,14 +457,6 @@ def block(job):
         if MARGIN <= px < MARGIN + BLOCK and MARGIN <= py < MARGIN + BLOCK:
             a, b, c, d = max(0, py - S), min(n, py + S), max(0, px - S), min(n, px + S); shots.append((name.replace(' ', '_'), a, b, c, d))
             Image.fromarray(rgb[a:b, c:d]).save(os.path.join(sdir, '%s_0raw.png' % name.replace(' ', '_')))
-    if cfg.get('wild') and acc is not None and shots:      # (a trial: the country as it might lie unploughed, for the sheet only)
-        info = np.asarray(Image.open(os.path.join(ROOT, 'data', 'info.png')).convert('RGBA'))[..., 3]; fi = W6 // info.shape[1]
-        x0, y0 = X0 // fi - 2, Y0 // fi - 2; cw = (X0 + n - 1) // fi + 3 - x0
-        hum = np.asarray(Image.fromarray(take(info, x0, y0, cw, cw)).resize((cw * fi, cw * fi), Image.BILINEAR))[Y0 - y0 * fi:Y0 - y0 * fi + n, X0 - x0 * fi:X0 - x0 * fi + n]
-        wild = ss(0.35, 0.6, hum.astype(np.float32) * (1.0 / 255.0)); del hum
-        k2, s2, t2, _ = whose(rgb, alpha, acc, wild); del wild; alt = rgb.copy(); carry(alt, s2, k2, fb); borrow(alt, k2, t2)
-        for nm, a, b, c, d in shots: Image.fromarray(alt[a:b, c:d]).save(os.path.join(sdir, '%s_5wild.png' % nm))
-        del alt, k2, s2, t2
     carry(rgb, src8, keep8, fb)
     for nm, a, b, c, d in shots: Image.fromarray(rgb[a:b, c:d]).save(os.path.join(sdir, '%s_6plain.png' % nm))
     stats['lent'] = borrow(rgb, keep8, tex8); T['carry'] = time.time() - t1; t1 = time.time()
@@ -472,14 +467,13 @@ def block(job):
         v = rgb[a:b, c:d].copy(); v[wet] = SEA; Image.fromarray(v).save(os.path.join(sdir, '%s_2sea.png' % nm))
         Image.fromarray(np.dstack([keep8[a:b, c:d], src8[a:b, c:d], tex8[a:b, c:d]])).save(os.path.join(sdir, '%s_3own.png' % nm))
         if acc is not None: Image.fromarray(np.dstack([acc['built'][a:b, c:d], acc['tree'][a:b, c:d], acc['crop'][a:b, c:d]])).save(os.path.join(sdir, '%s_4cover.png' % nm))
-    del acc, src8, tex8
-    # the packs
+    # the packs: one wherever the old mask or WorldCover has any land (a rock WorldCover has and the mask has not is land to the water's edge too)
     packs = {}; present = []; size = 0; q = cfg['q']; check = None
     for j in range(BUNDLE):
         for i in range(BUNDLE):
             o = (slice(MARGIN + j * PACK - APRON, MARGIN + (j + 1) * PACK + APRON), slice(MARGIN + i * PACK - APRON, MARGIN + (i + 1) * PACK + APRON))
             a = alpha[o]; own = keep8[o]
-            if not (a.max() > 0 or own.max() > 0): continue
+            if not (a.max() > 0 or own.max() > 0 or (acc is not None and acc['land'][o].max() > 24)): continue
             buf = encode(rgb[o], a, q); packs[(i, j)] = buf; present.append((bx * BUNDLE + i, by * BUNDLE + j)); size += len(buf)
             if check is None and own.min() < 255 and own.max() == 255 and a.min() == 0:      # (the first pack with a coast in it: does it come back as it was written?)
                 back = np.array(Image.open(io.BytesIO(buf)).convert('RGBA')); clear = a == 0
@@ -519,7 +513,7 @@ def main():
     arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
     out, work = arg('out', 'out'), arg('work', 'work'); opt = dict(a.split('=', 1) for a in sys.argv[1:] if '=' in a and not a.startswith('--'))
     for d in (out, work, os.path.join(work, 'src'), os.path.join(work, 'packs'), os.path.join(work, 'sheet')): os.makedirs(d, exist_ok=True)
-    t0 = time.time(); H = pack_hash(); jobs = int(opt.get('jobs', min(4, os.cpu_count() or 2))); q = int(opt.get('q', 90)); q3 = int(opt.get('q3', 96))
+    t0 = time.time(); H = pack_hash(); jobs = int(opt.get('jobs', min(4, os.cpu_count() or 2))); q = int(opt.get('q', 92)); q3 = int(opt.get('q3', 96))
     todo = blocks_of(opt); part = len(todo) < NBX * NBY
     say('the picture of the Earth: pack %s; %d of %d blocks%s; %d at a time; quality %d (%d at the levels the old picture had)' % (H, len(todo), NBX * NBY, ' (a trial)' if part else '', jobs, q, q3))
     # ---- the source
@@ -546,7 +540,7 @@ def main():
         if land or (tiles and wc_tiles_of(bx * BLOCK - MARGIN, by * BLOCK - MARGIN, WIN, tiles)): go.append((bx, by))
     say('%d blocks have land in them: %s' % (len(go), ' '.join('%d/%d' % b for b in go)))
     places = [p for p in PLACES if not opt.get('places') or p[0].replace(' ', '_') in opt['places'].split(',')]
-    cfg = dict(work=work, tiles=tiles, wc=int(opt.get('wc', 2250)), threads=int(opt.get('threads', 16)), mean=mean, climate=cl, q=q, places=places, shot=int(opt.get('shot', 640)), wild=opt.get('wild') == '1')
+    cfg = dict(work=work, tiles=tiles, wc=int(opt.get('wc', 2250)), threads=int(opt.get('threads', 16)), mean=mean, climate=cl, q=q, places=places, shot=int(opt.get('shot', 640)))
     done = []; fails = 0
     import multiprocessing as mp
     with cf.ProcessPoolExecutor(jobs, mp_context=mp.get_context('spawn')) as ex:
@@ -576,6 +570,9 @@ def main():
                 bundles.setdefault((px // BUNDLE, py // BUNDLE), {})[(px % BUNDLE, py % BUNDLE)] = buf; code.append('P'); total += len(buf); count += 1
         for (gx, gy), packs in bundles.items(): write_bundle(os.path.join(work, 'packs', '%d_b%d_%d.bin' % (lv, gx, gy)), packs)
         levels[lv] = dict(nx=nx, ny=ny, packs=''.join(code)); child = np.array([c == 'P' for c in code]).reshape(ny, nx)
+        if lv == 2:      # (the whole Earth to look at: the land as it is carried on, and with the old mask's sea over it)
+            Image.fromarray(np.asarray(pic)).save(os.path.join(out, 'planet_world_land.jpg'), quality=88)
+            v = np.array(pic); v[lows[2] < 92] = SEA; Image.fromarray(v).save(os.path.join(out, 'planet_world.jpg'), quality=88); del v
         say('level %d: %d packs of %d x %d in %d bundles' % (lv, code.count('P'), cw + 2 * APRON, ch + 2 * APRON, len(bundles)))
     del pic
     made = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
@@ -597,13 +594,13 @@ def sheet(work, out, places, S):
     """the places to look at, side by side: the Blue Marble as it is; with the land's colour carried on; that with the water where WorldCover has it; how far each texel's colour is its own; what covers it (red built over, green trees, blue ploughed)"""
     rows = []
     for name, lon, lat in places:
-        nm = name.replace(' ', '_'); fs = [os.path.join(work, 'sheet', '%s_%s.png' % (nm, k)) for k in ('0raw', '1out', '6plain', '5wild', '2sea', '3own', '4cover')]
+        nm = name.replace(' ', '_'); fs = [os.path.join(work, 'sheet', '%s_%s.png' % (nm, k)) for k in ('0raw', '1out', '6plain', '2sea', '3own', '4cover')]
         if os.path.exists(fs[0]): rows.append((name, [Image.open(f).convert('RGB') for f in fs if os.path.exists(f)]))
     if not rows: return
     cols = max(len(r[1]) for r in rows); sh = Image.new('RGB', (cols * (S + 4), len(rows) * (S + 4)), (12, 16, 26))
     for j, (name, ims) in enumerate(rows):
         for i, im in enumerate(ims): sh.paste(im, (i * (S + 4), j * (S + 4)))
-    sh.save(os.path.join(out, 'planet_imagery.jpg'), quality=90); say('planet_imagery.jpg: %s (one row each: as it is; as the game gets it; that with the towns painted plain; [wild=1: unploughed;] with the water; own (red), counted (green), painted over (blue); cover: built red, trees green, ploughed blue)' % ', '.join(r[0] for r in rows))
+    sh.save(os.path.join(out, 'planet_imagery.jpg'), quality=90); say('planet_imagery.jpg: %s (one row each: as it is; as the game gets it; that with the towns painted plain; with the water; own (red), counted (green), painted over (blue); cover: built red, trees green, ploughed blue)' % ', '.join(r[0] for r in rows))
 
 
 if __name__ == '__main__':

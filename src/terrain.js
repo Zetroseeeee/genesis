@@ -123,7 +123,7 @@
   const FRAG = `
     precision highp float;
     uniform sampler2D uElev; uniform vec4 uElevRect; uniform vec2 uElevTexel; uniform float uElevMin, uElevScale, uExag;
-    uniform sampler2D uImg; uniform vec4 uImgRect;
+    uniform sampler2D uImg; uniform vec4 uImgRect; uniform vec2 uImgK;
     uniform vec4 uWaterK;      // (x: how ragged the shore; y, z, w: to try things by)
     // The sky as still water would mirror it: its light at five heights above the horizon (the root of the height's sine: 0, a
     // quarter .. 1) toward the sun, across and away from it, worked out once a frame where the camera stands (main.js: skyMirror).
@@ -362,7 +362,10 @@
       #endif
       // ---------- imagery ----------
       // magnification estimate first (needed for the warp)
-      vec2 duv0 = fwidth(vUV * uImgRect.zw * 4096.0);
+      // (uImgK: 4096 to a pack of the picture's four coarsest levels, and from there down as many as a pack of the fourth would have
+      //  had - the picture is finer now than the five kilometres to a texel all of this was fitted to, and "how many of the
+      //  picture's texels to a pixel" is this shader's measure of how near the eye is: it is kept in the old texels.)
+      vec2 duv0 = fwidth(vUV * uImgRect.zw * uImgK);
       float texPerPx0 = max(duv0.x, duv0.y);
       float mag = clamp(1.0 - texPerPx0 * 1.2, 0.0, 1.0);            // 1 when strongly magnified
       vec2 wp0 = gc(60.0);
@@ -380,7 +383,9 @@
       // A coast was a flight of stairs; and since a lake is told from a shore by how level the mask lies (aw), with every
       // tread of the stairs dead level and every riser a cliff, a lake near its shore was crossed by a lattice of lines of
       // dry land, nine metres by nineteen. Magnified, the four texels are fetched and weighed here, and the slope is theirs.
-      // (texPerPx0 counts 4096 texels to a pack, which has 1024: it is four times the texels to a pixel.)
+      // (texPerPx0 counts 4096 texels to a pack, which has 1024: it is four times the texels to a pixel. At the picture's finer
+      //  levels the mask is the same mask, weighed between its texels by the builder as a card weighed it: its slope is still
+      //  told by the old texel.)
       { vec2 isz = vec2(textureSize(uImg, 0)), tx = dFdx(vUV) * uImgRect.zw * isz, ty = dFdy(vUV) * uImgRect.zw * isz;
         if (texPerPx0 < 0.6 && a > 0.004 && a < 0.996) {
           vec2 t0 = uImgRect.xy * isz, ti = floor(t0), q = (t0 - ti) + (vUV * uImgRect.zw + warp) * isz - 0.5, qi = floor(q), f = q - qi;
@@ -472,7 +477,7 @@
       vec2 geo = vec2((vLon / PI + 1.0) * 0.5, 0.5 - vLat / PI);   // global equirect uv (v down)
       vec4 info = texture2D(uInfo, geo);                             // r shelf, g ice, b how hard the winters are, a how humid the climate (tools/climate/build.py)
       // magnification: how many screen pixels per imagery texel (approx via derivatives)
-      vec2 duv = fwidth(vUV * uImgRect.zw * 4096.0);
+      vec2 duv = fwidth(vUV * uImgRect.zw * uImgK);
       float texPerPx = max(duv.x, duv.y);                            // >1 minified, <1 magnified
       float detailFade = clamp(1.0 - texPerPx * 0.9, 0.0, 1.0);      // 0 far, 1 close
       float closeFade = max(clamp(1.0 - texPerPx * 0.25, 0.0, 1.0), smoothstep(0.03, 0.003, uCamAlt));
@@ -1251,7 +1256,11 @@
       this.globals = opts.globals; // shared uniform objects
       this.frustum = new THREE.Frustum(); this._m = new THREE.Matrix4();
       this._sphere = new THREE.Sphere(); this._v = new THREE.Vector3();
-      this.elevMax = this.index.elev.maxLevel; this.imgMax = this.index.img.maxLevel;
+      // The picture of the Earth (data/i, tools/planet/imagery.py): its list says which packs there are, level by level (P a pack,
+      // S nothing but sea), how wide a pack's rim is and how many packs lie in a bundle.
+      this.img = opts.img && opts.img.levels ? opts.img : null;
+      if (!this.img) console.error('the picture of the Earth is not here (data/i/index.json): npm run fetch brings it');
+      this.elevMax = this.index.elev.maxLevel; this.imgMax = this.img ? this.img.maxLevel : -1; this.bundles = new Map();
       this.l6 = new Set((this.index.elev.l6 || []).map(([x, y]) => `${x}/${y}`));
       this.l7 = new Set((this.index.elev.l7 || []).map(([x, y]) => `${x}/${y}`));
       // The water's edge (data/w, tools/water/build.py): a field of distances to the nearest shore, far finer than the
@@ -1275,7 +1284,8 @@
       const key = `${L}/${px}/${py}`;
       if (kind === 'w') { const l = this.water && this.water.levels[L]; if (!l || px < 0 || py < 0 || px >= l.nx || py >= l.ny) return undefined; const c = l.packs[py * l.nx + px]; return c === 'P' ? 1 : c; }      // (L, S, F: no shore in it; ?: not made)
       if (kind === 'e') { if (L === 7) return this.l7.has(`${px}/${py}`) ? this.index.elev.packs[key] : undefined; if (L === 6) return this.l6.has(`${px}/${py}`) ? this.index.elev.packs[key] : undefined; return this.index.elev.packs[key]; }
-      return this.index.img.packs[key];
+      const l = this.img && this.img.levels[L]; if (!l || px < 0 || py < 0 || px >= l.nx || py >= l.ny) return undefined;
+      return l.packs[py * l.nx + px] === 'P' ? 1 : 0;
     }
     getPack(kind, L, px, py, priority) {
       const key = `${kind}${L}/${px}/${py}`;
@@ -1290,7 +1300,8 @@
       const url = this.base + (p.kind === 'e' ? `e/${p.L}_${p.px}_${p.py}.png` : p.kind === 'w' ? `w/${p.L}_${p.px}_${p.py}.${this.water.ext || 'webp'}` : `i/${p.L}_${p.px}_${p.py}.webp`);
       try {
         let blob;
-        if (p.kind === 'w' && this.water.bundle) blob = await this.waterBlob(p);
+        if (p.kind === 'w' && this.water.bundle) blob = await this.bundleBlob(p, 'w', this.water.bundle, this.water.ext);
+        else if (p.kind === 'i' && this.img.bundle) blob = await this.bundleBlob(p, 'i', this.img.bundle, this.img.ext);
         else { const r = await fetch(url); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); }
         const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
         p.w = bmp.width; p.h = bmp.height;
@@ -1326,18 +1337,30 @@
           tex = new THREE.DataTexture(three, p.w, p.h, THREE.RGBFormat, THREE.UnsignedByteType); tex.flipY = false; tex.unpackAlignment = 1; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
         } else {
           tex.format = THREE.RGBAFormat; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = this.opts.anisotropy || 4;
-          // CPU copy of the water mask (alpha) at the finest imagery level, so buildings and ships agree with the drawn coast
-          if (p.L === this.imgMax) { const cv = document.createElement('canvas'); cv.width = p.w; cv.height = p.h; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0); const d = ctx.getImageData(0, 0, p.w, p.h).data; const out = new Uint8Array(p.w * p.h); for (let i = 0; i < out.length; i++) out[i] = d[i * 4 + 3]; p.alpha = out; }
+          // CPU copy of the water mask (alpha), so buildings and ships agree with the drawn coast while the water's edge is on its way.
+          // From the level the picture always had: above it the mask is the same mask weighed finer, and whichever is here answers.
+          // (A strip at a time, as the water's packs are read.)
+          if (p.L >= Math.min(3, this.imgMax)) {
+            const ROWS = 512, cv = document.createElement('canvas'); cv.width = p.w; cv.height = Math.min(ROWS, p.h); const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.globalCompositeOperation = 'copy';
+            const out = new Uint8Array(p.w * p.h);
+            for (let y0 = 0; y0 < p.h; y0 += ROWS) {
+              const hh = Math.min(ROWS, p.h - y0), m = p.w * hh; ctx.drawImage(bmp, 0, y0, p.w, hh, 0, 0, p.w, hh);
+              const d = ctx.getImageData(0, 0, p.w, hh).data; for (let i = 0, o = y0 * p.w; i < m; i++, o++) out[o] = d[i * 4 + 3];
+              if (y0 + ROWS < p.h && !this.opts.slow) await new Promise((r) => setTimeout(r, 0));
+            }
+            p.alpha = out;
+          }
         }
         tex.needsUpdate = true; p.texture = tex; p.state = 'ready';
       } catch (e) { console.warn('pack failed', url, e); p.state = 'error'; }
       this.loading--;
     }
-    // A pack of the water's edge out of its bundle (tools/water/fetch.mjs: sixteen packs' own files end to end behind a table of
-    // where each begins, data/w/<level>_b<x>_<y>.bin - fifteen hundred small files were more than an update can carry). A
-    // bundle is fetched whole, once, and kept while its packs are being asked for: the eye seldom needs one pack alone.
-    waterBlob(p) {
-      const n = this.water.bundle, url = this.base + `w/${p.L}_b${Math.floor(p.px / n)}_${Math.floor(p.py / n)}.bin`, B = this.wBundles || (this.wBundles = new Map());
+    // A pack out of its bundle (the water's edge: tools/water/fetch.mjs, sixteen packs to a file; the picture of the Earth:
+    // tools/planet/imagery.py, sixty-four - the packs' own files end to end behind a table of where each begins,
+    // data/<w or i>/<level>_b<x>_<y>.bin: thousands of small files were more than an update can carry). A bundle is fetched
+    // whole, once, and kept while its packs are being asked for: the eye seldom needs one pack alone.
+    bundleBlob(p, dir, n, ext) {
+      const url = this.base + `${dir}/${p.L}_b${Math.floor(p.px / n)}_${Math.floor(p.py / n)}.bin`, B = this.bundles;
       let b = B.get(url);
       if (!b) {
         b = { url, used: 0, ready: fetch(url).then((r) => { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); }).then(async (blob) => {
@@ -1349,7 +1372,7 @@
         B.set(url, b);
       }
       b.used = this.frame;
-      return b.ready.then(({ blob, head }) => { const at = 8 + ((p.py % n) * n + p.px % n) * 8, off = head.getUint32(at, true), len = head.getUint32(at + 4, true); if (!len || off + len > blob.size) throw new Error('no such pack in its bundle'); return blob.slice(off, off + len, 'image/' + (this.water.ext || 'webp')); });
+      return b.ready.then(({ blob, head }) => { const at = 8 + ((p.py % n) * n + p.px % n) * 8, off = head.getUint32(at, true), len = head.getUint32(at + 4, true); if (!len || off + len > blob.size) throw new Error('no such pack in its bundle'); return blob.slice(off, off + len, 'image/' + (ext || 'webp')); });
     }
     pumpQueue() {
       if (!this.queue.length) return;
@@ -1358,7 +1381,7 @@
       this.queue.length = 0; // re-queued each frame by visible tiles
     }
     evictPacks() {
-      const limits = { i: 30, e: 56, w: 10 };
+      const limits = { i: 40, e: 56, w: 10 };
       for (const kind of ['i', 'e', 'w']) {
         const list = [...this.packs.values()].filter(p => p.kind === kind && p.state === 'ready' && p.users === 0);
         if (list.length <= limits[kind]) continue;
@@ -1366,15 +1389,17 @@
         const n = list.length - limits[kind];
         for (let i = 0; i < n; i++) { const p = list[i]; if (this.frame - p.lastUsed < 30) break; p.texture.dispose(); if (p.texture.image && p.texture.image.close) p.texture.image.close(); this.packs.delete(p.key); }
       }
-      // (the bundles the water's packs came out of: a few megabytes each, let go when none of their packs has been asked for in a while)
-      if (this.wBundles && this.wBundles.size > 4) { const old = [...this.wBundles.values()].sort((a, b) => a.used - b.used); for (let i = 0; i < old.length - 4; i++) if (this.frame - old[i].used > 600) this.wBundles.delete(old[i].url); }
+      // (the bundles packs came out of: megabytes each, let go when none of their packs has been asked for in a while)
+      if (this.bundles.size > 6) { const old = [...this.bundles.values()].sort((a, b) => a.used - b.used); for (let i = 0; i < old.length - 6; i++) if (this.frame - old[i].used > 600) this.bundles.delete(old[i].url); }
     }
     // best available pack for tile (L,tx,ty); requests the ideal one. Returns {pack, rect} or null
     bindPack(kind, L, tx, ty, priority) {
       let maxL;
       if (kind === 'e') { const s5 = Math.max(0, L - 5), s4 = Math.max(0, L - 4); maxL = (L >= 7 && this.l7.has(`${tx >> s5}/${ty >> s5}`)) ? 7 : (L >= 6 && this.l6.has(`${tx >> s4}/${ty >> s4}`)) ? 6 : Math.min(L, this.elevMax); }
       else maxL = Math.min(L, this.imgMax);
-      const per = kind === 'e' ? this.index.elev.packTiles : this.index.img.packTiles;
+      if (kind === 'i' && !this.img) return null;
+      const per = kind === 'e' ? this.index.elev.packTiles : this.img.packTiles;
+      const ap = kind === 'i' ? this.img.apron || 0 : 0, ts = kind === 'i' ? this.img.tile || 512 : 1;      // (the picture's packs have a rim of texels all round; the heights' have none)
       let ideal = null;
       for (let l = maxL; l >= 0; l--) {
         const sh = L - l; const txl = tx >> sh, tyl = ty >> sh;
@@ -1387,6 +1412,10 @@
           const ptx = Math.min(per, tilesX - px * per), pty = Math.min(per, tilesY - py * per);
           const within = 1 / (1 << sh);
           const u0 = ((txl % per) + (tx - (txl << sh)) * within) / ptx, v0 = ((tyl % per) + (ty - (tyl << sh)) * within) / pty;
+          if (kind === 'i') {
+            const sx = ptx * ts + 2 * ap, sy = pty * ts + 2 * ap, f = 4096 * Math.pow(2, Math.min(0, 3 - l));
+            return { pack: p, rect: [(ap + u0 * ptx * ts) / sx, (ap + v0 * pty * ts) / sy, within * ts / sx, within * ts / sy], level: l, k: [f * sx / (ptx * ts), f * sy / (pty * ts)] };
+          }
           return { pack: p, rect: [u0, v0, within / ptx, within / pty], level: l };
         }
       }
@@ -1445,7 +1474,7 @@
         uLadN: { value: new THREE.Vector2(mL(lx), mL(ly)) }, uLadF: { value: new THREE.Vector2(lx - Math.floor(lx), ly - Math.floor(ly)) },
         uPhF: { value: new THREE.Vector2(fr(gX * k0), fr(gY * k0)) }, uPhN: { value: new THREE.Vector2(m16(gX * k0), m16(gY * k0)) }, uPhR: { value: new THREE.Vector2(fr(rX * kR), fr(rY * kR)) }, uK0: { value: k0 }, uKR: { value: kR },
         uElev: { value: this.flatTex }, uElevRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uElevTexel: { value: new THREE.Vector2(1, 1) }, uElevMin: { value: 0 }, uElevScale: { value: 0 },
-        uImg: { value: this.blankImg }, uImgRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+        uImg: { value: this.blankImg }, uImgRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uImgK: { value: new THREE.Vector2(4096, 4096) },
         uWater: { value: this.waterTex }, uWaterRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uWaterP: { value: new THREE.Vector4(0, 1, 0, 0) }, uShoreQ: { value: SHORE_FLAT }, uWaterL: this.uWaterL,      // (P: 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; and for 2 the distance and the kind)
         uExag: { value: this.exag }, uSkirt: { value: Math.max(b.w, b.h) * GEO.D2R * 0.06 + 0.00002 },
       };
@@ -1546,7 +1575,7 @@
           else { const p = eb.pack; p.users++; u.uElev.value = p.texture; u.uElevMin.value = p.min; u.uElevScale.value = p.scale; u.uElevRect.value.set(eb.rect[0], eb.rect[1], eb.rect[2], eb.rect[3]); u.uElevTexel.value.set(1 / p.w, 1 / p.h); t.minH = Math.max(0, p.min); t.maxH = Math.max(0, p.min + 255 * p.scale); }
           t.ePack = eb;
         }
-        if (ib) { const p = ib.pack; if (!ib.absent) { p.users++; u.uImg.value = p.texture; u.uImgRect.value.set(ib.rect[0], ib.rect[1], ib.rect[2], ib.rect[3]); } t.iPack = ib; }
+        if (ib) { const p = ib.pack; if (!ib.absent) { p.users++; u.uImg.value = p.texture; u.uImgRect.value.set(ib.rect[0], ib.rect[1], ib.rect[2], ib.rect[3]); u.uImgK.value.set(ib.k[0], ib.k[1]); } t.iPack = ib; }
         if (this.water) {
           let wb = this.waterOff ? null : this.bindWater(t.L, t.tx, t.ty, pri);
           // (Most of the land of the Earth is far from any shore, and so is most of the sea: where a tile's piece of its pack says
@@ -1698,17 +1727,22 @@
       const ha = vh(i, j), hb = vh(i + 1, j), hc = vh(i, j + 1), hd = vh(i + 1, j + 1);
       return fu + fv <= 1 ? ha + (hb - ha) * fu + (hc - ha) * fv : hd + (hc - hd) * (1 - fu) + (hb - hd) * (1 - fv);
     }
-    // water as the shader draws it: imagery alpha (land 1, river 0.75, lake 0.5, sea 0) at the finest imagery level; -1 if unknown yet
+    // water as the shader draws it without the field of the water's edge: the picture's alpha (land 1, river 0.75, lake 0.5, sea 0)
+    // from the finest of its packs that is here (the mask is one mask at every level from the third up); -1 if unknown yet
     waterAlpha(lon, lat) {
-      const l = this.imgMax; const per = this.index.img.packTiles; const [tx, ty] = GEO.tileAt(l, lon, lat);
-      const px = Math.floor(tx / per), py = Math.floor(ty / per); const p = this.packs.get(`i${l}/${px}/${py}`);
-      if (!p || p.state !== 'ready' || !p.alpha) return -1;
-      const tilesX = 2 << l, tilesY = 1 << l; const ptx = Math.min(per, tilesX - px * per), pty = Math.min(per, tilesY - py * per);
-      const lonW = 360 / tilesX * ptx, latH = 180 / tilesY * pty; const lon0 = -180 + px * per * 360 / tilesX, lat0 = 90 - py * per * 180 / tilesY;
-      const fx = ((lon - lon0) / lonW) * p.w - 0.5, fy = ((lat0 - lat) / latH) * p.h - 0.5;
-      const x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy)));
-      const ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)); const d = p.alpha, w = p.w;
-      return ((d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay) / 255;
+      const I = this.img; if (!I) return -1; const per = I.packTiles, ap = I.apron || 0, ts = I.tile || 512;
+      for (let l = this.imgMax; l >= Math.min(3, this.imgMax); l--) {
+        const [tx, ty] = GEO.tileAt(l, lon, lat), px = Math.floor(tx / per), py = Math.floor(ty / per), lv = I.levels[l];
+        if (lv && lv.packs[py * lv.nx + px] === 'S') return 0;      // (nothing but sea: no pack was made)
+        const p = this.packs.get(`i${l}/${px}/${py}`); if (!p || p.state !== 'ready' || !p.alpha) continue;
+        const tilesX = 2 << l, tilesY = 1 << l, ptx = Math.min(per, tilesX - px * per), pty = Math.min(per, tilesY - py * per);
+        const lonW = 360 / tilesX * ptx, latH = 180 / tilesY * pty, lon0 = -180 + px * per * 360 / tilesX, lat0 = 90 - py * per * 180 / tilesY;
+        const fx = ap + ((lon - lon0) / lonW) * ptx * ts - 0.5, fy = ap + ((lat0 - lat) / latH) * pty * ts - 0.5;
+        const x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy)));
+        const ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)), d = p.alpha, w = p.w;
+        return ((d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay) / 255;
+      }
+      return -1;
     }
     // How far it is to the water's edge, metres (water negative), from the finest pack of the field that is here; this.wKind
     // (and this.wOpen: how open that water lies, 0..1; this.wLevel: how high it stands if it is fresh, metres, -1 where not known;
