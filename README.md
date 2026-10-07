@@ -10,6 +10,7 @@ down to a single street.
 
 ```bash
 npm install
+npm run fetch        # brings what is not kept in the repository: the picture of the Earth, the water's edge, the ground's materials, the models and art
 npm run build        # assembles dist/
 npm start            # opens the game in its desktop window (Electron)
 ```
@@ -21,7 +22,7 @@ Downloadable builds are attached to this repository's [Releases](../../releases)
 | Path | What lives there |
 | --- | --- |
 | `src/` | The game: simulation, globe and terrain renderer, towns, buildings, UI |
-| `data/` | World data: elevation and imagery tiles, rivers, vegetation, textures |
+| `data/` | World data: elevation, rivers, climate, vegetation; fetched into it: the picture of the Earth (`i/`), the water's edge (`w/`), textures, models |
 | `assets/` | Asset pipeline: manifests and job records for generated textures and 3D models |
 | `desktop/` | The desktop shell (Electron) and asset downloader |
 | `tools/` | Build script, test suites, screenshot and debug harnesses |

@@ -109,12 +109,14 @@
   // The planet's own maps as one texture of two layers (a fragment shader has sixteen textures on an Apple GPU, and the ground's
   // has them all): info.png (the sea's shelf, the ice, how hard the winters are, how dry the country is: tools/climate/build.py)
   // and under it veg.jpg, what grows there by nature (how green, how light, how warm-coloured: the map the trees are planted
-  // by), at info's size. Where that cannot be made, info.png alone, as it was.
+  // by), at info's size, with snow.png in its alpha (where snow lies in winter, as the Earth has it). Where that cannot be
+  // made, info.png alone, as it was.
   async function planetMaps() {
     const W = 2048, H = 1024;
     try {
       if (!renderer.capabilities.isWebGL2 || !THREE.DataTexture2DArray) throw new Error('no texture arrays');
-      const [a, b] = [await pixelsOf('data/info.png', W, H), await pixelsOf('data/veg.jpg', W, H)], data = new Uint8Array(W * H * 8); data.set(a, 0); data.set(b, W * H * 4);
+      const [a, b, c] = [await pixelsOf('data/info.png', W, H), await pixelsOf('data/veg.jpg', W, H), await pixelsOf('data/snow.png', W, H)], data = new Uint8Array(W * H * 8); data.set(a, 0); data.set(b, W * H * 4);
+      for (let i = 0, o = W * H * 4 + 3; i < W * H; i++, o += 4) data[o] = c[i * 4];      // (the second layer's alpha: how much snow the Earth's own winter has there, tools/planet/snow.py)
       const t = new THREE.DataTexture2DArray(data, W, H, 2); t.format = THREE.RGBAFormat; t.type = THREE.UnsignedByteType; t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true;
       return t;
     } catch (e) { console.warn('the planet\'s maps as one texture: ' + e.message + '; info.png alone'); const t = await loadTex('data/info.png', { flipY: false }); t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; return t; }
@@ -162,7 +164,7 @@
       terrain = new TERRAIN.Terrain({ scene, index, water, img, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID, plainWater: softGL && !window.GENESIS_POST, slow: softGL });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
-      trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL) trees.slice = 1e9; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png').catch((e) => console.warn('veg', e));
+      trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL) trees.slice = 1e9; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png', 'data/snow.png').catch((e) => console.warn('veg', e));
       life = new LIFE.Life({ scene, terrain }); if (softGL) life.budget = 0.5; movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
@@ -1240,9 +1242,7 @@
     globals.uCloudShift.value = world.cloudShift; globals.uCloudVis.value = world.cloudVis;
     world.updateBuildings(mapcam, false);
     // whether snow lies here now (by the climate of the place and the time of year): roofs go white with the ground
-    if (trees && trees.ready && mapcam.alt < 0.03) { const cold = TREES.Trees.COLD[trees.climateAt(mapcam.lon, mapcam.lat)], season = mapcam.lat >= 0 ? globals.uBare.value.z : globals.uBare.value.w; const thr = 1.02 - 0.55 * cold;
-        const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-        world.bUniforms.uSnow.value = sm(thr, thr + 0.1, season) * sm(0.08, 0.5, cold); }
+    if (trees && trees.ready && mapcam.alt < 0.03) world.bUniforms.uSnow.value = trees.lyingAt(mapcam.lon, mapcam.lat, mapcam.lat >= 0 ? globals.uBare.value.z : globals.uBare.value.w, mapcam.agl === undefined ? 0 : (mapcam.alt - mapcam.agl) * GEO.R_M / terrain.exag);
     // the colour of the ground hereabouts, for the light it throws back onto walls in shade (looked up now and then)
     if (trees && trees.ready && ((frameNo = (frameNo + 1) % 20) === 0) && mapcam.alt < 0.03) {
       const fw = trees.forestAt(mapcam.lon, mapcam.lat, Math.max(1, terrain.heightAt(mapcam.lon, mapcam.lat))); const g = world.bUniforms.uGround.value;

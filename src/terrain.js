@@ -486,9 +486,9 @@
       vec2 geo = vec2((vLon / PI + 1.0) * 0.5, 0.5 - vLat / PI);   // global equirect uv (v down)
       #ifdef INFO2
       vec4 info = texture(uInfo, vec3(geo, 0.0));                    // r shelf, g ice, b how hard the winters are, a how humid the climate (tools/climate/build.py)
-      vec3 natv = texture(uInfo, vec3(geo, 1.0)).rgb;                // by nature: how green the country is, how light, how warm-coloured (data/veg.jpg: what the trees are planted by)
+      vec4 natv = texture(uInfo, vec3(geo, 1.0));                    // by nature: how green the country is, how light, how warm-coloured (data/veg.jpg: what the trees are planted by); a: how much snow its winters bring (data/snow.png)
       #else
-      vec4 info = texture2D(uInfo, geo); vec3 natv = vec3(0.0, 0.5, 1.0);
+      vec4 info = texture2D(uInfo, geo); vec4 natv = vec4(0.0, 0.5, 1.0, 1.0);
       #endif
       // magnification: how many screen pixels per imagery texel (approx via derivatives)
       vec2 duv = fwidth(vUV * uImgRect.zw * uImgK);
@@ -547,7 +547,10 @@
       float seasonK = 900.0 + 5200.0 * pow(latN0, 1.5);
       // (dry air keeps its mountains bare far higher: the hills of the Altiplano, three hundred metres under a snow line reckoned
       //  by latitude alone, were white the year round)
-      float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winter - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0));
+      // (and a winter brings the snow line down only where it brings snow: natv.a, the Earth's own winter. Tibet is high, dry
+      //  and all but bare in January; by the latitude's rule alone it was an ice cap for half the year.)
+      float winterSnow = winter * mix(0.12, 1.0, smoothstep(0.05, 0.5, natv.a));
+      float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winterSnow - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0));
       float ice = max(info.g, white * max(smoothstep(snowLine0 - 900.0, snowLine0 + 200.0, vH), smoothstep(0.7, 0.8, latN0)));
       // biome weights
       float aboveTree = smoothstep(treeLine - 300.0, treeLine + 200.0, vH);
@@ -578,7 +581,7 @@
       // (not on the last four degrees round a pole: the frame the materials lie in has no place for a pole, and what lies there is
       //  plain white; and not under the sea or a lake, where nothing of the land is seen)
       float gOn0 = uTexMix * smoothstep(0.085, 0.02, uCamAlt), gOn = gOn0 * (1.0 - smoothstep(1.47, 1.5, abs(vLat))) * step(max(seaW, lakeW), 0.996) * step(uGndDbg, 4.5);
-      float snow = smoothstep(snowLine0 - 150.0, snowLine0 + 700.0, vH) * (1.0 - smoothstep(0.35, 0.7, slope)) * mix(0.25 + 0.75 * white, 0.85, winter * 0.8);
+      float snow = smoothstep(snowLine0 - 150.0, snowLine0 + 700.0, vH) * (1.0 - smoothstep(0.35, 0.7, slope)) * mix(0.06 + 0.94 * white, 0.85, winterSnow * 0.8) * (1.0 - 0.55 * wForest);      // (in summer, where the photograph has it: at 611 m to a texel it knows every snowfield; a wood under snow is dark from above, its floor white between the trees)
       float fall = autumn * decid; float bare = mix(uBare.y, uBare.x, hemi) * smoothstep(0.18, 0.4, latN0) * decid;
       float dl = 0.45, dl2 = 0.45, forestFar = 1.0, forestOpen = 1.0; vec2 gRel = vec2(0.0); float gRelK = 0.0; vec4 gSnow = vec4(1.0); vec2 gSnowN = vec2(0.0); float gSnowOn = 0.0;      // (gSnow: the snow, once it has been looked up)
       vec3 land = base * 0.98;
@@ -723,7 +726,7 @@
       land = mix(land, land * vec3(1.38, 0.96, 0.5), fall * (wForest * 0.8 + wGrass * 0.12));
       land = mix(land, mix(land, vec3(0.42, 0.36, 0.3), 0.6), bare * wForest * 0.7);
       land = mix(land, land * vec3(1.06, 0.96, 0.74), winter * wGrass * 0.55);
-      float snow = smoothstep(snowLine0 - 150.0, snowLine0 + 700.0, vH) * (1.0 - smoothstep(0.35, 0.7, slope)) * mix(0.25 + 0.75 * white, 0.85, winter * 0.8);
+      float snow = smoothstep(snowLine0 - 150.0, snowLine0 + 700.0, vH) * (1.0 - smoothstep(0.35, 0.7, slope)) * mix(0.06 + 0.94 * white, 0.85, winterSnow * 0.8) * (1.0 - 0.55 * wForest);      // (in summer, where the photograph has it: at 611 m to a texel it knows every snowfield; a wood under snow is dark from above, its floor white between the trees)
       land = mix(land, vec3(0.92, 0.94, 0.97) * (0.8 + dl * 0.2), max(snow, ice * 0.95));
       #ifdef USE_TEXARR
       // ---------- generated ground: real grass, sand, rock and snow under the biome weights, from ~30 km down ----------
@@ -914,20 +917,30 @@
       land = mix(land, roadCol * (0.85 + 0.3 * dl), smoothstep(0.4, 0.7, dec.b) * (1.0 - ice));
       // winter where winters are white: snow lies over the country for as long as the climate keeps it (weeks in a mild
       // one, and then in patches; half the year in the taiga). Beaten tracks and trodden town ground show through.
-      float snowLying = 0.0;
+      float snowLying = 0.0, snowCov = 0.0;
       { float cold = info.b;
+        #ifdef INFO2
+        // (Where: as the Earth's own winter has it - tools/planet/snow.py holds each hemisphere's January against its July. By the
+        //  climate's class alone a cold desert lay white from the Tarim to the Namib and a tundra from Siberia to the Puna of
+        //  the Andes, and Tibet, dry and all but bare in winter, was an ice cap. How long it lies is still the climate's.)
+        cold = max(cold, 0.35 * natv.a); float thr = 1.02 - 0.55 * cold;
+        // (And up a hillside before the plain under it: the map is of cells twenty kilometres across, and by it alone the snow of
+        //  the Alps ended at a round line drawn over ridge and valley alike. At its edge the snow keeps to the heights.)
+        float lying = smoothstep(thr, thr + 0.1, mix(uBare.w, uBare.z, hemi)) * smoothstep(0.06, 0.7, natv.a * (0.62 + min(max(vH, 0.0), 2200.0) / 1500.0)); snowLying = lying;
+        #else
         // (Snow lies on low ground only well away from the tropics. By the climate's map a cold desert is the Namib too, and a tundra
         //  the Puna of the Andes: each lay under a white sheet all its winter. Climates of mild winters keep snow from some forty
         //  degrees, or high up; the hard ones wherever they are found outside the tropics.)
         cold *= smoothstep(0.30, 0.42, latN0) * mix(smoothstep(0.34, 0.46, latN0 + max(vH - 800.0, 0.0) / 7000.0), 1.0, smoothstep(0.55, 0.72, cold));
         float thr = 1.02 - 0.55 * cold;
         float lying = smoothstep(thr, thr + 0.1, mix(uBare.w, uBare.z, hemi)) * smoothstep(0.08, 0.5, cold); snowLying = lying;
+        #endif
         if (lying > 0.003) {
-          float cover = smoothstep(1.0 - lying * 1.15, 1.15 - lying * 1.15, nMid.r * 0.55 + nMic.g * 0.3 + nFin.b * 0.15);
-          // (from far out the grain that breaks the snow's edge up is too small to see, and where the snow thins out by the climate
-          //  or the latitude it ended at a ruled line across a continent: from there it thins as it is told to)
-          cover = mix(cover, smoothstep(0.15, 0.9, lying) * (0.75 + 0.5 * (nMac.g - 0.5)), smoothstep(0.03, 0.12, uCamAlt));
-          cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - 0.4 * wForest * (1.0 - bare));
+          // (where it thins out it lies in patches, and the patches are of a size the eye can make out from where it is: from far
+          //  out the grain that breaks the snow's edge up from close to is too small to see, and the snow ended at a line)
+          float cover = smoothstep(1.0 - lying * 1.15, 1.15 - lying * 1.15, mix(nMid.r * 0.55 + nMic.g * 0.3 + nFin.b * 0.15, nMac.g * 0.45 + nMid.r * 0.55, smoothstep(0.03, 0.12, uCamAlt)));
+          // (a wood under snow is dark from above: the snow is on its floor, and the eye sees the trees)
+          cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * mix(0.5, 0.3, bare));
           vec3 snowCol = vec3(0.92, 0.94, 0.97) * (0.82 + dl2 * 0.2);
           #ifdef USE_TEXARR
           #ifdef USE_GROUND
@@ -936,7 +949,7 @@
           if (gOn > 0.002) snowCol = mix(snowCol, gtex(uGround, 6.0, 4.0) * 1.04, gOn * 0.85);
           #endif
           #endif
-          land = mix(land, snowCol, cover * 0.96 * (1.0 - ice));
+          snowCov = cover * 0.96 * (1.0 - ice); land = mix(land, snowCol, snowCov);
         } }
       // beach: a sand strip where the land runs down into the sea
       // (only on the sea's side of the shore line: a lake's shore is grass or forest to the water, and snow lies on a beach as on anything)
@@ -1164,6 +1177,9 @@
       #ifdef USE_GROUND
       ambC *= 0.7 + 0.3 * nLocal.z;      // (the light of the sky comes from above: what leans away from it, a slope or the side of a stone, has less of it)
       #endif
+      // (snow lights its own shade: what a white slope across the valley and the blue sky throw into it. Shaded as other ground
+      //  is, the mountains of a winter were white and navy, like marbled paper.)
+      ambC *= mix(vec3(1.0), vec3(1.55, 1.75, 2.15), max(max(snow, ice * 0.95), snowCov) * landW * day);
       vec3 lit = col * (ambC + diff * 1.05 * sunCol * mix(1.0, 0.5, seaW * 0.3));
       // ---------- what the water mirrors ----------
       // Still water is a mirror, dark looked down into and bright along the eye's level (Fresnel): it shows the sky that

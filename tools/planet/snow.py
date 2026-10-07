@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Where snow lies in winter, as the Earth has it (data/snow.png).
+"""How long snow lies in winter, as the Earth has it (data/snow.png).
 
-The game lays its winter snow by the climate's class: "a cold desert" lay white from the Tarim to the Namib, "a tundra"
+The game laid its winter snow by the climate's class: "a cold desert" lay white from the Tarim to the Namib, "a tundra"
 from Siberia to the Puna of the Andes, and Tibet, which is dry and all but bare in January, was an ice cap. The Blue
-Marble Next Generation (NASA Earth Observatory, 2004; public domain) has every month of the year: this holds each
-hemisphere's midwinter against its midsummer (January and July north of the equator, July and January south of it)
-and keeps what is white or grey in winter and was not in summer - the snow of an ordinary year, on open ground and
-through the trees of a taiga. What is white the year round (ice, salt, bright sand) is no winter's snow and is left
-out: the game has its own rule for ice.
+Marble Next Generation (NASA Earth Observatory, 2004; public domain) has every month of the year: this holds each of
+the seven months of a hemisphere's cold season (October to April north of the equator, April to October south of it)
+against its midsummer, and keeps what is white or grey in that month and was not in summer - snow, on open ground and
+through the trees of a taiga. What is kept is the share of the seven months in which a place had it: all of them in
+Siberia, three or four at Moscow, one about Berlin, none at Paris. (One month alone says yes or no: by January's the
+snow of Europe was a white sheet with a ruled edge through Poland.) What is white the year round (ice, salt, bright
+sand) is no winter's snow and is left out: the game has its own rule for ice.
 
     python3 tools/planet/snow.py --out out --work work      (the Planet workflow: mode "snow")
-        out/snow.png           2048 x 1024, grey: 0 no snow in winter ... 255 it lies everywhere
-        out/planet_snow.jpg    the same over the summer's picture, to look at
+        out/snow.png           2048 x 1024, grey: 0 no snow in any month ... 255 it lies all the cold season
+        out/planet_snow.jpg    the same over the summer's picture, to look at, and midwinter as the Blue Marble has it
 The game reads it into the alpha of the second layer of its planet's maps (planetMaps in src/main.js); the ground's
-shader lets snow lie in season only where it has some (terrain.js, at "winter where winters are white").
+shader lets snow lie only where it has some, and for as much of the year as it says (terrain.js, at "winter where
+winters are white"; Trees.lyingAt is its twin for boughs and roofs).
 """
 import os, sys, time, urllib.request
 import numpy as np
@@ -39,21 +42,25 @@ def month(m):
 def ss(a, b, x): t = np.clip((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t)
 
 
-jan, jul = month(1), month(7)
-north = (np.arange(H * 2) < H)[:, None, None]
-winter, summer = np.where(north, jan, jul), np.where(north, jul, jan)
-
-
 def lum(a): return a[..., 0] * 0.299 + a[..., 1] * 0.587 + a[..., 2] * 0.114
 def grey(a): mx, mn = a.max(-1), a.min(-1); return 1.0 - ss(0.10, 0.28, (mx - mn) / np.maximum(mx, 0.04))
 
 
-lw, ls = lum(winter), lum(summer)
-sea = (winter[..., 2] > winter[..., 0] + 0.03) & (lw < 0.2)          # (the Blue Marble's own sea: dark and blue)
-# snow: lighter than the summer by a good deal, and without colour; a wood under snow is grey, not white, and far darker than a field
-snow = ss(0.08, 0.22, lw - ls) * grey(winter) * ss(0.22, 0.38, lw) * (1.0 - sea)
-snow = np.array(Image.fromarray((snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.2))).astype(np.float32) / 255.0
-snow = np.clip((snow - 0.06) / 0.88, 0.0, 1.0)
+jan, jul = month(1), month(7)
+north = (np.arange(H * 2) < H)[:, None]
+summer = np.where(north[..., None], jul, jan); ls = lum(summer)
+sea = (summer[..., 2] > summer[..., 0] + 0.03) & (ls < 0.2)          # (the Blue Marble's own sea: dark and blue)
+COLD = {True: (10, 11, 12, 1, 2, 3, 4), False: (4, 5, 6, 7, 8, 9, 10)}      # the cold season's months, north and south
+snow = np.zeros((H * 2, W * 2), np.float32); winter = np.where(north[..., None], jan, jul)
+for k in range(7):
+    mn, ms = COLD[True][k], COLD[False][k]
+    a = np.where(north[..., None], jan if mn == 1 else month(mn), jul if ms == 7 else month(ms)); lw = lum(a)
+    # snow: lighter than the summer by a good deal, and without colour; a wood under snow is grey, not white, and far darker than a field
+    snow += ss(0.08, 0.22, lw - ls) * grey(a) * ss(0.22, 0.38, lw) * (1.0 - sea) / 7.0
+    del a, lw
+# (to the map's own cells, then smoothed over some sixty kilometres: what is left of a month's yes or no is how likely it is)
+snow = np.array(Image.fromarray(np.rint(snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.6))).astype(np.float32) / 255.0
+snow = np.clip((snow - 0.03) / 0.94, 0.0, 1.0)
 lat = 90.0 - (np.arange(H) + 0.5) * 180.0 / H
 print('snow in winter by latitude (the share of the land that has it; 10 degrees at a time, from the north):')
 landm = ~np.array(Image.fromarray(sea).resize((W, H), Image.NEAREST))
