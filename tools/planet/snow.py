@@ -185,13 +185,14 @@ ice = np.array(Image.fromarray(np.rint(ice * 255).astype(np.uint8)).resize((W, H
 snow = np.array(Image.fromarray(np.rint(snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.6))).astype(np.float32) / 255.0
 snow = np.clip((snow - 0.03) / 0.94, 0.0, 1.0)
 high = gaussian_filter(high.reshape(H, 2, W, 2).mean((1, 3)), 1.6, mode=('nearest', 'wrap'))      # (the heights as the snow is: to the map's cells, and as smooth)
-# (Where there is no snow at all for a hundred kilometres round, all that is known is that the country's height on the whole
-#  is too low for any, and ground a good deal higher may have none either: such country is counted as if it began two
-#  thousand metres above itself - the Hoggar stands 1,700 m above the Sahara about it and has no winter, nor have the
-#  ridges of the Puna. By how much snow there is round a place, smooth over a hundred kilometres, never by the cell's
-#  own: taken off wherever a cell had none, the snow of a high plain ended at a cliff - white pancakes on Qinghai.)
-near = gaussian_filter(snow, 5.0, mode=('nearest', 'wrap'))
-margin = 1.0 - ss(0.0, 0.02, near)
+# (Far from any snow, all that is known is that the country's height on the whole is too low for any, and ground a good deal
+#  higher may have none either: the Hoggar stands 1,700 m above the Sahara about it and has no winter, nor have the
+#  highlands of Yemen and Ethiopia. So country is counted as lying higher than it does by how far it is from the nearest
+#  snow: nothing beside it, two thousand metres from three hundred kilometres off. By the distance, which is smooth: taken
+#  off at once wherever a cell or its neighbourhood had no snow, there was a cliff in the map along the snow's edge, and the
+#  thin snow of a high plain ended at it - white pancakes on Qinghai.)
+has = gaussian_filter(snow, 2.0, mode=('nearest', 'wrap')) > 0.02
+margin = ss(1.0, 18.0, distance_transform_edt(~has))
 # How long it would lie at the level of the sea: 1 all the cold season, below nought never there. With the heights taken out
 # of it this is climate, which is smooth over a hundred kilometres, and what is left that is not smooth is one year's weather
 # and the Blue Marble's own patchwork (a month's picture is pieced together from its clearest days: a hole in the snow of

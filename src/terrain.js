@@ -557,7 +557,10 @@
       // the snow of the Alps ended at one line over ridge and valley alike; here a valley is green for most of its winter under
       // white mountains, and the ranges of a dry plateau have their winter snow while the plateau has none.)
       float noiseL = 0.5 * log2(max(max(dot(dFdx(vGL), dFdx(vGL)), dot(dFdy(vGL), dFdy(vGL))), 1e-30)) + 9.0;      // (the level the card would take of the noise at one repeat a radian)
-      float snowHere = clamp(natv.a * 4.0 - 3.0 + vH * 0.0005, 0.0, 1.25);
+      // (Its height by the heights' own texels, not by the mesh's corners: from far out a quad of the mesh is tens of kilometres,
+      //  and by the corners the snow's edge was a smooth line that moved as the mesh grew finer under the eye. By the texels it
+      //  is as ragged as the country, from every height the same.)
+      float snowHere = clamp(natv.a * 4.0 - 3.0 + 0.25 * (hE + hW + hS + hN) * 0.0005, 0.0, 1.25);
       float winterSnow = winter * mix(0.12, 1.0, smoothstep(0.05, 0.5, snowHere));
       float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winterSnow - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0));
       float ice = max(info.g, white * max(smoothstep(snowLine0 - 900.0, snowLine0 + 200.0, vH), smoothstep(0.7, 0.8, latN0)));
@@ -960,7 +963,11 @@
           //  a white mist over the country.)
           float open = clamp((lum0 - 0.2) * 3.0, -0.3, 0.4) * smoothstep(0.2, 0.6, green);      // (in green country: bare ground is light and says nothing by it)
           float edgeW = mix(0.05, 0.2, smoothstep(-7.5, -4.5, noiseL)) + 0.25 * smoothstep(-4.5, -2.5, noiseL);      // (and from where a country is a hand's breadth it fades as it thins: there is no grain left to make patches of, and the snow of Poland ended at a shore)
-          float cover = smoothstep(0.5 - edgeW, 0.5 + edgeW, lying + ((0.5 - gHU) * 0.6 + open * 0.6) * (1.0 - lying) * smoothstep(0.0, 0.25, lying));
+          // (and on the slopes that face away from the sun before those that face it - in bare country, where the photograph has no
+          //  fields and woods to tell apart, the lie of the land is the grain: by height alone the thin snow of a high plain
+          //  was a white pancake cut out along a contour)
+          float shady = clamp(nEnu.y * (vLat >= 0.0 ? 1.0 : -1.0) * 1.6, -0.5, 0.5);
+          float cover = smoothstep(0.5 - edgeW, 0.5 + edgeW, lying + ((0.5 - gHU) * 0.6 + open * 0.6 + shady * 0.7) * (1.0 - lying) * smoothstep(0.0, 0.25, lying));
           // (a wood under snow is dark from above: the snow is on its floor, and the eye sees the trees - through bare boughs more of it)
           cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * (1.0 - smoothstep(0.14, 0.32, lum0)) * mix(0.55, 0.3, bare));      // (the darker the photograph has it, the more of a wood it is)
           vec3 snowCol = vec3(0.92, 0.94, 0.97) * (0.82 + dl2 * 0.2);
@@ -1131,7 +1138,14 @@
       //  is open weeks after the last. By the snow lying at the moment, Ladoga was open water in March. Not where a month of
       //  snow is all the winter there is: from far out the Danish straits are a lake to the picture's map.)
       float iceOff = acos(clamp(2.0 * mix(uIceCold.y, uIceCold.x, hemi) - 1.0, -1.0, 1.0)) * 0.31831;      // (how far the year is from the end of winter: 0 early in March, 1 half a year on)
-      float frozen = smoothstep(0.0, 0.06, snowHere * 0.75 - 0.08 - iceOff) * smoothstep(0.3, 0.6, info.b);      // (hard winters from 0.6: Winnipeg's are 0.72)
+      // (Where the sea beside it freezes, a water freezes as that sea does and not by this rule: from far out a strait is a lake to
+      //  the picture's map, and by the snow of Sweden the Danish belts were ice into April.)
+      float iceIn = natv.g * 1.2 - 0.1 - iceOff;
+      // (High dry country has its hard winters without the snow: the lakes of Tibet freeze under a sky that brings none. And a
+      //  lake freezes from its shores: out in a great one the ice comes weeks later and goes weeks sooner.)
+      float coldShare = smoothstep(0.85, 1.0, info.b) * smoothstep(0.27, 0.36, latN0) * 0.55;
+      float lakeSeason = max(snowHere, coldShare) * 0.75 - 0.08 - (wOn > 0.5 ? 0.07 * smoothstep(300.0, 3000.0, off) : 0.0);
+      float frozen = max(smoothstep(0.0, 0.06, lakeSeason - iceOff) * smoothstep(0.3, 0.6, info.b) * (1.0 - smoothstep(0.02, 0.06, natv.g)), smoothstep(0.01, 0.05, iceIn));      // (hard winters from 0.6: Winnipeg's are 0.72)
       #else
       float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
       #endif
@@ -1149,7 +1163,6 @@
       //  iceOff is how far the year is from it, 0 at the end of winter and 1 half a year on. A month and more is asked
       //  before there is any (a radiometer's cell on a shore sees the land with the sea and takes it for some ice: the
       //  Danish straits froze every March), and what is ice all the year stays.)
-      float iceIn = natv.g * 1.2 - 0.1 - iceOff;
       float seaIce = smoothstep(0.01, 0.05, iceIn) * seaW;
       float floe = smoothstep(0.35, 0.65, mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) + 0.3 * nMic.a) * smoothstep(0.02, 0.22, iceIn);
       #else
