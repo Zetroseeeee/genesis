@@ -73,9 +73,11 @@ WC_ENV = dict(GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR', CPL_VSIL_CURL_ALLOWED_EX
               GDAL_HTTP_MERGE_CONSECUTIVE_RANGES='YES', GDAL_HTTP_MULTIPLEX='YES', VSI_CACHE='TRUE', GDAL_HTTP_TIMEOUT='90', GDAL_HTTP_CONNECTTIMEOUT='30')
 UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) holocene-planet'}
 SEA = (12, 30, 60)                                  # (only in the pictures to look at)
-PLACES = [('Alps', 9.6, 46.4), ('Paris', 2.35, 48.85), ('London', -0.1, 51.5), ('Po', 10.2, 45.2), ('Nile delta', 31.0, 30.6), ('Tokyo', 139.7, 35.7), ('Finland', 27.0, 62.5), ('Aegean', 25.0, 37.5),
+PLACES = [('Alps', 9.6, 46.4), ('Paris', 2.35, 48.85), ('London', -0.1, 51.5), ('Po', 10.2, 44.0), ('Nile delta', 31.0, 30.6), ('Tokyo', 139.7, 35.7), ('Finland', 27.0, 62.5), ('Aegean', 25.0, 37.5),
           ('Ganges', 88.0, 23.5), ('Amazon mouth', -50.5, -0.5), ('New York', -74.0, 40.7), ('Mississippi', -90.5, 30.2), ('Rondonia', -62.5, -10.5), ('Cape', 19.0, -33.8), ('Sydney', 151.0, -33.9),
-          ('Aral', 60.0, 45.0), ('Maldives', 73.3, 4.0), ('Antarctic peninsula', -62.0, -65.0), ('Titicaca', -69.4, -15.9), ('Hawaii', -156.3, 20.3)]
+          ('Aral', 60.0, 45.0), ('Maldives', 73.3, 4.0), ('Antarctic peninsula', -62.0, -65.0), ('Titicaca', -69.4, -15.9), ('Hawaii', -156.3, 20.3),
+          ('Beijing', 116.4, 39.9), ('China plain', 115.5, 35.5), ('Delhi', 77.2, 28.6), ('Ireland', -8.0, 53.2), ('Madrid', -3.7, 40.4), ('Moscow', 37.6, 55.75), ('Ukraine', 32.0, 49.0), ('Black Forest', 8.6, 48.6),
+          ('Shanghai', 121.0, 31.2), ('Java', 110.4, -7.4), ('Corn belt', -93.0, 41.5), ('Sahel', 5.0, 13.0)]
 
 
 def say(*a): print(*a, flush=True)
@@ -335,7 +337,7 @@ def climate_means(work):
 def sea_like(r, g, b):
     """the Blue Marble's own water: its sea is (2, 5, 20), its shallows dark and blue before anything, its lakes next to black
     (a dark wood is (13, 27, 2): no bluer than it is red, and not that dark)"""
-    return ((b > r + 10) & (b > g - 2) & (0.299 * r + 0.587 * g + 0.114 * b < 80)) | (r + g + b < 22)
+    return ((b > r + 10) & (b > g - 2) & (0.299 * r + 0.587 * g + 0.114 * b < 80)) | (r + g + b < 22) | ((r < 10) & (r + g + b < 60))
 
 
 def fallback_cells(X0, Y0, n, mean, cl):
@@ -375,41 +377,94 @@ def psnr(a, b):
 
 
 # ---------------------------------------------------------------- a block ----------------------------------------------
+def whose(rgb, alpha, acc, wild=None):
+    """what each texel of a window is, as planes of bytes:
+      keep  how far its colour is the land's own (255: wholly)
+      src   how much it counts for the texels that take their colour from others (only what is plainly open country counts whole)
+      tex   how far it is land that is painted over (a town; with wild, a field): it is given its own light and dark back
+    A shore is taken strictly: a texel beside one with water in it has the water's dark in its own colour (the source is
+    weighed among its neighbours), so it takes the colour from further in - but an islet too small to have a "further in"
+    keeps what it has. wild: how far a ploughed texel is to be painted over there (0..1), or None."""
+    from scipy import ndimage
+    n = rgb.shape[0]; lf8 = np.empty((n, n), np.uint8); bw8 = np.zeros((n, n), np.uint8); pure8 = np.full((n, n), 255, np.uint8); seen = 0; STRIP = 1024
+    for r in range(0, n, STRIP):
+        sl = slice(r, r + STRIP); lf = ss(0.85, 0.98, alpha[sl].astype(np.float32) * (1.0 / 255.0))
+        if acc is not None:
+            cov = acc['cov'][sl].astype(np.float32); inv = 1.0 / np.maximum(cov, 1.0); ok = cov >= 128; seen += int(ok.sum()); bf = acc['built'][sl] * inv
+            lf = np.where(ok, acc['land'][sl] * inv, lf); bw = np.where(ok, ss(0.08, 0.30, bf), 0.0); pure = np.where(ok, 1.0 - ss(0.01, 0.05, bf), 1.0)
+            if wild is not None:
+                cf_ = acc['crop'][sl] * inv; tf = acc['tree'][sl] * inv; h = wild[sl]
+                bw = np.where(ok, np.maximum(bw, ss(0.25, 0.6, cf_) * h), bw)
+                pure = np.where(ok, pure * (1.0 - ss(0.05, 0.2, cf_) * h) * (1.0 - h * 0.9 * (1.0 - ss(0.5, 0.85, tf))), pure)      # (where woods would stand, what is wood today counts most)
+            bw8[sl] = np.rint(bw * 255.0).astype(np.uint8); pure8[sl] = np.rint(pure * 255.0).astype(np.uint8)
+        lf8[sl] = np.rint(np.clip(lf, 0.0, 1.0) * 255.0).astype(np.uint8)
+    lmin = ndimage.minimum_filter(lf8, size=3, mode='nearest'); strict8 = np.empty((n, n), np.uint8)
+    for r in range(0, n, STRIP): strict8[r:r + STRIP] = np.rint(ss(0.70, 0.95, lmin[r:r + STRIP].astype(np.float32) * (1.0 / 255.0)) * 255.0).astype(np.uint8)
+    del lmin; near = ndimage.maximum_filter(strict8, size=7, mode='nearest') > 0
+    keep8 = np.empty((n, n), np.uint8); src8 = np.empty((n, n), np.uint8); tex8 = np.empty((n, n), np.uint8)
+    for r in range(0, n, STRIP):
+        sl = slice(r, r + STRIP); kl = np.where(near[sl], strict8[sl].astype(np.float32), ss(0.70, 0.95, lf8[sl].astype(np.float32) * (1.0 / 255.0)) * 255.0) * (1.0 / 255.0)
+        c = rgb[sl].astype(np.float32); kl[sea_like(c[..., 0], c[..., 1], c[..., 2])] = 0.0; bw = bw8[sl].astype(np.float32) * (1.0 / 255.0)
+        keep = kl * (1.0 - bw); keep8[sl] = np.rint(keep * 255.0).astype(np.uint8); src8[sl] = np.rint(keep * pure8[sl]).astype(np.uint8); tex8[sl] = np.rint(kl * bw * 255.0).astype(np.uint8)
+    return keep8, src8, tex8, seen
+
+
+def detail_of(rgb):
+    """how much lighter or darker each texel is than the country round it (some three kilometres): a byte, 128 for neither"""
+    n = rgb.shape[0]; lum = np.asarray(Image.fromarray(rgb).convert('L')); low = np.asarray(Image.fromarray(lum).resize((n // 8, n // 8), Image.BOX).resize((n, n), Image.BICUBIC))
+    return np.clip(lum.astype(np.int16) - low + 128, 0, 255).astype(np.uint8)
+
+
+def retexture(rgb, tex8, det8, gain):
+    """land that was painted over gets its own light and dark back, in the colour it was given (a town's streets and parks become
+    the mottle of open country; painted plain, it was a smear among the fields)"""
+    n = rgb.shape[0]
+    for r in range(0, n, 1024):
+        sl = slice(r, r + 1024); t = tex8[sl]
+        if not t.any(): continue
+        c = rgb[sl].astype(np.float32); lum = 0.299 * c[..., 0] + 0.587 * c[..., 1] + 0.114 * c[..., 2]
+        f = 1.0 + gain * (t.astype(np.float32) * (1.0 / 255.0)) * (det8[sl].astype(np.float32) - 128.0) / np.maximum(lum, 24.0)
+        rgb[sl] = np.clip(np.rint(c * np.clip(f, 0.6, 1.6)[..., None]), 0, 255).astype(np.uint8)
+
+
 def block(job):
     """one block of the finest level: its packs into a bundle, its picture at half the size into the level below. Returns what it did."""
     bx, by, cfg = job; t0 = time.time(); T = {}; work = cfg['work']
     X0, Y0, n = bx * BLOCK - MARGIN, by * BLOCK - MARGIN, WIN
     src = Source(work); rgb = level6(src, X0, Y0, n); T['picture'] = time.time() - t0; t1 = time.time()
-    lows = None; alpha = alpha_window(TOP, X0, Y0, n, n, lows)
+    alpha = alpha_window(TOP, X0, Y0, n, n, None)
     if cfg['tiles']: acc, got, bad = wc_planes(X0, Y0, n, cfg['tiles'], cfg['wc'], cfg['threads'])
     else: acc, got, bad = None, 0, 0
     T['cover'] = time.time() - t1; t1 = time.time()
-    # how far a texel's colour is the land's own (keep8); with it, how much it counts for the texels that have none
-    keep8 = np.empty((n, n), np.uint8); seen = 0
-    for r in range(0, n, 1024):
-        sl = slice(r, r + 1024); k = ss(0.85, 0.98, alpha[sl].astype(np.float32) * (1.0 / 255.0))
-        if acc is not None:
-            cov = acc['cov'][sl].astype(np.float32); inv = 1.0 / np.maximum(cov, 1.0); ok = cov >= 128; seen += int(ok.sum())
-            k = np.where(ok, ss(0.70, 0.95, acc['land'][sl] * inv) * (1.0 - ss(0.08, 0.30, acc['built'][sl] * inv)), k)
-        c = rgb[sl].astype(np.float32); k[sea_like(c[..., 0], c[..., 1], c[..., 2])] = 0.0
-        keep8[sl] = np.rint(k * 255.0).astype(np.uint8)
-    mean, cl = cfg['mean'], cfg['climate']
+    keep8, src8, tex8, seen = whose(rgb, alpha, acc); det8 = detail_of(rgb)
+    mean, cl = cfg['mean'], cfg['climate']; fb = fallback_cells(X0, Y0, n, mean, cl)
     inner = (slice(MARGIN, MARGIN + BLOCK), slice(MARGIN, MARGIN + BLOCK))
-    stats = dict(bx=bx, by=by, tiles=got, bad=bad, seen=seen / float(n * n), own=float((keep8[inner] == 255).mean()), none=float((keep8[inner] == 0).mean()))
-    shots = []
+    stats = dict(bx=bx, by=by, tiles=got, bad=bad, seen=seen / float(n * n), own=float((keep8[inner] == 255).mean()), none=float((keep8[inner] == 0).mean()), town=float((tex8[inner] > 127).mean()))
+    shots = []; S = cfg['shot'] // 2; sdir = os.path.join(work, 'sheet')
     for name, lon, lat in cfg['places']:      # (the picture before anything is done to it, for the sheet)
-        px, py = int((lon + 180.0) / 360.0 * W6) - X0, int((90.0 - lat) / 180.0 * H6) - Y0; S = cfg['shot'] // 2
+        px, py = int((lon + 180.0) / 360.0 * W6) - X0, int((90.0 - lat) / 180.0 * H6) - Y0
         if MARGIN <= px < MARGIN + BLOCK and MARGIN <= py < MARGIN + BLOCK:
-            a, b, c, d = max(0, py - S), min(n, py + S), max(0, px - S), min(n, px + S); shots.append((name, a, b, c, d))
-            Image.fromarray(rgb[a:b, c:d]).save(os.path.join(work, 'sheet', '%s_0raw.png' % name.replace(' ', '_')))
-    carry(rgb, keep8, keep8, fallback_cells(X0, Y0, n, mean, cl)); T['carry'] = time.time() - t1; t1 = time.time()
-    for name, a, b, c, d in shots:
-        nm = name.replace(' ', '_'); Image.fromarray(rgb[a:b, c:d]).save(os.path.join(work, 'sheet', '%s_1out.png' % nm))
+            a, b, c, d = max(0, py - S), min(n, py + S), max(0, px - S), min(n, px + S); shots.append((name.replace(' ', '_'), a, b, c, d))
+            Image.fromarray(rgb[a:b, c:d]).save(os.path.join(sdir, '%s_0raw.png' % name.replace(' ', '_')))
+    if cfg.get('wild') and acc is not None and shots:      # (a trial: the country as it might lie unploughed, for the sheet only)
+        info = np.asarray(Image.open(os.path.join(ROOT, 'data', 'info.png')).convert('RGBA'))[..., 3]; fi = W6 // info.shape[1]
+        x0, y0 = X0 // fi - 2, Y0 // fi - 2; cw = (X0 + n - 1) // fi + 3 - x0
+        hum = np.asarray(Image.fromarray(take(info, x0, y0, cw, cw)).resize((cw * fi, cw * fi), Image.BILINEAR))[Y0 - y0 * fi:Y0 - y0 * fi + n, X0 - x0 * fi:X0 - x0 * fi + n]
+        wild = ss(0.35, 0.6, hum.astype(np.float32) * (1.0 / 255.0)); del hum
+        k2, s2, t2, _ = whose(rgb, alpha, acc, wild); del wild; alt = rgb.copy(); carry(alt, s2, k2, fb); retexture(alt, t2, det8, cfg['gain'])
+        for nm, a, b, c, d in shots: Image.fromarray(alt[a:b, c:d]).save(os.path.join(sdir, '%s_5wild.png' % nm))
+        del alt, k2, s2, t2
+    carry(rgb, src8, keep8, fb)
+    for nm, a, b, c, d in shots: Image.fromarray(rgb[a:b, c:d]).save(os.path.join(sdir, '%s_6plain.png' % nm))
+    retexture(rgb, tex8, det8, cfg['gain']); del det8; T['carry'] = time.time() - t1; t1 = time.time()
+    for nm, a, b, c, d in shots:
+        Image.fromarray(rgb[a:b, c:d]).save(os.path.join(sdir, '%s_1out.png' % nm))
         wet = alpha[a:b, c:d] < 92
         if acc is not None: cv = acc['cov'][a:b, c:d]; wet = np.where(cv >= 128, acc['land'][a:b, c:d].astype(np.float32) < 0.5 * cv, wet)
-        v = rgb[a:b, c:d].copy(); v[wet] = SEA; Image.fromarray(v).save(os.path.join(work, 'sheet', '%s_2sea.png' % nm))
-        Image.fromarray(keep8[a:b, c:d]).save(os.path.join(work, 'sheet', '%s_3own.png' % nm))
-        if acc is not None: Image.fromarray(np.dstack([acc['built'][a:b, c:d], acc['tree'][a:b, c:d], acc['crop'][a:b, c:d]])).save(os.path.join(work, 'sheet', '%s_4cover.png' % nm))
+        v = rgb[a:b, c:d].copy(); v[wet] = SEA; Image.fromarray(v).save(os.path.join(sdir, '%s_2sea.png' % nm))
+        Image.fromarray(np.dstack([keep8[a:b, c:d], src8[a:b, c:d], tex8[a:b, c:d]])).save(os.path.join(sdir, '%s_3own.png' % nm))
+        if acc is not None: Image.fromarray(np.dstack([acc['built'][a:b, c:d], acc['tree'][a:b, c:d], acc['crop'][a:b, c:d]])).save(os.path.join(sdir, '%s_4cover.png' % nm))
+    del acc, src8, tex8
     # the packs
     packs = {}; present = []; size = 0; q = cfg['q']; check = None
     for j in range(BUNDLE):
@@ -418,11 +473,10 @@ def block(job):
             a = alpha[o]; own = keep8[o]
             if not (a.max() > 0 or own.max() > 0): continue
             buf = encode(rgb[o], a, q); packs[(i, j)] = buf; present.append((bx * BUNDLE + i, by * BUNDLE + j)); size += len(buf)
-            if check is None and own.min() < 255 and own.max() == 255:      # (the first pack with a coast in it: does it come back as it was written?)
+            if check is None and own.min() < 255 and own.max() == 255 and a.min() == 0:      # (the first pack with a coast in it: does it come back as it was written?)
                 back = np.array(Image.open(io.BytesIO(buf)).convert('RGBA')); clear = a == 0
-                check = dict(pack='%d/%d' % (bx * BUNDLE + i, by * BUNDLE + j), bytes=len(buf), alpha=bool(np.array_equal(back[..., 3], a)), db=psnr(back[..., :3], rgb[o]),
-                             db_clear=psnr(back[..., :3][clear], rgb[o][clear]) if clear.any() else None,
-                             sizes={qq: len(encode(rgb[o], a, qq)) for qq in (85, 90, 92, 95)})
+                check = dict(pack='%d/%d' % (bx * BUNDLE + i, by * BUNDLE + j), bytes=len(buf), alpha=bool(np.array_equal(back[..., 3], a)), db=round(psnr(back[..., :3], rgb[o]), 1),
+                             db_clear=round(psnr(back[..., :3][clear], rgb[o][clear]), 1), sizes={qq: len(encode(rgb[o], a, qq)) for qq in (85, 90, 92, 95)})
     if packs: write_bundle(os.path.join(work, 'packs', '%d_b%d_%d.bin' % (TOP, bx, by)), packs)
     T['packs'] = time.time() - t1
     # the level below: this block at half the size
@@ -484,16 +538,16 @@ def main():
         if land or (tiles and wc_tiles_of(bx * BLOCK - MARGIN, by * BLOCK - MARGIN, WIN, tiles)): go.append((bx, by))
     say('%d blocks have land in them: %s' % (len(go), ' '.join('%d/%d' % b for b in go)))
     places = [p for p in PLACES if not opt.get('places') or p[0].replace(' ', '_') in opt['places'].split(',')]
-    cfg = dict(work=work, tiles=tiles, wc=int(opt.get('wc', 2250)), threads=int(opt.get('threads', 16)), mean=mean, climate=cl, q=q, places=places, shot=int(opt.get('shot', 640)))
+    cfg = dict(work=work, tiles=tiles, wc=int(opt.get('wc', 2250)), threads=int(opt.get('threads', 16)), mean=mean, climate=cl, q=q, places=places, shot=int(opt.get('shot', 640)), gain=float(opt.get('gain', 0.6)), wild=opt.get('wild') == '1')
     done = []; fails = 0
     import multiprocessing as mp
     with cf.ProcessPoolExecutor(jobs, mp_context=mp.get_context('spawn')) as ex:
         for st in ex.map(block, [(bx, by, cfg) for bx, by in go]):
             done.append(st); fails += st['bad']
             for px, py in st['present']: present[py, px] = True
-            say('block %d/%d: %d packs, %.1f MB; WorldCover %d tiles (%d not read), saw %.0f%% of it; %.0f%% the land\'s own colour, %.0f%% carried on; %s; %.0f s' % (
-                st['bx'], st['by'], len(st['present']), st['bytes'] / 1e6, st['tiles'], st['bad'], 100 * st['seen'], 100 * st['own'], 100 * st['none'], st['seconds'], st['total']))
-            if st['check']: say('   pack %(pack)s: %(bytes)d bytes; the mask came back whole: %(alpha)s; colour %(db).1f dB, under the clear texels %(db_clear)s dB; at other qualities %(sizes)s' % st['check'])
+            say('block %d/%d: %d packs, %.1f MB; WorldCover %d tiles (%d not read), saw %.0f%% of it; %.0f%% the land\'s own colour, %.0f%% carried on, %.2f%% towns; %s; %.0f s' % (
+                st['bx'], st['by'], len(st['present']), st['bytes'] / 1e6, st['tiles'], st['bad'], 100 * st['seen'], 100 * st['own'], 100 * st['none'], 100 * st['town'], st['seconds'], st['total']))
+            if st['check']: say('   pack %(pack)s: %(bytes)d bytes; the mask came back whole: %(alpha)s; colour %(db).1f dB, under the clear texels %(db_clear).1f dB; at other qualities %(sizes)s' % st['check'])
     if fails and opt.get('lenient') != '1': sys.exit('WorldCover: %d tiles could not be read (lenient=1 goes on without them)' % fails)
     say('the finest level: %d packs, %.1f MB, in %.0f s' % (int(present.sum()), sum(s['bytes'] for s in done) / 1e6, time.time() - t0))
     # ---- the levels below
@@ -535,13 +589,13 @@ def sheet(work, out, places, S):
     """the places to look at, side by side: the Blue Marble as it is; with the land's colour carried on; that with the water where WorldCover has it; how far each texel's colour is its own; what covers it (red built over, green trees, blue ploughed)"""
     rows = []
     for name, lon, lat in places:
-        nm = name.replace(' ', '_'); fs = [os.path.join(work, 'sheet', '%s_%s.png' % (nm, k)) for k in ('0raw', '1out', '2sea', '3own', '4cover')]
+        nm = name.replace(' ', '_'); fs = [os.path.join(work, 'sheet', '%s_%s.png' % (nm, k)) for k in ('0raw', '1out', '6plain', '5wild', '2sea', '3own', '4cover')]
         if os.path.exists(fs[0]): rows.append((name, [Image.open(f).convert('RGB') for f in fs if os.path.exists(f)]))
     if not rows: return
     cols = max(len(r[1]) for r in rows); sh = Image.new('RGB', (cols * (S + 4), len(rows) * (S + 4)), (12, 16, 26))
     for j, (name, ims) in enumerate(rows):
         for i, im in enumerate(ims): sh.paste(im, (i * (S + 4), j * (S + 4)))
-    sh.save(os.path.join(out, 'planet_imagery.jpg'), quality=90); say('planet_imagery.jpg: %s (one row each: as it is, carried on, with the water, own, cover)' % ', '.join(r[0] for r in rows))
+    sh.save(os.path.join(out, 'planet_imagery.jpg'), quality=90); say('planet_imagery.jpg: %s (one row each: as it is; as the game gets it; that without the towns\' own light and dark; [wild=1: unploughed;] with the water; own (red), counted (green), painted over (blue); cover: built red, trees green, ploughed blue)' % ', '.join(r[0] for r in rows))
 
 
 if __name__ == '__main__':
