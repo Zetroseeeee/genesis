@@ -20,13 +20,12 @@ OUT, WORK = arg('out', 'out'), arg('work', 'work')
 what = [a for a in sys.argv[1:] if a in ('urls', 'months', 'sheet')] or ['urls', 'months', 'sheet']
 UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) holocene-planet-probe'}
 EO = 'https://eoimages.gsfc.nasa.gov/images/imagerecords/'
-# Blue Marble Next Generation at the Earth Observatory: a record for every month and kind (the plain land surface; with the
-# hills' shade; with the sea bed's too). The records' numbers as remembered: the probe says which are right.
-IDS = {'': [74243, 74268, 74293, 74318, 74343, 74368, 74393, 74418, 74443, 74468, 74493, 74518],
-       '.topo': [73938, 73967, 73992, 74017, 74042, 74067, 74092, 74117, 74142, 74167, 74192, 74218],
-       '.topo.bathy': [73580, 73605, 73630, 73655, 73701, 73726, 73751, 73776, 73801, 73826, 73884, 73909]}
-def bmng(m, kind='', size='3x5400x2700', ext='jpg', tile=''):
-    i = IDS[kind][m - 1]; return '%s%d/%d/world%s.2004%02d.%s%s.%s' % (EO, i // 1000 * 1000, i, kind, m, size, tile and '.' + tile, ext)
+# Blue Marble Next Generation (NASA Earth Observatory; R. Stockli): the land's surface month by month through 2004, 500 m to a
+# pixel, in eight pieces of 21600 pixels a side (A1 .. D2: A-D from the west, 1 north, 2 south), and whole at 2 km and 8 km.
+BMNG = 'https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/'
+MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+def bmng(m, size='3x5400x2700', ext='jpg', tile=''):
+    return '%s%s/world.2004%02d.%s%s%s' % (BMNG, MONTHS[m - 1], m, size, tile and '.' + tile, ext if ext.startswith('_') else '.' + ext)
 SVS = 'https://svs.gsfc.nasa.gov/vis/a000000/'
 
 
@@ -65,9 +64,10 @@ def links(url):
 
 if 'urls' in what:
     print('== the sources ==')
-    for name, url in [(('bmng%s %02d' % (k, m)), bmng(m, k)) for k in IDS for m in (1, 2, 7, 8, 12)] + [
-        ('bmng 500 m tile (aug, A1)', bmng(8, '', '3x21600x21600', 'png', 'A1')), ('bmng 500 m tile (feb, D2)', bmng(2, '', '3x21600x21600', 'png', 'D2')),
-        ('bmng 2 km png (aug)', bmng(8, '', '3x21600x10800', 'png')), ('bmng 2 km jpg (aug)', bmng(8, '', '3x21600x10800', 'jpg')),
+    for name, url in [('bmng 8 km %02d' % m, bmng(m)) for m in (1, 2, 7, 8)] + [
+        ('bmng 500 m A1 jpg (aug)', bmng(8, '3x21600x21600', 'jpg', 'A1')), ('bmng 500 m A1 tif (aug)', bmng(8, '3x21600x21600', '_geo.tif', 'A1')),
+        ('bmng 500 m C1 jpg (aug)', bmng(8, '3x21600x21600', 'jpg', 'C1')), ('bmng 500 m D2 jpg (feb)', bmng(2, '3x21600x21600', 'jpg', 'D2')), ('bmng 500 m D2 tif (feb)', bmng(2, '3x21600x21600', '_geo.tif', 'D2')),
+        ('bmng 2 km jpg (aug)', bmng(8, '3x21600x10800', 'jpg')), ('bmng 2 km tif (aug)', bmng(8, '3x21600x10800', '_geo.tif')),
         ('clouds 8192', EO + '57000/57747/cloud_combined_8192.tif'),
         ('clouds 2048', EO + '57000/57747/cloud_combined_2048.jpg'),
         ('clouds east 21600', EO + '57000/57747/cloud.E.2001210.21600x21600.png'),
