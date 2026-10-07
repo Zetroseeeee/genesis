@@ -56,7 +56,8 @@ for k in range(7):
     mn, ms = COLD[True][k], COLD[False][k]
     a = np.where(north[..., None], jan if mn == 1 else month(mn), jul if ms == 7 else month(ms)); lw = lum(a)
     # snow: lighter than the summer by a good deal, and without colour; a wood under snow is grey, not white, and far darker than a field
-    snow += ss(0.08, 0.22, lw - ls) * grey(a) * ss(0.22, 0.38, lw) * (1.0 - sea) / 7.0
+    # (bare boughs without snow are lighter than the summer's leaves too, but brown)
+    snow += ss(0.08, 0.22, lw - ls) * grey(a) * ss(0.16, 0.30, lw) * (1.0 - sea) / 7.0
     del a, lw
 # (to the map's own cells, then smoothed over some sixty kilometres: what is left of a month's yes or no is how likely it is)
 snow = np.array(Image.fromarray(np.rint(snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.6))).astype(np.float32) / 255.0

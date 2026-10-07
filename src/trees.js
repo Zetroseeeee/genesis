@@ -263,15 +263,14 @@
       if (climateUrl) img(climateUrl).then((c) => { this.climate = c; for (const L of this.last) L.t = -1e9; }).catch((e) => console.warn('climate', e));
       if (snowUrl) img(snowUrl).then((c) => { this.snow = c; }).catch((e) => console.warn('snow', e));
     }
-    // How much of the ground snow covers at a place just now (0..1), the twin of the ground shader's rule: where, as the Earth's own
-    // winter has it (data/snow.png: tools/planet/snow.py); how long, by how hard the climate's winters are. cold: the cold of the
-    // year in that hemisphere (0..1, a month behind the sun). Roofs and boughs go white by it with the ground.
-    // h: how high the place lies, in metres (at the snow's edge it keeps to the heights: a hillside is white before the plain under it).
+    // How much of the ground snow covers at a place just now (0..1), the twin of the ground shader's rule (without the grain of
+    // its edge): where and for how much of the year, as the Earth has it (data/snow.png, the share of a cold season in which snow
+    // lay there: tools/planet/snow.py); sooner and longer on the heights. cold: the cold of the year in that hemisphere
+    // (0..1, a month behind the sun); h: how high the place lies, in metres. Roofs and boughs go white by it with the ground.
     lyingAt(lon, lat, coldYear, h) {
-      let cold = Trees.COLD[this.climateAt(lon, lat)] || 0;
-      if (!this.snow) { const thr = 1.02 - 0.55 * cold; return smooth(thr, thr + 0.1, coldYear) * smooth(0.08, 0.5, cold); }
-      const sn = this.snow, real = this.samp(sn, (lon + 180) / 360 * sn.width, (90 - lat) / 180 * sn.height, 0); cold = Math.max(cold, 0.35 * real);
-      const thr = 1.02 - 0.55 * cold; return smooth(thr, thr + 0.1, coldYear) * smooth(0.06, 0.7, real * (0.62 + Math.min(Math.max(h || 0, 0), 2200) / 1500));
+      if (!this.snow) { const cold = Trees.COLD[this.climateAt(lon, lat)] || 0, thr = 1.02 - 0.55 * cold; return smooth(thr, thr + 0.1, coldYear) * smooth(0.08, 0.5, cold); }
+      const sn = this.snow, real = this.samp(sn, (lon + 180) / 360 * sn.width, (90 - lat) / 180 * sn.height, 0);
+      return Math.min(1, Math.max(0, (real * (0.8 + Math.min(Math.max(h || 0, 0), 2400) * 0.0008) - 0.07 - (1 - coldYear) * 1.15) / 0.45));
     }
     // bilinear sample of an ImageData channel at fractional pixel coords (wrapping x)
     samp(id, fx, fy, ch) {
