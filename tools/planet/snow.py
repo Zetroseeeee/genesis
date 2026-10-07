@@ -97,7 +97,7 @@ ix = distance_transform_edt(sea | wet, return_distances=False, return_indices=Tr
 # and Ice Data Center has: how much of the sea is ice, month by month since 1979, from microwave radiometers that see by
 # night and through cloud, on a grid of 25 km about each pole (Fetterer, Knowles, Meier, Savoie and Windnagel: Sea Ice Index,
 # Version 4, NSIDC, doi:10.7265/a98x-0f50). Its first ten years are taken, which are the nearest it has to a sea nobody had
-# warmed: for each month the mean of them, and a month has ice where three tenths of the sea and more is ice.
+# warmed: for each month the mean of them, and a month has ice where four tenths of the sea and more is ice.
 import rasterio
 from rasterio.warp import transform as reproject
 from concurrent.futures import ThreadPoolExecutor
@@ -126,7 +126,7 @@ for hemi in 'NS':
             ok = a <= 1000; acc = np.where(ok, a, 0.0) if acc is None else acc + np.where(ok, a, 0.0); n = ok.astype(np.float32) if n is None else n + ok
         if acc is None: continue
         conc = np.where(n > 0, acc / np.maximum(n, 1.0) / 1000.0, np.nan)      # the mean of the years; nan: land
-        has = ss(0.15, 0.5, conc); share = has if share is None else share + has
+        has = ss(0.25, 0.55, conc); share = has if share is None else share + has      # (not less: a radiometer's cell of 25 km on a shore sees the land with the sea, and takes it for a little ice - the Danish straits froze every March)
     share = share / 12.0; sea_ = ~np.isnan(share)
     ix, dist = distance_transform_edt(~sea_, return_distances=True, return_indices=True)[::-1]      # (land takes the nearest sea's, within some four hundred kilometres)
     share = np.where(sea_, share, np.where(dist < 16, share[ix[0], ix[1]], 0.0)); share = np.nan_to_num(share)
