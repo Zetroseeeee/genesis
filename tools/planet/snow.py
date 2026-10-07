@@ -35,7 +35,7 @@ snow's twin for boughs and roofs).
 import os, sys, time, urllib.request, urllib.error
 import numpy as np
 from PIL import Image, ImageFilter
-from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion, binary_dilation, median_filter
+from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion, binary_dilation, median_filter, grey_closing
 
 Image.MAX_IMAGE_PIXELS = None
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
@@ -202,7 +202,12 @@ margin = ss(1.0, 18.0, distance_transform_edt(~has))
 MR = 6
 yy, xx = np.mgrid[-MR:MR + 1, -MR:MR + 1]
 sealevel = snow - PER_KM * high / 1000.0
-sealevel = median_filter(np.concatenate([sealevel[:, -MR:], sealevel, sealevel[:, :MR]], 1), footprint=(yy * yy + xx * xx <= MR * MR), mode='nearest')[:, MR:-MR]      # (round the Earth by hand: a filter of ranks takes one way of ending for both ways)
+wide = np.concatenate([sealevel[:, -2 * MR:], sealevel, sealevel[:, :2 * MR]], 1)      # (round the Earth by hand: a filter of ranks takes one way of ending for both ways)
+wide = median_filter(wide, footprint=(yy * yy + xx * xx <= MR * MR), mode='nearest')
+# (and a hole that is left is closed where it is narrower than some hundred and forty kilometres: in the depth of winter the
+#  snow of a plain is whole, and a dip in the map just where little snow becomes none was a round bare island in the white)
+yy, xx = np.mgrid[-4:5, -4:5]
+sealevel = grey_closing(wide, footprint=(yy * yy + xx * xx <= 16), mode='nearest')[:, 2 * MR:-2 * MR]
 sealevel = gaussian_filter(sealevel, 1.2, mode=('nearest', 'wrap')) - margin
 lat = 90.0 - (np.arange(H) + 0.5) * 180.0 / H
 print('snow in winter by latitude (the share of the land that has it; 10 degrees at a time, from the north):')
