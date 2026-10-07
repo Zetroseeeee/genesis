@@ -512,44 +512,55 @@ Conventions that matter:
   `info.png` and under it `veg.jpg` at the same size - the ground's shader has all sixteen textures, and a layer
   costs none. `info.png` is read back through the card (`pixelsOf`): a 2D canvas keeps colour multiplied by alpha,
   and its alpha is how dry the country is. The second layer's alpha is the snow of the Earth's own winters (below).
-- **Winter** (`data/snow.png`, `tools/planet/snow.py`; `snowMap` in `terrain.js`, `Trees.lyingAt`). Where snow lies,
-  and for how much of the year, is the Earth's own: the Blue Marble has every month, and the map is the share of a
-  cold season's seven months (October to April in the north, April to October in the south) in which a place was
-  white or grey and had not been in summer - all of them in Siberia, five at Moscow, four at Winnipeg, one in the
-  Ukraine, none at Berlin, none in Tibet (which is dry: by the climate's class it was an ice cap half the year, and
-  a cold desert from the Tarim to the Namib lay white). A wood's winter is measured as a wood's: under snow it is
-  grey, not white, and takes the snow of the open ground about it (by their own look the larch of Yakutia and the
-  woods of Minnesota had no winter). Snow lies where `map x height > 0.07 + 1.15 x (1 - the cold of the year)`
-  (`uBare.z/.w`, a month behind the sun; `snowAsk`): deep winter takes in every place that has any, and the edges
-  of the season only where it lies all winter; the height counts for much (0.8 at the sea, 2.7 from 2,400 m), so
-  that at its edge the snow keeps to the hills, and comes to them first and leaves them last - and what the season
-  asks rises past anything a height has from late spring (or the Alps lay white all July: what stays the year
-  round is the snow line's to say, and the photograph's). The same number brings the snow line of the mountains
-  down in winter (`winterSnow`). **It does not end at a line.** It thins out over half the map's range, and where
-  it thins it lies on open ground before the woods: the photograph's own light and dark, field by field (`lum0`),
-  say which is which, and from close to the hollows of the ground's own material do (`gHU`). That grain is what
-  tells snow from cloud. Three things that were tried and looked wrong: January alone (a yes or no: the snow of
-  Europe was a white sheet with a ruled edge through Poland); noise the size of a country added to the map, or
-  the map looked up a little way off by it (white puffs on green, and the snow of the Alps lying beside the Alps);
-  the place's own noise from far out (it repeats every forty kilometres and less: the thinning snow of Poland was
-  a wallpaper of dark dots from six hundred up - `noiseL` fades each size out long before its repeat is small in
-  the picture). A wood under snow is dark from above (`wForest` hides four
-  half of it at most, a third under bare boughs, by how dark the photograph has it), and snow lights its own shade
-  (the ambient light is up to twice as much and bluer on it: shaded as other ground, a winter's mountains were
-  white and navy) while the sun's own light counts for a little less on it (under a high sun every slope of a
-  snowfield was past white, a sheet of paper with no hills in it).
-  **Ice on the sea** is the sea's own too (`natv.g`, the map's green; `uIceCold`): the share of the year's twelve
-  months in which the sea there is ice, from the Sea Ice Index of the US National Snow and Ice Data Center (the
-  mean of its first ten years; the Blue Marble's sea is one dark blue the year round) - twelve at the pole, seven
-  in Hudson Bay, five in the Gulf of Bothnia, none off Norway. By the latitude alone, in winter there was ice off
-  Scotland. Ice of so many months lies while `yearOff = acos(2 x cold - 1) / pi` is less than its share, which is
-  just that many months about the end of winter (the sea runs eleven weeks behind the sun); a month and more is
-  asked before there is any (a radiometer's cell on a shore sees the land with the sea, and the Danish straits froze
-  every March). Lakes and rivers freeze where the climate's winters are hard (`info.b`) by the snow of their shores,
-  counted half as much again and on the sea's slower clock (`frozen`: by the snow lying at the moment Ladoga was open
-  water in March); the Caspian is the sea's, and has no ice in the Index. Roofs and boughs ask
-  `trees.lyingAt(lon, lat, cold, height)`, the same sum without the grain. Look at Europe and North America from
-  2,500 km and more, Poland from 600, the Alps from 300 and 80 and a town in the snow after touching any of it.
+- **Winter** (`data/snow.png`, `tools/planet/snow.py`; `snowHere` in `terrain.js`, `Trees.lyingAt`). Where snow lies,
+  and for how much of the year, is the Earth's own: the Blue Marble has every month, and the builder reads from it
+  the share of a cold season's seven months (October to April in the north, April to October in the south) in which
+  a place was white or grey and had not been in summer - all of them at Yakutsk, 0.9 at Novosibirsk, 0.7 at Moscow
+  and Quebec, 0.6 at St Petersburg and Winnipeg, 0.4 at Stockholm, 0.25 at Kyiv, 0.13 at Warsaw, none at Berlin or in
+  Tibet (which is dry: by the climate's class it was an ice cap half the year, and a cold desert from the Tarim to
+  the Namib lay white). A wood's winter is measured as a wood's (under snow it is grey, not white), and a wood takes
+  the snow of the open ground about it (by their own look the larch of Yakutia and the woods of Minnesota had no
+  winter); water takes that of its nearest land.
+  *Heights.* The map is of cells twenty kilometres across, and what it has for the Alps is the Alps on the whole.
+  Snow lies half the season longer for every thousand metres (`PER_KM`; 0.0005 a metre in the shader and in
+  `lyingAt`), so the map keeps how long it would lie **at the level of the sea** - the cell's share less what the
+  cell's own height on the whole accounts for (the game's heights, smoothed as the snow is), `(share + 3) / 4` in
+  red - and every place adds its own height back: `snowHere = clamp(map x 4 - 3 + height x 0.0005, 0, 1.25)`. A
+  valley of the Alps is green for most of its winter under white mountains; the high ranges of a dry plateau have
+  snow while the plateau has none. A cell without snow counts as if it began 600 m above itself, and 2,000 m where
+  there is none for a hundred kilometres round (the Hoggar has no winter). The same number brings the snow line of
+  the mountains down in winter (`winterSnow`).
+  *The season.* Snow of so much of the cold season lies for just so long about the depth of winter: `snowOff =
+  acos(2 x cold - 1) / pi` is how far the year is from that (`uBare.z/.w`: 0 late in January, 1 half a year on),
+  the cold season is 0.58 of the year, and snow lies while `snowHere x 0.58 > snowOff`, coming and going over three
+  weeks; where there is little of it in any winter it is thin in all of them (`smoothstep(0.02, 0.4, .)`).
+  **It does not end at a line.** It thins out, and where it thins it lies on open ground before the woods: the
+  photograph's own light and dark, field by field (`lum0`), say which is which, and from close to the hollows of the
+  ground's own material do (`gHU`). That grain is what tells snow from cloud; a patch has an edge where the grain is
+  large in the picture (`edgeW`), or thinning snow is a white mist. Things that were tried and looked wrong: January
+  alone (a yes or no: the snow of Europe was a white sheet with a ruled edge through Poland); noise the size of a
+  country added to the map, or the map looked up a little way off by it (white puffs on green, and the snow of the
+  Alps lying beside the Alps); the place's own noise from far out (it repeats every forty kilometres and less: the
+  thinning snow of Poland was a wallpaper of dark dots from six hundred up - `noiseL` fades each size out long
+  before its repeat is small in the picture, here and for the wind's patches on the sea and the blots of a lake's
+  ice); the height counted as a factor on the map's share (the plains had too little or the valleys too much).
+  A wood under snow is dark from above (`wForest` hides half of it at most, a third under bare boughs, by how dark
+  the photograph has it), and snow lights its own shade (the ambient light is up to twice as much and bluer on it:
+  shaded as other ground, a winter's mountains were white and navy) while the sun's own light counts for a little
+  less on it (under a high sun every slope of a snowfield was past white, a sheet of paper with no hills in it).
+  Roofs and boughs ask `trees.lyingAt(lon, lat, cold, height)`, the same sum without the grain.
+  **Ice on the sea** is the sea's own too (`natv.g`, the map's green; `uIceCold`, `iceOff`): the share of the
+  year's twelve months in which the sea there is ice, from the Sea Ice Index of the US National Snow and Ice Data
+  Center (the mean of its first ten years; the Blue Marble's sea is one dark blue the year round) - twelve at the
+  pole, nine in Baffin Bay, seven in Hudson Bay, four in the Gulf of Bothnia, none off Norway. By the latitude alone,
+  in winter there was ice off Scotland. Ice of so many months lies for just that many about the end of winter (the
+  sea runs eleven weeks behind the sun); a month and more is asked before there is any (a radiometer's cell on a
+  shore sees the land with the sea, and the Danish straits froze every March). Lakes and rivers freeze where the
+  climate's winters are hard (`info.b`) by the snow of their shores, counted three quarters as long and on the
+  sea's slower clock (`frozen`: by the snow lying at the moment Ladoga was open water in March); the Caspian is the
+  sea's, and has no ice in the Index. Both notices are in the game's menu.
+  Look at Europe and North America from 2,500 km and more, Poland from 600, the Alps from 300 and 80 and low, a
+  town in the snow, and the seas (`winter_*`, `thaw_europe`, `ice_*` in the tour) after touching any of it.
 - **The water's edge** (`data/w`, `tools/water/build.py`; `uWater` in `terrain.js`). A field of distances: how
   many metres it is from every place to the nearest shore (land positive), 305 m to a texel at level 7 and the
   same at half and a quarter the fineness (levels 6 and 5), in packs of 2052 texels with a rim of two. Its nought

@@ -959,7 +959,7 @@
           //  snow fades as it thins; where it is many - from a hundred kilometres down - a patch has an edge, or thinning snow is
           //  a white mist over the country.)
           float open = clamp((lum0 - 0.2) * 3.0, -0.3, 0.4) * smoothstep(0.2, 0.6, green);      // (in green country: bare ground is light and says nothing by it)
-          float edgeW = mix(0.05, 0.2, smoothstep(-7.5, -4.5, noiseL));
+          float edgeW = mix(0.05, 0.2, smoothstep(-7.5, -4.5, noiseL)) + 0.25 * smoothstep(-4.5, -2.5, noiseL);      // (and from where a country is a hand's breadth it fades as it thins: there is no grain left to make patches of, and the snow of Poland ended at a shore)
           float cover = smoothstep(0.5 - edgeW, 0.5 + edgeW, lying + ((0.5 - gHU) * 0.6 + open * 0.6) * (1.0 - lying) * smoothstep(0.0, 0.25, lying));
           // (a wood under snow is dark from above: the snow is on its floor, and the eye sees the trees - through bare boughs more of it)
           cover *= (1.0 - smoothstep(0.3, 0.65, slope)) * (1.0 - 0.75 * smoothstep(0.4, 0.7, dec.b)) * (1.0 - 0.45 * smoothstep(0.04, 0.22, dec.b)) * (1.0 - wForest * (1.0 - smoothstep(0.14, 0.32, lum0)) * mix(0.55, 0.3, bare));      // (the darker the photograph has it, the more of a wood it is)
@@ -1131,7 +1131,7 @@
       //  is open weeks after the last. By the snow lying at the moment, Ladoga was open water in March. Not where a month of
       //  snow is all the winter there is: from far out the Danish straits are a lake to the picture's map.)
       float iceOff = acos(clamp(2.0 * mix(uIceCold.y, uIceCold.x, hemi) - 1.0, -1.0, 1.0)) * 0.31831;      // (how far the year is from the end of winter: 0 early in March, 1 half a year on)
-      float frozen = smoothstep(0.0, 0.06, snowHere * 0.75 - 0.08 - iceOff) * smoothstep(0.5, 0.85, info.b);
+      float frozen = smoothstep(0.0, 0.06, snowHere * 0.75 - 0.08 - iceOff) * smoothstep(0.3, 0.6, info.b);      // (hard winters from 0.6: Winnipeg's are 0.72)
       #else
       float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
       #endif
