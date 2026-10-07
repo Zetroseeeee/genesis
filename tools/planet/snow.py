@@ -197,11 +197,12 @@ margin = ss(1.0, 18.0, distance_transform_edt(~has))
 # of it this is climate, which is smooth over a hundred kilometres, and what is left that is not smooth is one year's weather
 # and the Blue Marble's own patchwork (a month's picture is pieced together from its clearest days: a hole in the snow of
 # Mazovia a hundred kilometres across, with the edges of a tile, was a dark window in the white of every winter). So it is
-# taken as the middle value within some seventy kilometres, which keeps an edge where there is one and lets go of holes and
+# taken as the middle value within some hundred kilometres, which keeps an edge where there is one and lets go of holes and
 # islands smaller than that, and then smoothed a little.
-yy, xx = np.mgrid[-4:5, -4:5]
+MR = 6
+yy, xx = np.mgrid[-MR:MR + 1, -MR:MR + 1]
 sealevel = snow - PER_KM * high / 1000.0
-sealevel = median_filter(np.concatenate([sealevel[:, -4:], sealevel, sealevel[:, :4]], 1), footprint=(yy * yy + xx * xx <= 16), mode='nearest')[:, 4:-4]      # (round the Earth by hand: a filter of ranks takes one way of ending for both ways)
+sealevel = median_filter(np.concatenate([sealevel[:, -MR:], sealevel, sealevel[:, :MR]], 1), footprint=(yy * yy + xx * xx <= MR * MR), mode='nearest')[:, MR:-MR]      # (round the Earth by hand: a filter of ranks takes one way of ending for both ways)
 sealevel = gaussian_filter(sealevel, 1.2, mode=('nearest', 'wrap')) - margin
 lat = 90.0 - (np.arange(H) + 0.5) * 180.0 / H
 print('snow in winter by latitude (the share of the land that has it; 10 degrees at a time, from the north):')

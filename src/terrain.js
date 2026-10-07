@@ -1145,7 +1145,7 @@
       //  lake freezes from its shores: out in a great one the ice comes weeks later and goes weeks sooner.)
       float coldShare = smoothstep(0.85, 1.0, info.b) * smoothstep(0.27, 0.36, latN0) * 0.55;
       float lakeSeason = max(snowHere, coldShare) * 0.75 - 0.08 - (wOn > 0.5 ? 0.07 * smoothstep(300.0, 3000.0, off) : 0.0);
-      float frozen = max(smoothstep(0.0, 0.06, lakeSeason - iceOff) * smoothstep(0.3, 0.6, info.b) * (1.0 - smoothstep(0.02, 0.06, natv.g)), smoothstep(0.01, 0.05, iceIn));      // (hard winters from 0.6: Winnipeg's are 0.72)
+      float frozen = max(smoothstep(0.0, 0.06, lakeSeason - iceOff) * max(smoothstep(0.3, 0.6, info.b), smoothstep(0.5, 0.8, snowHere)) * (1.0 - smoothstep(0.02, 0.06, natv.g)), smoothstep(0.01, 0.05, iceIn));      // (hard winters from 0.6 by the climate's class - Winnipeg's are 0.72 - or wherever snow lies for four months and more: a tarn of the Alps, a lake of the Qilian)
       #else
       float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
       #endif
@@ -1743,7 +1743,9 @@
         //  mountains is a few hundred metres across, the quads from far off are kilometres, and every corner within a quad
         //  and a half of it was taken down to its level - a pit miles wide with walls in shadow, dark blue dots all over
         //  the snows of the Himalaya. A lake that small may lie a little aslant on its triangle: nobody can see that.)
-        if (t.wPack && t.wPack.pack) u.uWaterP.value.z = t.wWide > 0 && t.wWide < 0.75 * t.quadM / t.grid ? 1 : 0;
+        //  (Not where the field has reached its limit in the middle of a water - 3.6 km from any shore at the finest level, twice
+        //  and four times that at the coarser: that is a great lake, however wide, and lies level as it did.)
+        if (t.wPack && t.wPack.pack) u.uWaterP.value.z = t.wWide > 0 && t.wWide < 0.75 * t.quadM / t.grid && t.wWide < 0.8 * WCODE.deep * t.wPack.pack.scale ? 1 : 0;
         if (!t.inScene) { this.group.add(t.mesh); t.inScene = true; }
       }
       // remove tiles not visible; dispose stale

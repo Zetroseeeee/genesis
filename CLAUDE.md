@@ -530,7 +530,7 @@ Conventions that matter:
   snow while the plateau has none. Far from any snow, country counts as lying higher than it does: by 2,000 m from
   three hundred kilometres off (the Hoggar has no winter, nor Yemen, nor Ethiopia), by nothing beside the snow - by
   the distance, which is smooth (taken off at once, there was a cliff in the map along the snow's edge). With the
-  heights out of it the map is climate, smooth over a hundred kilometres: it is the middle value within seventy,
+  heights out of it the map is climate, smooth over a hundred kilometres: it is the middle value within a hundred,
   which lets go of one year's holes and islands (a hole in the snow of Mazovia with the edges of a tile). And a
   place's own height is that of the heights' texels (`hE` .. `hN`), not of the mesh's corners: from far out a quad
   is tens of kilometres, and the snow's edge was a smooth line that moved as the mesh grew finer under the eye. The same number brings the snow line of

@@ -225,7 +225,7 @@ earth_alps      | tools/scenes/forest.js | null | __G.world.cloudsOn = false; co
 earth_alps_low  | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(9.6, 46.2, 60000, 0.7, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
 earth_paris     | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(2.35, 48.85, 100000, 0.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
 earth_nile      | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(31.2, 29.5, 400000, 0.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
-earth_himalaya  | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(86.9, 28.0, 250000, 0.7, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
+earth_himalaya  | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(86.9, 28.0, 250000, 0.7, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
 earth_andes     | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(-68.5, -17.0, 600000, 0.0, 0, 0.0); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
 earth_amazon    | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(-60.0, -3.2, 300000, 0.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
 earth_sahara    | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(8.0, 24.0, 800000, 0.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 34
