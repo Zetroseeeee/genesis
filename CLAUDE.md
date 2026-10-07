@@ -504,10 +504,10 @@ Conventions that matter:
   is rougher within the pixel (`wRough`), which spreads the sun's image into a path and lifts what the horizon's
   sea mirrors above the horizon. *Surf*: where the sea comes in from the open (`wOpen`, and more under a headland
   than in a bay) lines of white run in along the shore, 34 m apart, each breaking along a stretch of itself; a
-  pale fringe from too far to tell them apart; great lakes a little, small ones none. And only on shores that face
+  pale fringe from too far to tell them apart; great lakes a little, small ones none. And most on shores that face
   the swell, which comes as the winds of the Earth blow (out of the west between thirty and sixty degrees, with
-  the trades out of the east in the tropics, turned some way by the noise of the place): all round an islet the
-  lines were rings, like a target. *The mirror*: Fresnel, the
+  the trades out of the east in the tropics, turned some way by the noise of the place); a lee shore keeps a
+  third. All round an islet the lines were rings, like a target. *The mirror*: Fresnel, the
   sky from a table of fifteen colours made once a frame where the camera stands (`skyMirror` in `main.js`: the
   air's own sum at five heights, toward the sun, across and away), the sun by a lobe as wide as `wRough`; in
   light, as the air is (`lit` is a root of light: mixed as squares). A river of the decal and a flood mirror too.
@@ -517,9 +517,11 @@ Conventions that matter:
   `sea_region`, `river_bend`, `river_wide` and `planet` on the Mac after touching any of it; here, start the live page with `GRID=1` (the
   mesh at its real fineness: with the coarse one the shore's flat strip is as wide as the field allows and no
   wider than a quad, and the sea stands up the shore again).
-  *What it costs* (the build Mac, 1680 by 1050, each in one page: `costw_*`): down at the sea 30 frames a second,
-  31 without the waves, 32 with nothing mirrored either; from three kilometres 28.5, 30 and 31; low by a lake in
-  the taiga 33, 36 and 37; over a town inland to the horizon 25.5, 26, 27, and 27.5 without the field at all.
+  *What it costs* (the build Mac, 1680 by 1050, each in one page: `costw_*`): down at the sea 29 frames a second,
+  31 without the waves, 31.5 with nothing mirrored either; from three kilometres 27, 28.5 and 29.5; low by a lake
+  in the taiga 31.5, 33.5 and 35.5; over a town inland to the horizon 24.5 with all of it and 24 with none
+  (`costw_town`: nothing that can be measured - keep it so). A pack is four million texels: `loadPack` reads it
+  out of its picture a strip at a time and lets the frame through between two.
   A software renderer runs both arms of every branch at every pixel, so what a real card skips (the sixteen
   texels away from a shore, waves and surf on dry land) it pays for everywhere: the frame took twice as long. The
   test suite's pages (a software renderer without `POST`) therefore compile the water plain (`WATER_PLAIN`: the
