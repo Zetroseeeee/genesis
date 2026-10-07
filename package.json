@@ -1,7 +1,7 @@
 {
   "name": "genesis",
   "productName": "Holocene",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "private": true,
   "description": "Holocene \u2014 a god-game on the real Earth, from 10,000 BC",
   "main": "desktop/main.js",
@@ -14,7 +14,7 @@
     "test": "node tools/build.js && ONLY=2,7 node tools/test_sim.js",
     "test:e2e": "node tools/build.js && node tools/test_e2e.js",
     "start": "node tools/build.js && electron .",
-    "fetch": "node tools/textures/fetch.mjs && node tools/ground/fetch.mjs && node tools/models/fetch.mjs",
+    "fetch": "node tools/textures/fetch.mjs && node tools/ground/fetch.mjs && node tools/water/fetch.mjs && node tools/models/fetch.mjs",
     "pack:mac": "node tools/build.js && electron-builder --mac --arm64 --dir"
   },
   "devDependencies": {

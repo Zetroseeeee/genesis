@@ -1,6 +1,7 @@
 # Makes the water's edge of the real Earth (tools/water/build.py: a field of distances to the nearest shore, from the
-# water masks of the Copernicus DEM on AWS Open Data - a host the cloud workspace cannot reach) and keeps it in the
-# "water" release, under the name of the builder it was made by. tools/water/fetch.mjs brings it into data/w/.
+# water masks of the Copernicus DEM and the water of ESA WorldCover, both on AWS Open Data - hosts the cloud workspace
+# cannot reach) and keeps it in the "water" release, under the name of what it was made from (the builder, the rivers
+# the game draws and the list of its heights: twelve digits of their SHA-256). tools/water/fetch.mjs brings it into data/w/.
 # tools/water/pack.sh runs it.
 name: Water
 on:
@@ -60,7 +61,7 @@ jobs:
           [ -n "$ONLY" ] && set -- "$@" --only "$ONLY"
           [ -n "$SHEET" ] && set -- "$@" --sheet "$SHEET"
           python3 tools/water/build.py "$@" 2>&1 | tee out/water_build.log
-          ls -la out | head -30; du -sh tiles out
+          echo "$(ls out | wc -l) files in out"; du -sh tiles out      # (never "ls | head" here: with more files than head takes, ls fails on the closed pipe and the step with it - an hour's work was lost so)
       - name: Keep
         env:
           GH_TOKEN: ${{ github.token }}
@@ -70,14 +71,14 @@ jobs:
         run: |
           set -euo pipefail
           case "$TAG" in *[!A-Za-z0-9_-]*|'') echo "bad tag"; exit 1;; esac
-          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "The water's edge" --notes "The shoreline of the Earth as a field of distances, made by tools/water/build.py from the water masks of the Copernicus DEM: produced using Copernicus WorldDEM-90 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved." --latest=false
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "The water's edge" --notes "The shoreline of the Earth as a field of distances, made by tools/water/build.py from the water masks of the Copernicus DEM (produced using Copernicus WorldDEM-90 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved) and from ESA WorldCover 2021 ((c) ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium; CC BY 4.0)." --latest=false
           gh release upload "$TAG" out/water_build.log -R "$GITHUB_REPOSITORY" --clobber
           [ "$MODE" = "probe" ] && exit 0
           [ -s out/water_sheet.jpg ] && gh release upload "$TAG" out/water_sheet.jpg -R "$GITHUB_REPOSITORY" --clobber
-          # The whole Earth is kept under the name of the builder that made it (twelve digits of its SHA-256): the game's
-          # build asks for the one its own builder makes. A trial of some blocks is kept as water-part.tar, and is nobody's pack.
+          # The whole Earth is kept under the name of what it was made from (twelve digits of the SHA-256 of the builder, the
+          # game's rivers and the list of its heights together): the game's build asks for the one its own files make. A trial of some blocks is kept as water-part.tar, and is nobody's pack.
           if [ -n "$PART" ]; then cp out/water.tar water-part.tar; gh release upload "$TAG" water-part.tar -R "$GITHUB_REPOSITORY" --clobber; exit 0; fi
-          H="$(sha256sum tools/water/build.py | cut -c1-12)"
+          H="$(cat tools/water/build.py data/rivers.png data/index.json | sha256sum | cut -c1-12)"
           cp out/water.tar "water-$H.tar"; cp out/index.json "water-$H.json"
           echo "pack $H"
           gh release upload "$TAG" "water-$H.tar" "water-$H.json" -R "$GITHUB_REPOSITORY" --clobber

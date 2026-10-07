@@ -25,7 +25,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   `SHADOW=4096` turns the shadow map on at its real size (software GL goes without), `TREES=1` and `LOD=1` give full forests and the finest models, `GRID=1` the terrain mesh at its real fineness, `DIST=<dir>` serves a snapshot build.
   What the software renderer gets less of, so that a frame takes a second and not a minute: a quarter of the pixels
   (not for screenshots), a terrain mesh a quarter as fine each way (the vertex shader's texture lookups run on the
-  CPU), few trees and none that fill the picture (`trees.coverCap`), coarser models, no shadow map. Instance buffers
+  CPU), few trees and none that fill the picture (`trees.coverCap`), coarser models, no shadow map, plain water
+  (no waves or surf; all of it with `POST=1`). With `TREES=1` and `GRID=1` together a frame down in a wood takes
+  minutes: ask for full forests only where the trees are the question. Instance buffers
   are sent with `GEO.touch(attr, n)` (the used part only): whole-buffer uploads stalled it for half a minute at a time.
 - `tools/peek.sh <name> <url> ...` — contact sheet of generated images via the Peek workflow (`shots/peek/<name>.jpg`).
 - `node tools/coverage.js [eras] [--all] [--wonder]` — which planned buildings are real models and which still fall
@@ -111,6 +113,26 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   from the game's own picture of the Earth.
 - `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
   their neighbours begin with (they must: see "A pack is a texture of its own"); `fix` makes them.
+- `tools/water/pack.sh` — makes the water's edge on GitHub (the Water workflow runs `tools/water/build.py`: its sources
+  are on AWS, out of reach from here) and brings it here: `data/w/` (`index.json` and 1,484 packs, kept in 157
+  bundles of sixteen: `<level>_b<x>_<y>.bin`, a table and then the packs' own files; `fetch.mjs` makes them, always
+  the same bytes, and `terrain.waterBlob` reads a pack out of its bundle), fetched (`npm run fetch`), never
+  committed. In bundles because of the updates: a game that is out fetches what changed file by file, and past 400
+  files that differ `tools/update/publish.js` begins a new line (everybody fetches the whole app again); 1,500
+  small files were that at once. **Data that comes in many small files goes into bundles.** `node
+  tools/water/fetch.mjs check` says whether what is here is whole (the game's build asks). About an hour and a quarter for the whole Earth. `ONLY=7/36/4,7/31/8` or
+  `BBOX=lon0,lat0,lon1,lat1` makes some blocks only (a trial: a minute or two; it comes here as it is and is nobody's
+  pack), `MODE=probe` only looks at the sources, `REF=<branch>` runs a branch's builder. A pack is kept under the
+  name of what it was made from (twelve digits of the SHA-256 of `tools/water/build.py`, `data/rivers.png` and
+  `data/index.json` together), and `tools/water/fetch.mjs` asks for the pack of the files beside it: **after any
+  change to the builder, to the rivers the game draws or to the list of its heights, the pack must be made before
+  `main` is pushed** (the game's build stops without it: `WATER_STRICT`; elsewhere the pack that is here is kept,
+  with a warning). Look at `shots/peek/water_sheet.jpg` and the end of `shots/peek/water_build.log`. In a workflow
+  never write `ls | head` under `pipefail`: with more files than `head` takes, `ls` fails on the closed pipe (the
+  first whole build was thrown away by its own listing, after 33 minutes).
+- `python3 tools/imagery/under.py` — carries the land's colour on under the water in the picture of the Earth
+  (`data/i`) and the land's green in `data/veg.jpg`: the true shore runs a texel or two inside and outside the
+  picture's own. Run it after anything that remakes `data/i`, then `seams.mjs check`.
 - `node tools/terrain/voids.mjs scan` — holes in the elevation packs (`data/e`): ground at zero where the simulation's
   grid has land well above the sea. It must report none. `fix` fills them (real heights from the Terrain Tiles on AWS;
   Antarctica from the half-degree grid, made to meet the ice beside it); that host is out of reach from here, so the
@@ -324,7 +346,8 @@ Conventions that matter:
 - **The picture's last steps** (`post.js`; on a real GPU at full quality, `POST=1` in the harnesses). The scene is
   drawn into a target that holds light brighter than white (half floats, four samples) and its depth, then: shade
   (ambient occlusion from the depth alone, two reaches, a share of the distance wide so it reads at every height;
-  fades with the haze and with height), glow (what is above white bleeds, the wider rings weighed more: `POST.wide`),
+  fades with the haze and with height; not laid on open water, which the ground's shader marks in the picture's
+  fourth channel - an island stood in a dark stain), glow (what is above white bleeds, the wider rings weighed more: `POST.wide`),
   develop (a little contrast and colour, a shoulder into white, darker corners, grain). 0 to 1 is the picture as the
   shaders made it; only what they write above 1 is "more than white", and they write it where `uGlow` is 1 (the sun's
   image on water, flames, lit windows, a fire front; the sun's disc is thousands). Depth here is ordinary perspective
@@ -422,18 +445,96 @@ Conventions that matter:
   riser of the stairs was a line of dry land across the water (a lattice over every lake near its shore, in every
   release up to 0.19). Where the picture is magnified the mask's four texels are fetched and weighed in the shader
   and its slope is theirs (`terrain.js`, at `img`). Look at water from low down on the Mac (`taiga_shore`,
-  `lake_low`, `coast_low`, `port`) after touching the mask. Still to do, for the water: a coast's texels are
-  mixtures (64, 96, 128 ...), and 128 is also what a lake is, so a coast's ramp passes through the lake's value:
-  the blue band and the bar of sand off many coasts are that (the shader's sea begins at 0.36 of the mask, a
-  lake's shore and `isWater` at 0.62).
-- **Still water lies level.** The ground's small relief (`dispAt`, the vertex shader) ends where the picture of the
-  Earth has water (`WET`): a lake heaved as the land is was a sheet of bumps under a flat picture of water.
+  `lake_low`, `coast_low`, `port`) after touching the mask. The mask itself is no coast: its texels on a coast are
+  mixtures (64, 96, 128 ...), and 128 is also what a lake is, so off many coasts there was a blue band and a bar
+  of sand. Since 0.21 the water's edge is the field's (below); the mask draws the coasts only from far out (tiles
+  under level 5) and while a pack is on its way.
+- **The water's edge** (`data/w`, `tools/water/build.py`; `uWater` in `terrain.js`). A field of distances: how
+  many metres it is from every place to the nearest shore (land positive), 305 m to a texel at level 7 and the
+  same at half and a quarter the fineness (levels 6 and 5), in packs of 2052 texels with a rim of two. Its nought
+  is the shore, and lies true far below the texel. Three bytes a texel: the distance (a step is 16 m out to 480 m
+  either way, then ever coarser to 3.6 km of water; times 2 and 4 at the coarser levels); what water the nearest
+  water is (sea 0 .. fresh 15) and how open it lies (15 on an open coast, half and less in a harbour, a sound, a
+  fjord, a small lake), four bits each; and how high the nearest fresh water stands, by the game's own heights.
+  Packs without a shore are not kept: the list says land, sea or fresh.
+  *Where it comes from.* The water mask of the Copernicus DEM (90 m; it knows sea from lake from river) and, for
+  what that lacks, the water of ESA WorldCover (read at 80 m): the first was made by radar, much of the north in
+  winter, and a frozen lake is land to a radar (a square degree of Finland had a fortieth of water where a tenth
+  is, the Taymyr none). A river is water only where it is 1.2 km wide; narrower, the game draws it itself
+  (`decal.js`), and what the second source has along the game's own river lines follows the same rule. Lakes under
+  0.4 km² are left out. Both notices are in the game's menu ("Where the world comes from"): they must stay there.
+  *In the shader.* The fragment shader fetches the four texels about a pixel and weighs them itself (a card's 256
+  steps: see above); near the shore and from close, sixteen (Catmull-Rom: weighed between four the shore is a run
+  of straight pieces a texel long), which also gives how the shore bends (`wBend`: a bay positive, a headland
+  negative: sand gathers in the one and is washed off the other) and the way to the nearest land (`wLand`). The
+  noise of the place roughens the line (a beach runs smooth, a steep shore ragged) and the sea's edge comes and
+  goes a few metres. `wD`, `wK`, `wOpen`, `wCov` (the pixel's share of water) are what everything after reads.
+  A pixel far inland by its nearest texel stops there (one lookup, not four: most pixels of most pictures), and a
+  tile whose piece of its pack is nothing but far land or open sea is told so once (`waterFlat`; `uWaterP.x = 2`)
+  and looks nothing up at all.
+  *In the mesh.* The sea lies at nought and a lake at its level, and the ground comes up from the water's own
+  level, beginning a little inland (`uShoreQ`: a quad and a half of the tile's mesh as it is, never under 60 m): a
+  triangle with one corner in the water and one on a hill carried the water up the hill. Without the levels a lake
+  under a mountain climbed it; with them the game cuts the lake's bed into its own (coarse) heights. The byte the
+  card cannot weigh (two things in one) is fetched from the nearest texel. `shoreAt` (metres; then `wKind`,
+  `wOpen`, `wLevel`), `isWater`, `heightAt` and `gpuVertexH` are the CPU's twins: trees, harbours, piers, ships,
+  town sites and walls ask them, and ask again whenever more packs have come (`stats.packsW`).
+  **The terrain shader is at 16 textures with it, which is all an Apple GPU allows**: the next one must take the
+  place of another.
+- **Water** (`terrain.js`, from `// ---------- water`). What comes up out of it, then what it mirrors. *Depth*:
+  the metres out from the shore times how fast the bottom falls, and it falls as the land above the shore rises
+  (the ground's height 260 m inland of the nearest shore: under a hill the strait is deep a stone's throw out, off
+  a flat coast the shallows run a furlong), never deeper than the shelf allows (`info.r`; far from any shore and
+  where there is no field the shelf alone says). *Colour*: the bed (sand in a bay, dark rock under a headland,
+  the photograph of sunlit shallows from close) seen through that much water, red going first, then the deep's own
+  blue; lakes blue-green, dark as tea where the winters are hard and wet (`peat`), milky high in wet mountains,
+  clear and very blue on the high dry plateaus. A lake's bed falls as the land above its shore rises above the
+  water's own level (`vH` there), never more gently than a floor (the heights come in steps of seven metres and
+  more); peat hides the bed within a step from the shore. A great river is in the field as fresh water too, often
+  in pieces (where it is 1.2 km wide), with the game's own ribbon of it beside them and between them: narrow water
+  between flat banks (`riverish`) is therefore given a river's water as the decal's rivers have it, shallows a
+  furlong wide, pale and green, over a blue channel, brown with silt in dry country; a small lake of the plain
+  likewise. *Waves*: one
+  picture of a ruffled surface at four sizes (repeats of 40 m, 160 m, 640 m, 2.5 km), each drifting its own way,
+  less in the lee of a shore and in sheltered water, in patches as the wind lies. Each size is bent by the noise
+  of the place that is some four of its repeats long and more, by half a repeat or so (bent by grain as small as
+  itself the waves are smeared; laid straight, or one size alone, they are a lattice from a mile up: a lake keeps
+  a little of the two large sizes for that). What the card averages away as a
+  size grows small in the picture is not thrown away: the averaged normal is shorter, and by that much the water
+  is rougher within the pixel (`wRough`), which spreads the sun's image into a path and lifts what the horizon's
+  sea mirrors above the horizon. *Surf*: where the sea comes in from the open (`wOpen`, and more under a headland
+  than in a bay) lines of white run in along the shore, 34 m apart, each breaking along a stretch of itself; a
+  pale fringe from too far to tell them apart; great lakes a little, small ones none. And most on shores that face
+  the swell, which comes as the winds of the Earth blow (out of the west between thirty and sixty degrees, with
+  the trades out of the east in the tropics, turned some way by the noise of the place); a lee shore keeps a
+  third. All round an islet the lines were rings, like a target. *The mirror*: Fresnel, the
+  sky from a table of fifteen colours made once a frame where the camera stands (`skyMirror` in `main.js`: the
+  air's own sum at five heights, toward the sun, across and away), the sun by a lobe as wide as `wRough`; in
+  light, as the air is (`lit` is a root of light: mixed as squares). A river of the decal and a flood mirror too.
+  `uSeaK`: x how high the waves run, y how much surf, z how clear the water (w: 1 no waves, 2 nothing mirrored, to
+  ask what they cost: `__T.costsWater()`, `costw_*` in the tour). Look at `sea_air`, `sea_cove`, `sea_low`, `surf`,
+  `sea_dusk`, `sea_glint`, `lakes`, `lake_fin`, `lakes_radar`, `lake_alp`, `fjord`, `delta`, `lagoon`, `tundra`,
+  `sea_region`, `river_bend`, `river_wide` and `planet` on the Mac after touching any of it; here, start the live page with `GRID=1` (the
+  mesh at its real fineness: with the coarse one the shore's flat strip is as wide as the field allows and no
+  wider than a quad, and the sea stands up the shore again).
+  *What it costs* (the build Mac, 1680 by 1050, each in one page: `costw_*`): down at the sea 29 frames a second,
+  31 without the waves, 31.5 with nothing mirrored either; from three kilometres 27, 28.5 and 29.5; low by a lake
+  in the taiga 31.5, 33.5 and 35.5; over a town inland to the horizon 24.5 with all of it and 24 with none
+  (`costw_town`: nothing that can be measured - keep it so). A pack is four million texels: `loadPack` reads it
+  out of its picture a strip at a time and lets the frame through between two.
+  A software renderer runs both arms of every branch at every pixel, so what a real card skips (the sixteen
+  texels away from a shore, waves and surf on dry land) it pays for everywhere: the frame took twice as long. The
+  test suite's pages (a software renderer without `POST`) therefore compile the water plain (`WATER_PLAIN`: the
+  shore from four texels, no waves, no surf, the bed falling evenly); the harnesses with `POST=1` have all of it.
+- **Still water lies level.** The ground's small relief (`dispAt`, the vertex shader) begins `WET_RISE` metres
+  inland of the flat strip along every shore (by the picture's mask where there is no field: `WET`): a lake heaved
+  as the land is was a sheet of bumps under a flat picture of water.
 - **How near the eye is** is `mapcam.agl`, its height above the ground it looks at; `mapcam.alt` is its height above
   the sea. `uCamAlt` and whatever is shown only from close to go by the first: the ground is drawn twice as tall, a
   town at 1,600 m stands three kilometres up, and by the height above the sea the high plains of Iran, Ethiopia,
   Mexico and the Andes never showed a field's plots, the scrub or anything else that is for near.
-- **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 15 with everything on. Adding a
-  sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
+- **Apple GPUs allow a fragment shader 16 textures.** The terrain shader is at 16 with everything on (the water's
+  edge took the last). Adding a sampler there means freeing one (pack into an array layer). The Mac launch check reports `samplers` and fails on
   any shader error; software GL (the local harness) allows 32 and will not warn you.
 - **Models are chosen by role**: `MODELS.pick(it.as || it.kind, era, culture)`. A plan item can carry `as`
   (`market`, `palace`, `academy`, `shrine`, `mine`, `watchtower`, `wall_mud`, `gate_palisade` ...) where the kit kind
@@ -492,7 +593,15 @@ Conventions that matter:
   class (`zoneOf`, `Trees.THIN`). Rebuild both with `tools/climate/build.py` (the source and its licence are in the
   file's header). The year: `uSeason` (sun), `uBare` (leaves down N/S, the cold of the year N/S, a month behind the sun).
 - **Rivers** are drawn wider than life (`drawnWidth()` in `decal.js`: brooks four times, great rivers twice), like
-  roads and towns. The decal's red channel is a distance to the water (1 centre line, 0.5 the water's edge, 0 the end
+  roads and towns. A river's ribbon is one strip, mitred at every point of its line (as boxes run on past their
+  ends, a great river's two kilometres of ribbon threw a corner out at every least turn: its banks were saws).
+  Where a river is wide enough to be water in the field of the water's edge (1.2 km) and the line of it held here
+  runs in that water, the ribbon lay out over both banks as a second river's shallows: a line that keeps in the
+  field's water, or within 150 m of it, for 1.5 km either way is left to the field (`ALONG_*` in `decal.js`;
+  `stats.along` counts the pieces), one that only comes down to a shore or leaves one is drawn to the water's
+  edge. A line that runs beside the field's water is drawn: the field has such a river in pieces, and there is no
+  telling its own water from a lake it passes (asked for a mile to either side, the Yangtze at Nanjing was cut in
+  two). The cure is in the builder: a river kept whole or not at all. `nearestRiver` answers by the line. The decal's red channel is a distance to the water (1 centre line, 0.5 the water's edge, 0 the end
   of the bank), from which the ground shader draws the water, a green bank and, where a road crosses, a deck.
   Everything that asks where the water is (`decal.nearestRiver`) gets the drawn width; walls are cut at the bank.
 - **After dark** (`life.js`): open fires burn from dusk till morning in towns that have no lamps yet (style era ≤ 5):

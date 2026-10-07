@@ -571,7 +571,7 @@
     const y = (i / W) | 0, x = i - y * W;
     const su = sim.siteU[i] >= 0 ? sim.siteU[i] : 0.5, sv = sim.siteU[i] >= 0 ? sim.siteV[i] : 0.5;
     let lon = (x + su) / W * 360 - 180, lat = 90 - (y + sv) / H * 180;
-    const R = c ? radiusM(sim, i, c) : 100; const key = `${su.toFixed(3)}|${sv.toFixed(3)}|${Math.round(R / 50)}|${terrain && terrain.stats ? terrain.stats.packsE + '/' + terrain.stats.packsI : 0}|${decal && decal.segIndex ? 1 : 0}`;
+    const R = c ? radiusM(sim, i, c) : 100; const key = `${su.toFixed(3)}|${sv.toFixed(3)}|${Math.round(R / 50)}|${terrain && terrain.stats ? terrain.stats.packsE + '/' + terrain.stats.packsI + '/' + (terrain.stats.packsW || 0) : 0}|${decal && decal.segIndex ? 1 : 0}`;
     const hit = siteCache.get(i); if (hit && hit.key === key) return hit.pt;
     const cl = Math.max(0.15, Math.cos(lat * D2R)); const mLon = 1 / (6371000 * cl * D2R), mLat = 1 / (6371000 * D2R);
     const rv = decal ? decal.nearestRiver(lon, lat) : null;

@@ -22,6 +22,8 @@
   // How wide a river is drawn. Towns stand many times life size and roads six times; at its true width the river
   // beside a village would be a thread. Brooks and small rivers are drawn four times as wide as they are, the great
   // rivers twice (they are wide already). Everything that asks where the water is gets this width.
+  // a line that keeps in the water of the field (terrain.shoreAt), or within ALONG_NEAR metres of it, for ALONG_M metres either way is the field's river, not the decal's; lines of rivers narrower than ALONG_MIN are not asked
+  const ALONG_NEAR = 150, ALONG_M = 1500, ALONG_MIN = 200;
   function drawnWidth(w) { const t = Math.min(1, Math.max(0, (w - 100) / 500)); return w * (4 - 2 * t * t * (3 - 2 * t)); }
 
   class Decal {
@@ -96,10 +98,12 @@
       const cl = Math.max(0.15, Math.cos(cam.lat * D2R));
       const lat0 = cam.lat * D2R - E / 2, lon0 = cam.lon * D2R - E / 2 / cl;
       const r = this.rect;
-      const moved = !r || Math.abs(lat0 - r.lat0) > E / 8 || Math.abs(lon0 - r.lon0) > E / 8 / cl || Math.abs(Math.log(E / r.E)) > 0.2;
+      // (the field of the water's edge says which lines are its own rivers: the rivers are drawn again when more of it has come, no oftener than every second and a half)
+      const wv = this.terrain && this.terrain.stats ? this.terrain.stats.packsW || 0 : 0, water = wv !== this.lastW && now - (this.lastBuild || 0) > 1500;
+      const moved = !r || water || Math.abs(lat0 - r.lat0) > E / 8 || Math.abs(lon0 - r.lon0) > E / 8 / cl || Math.abs(Math.log(E / r.E)) > 0.2;
       const stale = simStamp !== this.lastSimStamp && now - this.lastBuild > 2500;
       if (!moved && !stale) return 0;
-      if (moved) this.rect = { lon0, lat0, E, cl, w: E / cl, h: E };
+      if (moved) { this.rect = { lon0, lat0, E, cl, w: E / cl, h: E }; this.lastW = wv; }
       return moved ? 2 : 1;      // 2: everything (camera moved), 1: only roads and land use (the world changed)
     }
     rebuild(cam, sim, now, simStamp, what) {
@@ -131,7 +135,7 @@
         for (let k = 0; k < n; k++) idx.push(c0, c0 + 1 + k, c0 + 2 + k);
       };
       // ----- rivers (only when the covered area changed) -----
-      let nr = this.stats.rivers || 0;
+      let nr = this.stats.rivers || 0, nAlong = 0;
       if (what === 2 && this.rivers.length) {
         nr = 0;
         const C = this.CELL; const seen = new Set();
@@ -155,12 +159,59 @@
               for (let i = 0; i + 3 < pts.length; i += 2) { const ax = pts[i], ay = pts[i + 1], bx = pts[i + 2], by = pts[i + 3]; out.push(ax * 0.75 + bx * 0.25, ay * 0.75 + by * 0.25, ax * 0.25 + bx * 0.75, ay * 0.25 + by * 0.75); }
               out.push(pts[pts.length - 2], pts[pts.length - 1]); pts = out;
             }
+            // (A great river is water in the field of the water's edge, bank to bank, and where the line of it held here runs in
+            //  that water its ribbon, a mile wide, lay out over both banks as a second river's shallows. Where a line keeps to
+            //  the field's water - in it, or within ALONG_NEAR metres of it - without a break for ALONG_M metres either way, the
+            //  water is left to the field. A line that only comes down to a shore or leaves one has dry ground on one side of
+            //  that span and is drawn to the water's edge; so is one that runs beside the water and not in it, for there is no
+            //  telling a river's own water there from a lake the river passes. Only lines of rivers wide enough to be in the
+            //  field are asked.)
+            let along = null; const T = this.terrain;
+            if (T && T.water && T.shoreAt && line.width >= ALONG_MIN && mpp < 250) {      // (from far out the ribbon's lap over a bank is under a pixel of the decal: not worth the asking)
+              const n = pts.length >> 1, wet = new Uint8Array(n), run = new Float32Array(n), mw = mg + ALONG_M * 1.5 / R_M; let any = 0;
+              for (let k = 0; k < n; k++) {
+                const x = pts[k * 2], y = pts[k * 2 + 1]; if (k) run[k] = run[k - 1] + Math.hypot((x - pts[k * 2 - 2]) * r.cl, y - pts[k * 2 - 1]) * R_M;
+                if (x < lon0 - mw || x > lon1 + mw || y < lat0 - mw || y > lat1 + mw) continue;
+                const sd = T.shoreAt(x / D2R, y / D2R); if (sd !== null && sd < ALONG_NEAR) { wet[k] = 1; any++; }
+              }
+              if (any > 1) {
+                // (dry[k]: how many of the points before k are dry, so that a span is all wet where the count does not change across it)
+                const dry = new Int32Array(n + 1); for (let k = 0; k < n; k++) dry[k + 1] = dry[k] + (wet[k] ? 0 : 1);
+                along = new Uint8Array(n); let lo = 0, hi = 0;
+                for (let k = 0; k < n; k++) { if (!wet[k]) continue; while (lo < k && run[lo] < run[k] - ALONG_M) lo++; if (hi < k) hi = k; while (hi < n - 1 && run[hi] < run[k] + ALONG_M) hi++; along[k] = dry[hi + 1] === dry[lo] ? 1 : 0; }
+              }
+            }
+            // The ribbon is one strip, mitred at every point of the line. (Each piece was a box of its own, run on past both its
+            // ends by half the ribbon's width, which closed the outer side of a bend: but a great river's ribbon is two
+            // kilometres and more across, and the least turn of the line threw a box's corner out by hundreds of metres. Its
+            // banks were saws.) mx, my: the way across the line at each point, to the left, as long as keeps the width through
+            // the bend there (twice at the most: the point of a hairpin is cut short).
+            const np = pts.length >> 1, mx = new Float32Array(np), my = new Float32Array(np);
+            for (let k = 0; k < np; k++) {
+              const x = pts[k * 2], y = pts[k * 2 + 1]; let ux = 0, uy = 0, vx = 0, vy = 0;
+              if (k > 0) { ux = (x - pts[k * 2 - 2]) * r.cl; uy = y - pts[k * 2 - 1]; const l = Math.hypot(ux, uy) || 1; ux /= l; uy /= l; }
+              if (k < np - 1) { vx = (pts[k * 2 + 2] - x) * r.cl; vy = pts[k * 2 + 3] - y; const l = Math.hypot(vx, vy) || 1; vx /= l; vy /= l; }
+              if (k === 0) { ux = vx; uy = vy; } if (k === np - 1) { vx = ux; vy = uy; }
+              let nx = -(uy + vy), ny = ux + vx; const l = Math.hypot(nx, ny); if (l < 1e-6) { nx = -uy; ny = ux; } else { nx /= l; ny /= l; }
+              const c = Math.max(0.5, nx * -uy + ny * ux); mx[k] = nx / c; my[k] = ny / c;
+            }
+            const strip = (k, hw, cls, kind) => {
+              let ax = pts[k * 2], ay = pts[k * 2 + 1], bx = pts[k * 2 + 2], by = pts[k * 2 + 3];
+              if (k === 0 || k === np - 2) {      // (the line's own two ends run on by half the width, as every piece's did: a tributary reaches into the river it joins)
+                let dx = (bx - ax) * r.cl, dy = by - ay; const L = Math.hypot(dx, dy); if (L < 1e-9) return; dx /= L; dy /= L;
+                if (k === 0) { ax -= dx * hw / r.cl; ay -= dy * hw; } if (k === np - 2) { bx += dx * hw / r.cl; by += dy * hw; }
+              }
+              const aox = mx[k] * hw / r.cl, aoy = my[k] * hw, box = mx[k + 1] * hw / r.cl, boy = my[k + 1] * hw;
+              pos.push(ax + aox, ay + aoy, 0, ax - aox, ay - aoy, 0, bx + box, by + boy, 0, bx - box, by - boy, 0);
+              aux.push(1, cls, kind, -1, cls, kind, 1, cls, kind, -1, cls, kind);
+              idx.push(vi, vi + 1, vi + 2, vi + 2, vi + 1, vi + 3); vi += 4;
+            };
             for (let i = 0; i + 3 < pts.length; i += 2) {
               const ax = pts[i], ay = pts[i + 1], bx = pts[i + 2], by = pts[i + 3];
               if ((ax < lon0 - mg && bx < lon0 - mg) || (ax > lon1 + mg && bx > lon1 + mg) || (ay < lat0 - mg && by < lat0 - mg) || (ay > lat1 + mg && by > lat1 + mg)) continue;
-              quad(ax, ay, bx, by, hwLon, hwLat, line.cls, 0);
-              // the wet land along it: green well beyond the bank, wider along a great river
-              if (resolved) { const hh = (hwW * 5 + 150) / R_M; quad(ax, ay, bx, by, hh, hh, 0.3 + 0.5 * Math.min(1, line.width / 600), 2); }
+              if (along && along[i >> 1] && along[(i >> 1) + 1]) nAlong++; else strip(i >> 1, hwLat, line.cls, 0);
+              // the wet land along it: green well beyond the bank, wider along a great river (the field's river has it too)
+              if (resolved) strip(i >> 1, (hwW * 5 + 150) / R_M, 0.3 + 0.5 * Math.min(1, line.width / 600), 2);
             }
           }
         }
@@ -242,7 +293,7 @@
       }
       // ----- geometry + render -----
       if (this.mesh) { this.scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh = null; }
-      this.stats.verts = vi + (this.stats.riverVerts || 0); this.stats.rivers = nr; this.stats.roads = nroad; this.roads = roads;
+      this.stats.verts = vi + (this.stats.riverVerts || 0); this.stats.rivers = nr; if (what === 2) this.stats.along = nAlong; this.stats.roads = nroad; this.roads = roads;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aux', new THREE.Float32BufferAttribute(aux, 3)); g.setIndex(idx);
       this.mesh = new THREE.Mesh(g, this.mat); this.mesh.frustumCulled = false; this.scene.add(this.mesh);

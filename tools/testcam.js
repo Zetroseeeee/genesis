@@ -59,6 +59,13 @@ window.__T.costsGround = function () {
     ['all again', () => { TEX.ground = g; T.setTextures(TEX, true); }]], 3, 2500);
 };
 // what the trees cost: all; without what grows under them; with their outlines drawn pixel by pixel; none of them
+// what the water costs, each left out on top of the one before: its waves (four lookups a pixel of water), what it mirrors (the sky and
+// the sun's path), the field of the water's edge itself (then the coasts are drawn from the picture of the Earth, as they were)
+window.__T.costsWater = function () {
+  const T = __G.terrain, K = __G.globals.uSeaK.value;
+  __T.cost([['all', () => {}], ['no waves', () => { K.w = 1; }], ['and nothing mirrored', () => { K.w = 2; }], ['and no field of the shore', () => { T.waterOff = true; }],
+    ['all again', () => { K.w = 0; T.waterOff = false; }]], 4, 2500);
+};
 window.__T.costsTrees = function () {
   const Tr = __G.trees; if (!Tr) return 'no trees'; const show = (ti, on) => { for (const I of Tr.imps[ti].values()) I.visible = on; };
   __T.cost([['all (' + Tr.modelCount.join(' ') + ')', () => {}], ['no undergrowth', () => { show(3, false); }], ['and edges by the pixel', () => { Tr.coverOff = true; }], ['and no far trees', () => { show(1, false); show(2, false); }],

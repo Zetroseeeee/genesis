@@ -310,7 +310,7 @@
       // whatever this does not know of.
       const S = this.season, B = this.bareness, q = (v) => Math.round((v || 0) * 24), T = this.terrain;
       const sig = (S ? q(S.y) + ',' + q(S.w) : '') + ':' + (B ? q(B.x) + ',' + q(B.y) + ',' + q(B.z) + ',' + q(B.w) : '') + ':' + (this.flora() ? 1 : 0) + ':' + (this.climate ? 1 : 0);
-      const far = (sim ? sim.year : 0) + ':' + (T.stats ? T.stats.packsI + ':' + T.stats.packsE : ''), nearby = far + ':' + (T.meshVersion || 0);
+      const far = (sim ? sim.year : 0) + ':' + (T.stats ? T.stats.packsI + ':' + T.stats.packsE + ':' + (T.stats.packsW || 0) : ''), nearby = far + ':' + (T.meshVersion || 0);
       for (let ti = 0; ti < TIERS.length && !this._job; ti++) {
         const t = TIERS[ti], L = this.last[ti], near = ti === 0 || t.under, soft = near ? nearby : far;
         // (what grows under the trees is only there to be seen from close to: from higher up it is not placed at all)
@@ -416,14 +416,18 @@
           if (fades) { const rr = R * (0.8 + 0.2 * hash2(gx, gy, 93)); if (d2 > rr * rr) continue; }      // (it thins out over the last fifth of its reach, as the next tier comes in: uHole)
           if (under && hash2(gx, gy, 94) > thin * (1 - smooth(0.3, 1.0, Math.sqrt(d2) / R))) continue;
           const i = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W);
-          if (sim && !sim.land[i]) continue;
+          // No tree stands in water, on a beach or in a river. Where the field of the water's edge is here it says how far inland a
+          // plot lies (the ground is drawn by it): a wood comes down to a lake's shore, and stands back from the sea behind
+          // its beach, thinly at first. Elsewhere the simulation's own half-degree cells say what is land, and the picture's mask.
+          const sd = T.shoreAt(lon, lat);
+          if (sd === null) { if (T.wPending || (sim && !sim.land[i])) continue; }      // (a shore whose pack is still on its way: no tree until it is known where the water is)
+          else if (sd < (T.wKind > 0.5 ? 26 : 55 + 110 * hash2(gx, gy, 96) * hash2(gx, gy, 97))) continue;
           const h = near ? T.meshHeightAt(lon, lat, vc) : T.heightAt(lon, lat); if (h <= 0.5) continue;
-          // no tree stands in water, on a beach or in a river (the picture's own water mask where it has arrived, as the ground is drawn)
           let rv = null;
           // (The mask is a coarse picture, and between water and land it climbs over a kilometre or so: only its lower half is shore.
           //  Keeping trees off all of the climb but the step where rivers lie left a bare belt behind every lake, with a
           //  row of trees along the water in front of it.)
-          { const wa = T.waterAlpha(lon, lat); if (wa >= 0 && wa < 0.62) continue;
+          { if (sd === null) { const wa = T.waterAlpha(lon, lat); if (wa >= 0 && wa < 0.62) continue; }
             if (river && (ti < 2 || under)) { rv = river.nearestRiver(lon, lat); if (rv && rv.d < rv.hw + 6) continue; } }
           const fw = this.forestAt(lon, lat, h);
           // in dry country trees line the rivers: palms and thorn trees along the Nile and the Euphrates, poplars along a steppe river
@@ -520,7 +524,7 @@
               // slender trees stand closer than broad ones: a spruce or a birch brings a neighbour, so a wood of them closes its canopy too
               if (!under && aspect < 0.78 && kEff <= kTier * 1.05 && hash2(gx, gy, 81) < density && sn < maxN) {
                 const a2 = hash2(gx, gy, 82) * 6.2832, r2 = (0.34 + 0.16 * hash2(gx, gy, 83)) * t.s; const lon2 = lon + Math.cos(a2) * r2 / (R_M * D2R * cl), lat2 = lat + Math.sin(a2) * r2 / (R_M * D2R);
-                const h2 = ti === 0 ? T.meshHeightAt(lon2, lat2, vc) : h; const wa2 = ti < 2 ? T.waterAlpha(lon2, lat2) : 1; const rv2 = river && ti < 2 ? river.nearestRiver(lon2, lat2) : null;
+                const h2 = ti === 0 ? T.meshHeightAt(lon2, lat2, vc) : h; const sd2 = ti < 2 ? T.shoreAt(lon2, lat2) : null, wa2 = ti >= 2 ? 1 : sd2 !== null ? (sd2 < (T.wKind > 0.5 ? 26 : 70) ? 0 : 1) : T.waterAlpha(lon2, lat2); const rv2 = river && ti < 2 ? river.nearestRiver(lon2, lat2) : null;
                 if (h2 > 0.5 && !(wa2 >= 0 && wa2 < 0.62) && !(rv2 && rv2.d < rv2.hw + 6)) {
                   const f2 = GEO.enu(lon2, lat2); const g2 = hgt * (0.78 + 0.3 * hash2(gx, gy, 84)); p.copy(f2.up).multiplyScalar(1 + (h2 * exag - 0.15 * kEff) / R_M);
                   basis.makeBasis(f2.east, f2.up, f2.north.clone().negate()); q.setFromRotationMatrix(basis);

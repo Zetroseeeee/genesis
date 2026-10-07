@@ -51,10 +51,13 @@ jobs:
       - name: Fetch art and models
         env:
           GROUND_STRICT: '1'      # (the ground's materials must be the pack of the list in this commit, or the build stops)
+          WATER_STRICT: '1'       # (and the water's edge the pack of this commit's builder and rivers: tools/water/pack.sh makes it, in about an hour)
         run: |
           npm run fetch
           # (built without the ground's materials the game would draw the ground the old way, and nobody would be told)
           node -e "const fs = require('fs'), j = JSON.parse(fs.readFileSync('data/tex/ground.json', 'utf8')); for (const f of [j.albedo, j.normal]) if (!(fs.statSync('data/tex/' + f).size > 1e6)) throw new Error('ground: ' + f + ' is missing'); console.log('ground: ' + j.layers.length + ' materials, made ' + j.made);"
+          # (and without the water's edge it would draw its coasts from the picture of the Earth, five kilometres to a texel)
+          node tools/water/fetch.mjs check
       - name: Package
         run: npm run pack:mac
         env:
@@ -162,7 +165,8 @@ jobs:
           if [ ! -x out/prev/Holocene.app/Contents/MacOS/Holocene ]; then say "the earlier app could not be got out of its image: it was not tested, so nothing is given out"; exit 1; fi
           if [ ! -s out/prev/Holocene.app/Contents/Resources/app/desktop/content.json ]; then say "the earlier app has no updater: nothing to test with"; exit 0; fi
           say "the app that is out: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' out/prev/Holocene.app/Contents/Info.plist); expecting: $EXPECT"
-          GENESIS_SMOKE=1 GENESIS_SMOKE_UPDATE=1 GENESIS_SMOKE_EXPECT="$EXPECT" GENESIS_UPDATE_MANIFEST=manifest-next.json GENESIS_USERDATA="$PWD/out/prev-userdata" GENESIS_SMOKE_SHOT="$PWD/out/field.png" \
+          # (GENESIS_SMOKE_TIMEOUT: the app gives the whole of it three times that and a minute and a half, and an update can be two hundred megabytes)
+          GENESIS_SMOKE=1 GENESIS_SMOKE_TIMEOUT=240 GENESIS_SMOKE_UPDATE=1 GENESIS_SMOKE_EXPECT="$EXPECT" GENESIS_UPDATE_MANIFEST=manifest-next.json GENESIS_USERDATA="$PWD/out/prev-userdata" GENESIS_SMOKE_SHOT="$PWD/out/field.png" \
             out/prev/Holocene.app/Contents/MacOS/Holocene --smoke 2>out/field.err | tee out/field.log
           say "the app ended ($(wc -c < out/field.log | tr -d ' ') bytes of report)"
           grep '\[update\]' out/field.log || true

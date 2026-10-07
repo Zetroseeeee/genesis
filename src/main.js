@@ -81,7 +81,7 @@
     uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
     // the ground's materials (textures.js: TEX.ground), laid at a ladder of sizes in a frame of cells a metre and a half across at the equator
-    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 20 }, uGndFar: { value: new Float32Array(24) }, uGndFarD: { value: new Float32Array(48) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(75).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.4, GND_PX) }, uGndT: { value: new THREE.Vector4(1, 1, 0.25, 3) }, uGndShow: { value: -1 }, uGndV: { value: 1 }, uGndDbg: { value: 0 }, uGndFine: { value: new THREE.Vector3(0.75, 0.6, 2.25) }, uGndCls: { value: new Float32Array(24) },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndT: how far a material's brightness follows the photograph of the Earth (0..1), and its hue (a factor), how wide the span in which one step of the ladder gives way to the next (0.1: a patchwork of the two; 0.25 and more: they lie over each other), how ragged its edge; uGndShow: one layer everywhere (to look at it), or -1; uGndV: how much the ground varies from stretch to stretch (lusher, drier); uGndDbg: parts left out, to measure them (terrain.js); uGndFine: how many steps of the ladder lower the fine kinds of ground stand: at the closest, how fast that grows with height, at the most (uGndCls: which they are, from textures.js)
+    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 20 }, uGndFar: { value: new Float32Array(24) }, uGndFarD: { value: new Float32Array(48) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(75).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.4, GND_PX) }, uGndT: { value: new THREE.Vector4(1, 1, 0.25, 3) }, uWaterK: { value: new THREE.Vector4(1, 1, 1, 1) }, uSkyR: { value: new Float32Array(45).fill(0.3) }, uSeaK: { value: new THREE.Vector4(1, 1, 1, 0) }, uGndShow: { value: -1 }, uGndV: { value: 1 }, uGndDbg: { value: 0 }, uGndFine: { value: new THREE.Vector3(0.75, 0.6, 2.25) }, uGndCls: { value: new Float32Array(24) },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndT: how far a material's brightness follows the photograph of the Earth (0..1), and its hue (a factor), how wide the span in which one step of the ladder gives way to the next (0.1: a patchwork of the two; 0.25 and more: they lie over each other), how ragged its edge; uGndShow: one layer everywhere (to look at it), or -1; uGndV: how much the ground varies from stretch to stretch (lusher, drier); uGndDbg: parts left out, to measure them (terrain.js); uGndFine: how many steps of the ladder lower the fine kinds of ground stand: at the closest, how fast that grows with height, at the most (uGndCls: which they are, from textures.js)
     uGlow: { value: 0 },      // 1 while the picture goes through post.js, which can hold light brighter than white and lets it bleed
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
@@ -114,6 +114,8 @@
       loadSettings(); setMode('intro'); homeInit();
       setLoad(6, 'terrain index');
       const index = await (await fetch('data/index.json')).json();
+      // (the water's edge: fetched with the art, not kept in the repository; without it the coasts are the picture's own)
+      let water = null; try { const r = await fetch('data/w/index.json'); if (r.ok) water = await r.json(); } catch (e) { water = null; }
       setLoad(14, 'surface data');
       const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([loadTex('data/info.png', { flipY: false }), loadTex('data/noise.png', { aniso: ANISO_NOISE }), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
       info.wrapS = THREE.RepeatWrapping; info.wrapT = THREE.ClampToEdgeWrapping; info.minFilter = THREE.LinearFilter; info.generateMipmaps = false;
@@ -126,7 +128,7 @@
       for (let i = 0; i < N; i++) { worldData.elev[i] = wd.data[i * 4]; worldData.fert[i] = wd.data[i * 4 + 1] / 255; worldData.flags[i] = wd.data[i * 4 + 2]; worldData.land[i] = wd.data[i * 4 + 2] & 1; }
       setLoad(50, 'peoples');
       world = new WORLD.World({ scene, terrain: { exag: 2.0, heightAt: () => 0 } });
-      terrain = new TERRAIN.Terrain({ scene, index, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID });
+      terrain = new TERRAIN.Terrain({ scene, index, water, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID, plainWater: softGL && !window.GENESIS_POST, slow: softGL });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
       trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL) trees.slice = 1e9; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png').catch((e) => console.warn('veg', e));
@@ -1139,6 +1141,25 @@
   // ---------- loop ----------
   let frameNo = 0; let last = performance.now(), acc = 0, texAge = 0, uiAge = 0, tpsCount = 0, tpsT = 0, sunAngle = 0.6, mmT = 0, olT = 0, seasonPhase = 0.45;
   let framesDrawn = 0, lastReal = performance.now();
+  // The sky as water mirrors it (the ground's shader: uSkyR). Its light from five heights above the horizon, toward the sun,
+  // across and away from it, where the camera stands, by the same sum the sky itself is drawn with: fifteen lines of sight a
+  // frame, here, instead of one at every pixel of the sea.
+  const _skyDir = [0, 0, 0], _skyC = [0, 0, 0], _skyS = [0, 0, 0], _skyOpt = { near: [1, 1, 1] };
+  function skyMirror() {
+    const U = AIR.uniforms, E = U.uAirE.value.x, N = U.uAirN.value, K = U.uAirK.value, out = globals.uSkyR.value;
+    const su = Math.min(1, Math.max(-1, AIR.sunUp)), sh = Math.sqrt(Math.max(1 - su * su, 0));
+    _skyS[0] = sh; _skyS[1] = 0; _skyS[2] = su; _skyC[0] = 0; _skyC[1] = 0; _skyC[2] = -(AIR.RG + 1e-6);
+    _skyOpt.near[0] = K.x; _skyOpt.near[1] = K.y; _skyOpt.near[2] = K.z;
+    for (let ie = 0; ie < 5; ie++) {
+      const sinE = Math.max(ie * ie / 16, 0.012), cosE = Math.sqrt(1 - sinE * sinE);      // (the lowest a little above the horizon itself: along the ground the air has no end)
+      for (let ia = 0; ia < 3; ia++) {
+        const ca = 1 - ia, sa = ia === 1 ? 1 : 0;
+        _skyDir[0] = cosE * ca; _skyDir[1] = cosE * sa; _skyDir[2] = sinE;
+        const r = AIR.march(_skyC, _skyDir, Infinity, 12, _skyS, _skyOpt), o = (ie * 3 + ia) * 3;
+        out[o] = r.L[0] * E + N.x * (1 - r.T[0]); out[o + 1] = r.L[1] * E + N.y * (1 - r.T[1]); out[o + 2] = r.L[2] * E + N.z * (1 - r.T[2]);
+      }
+    }
+  }
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -1209,6 +1230,7 @@
     }
     // the air for this frame (air.js): where the planet and the sun are from the camera, how far the eye is opened. The sky is drawn through it, so behind everything is the black of space
     if (window.AIR) { camera.updateMatrixWorld(); AIR.update(camera, globals.uSun.value, mapcam.alt, mapcam.dist); }
+    if (window.AIR) skyMirror();
     const posted = postOk && !POST.off && !POST.broken && settings.quality === 'high'; globals.uGlow.value = world.bUniforms.uGlow.value = posted ? 1 : 0; if (life) life.uniforms.uGlow.value = posted ? 1 : 0;
     updateLabels(); updatePlots(); updateFlows();
     if (now - mmT > 700) { mmT = now; updateMinimap(false); }
