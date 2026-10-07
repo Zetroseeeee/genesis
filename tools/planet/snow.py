@@ -174,10 +174,12 @@ for hemi in 'NS':
     v = (at(r0, c0) * (1 - fc) + at(r0, c0 + 1) * fc) * (1 - fr) + (at(r0 + 1, c0) * (1 - fc) + at(r0 + 1, c0 + 1) * fc) * fr
     ice[rows] = v.reshape(len(rows), W * 2).astype(np.float32)
     print('  %s: %s cells of 25 km, %s; ice all the year on %.1f million km2, in some month on %.1f' % (hemi, 'x'.join(map(str, share.shape)), crs, (share[sea_] > 0.96).sum() * 625e-6, (share[sea_] > 0.04).sum() * 625e-6))
-# only the game's own water speaks, a texel clear of any shore; the land takes its nearest water's (a card weighs between a
-# shore's texels: it must find the sea's ice there, not nothing)
+# only the game's own water speaks, a texel clear of any shore; the land beside it takes its nearest water's (a card weighs
+# between a shore's texels: it must find the sea's ice there, not nothing)
 open_water = binary_erosion(wet, iterations=1, border_value=1)
-ix = distance_transform_edt(~open_water, return_distances=False, return_indices=True); ice = np.where(open_water, ice, ice[ix[0], ix[1]]); del ix
+# (no further than some forty kilometres in: the lakes and rivers of a country freeze by its own winters, not by a sea's that
+#  lies a thousand kilometres off - the game lets a water freeze as the sea beside it does wherever this map has any ice)
+dist, ix = distance_transform_edt(~open_water, return_distances=True, return_indices=True); ice = np.where(open_water, ice, ice[ix[0], ix[1]] * np.clip(1.0 - (dist - 2.0) / 3.0, 0.0, 1.0)); del ix, dist
 ice = np.array(Image.fromarray(np.rint(ice * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.0))).astype(np.float32) / 255.0
 # (to the map's own cells, then smoothed over some sixty kilometres: what is left of a month's yes or no is how likely it is)
 snow = np.array(Image.fromarray(np.rint(snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.6))).astype(np.float32) / 255.0
