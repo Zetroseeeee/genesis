@@ -82,6 +82,31 @@ window.__T.costsMesh = function () {
   const T = __G.terrain, q = T.quadPx;
   __T.cost([['quads of ' + q + ' px', () => {}], ['of 4', () => { T.quadPx = 4; }], ['of 6', () => { T.quadPx = 6; }], ['of 12', () => { T.quadPx = 12; }], ['of ' + q + ' again', () => { T.quadPx = q; }], ['of 4 again', () => { T.quadPx = 4; }], ['of ' + q + ' a third time', () => { T.quadPx = q; }]], 3, 2500);
 };
+// what the picture of the Earth costs now that it is eight times as fine: looked at in fewer ways where the ground runs away from
+// the eye (the card's own filtering: 16 as the game has it, then 4 and 2), and no finer than it used to be (level 3, five kilometres
+// to a texel: what the game had until 0.21) - each undone before the next
+window.__T.costsPlanet = function () {
+  const T = __G.terrain, full = T.opts.anisotropy || 16, top = T.imgMax, packs = () => [...T.packs.values()].filter((p) => p.kind === 'i' && p.texture).map((p) => p.texture), set = (n) => () => { __T.aniso(n, ...packs()); };
+  __T.cost([['all (' + packs().length + ' packs, ' + full + ' ways)', () => {}], ['the picture 4 ways', set(4)], ['2 ways', set(2)], [full + ' ways again', set(full)], ['no finer than level 3', () => { T.imgMax = 3; }],
+    ['and 2 ways', set(2)], ['all again (' + top + ', ' + full + ')', () => { T.imgMax = top; setTimeout(set(full), 1500); }], ['all a third time', set(full)]], 3, 3000);
+};
+// What the ground has to show and what it is still waiting for, written into the picture once a second: __T.watch(). The frame
+// rate of the last second, the packs by kind and state, and what every tile in the picture is drawn with: the picture, the heights
+// and the water's edge by level ('-' none, 'f' no shore near). A view is whole when nothing is loading and the levels stand still.
+window.__T.watch = function () {
+  const T = __G.terrain, el = document.createElement('div'); el.style.cssText = 'position:fixed;left:14%;top:40%;z-index:99999;background:#000;color:#fff;font:17px monospace;padding:10px;white-space:pre'; document.body.appendChild(el);
+  const t0 = performance.now(); let frames = 0, last = t0; const tick = () => { frames++; requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+  const j = (o) => Object.keys(o).sort().map((k) => k + ':' + o[k]).join(' '); let busy = 0, was = '', grown = 0, wasT = '';
+  setInterval(() => {
+    const now = performance.now(), fps = frames / ((now - last) / 1000); frames = 0; last = now;
+    const st = {}; for (const p of T.packs.values()) { const k = p.kind + ' ' + p.state; st[k] = (st[k] || 0) + 1; }
+    const w = [0, 0, 0], iL = {}, eL = {}, wL = {}; let n = 0;
+    for (const t of T.tiles.values()) { if (!t.inScene) continue; n++; w[Math.round(t.uniforms.uWaterP.value.x)]++; const a = t.iPack && !t.iPack.absent ? t.iPack.level : '-', b = t.ePack && !t.ePack.absent ? t.ePack.level : '-', c = t.wPack ? (t.wPack.pack ? t.wPack.level : 'f') : '-'; iL[a] = (iL[a] || 0) + 1; eL[b] = (eL[b] || 0) + 1; wL[c] = (wL[c] || 0) + 1; }
+    const sec = (now - t0) / 1000, sig = j(iL) + j(eL) + j(wL), Tr = __G.trees, trees = Tr ? Tr.modelCount.join(' ') : '-';
+    if (T.loading > 0 || sig !== was) busy = sec; was = sig; if (trees !== wasT) grown = sec; wasT = trees;      // (the last second in which something was on its way or changed)
+    el.textContent = sec.toFixed(0) + ' s  ' + fps.toFixed(1) + ' fps  tiles ' + n + '  loading ' + T.loading + '  bundles ' + (T.bundles ? T.bundles.size : '-') + '   the ground whole since ' + busy.toFixed(0) + ' s' + '\npacks  ' + j(st) + '\nthe picture by level  ' + j(iL) + '\nthe heights by level  ' + j(eL) + '\nthe water: the mask ' + w[0] + ', a pack ' + w[1] + ', no shore near ' + w[2] + '; by level  ' + j(wL) + '\ntrees ' + trees + ', unchanged since ' + grown.toFixed(0) + ' s';
+  }, 1000);
+};
 // how many ways a texture is looked at where it runs away from the eye, set on the card as it is (no new upload): __T.aniso(n, textures...)
 window.__T.aniso = function (n, ...texs) {
   const R = __G.renderer, gl = R.getContext(), ext = gl.getExtension('EXT_texture_filter_anisotropic'); if (!ext) return 0; let k = 0;
