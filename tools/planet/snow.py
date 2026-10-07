@@ -35,7 +35,7 @@ snow's twin for boughs and roofs).
 import os, sys, time, urllib.request, urllib.error
 import numpy as np
 from PIL import Image, ImageFilter
-from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion, maximum_filter
+from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion
 
 Image.MAX_IMAGE_PIXELS = None
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
@@ -179,8 +179,8 @@ high = gaussian_filter(high.reshape(H, 2, W, 2).mean((1, 3)), 1.6, mode=('neares
 #  deal higher may have none either. So a cell without snow is counted as if it began six hundred metres above itself - and
 #  two thousand where there is none for a hundred kilometres round: the Hoggar stands 1,700 m above the Sahara about it
 #  and has no winter, nor have the ridges of the Puna.)
-near = maximum_filter(snow, size=11, mode=('nearest', 'wrap'))
-margin = (0.3 + 0.7 * (1.0 - ss(0.0, 0.08, near))) * (1.0 - ss(0.0, 0.1, snow))
+near = gaussian_filter(snow, 5.0, mode=('nearest', 'wrap'))      # (smooth and round: by the most within a square of cells, the margin's edge was a row of boxes)
+margin = (0.3 + 0.7 * (1.0 - ss(0.0, 0.02, near))) * (1.0 - ss(0.0, 0.1, snow))
 sealevel = snow - PER_KM * high / 1000.0 - margin      # how long it would lie at the level of the sea: 1 all the cold season, below nought never there
 lat = 90.0 - (np.arange(H) + 0.5) * 180.0 / H
 print('snow in winter by latitude (the share of the land that has it; 10 degrees at a time, from the north):')
