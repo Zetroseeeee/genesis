@@ -211,7 +211,10 @@ print('done')
 
 if 'ice' in what:
     print('== ice on the sea: the Sea Ice Index (NSIDC G02135) ==')
-    hosts = ['https://noaadata.apl.washington.edu/DATASETS/NOAA/G02135/', 'https://masie_web.apps.nsidc.org/pub/DATASETS/NOAA/G02135/']
+    hosts = ['https://noaadata.apps.nsidc.org/NOAA/G02135/', 'https://masie_web.apps.nsidc.org/pub/DATASETS/NOAA/G02135/']
+    import subprocess
+    for h in ('noaadata.apps.nsidc.org', 'masie_web.apps.nsidc.org', 'nsidc.org', 'n5eil01u.ecs.nsidc.org'):
+        r = subprocess.run(['curl', '-sS', '-o', '/dev/null', '-m', '20', '-w', '%{http_code} %{remote_ip}', 'https://%s/' % h], capture_output=True, text=True); print('  curl %s: %s %s' % (h, r.stdout.strip(), r.stderr.strip()[:90]))
     got = None
     for base in hosts:
         for sub in ['', 'north/', 'north/monthly/', 'north/monthly/geotiff/', 'north/monthly/geotiff/03_Mar/', 'south/monthly/geotiff/09_Sep/', 'north/monthly/shapefiles/', 'north/monthly/shapefiles/shp_median/']:
