@@ -21,8 +21,11 @@ Sea Ice Index of the US National Snow and Ice Data Center (the mean of its first
 Marble's own sea is one dark blue the year round.
 
     python3 tools/planet/snow.py --out out --work work      (the Planet workflow: mode "snow")
-        out/snow.png           2048 x 1024; red: 0 no snow in any month ... 255 it lies all the cold season;
-                               green: 0 the sea never freezes ... 255 it is ice all the year
+        out/snow.png           2048 x 1024; red: for how much of its cold season snow would lie there at the level of the
+                               sea, (share + 3) / 4 - the share less half of it for every thousand metres the country
+                               lies high (see "how high the country lies"); the game adds each place's own height back;
+                               green: 0 the sea never freezes ... 255 it is ice all the year;
+                               blue: the share itself, as it was read (nothing in the game reads it: to look at)
         out/planet_snow.jpg    the same over the summer's picture, to look at, and midwinter as the Blue Marble has it
 The game reads it into the second layer of its planet's maps (planetMaps in src/main.js: the snow into its alpha, the
 ice into its green); the ground's shader lets snow lie and the sea freeze only where the map has some, and for as much
@@ -32,7 +35,7 @@ snow's twin for boughs and roofs).
 import os, sys, time, urllib.request, urllib.error
 import numpy as np
 from PIL import Image, ImageFilter
-from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion
+from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion, maximum_filter
 
 Image.MAX_IMAGE_PIXELS = None
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
@@ -90,7 +93,32 @@ snow = filled; del m1, m2, b1, b2, w0, filled
 #  no dark blue sea, and as "land that is white in summer too" it had no winter - the lakes of the north lay open in January.)
 mask = np.array(Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mask.png')).resize((W * 2, H * 2), Image.BOX))
 wet = mask < 160                                      # the game's water: the sea (0), a lake (128) and what a shore mixes of them
-ix = distance_transform_edt(sea | wet, return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]; del ix
+ix = distance_transform_edt(sea | wet, return_distances=False, return_indices=True); snow = snow[ix[0], ix[1]]
+
+# ---------- how high the country lies ----------
+# The map is of cells twenty kilometres across, and what it has for the Alps is the Alps on the whole: the valleys with the
+# peaks. Snow lies the longer the higher the ground - half the cold season more for every thousand metres, by the Alps, the
+# Rockies and Scandinavia alike - so what is kept is how long it would lie at the level of the sea (the cell's share less what
+# the cell's own height on the whole accounts for: below nought wherever the high ground alone has snow, as in Tibet), and
+# the game adds each place's own height back: a valley of the Alps is green for most of its winter under white mountains,
+# and the high ranges of a dry plateau have their winter snow while the plateau has none.
+import json
+PER_KM = 0.5
+REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+E = json.load(open(os.path.join(REPO, 'data', 'index.json')))['elev']
+def heights():
+    rows = []
+    for py in range(2):
+        row = []
+        for px in range(4):
+            im = Image.open(os.path.join(REPO, 'data', 'e', '3_%d_%d.png' % (px, py))); mn, sc = E['packs']['3/%d/%d' % (px, py)]
+            a = np.array(im.getpalette(), np.float32).reshape(-1, 3)[:, 0][np.asarray(im)] if im.mode == 'P' else np.asarray(im.convert('L'), np.float32)      # (a paletted pack is read as its greys, not as the palette's numbers)
+            row.append(np.maximum(mn + a * sc, 0.0))
+        rows.append(np.concatenate(row, 1))
+    h = np.concatenate(rows, 0); k = h.shape[1] // (W * 2)
+    return h.reshape(H * 2, k, W * 2, k).mean((1, 3))
+high = heights()[ix[0], ix[1]]; del ix      # (and water takes the height of the land nearest to it, as it takes its snow)
+print('the game\'s own heights: %s, to %.0f m; land on the whole %.0f m' % ('x'.join(map(str, high.shape)), high.max(), high[~(sea | wet)].mean()))
 
 # ---------- ice on the sea ----------
 # The Blue Marble has no ice on its sea (its ocean is one dark blue the year round). The Sea Ice Index of the US National Snow
@@ -146,18 +174,26 @@ ice = np.array(Image.fromarray(np.rint(ice * 255).astype(np.uint8)).resize((W, H
 # (to the map's own cells, then smoothed over some sixty kilometres: what is left of a month's yes or no is how likely it is)
 snow = np.array(Image.fromarray(np.rint(snow * 255).astype(np.uint8)).resize((W, H), Image.BOX).filter(ImageFilter.GaussianBlur(1.6))).astype(np.float32) / 255.0
 snow = np.clip((snow - 0.03) / 0.94, 0.0, 1.0)
+high = gaussian_filter(high.reshape(H, 2, W, 2).mean((1, 3)), 1.6, mode=('nearest', 'wrap'))      # (the heights as the snow is: to the map's cells, and as smooth)
+# (Where a cell has no snow at all, all that is known is that its own height on the whole is too low for any: ground a good
+#  deal higher may have none either. So a cell without snow is counted as if it began six hundred metres above itself - and
+#  two thousand where there is none for a hundred kilometres round: the Hoggar stands 1,700 m above the Sahara about it
+#  and has no winter, nor have the ridges of the Puna.)
+near = maximum_filter(snow, size=11, mode=('nearest', 'wrap'))
+margin = (0.3 + 0.7 * (1.0 - ss(0.0, 0.08, near))) * (1.0 - ss(0.0, 0.1, snow))
+sealevel = snow - PER_KM * high / 1000.0 - margin      # how long it would lie at the level of the sea: 1 all the cold season, below nought never there
 lat = 90.0 - (np.arange(H) + 0.5) * 180.0 / H
 print('snow in winter by latitude (the share of the land that has it; 10 degrees at a time, from the north):')
 landm = ~np.array(Image.fromarray(sea).resize((W, H), Image.NEAREST))
 for a in range(90, -90, -10):
     m = (lat <= a) & (lat > a - 10); l = landm[m]; print('  %4d..%4d: %5.1f%%' % (a, a - 10, 100.0 * snow[m][l].mean() if l.any() else 0.0))
-for name, lon, la in [('Tibet', 88, 33), ('Tarim', 83, 39), ('Mongolia', 104, 47), ('Kazakh steppe', 68, 49), ('Moscow', 37, 56), ('St Petersburg', 30.3, 59.9), ('Karelia', 33, 63), ('Helsinki', 25, 60.3), ('Stockholm', 18, 59.4), ('Oslo', 10.8, 60), ('Warsaw', 21, 52.2), ('Paris', 2.3, 48.8), ('Berlin', 13.4, 52.5), ('Kyiv', 30.5, 50.4), ('Novosibirsk', 83, 55), ('Irkutsk', 104.3, 52.3), ('Yakutsk', 129.7, 62), ('Sapporo', 141.4, 43.1), ('Ottawa', -75.7, 45.4), ('Quebec', -71.2, 46.9), ('Duluth', -92.1, 46.8), ('Edmonton', -113.5, 53.5), ('Anchorage', -150, 61.2), ('Beijing', 116.4, 39.9), ('Harbin', 126.6, 45.8), ('Chicago', -87.6, 41.9), ('Denver', -105, 39.7), ('Winnipeg', -97, 50), ('Great Basin', -116, 40), ('Anatolia', 33, 39), ('Iran plateau', 54, 33), ('Namib', 15, -23), ('Karoo', 24, -32), ('Patagonia 45S', -69, -45), ('Patagonia 50S', -70, -50), ('Puna', -67, -22), ('Santiago Andes', -70.1, -33.5), ('NZ Alps', 170, -43.8), ('Alps', 9.5, 46.6), ('Sahara Hoggar', 5.5, 23.3), ('Hokkaido', 143, 43.5)]:
-    x, y = int((lon + 180) / 360 * W), int((90 - la) / 180 * H); print('  %-16s %.2f   (winter %s, summer %s)' % (name, snow[y, x], np.rint(winter[y * 2, x * 2] * 255).astype(int), np.rint(summer[y * 2, x * 2] * 255).astype(int)))
+for name, lon, la in [('Tibet', 88, 33), ('Tarim', 83, 39), ('Mongolia', 104, 47), ('Kazakh steppe', 68, 49), ('Moscow', 37, 56), ('St Petersburg', 30.3, 59.9), ('Karelia', 33, 63), ('Helsinki', 25, 60.3), ('Stockholm', 18, 59.4), ('Oslo', 10.8, 60), ('Warsaw', 21, 52.2), ('Paris', 2.3, 48.8), ('Berlin', 13.4, 52.5), ('Kyiv', 30.5, 50.4), ('Novosibirsk', 83, 55), ('Irkutsk', 104.3, 52.3), ('Yakutsk', 129.7, 62), ('Sapporo', 141.4, 43.1), ('Ottawa', -75.7, 45.4), ('Quebec', -71.2, 46.9), ('Duluth', -92.1, 46.8), ('Edmonton', -113.5, 53.5), ('Anchorage', -150, 61.2), ('Beijing', 116.4, 39.9), ('Harbin', 126.6, 45.8), ('Chicago', -87.6, 41.9), ('Denver', -105, 39.7), ('Winnipeg', -97, 50), ('Great Basin', -116, 40), ('Anatolia', 33, 39), ('Iran plateau', 54, 33), ('Namib', 15, -23), ('Karoo', 24, -32), ('Patagonia 45S', -69, -45), ('Patagonia 50S', -70, -50), ('Puna', -67, -22), ('Santiago Andes', -70.1, -33.5), ('NZ Alps', 170, -43.8), ('Alps', 9.5, 46.6), ('Sahara Hoggar', 5.5, 23.3), ('Hokkaido', 143, 43.5), ('Hoggar peaks', 5.6, 23.3), ('Altiplano', -68, -19), ('Rhone valley', 7.6, 46.3), ('Engadin', 9.9, 46.5), ('Po plain', 10, 45.2), ('Norway fjell', 8, 61), ('Norway coast', 5.3, 60.4), ('Kilimanjaro', 37.35, -3.07), ('Atlas', -7.9, 31.1), ('Zagros', 50, 32.5), ('Kunlun', 85, 36), ('Karakoram', 76.5, 35.9)]:
+    x, y = int((lon + 180) / 360 * W), int((90 - la) / 180 * H); print('  %-16s %.2f   at %4.0f m; at the sea %5.2f   (winter %s, summer %s)' % (name, snow[y, x], high[y, x], sealevel[y, x], np.rint(winter[y * 2, x * 2] * 255).astype(int), np.rint(summer[y * 2, x * 2] * 255).astype(int)))
 print('ice on the sea (months of the year):')
 for name, lon, la in [('North Pole', 0, 88), ('Baffin Bay', -65, 73), ('Hudson Bay', -85, 60), ('Labrador coast', -57, 56), ('Gulf of St Lawrence', -62, 48), ('Lake Superior', -87.5, 47.7), ('Greenland Sea', -5, 76), ('Norwegian Sea', 5, 68), ('North Sea', 3, 56), ('Barents Sea', 35, 73), ('White Sea', 38, 65.5), ('Gulf of Bothnia', 21, 64), ('Gulf of Finland', 26, 59.9), ('Baltic proper', 19, 56), ('Kara Sea', 70, 75), ('Laptev Sea', 125, 75), ('Sea of Okhotsk', 148, 55), ('Bering Sea north', -170, 62), ('Bering Sea south', -170, 55), ('Sea of Japan north', 139, 46), ('Caspian north', 50.5, 46), ('Lake Baikal', 108, 53.5), ('Black Sea', 34, 43.5), ('Weddell Sea', -40, -72), ('Ross Sea', -175, -75), ('Southern Ocean 60 S', 0, -60), ('Southern Ocean 66 S', 0, -66), ('Drake Passage', -65, -58)]:
     x, y = int((lon + 180) / 360 * W), int((90 - la) / 180 * H); print('  %-20s %4.1f months' % (name, ice[y, x] * 12))
 os.makedirs(OUT, exist_ok=True)
-Image.fromarray(np.dstack([np.rint(snow * 255), np.rint(ice * 255), np.zeros((H, W))]).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'snow.png'), optimize=True)
+Image.fromarray(np.dstack([np.rint(np.clip((sealevel + 3.0) / 4.0, 0.0, 1.0) * 255), np.rint(ice * 255), np.rint(snow * 255)]).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'snow.png'), optimize=True)
 s2 = np.array(Image.fromarray(np.rint(summer * 255).astype(np.uint8)).resize((W, H), Image.BOX)).astype(np.float32)
 wet2 = np.array(Image.fromarray(wet).resize((W, H), Image.NEAREST)); k = np.where(wet2, ice, snow)[..., None]
 v = s2 * (1 - k) + np.array([245, 248, 252], np.float32) * k

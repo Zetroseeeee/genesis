@@ -487,7 +487,7 @@
       vec2 geo = vec2((vLon / PI + 1.0) * 0.5, 0.5 - vLat / PI);   // global equirect uv (v down)
       #ifdef INFO2
       vec4 info = texture(uInfo, vec3(geo, 0.0));                    // r shelf, g ice, b how hard the winters are, a how humid the climate (tools/climate/build.py)
-      vec4 natv = texture(uInfo, vec3(geo, 1.0));                    // by nature: how green the country is and how warm-coloured (r, b: data/veg.jpg, what the trees are planted by); for how much of its winter the sea is ice (g) and snow lies (a: data/snow.png)
+      vec4 natv = texture(uInfo, vec3(geo, 1.0));                    // by nature: how green the country is and how warm-coloured (r, b: data/veg.jpg, what the trees are planted by); for how much of the year the sea is ice (g) and of its cold season snow would lie at the level of the sea (a: data/snow.png)
       #else
       vec4 info = texture2D(uInfo, geo); vec4 natv = vec4(0.0, 0.5, 1.0, 1.0);
       #endif
@@ -551,11 +551,13 @@
       //  by latitude alone, were white the year round)
       // (and a winter brings the snow line down only where it brings snow: natv.a, the Earth's own winter. Tibet is high, dry
       //  and all but bare in January; by the latitude's rule alone it was an ice cap for half the year.)
-      // How much of its cold season snow lies here (natv.a: tools/planet/snow.py).
-      float snowMap = natv.a, noiseL = 0.5 * log2(max(max(dot(dFdx(vGL), dFdx(vGL)), dot(dFdy(vGL), dFdy(vGL))), 1e-30)) + 9.0;      // (noiseL: the level the card would take of the noise at one repeat a radian)
-      // (it comes first to the heights and leaves them last: by the map alone, of cells twenty kilometres across, the snow of the
-      //  Alps ended at one line over ridge and valley alike, and the ranges at a snowy country's edge stood bare beside it)
-      float snowUp = 0.8 + min(max(vH, 0.0), 2400.0) * 0.0008, snowHere = snowMap * snowUp;
+      // For how much of its cold season snow lies here: 1 all seven months of it, and a little more where it lies into the summer.
+      // The map (natv.a: tools/planet/snow.py) has how long it would lie at the level of the sea, of cells twenty kilometres
+      // across, and every place adds its own height: half the season more for each thousand metres. (By the map's cells alone
+      // the snow of the Alps ended at one line over ridge and valley alike; here a valley is green for most of its winter under
+      // white mountains, and the ranges of a dry plateau have their winter snow while the plateau has none.)
+      float noiseL = 0.5 * log2(max(max(dot(dFdx(vGL), dFdx(vGL)), dot(dFdy(vGL), dFdy(vGL))), 1e-30)) + 9.0;      // (the level the card would take of the noise at one repeat a radian)
+      float snowHere = clamp(natv.a * 4.0 - 3.0 + vH * 0.0005, 0.0, 1.25);
       float winterSnow = winter * mix(0.12, 1.0, smoothstep(0.05, 0.5, snowHere));
       float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winterSnow - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0));
       float ice = max(info.g, white * max(smoothstep(snowLine0 - 900.0, snowLine0 + 200.0, vH), smoothstep(0.7, 0.8, latN0)));
@@ -927,21 +929,19 @@
       float snowLying = 0.0, snowCov = 0.0;
       { float cold = info.b, coldNow = mix(uBare.w, uBare.z, hemi);
         #ifdef INFO2
-        // (Where, and for how much of the year: as the Earth has it - the share of a cold season's seven months in which snow lay
-        //  there (snowMap, above). By the climate's class alone a cold desert lay white from the Tarim to the Namib and a tundra
-        //  from Siberia to the Puna of the Andes, and Tibet, dry and all but bare in winter, was an ice cap.
-        //  And it does not end at a line: it thins out over a hundred kilometres and more, lying on open ground long
-        //  after the woods show dark through it. The noise of the place roughens its edge from close to, and is left out
-        //  long before a repeat of it is small in the picture (the largest repeats every forty kilometres: from six hundred
-        //  up, the thinning snow of Poland was a wallpaper of dark dots). Nor is there any noise the size of a country in
-        //  it: thinning out by that, the snow of a plain seen from far out was white puffs on green, like cloud.)
+        // (Where, and for how much of the year: as the Earth has it - snowHere, above. By the climate's class alone a cold desert
+        //  lay white from the Tarim to the Namib and a tundra from Siberia to the Puna of the Andes, and Tibet, dry and all but
+        //  bare in winter, was an ice cap. Snow of so much of the season lies for just so long about the depth of winter:
+        //  snowOff is how far the year is from that, 0 late in January and 1 half a year on, and the cold season is 0.58 of
+        //  the year. It comes and goes over three weeks, and where there is little of it in any winter it is thin in all of
+        //  them: it does not end at a line but thins out over a hundred kilometres and more, lying on open ground long after
+        //  the woods show dark through it. The noise of the place roughens its edge from close to, and is left out long
+        //  before a repeat of it is small in the picture (the largest repeats every forty kilometres: from six hundred up,
+        //  the thinning snow of Poland was a wallpaper of dark dots). Nor is there any noise the size of a country in it:
+        //  thinning out by that, the snow of a plain seen from far out was white puffs on green, like cloud.)
         float rag = (nMac.g - 0.512) * 0.5 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23)) + (nMid.g - 0.512) * 0.3 * (1.0 - smoothstep(0.0, 1.5, noiseL + 10.23)) + (nMic.g - 0.512) * 0.2 * (1.0 - smoothstep(0.0, 1.5, noiseL + 13.13)) + (nFin.g - 0.512) * 0.12 * (1.0 - smoothstep(0.0, 1.5, noiseL + 15.29));
-        float sn = snowHere + rag * smoothstep(0.0, 0.15, snowMap);
-        // (what the season asks: little in the depth of winter, more than a plain ever has by the spring, and from then more than
-        //  any height has: with the heights counting for as much as they do, the Alps, Norway and Armenia lay white all July.
-        //  What stays the year round is the snow line's to say, and the photograph's.)
-        float warmNow = 1.0 - coldNow, snowAsk = 0.07 + warmNow * 1.15 + 2.0 * smoothstep(0.55, 1.0, warmNow);
-        float lying = clamp((sn - snowAsk) / (0.45 * max(1.0, snowUp * 0.8)), 0.0, 1.0); snowLying = lying;      // (on high ground the map counts for more, and would thin out over less of itself: the snow of Tibet lay in white pancakes)
+        float sn = snowHere + rag * smoothstep(0.02, 0.2, snowHere), snowOff = acos(clamp(2.0 * coldNow - 1.0, -1.0, 1.0)) * 0.31831;
+        float lying = clamp((sn * 0.58 - snowOff) / 0.2 + 0.5, 0.0, 1.0) * smoothstep(0.02, 0.4, sn); snowLying = lying;
         #else
         // (Snow lies on low ground only well away from the tropics. By the climate's map a cold desert is the Namib too, and a tundra
         //  the Puna of the Andes: each lay under a white sheet all its winter. Climates of mild winters keep snow from some forty
@@ -1126,11 +1126,12 @@
       // where the snow lies long, still water freezes: lakes and rivers under white ice (blown clear in places), and in
       // the hardest winters the sea stands fast along the shore
       #ifdef INFO2
-      // (by the snow of its shores, counted for half as much again - a lake freezes where snow would lie on open ground, and the
+      // (by the snow of its shores, counted for a third as much again - a lake freezes where snow would lie on open ground, and the
       //  map has too little of it among woods - and on the sea's slower clock: a lake freezes weeks after the first snow and
-      //  is open weeks after the last. By the snow lying at the moment, Ladoga was open water in March.)
-      float warmIce = 1.0 - mix(uIceCold.y, uIceCold.x, hemi);
-      float frozen = smoothstep(0.0, 0.15, snowHere * 1.5 - (0.17 + warmIce * 1.15 + 2.0 * smoothstep(0.55, 1.0, warmIce))) * smoothstep(0.5, 0.85, info.b);      // (0.17: not where a month of snow is all the winter there is - from far out the Danish straits are a lake to the picture's map)
+      //  is open weeks after the last. By the snow lying at the moment, Ladoga was open water in March. Not where a month of
+      //  snow is all the winter there is: from far out the Danish straits are a lake to the picture's map.)
+      float iceOff = acos(clamp(2.0 * mix(uIceCold.y, uIceCold.x, hemi) - 1.0, -1.0, 1.0)) * 0.31831;      // (how far the year is from the end of winter: 0 early in March, 1 half a year on)
+      float frozen = smoothstep(0.0, 0.06, snowHere * 0.75 - 0.08 - iceOff) * smoothstep(0.5, 0.85, info.b);
       #else
       float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
       #endif
@@ -1145,11 +1146,10 @@
       //  there is ice (tools/planet/snow.py, from the Sea Ice Index). By the latitude alone, in winter there was ice off
       //  Scotland, where the sea never freezes, as in Hudson Bay, where it does for seven months. The sea is slow: its ice is
       //  widest eleven weeks behind the sun (uIceCold), and ice of so many months lies for just so many about that time:
-      //  yearOff is how far the year is from it, 0 at the end of winter and 1 half a year on. A month and more is asked
+      //  iceOff is how far the year is from it, 0 at the end of winter and 1 half a year on. A month and more is asked
       //  before there is any (a radiometer's cell on a shore sees the land with the sea and takes it for some ice: the
       //  Danish straits froze every March), and what is ice all the year stays.)
-      float yearOff = acos(clamp(2.0 * mix(uIceCold.y, uIceCold.x, hemi) - 1.0, -1.0, 1.0)) * 0.31831;
-      float iceIn = natv.g * 1.2 - 0.1 - yearOff;
+      float iceIn = natv.g * 1.2 - 0.1 - iceOff;
       float seaIce = smoothstep(0.01, 0.05, iceIn) * seaW;
       float floe = smoothstep(0.35, 0.65, mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) + 0.3 * nMic.a) * smoothstep(0.02, 0.22, iceIn);
       #else

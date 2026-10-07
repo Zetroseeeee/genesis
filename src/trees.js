@@ -264,15 +264,15 @@
       if (snowUrl) img(snowUrl).then((c) => { this.snow = c; }).catch((e) => console.warn('snow', e));
     }
     // How much of the ground snow covers at a place just now (0..1), the twin of the ground shader's rule (without the grain of
-    // its edge): where and for how much of the year, as the Earth has it (data/snow.png, the share of a cold season in which snow
-    // lay there: tools/planet/snow.py); sooner and longer on the heights. cold: the cold of the year in that hemisphere
-    // (0..1, a month behind the sun); h: how high the place lies, in metres. Roofs and boughs go white by it with the ground.
+    // its edge): for how much of its cold season snow lies there - what the map has for the level of the sea (data/snow.png:
+    // tools/planet/snow.py) and half the season more for every thousand metres the place lies high - and so for how long about
+    // the depth of winter. cold: the cold of the year in that hemisphere (0..1, a month behind the sun); h: how high the place
+    // lies, in metres. Roofs and boughs go white by it with the ground.
     lyingAt(lon, lat, coldYear, h) {
       if (!this.snow) { const cold = Trees.COLD[this.climateAt(lon, lat)] || 0, thr = 1.02 - 0.55 * cold; return smooth(thr, thr + 0.1, coldYear) * smooth(0.08, 0.5, cold); }
-      const sn = this.snow, real = this.samp(sn, (lon + 180) / 360 * sn.width, (90 - lat) / 180 * sn.height, 0);
-      const up = 0.8 + Math.min(Math.max(h || 0, 0), 2400) * 0.0008;
-      const warm = 1 - coldYear;
-      return Math.min(1, Math.max(0, (real * up - 0.07 - warm * 1.15 - 2 * smooth(0.55, 1, warm)) / (0.45 * Math.max(1, up * 0.8))));
+      const sn = this.snow, s = Math.min(1.25, Math.max(0, this.samp(sn, (lon + 180) / 360 * sn.width, (90 - lat) / 180 * sn.height, 0) * 4 - 3 + (h || 0) * 0.0005));
+      const off = Math.acos(Math.min(1, Math.max(-1, 2 * coldYear - 1))) / Math.PI;
+      return Math.min(1, Math.max(0, (s * 0.58 - off) / 0.2 + 0.5)) * smooth(0.02, 0.4, s);
     }
     // bilinear sample of an ImageData channel at fractional pixel coords (wrapping x)
     samp(id, fx, fy, ch) {
