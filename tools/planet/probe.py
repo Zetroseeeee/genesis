@@ -19,8 +19,14 @@ arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sy
 OUT, WORK = arg('out', 'out'), arg('work', 'work')
 what = [a for a in sys.argv[1:] if a in ('urls', 'months', 'sheet')] or ['urls', 'months', 'sheet']
 UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) holocene-planet-probe'}
-BMNG = 'https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/'
 EO = 'https://eoimages.gsfc.nasa.gov/images/imagerecords/'
+# Blue Marble Next Generation at the Earth Observatory: a record for every month and kind (the plain land surface; with the
+# hills' shade; with the sea bed's too). The records' numbers as remembered: the probe says which are right.
+IDS = {'': [74243, 74268, 74293, 74318, 74343, 74368, 74393, 74418, 74443, 74468, 74493, 74518],
+       '.topo': [73938, 73967, 73992, 74017, 74042, 74067, 74092, 74117, 74142, 74167, 74192, 74218],
+       '.topo.bathy': [73580, 73605, 73630, 73655, 73701, 73726, 73751, 73776, 73801, 73826, 73884, 73909]}
+def bmng(m, kind='', size='3x5400x2700', ext='jpg', tile=''):
+    i = IDS[kind][m - 1]; return '%s%d/%d/world%s.2004%02d.%s%s.%s' % (EO, i // 1000 * 1000, i, kind, m, size, tile and '.' + tile, ext)
 SVS = 'https://svs.gsfc.nasa.gov/vis/a000000/'
 
 
@@ -59,12 +65,9 @@ def links(url):
 
 if 'urls' in what:
     print('== the sources ==')
-    for name, url in [
-        ('bmng tile 500 m (aug, A1)', BMNG + 'world_500m/world.200408.3x21600x21600.A1.png'),
-        ('bmng 2 km (aug)', BMNG + 'world_2km/world.200408.3x21600x10800.png'),
-        ('bmng 8 km (aug)', BMNG + 'world_8km/world.200408.3x5400x2700.png'),
-        ('bmng 8 km jpg (aug)', BMNG + 'world_8km/world.200408.3x5400x2700.jpg'),
-        ('bmng topo 500 m (aug, A1)', BMNG + 'world.topo_500m/world.topo.200408.3x21600x21600.A1.png'),
+    for name, url in [(('bmng%s %02d' % (k, m)), bmng(m, k)) for k in IDS for m in (1, 2, 7, 8, 12)] + [
+        ('bmng 500 m tile (aug, A1)', bmng(8, '', '3x21600x21600', 'png', 'A1')), ('bmng 500 m tile (feb, D2)', bmng(2, '', '3x21600x21600', 'png', 'D2')),
+        ('bmng 2 km png (aug)', bmng(8, '', '3x21600x10800', 'png')), ('bmng 2 km jpg (aug)', bmng(8, '', '3x21600x10800', 'jpg')),
         ('clouds 8192', EO + '57000/57747/cloud_combined_8192.tif'),
         ('clouds 2048', EO + '57000/57747/cloud_combined_2048.jpg'),
         ('clouds east 21600', EO + '57000/57747/cloud.E.2001210.21600x21600.png'),
@@ -85,11 +88,11 @@ if 'urls' in what:
         st, h = ask(url)
         if st in (403, 405) or isinstance(st, str): st, h = ask(url, 'GET', 'bytes=0-15')
         print('%-28s %-5s %12s  %-24s %s' % (name, st, h.get('Content-Length') or h.get('Content-Range', ''), (h.get('Content-Type') or '')[:24], url), flush=True)
-    for name, url in [('bmng', BMNG), ('bmng 500 m', BMNG + 'world_500m/'), ('bmng 2 km', BMNG + 'world_2km/'), ('bmng 8 km', BMNG + 'world_8km/'),
-                      ('eo clouds', 'https://visibleearth.nasa.gov/images/57747/blue-marble-clouds'), ('svs stars', 'https://svs.gsfc.nasa.gov/4851/'), ('svs moon', 'https://svs.gsfc.nasa.gov/4720/')]:
+    for name, url in [('eo bmng', 'https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/'), ('eo bmng base', 'https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/'),
+                      ('visible earth aug', 'https://visibleearth.nasa.gov/images/74418/'), ('eo clouds', 'https://visibleearth.nasa.gov/images/57747/blue-marble-clouds'), ('svs stars', 'https://svs.gsfc.nasa.gov/4851/'), ('svs moon', 'https://svs.gsfc.nasa.gov/4720/')]:
         ls, n = links(url)
         if ls is None: print('-- %s: %s' % (name, n)); continue
-        keep = [l for l in ls if re.search(r'\.(png|jpg|tif|exr|gz|txt)$|/$', l) and not l.startswith(('http://www', 'mailto'))]
+        keep = [l for l in ls if re.search(r'\.(png|jpg|tif|exr|gz|txt)$', l) or re.search(r'blue-marble|imagerecords|images/7[34]\d\d\d', l)]
         print('-- %s (%d bytes of page, %d links): %s' % (name, n, len(ls), ' '.join(keep)[:3000]), flush=True)
 
 
@@ -105,12 +108,9 @@ def game_picture(size):
 months = {}
 if 'months' in what or 'sheet' in what:
     os.makedirs(WORK, exist_ok=True)
-    ls, _ = links(BMNG + 'world_8km/'); ls = ls or []
     for m in range(1, 13):
-        cand = [l for l in ls if re.search(r'world\.2004%02d\.3x5400x2700\.(jpg|png)$' % m, l)] or ['world.2004%02d.3x5400x2700.jpg' % m, 'world.2004%02d.3x5400x2700.png' % m]
-        for c in sorted(cand, key=lambda s: s.endswith('.png')):
-            try: months[m] = np.array(Image.open(fetch(BMNG + 'world_8km/' + os.path.basename(c), os.path.basename(c))).convert('RGB')); break
-            except Exception as e: print('  month %d: %s: %s' % (m, c, str(e)[:60]))
+        try: months[m] = np.array(Image.open(fetch(bmng(m), 'world.2004%02d.jpg' % m)).convert('RGB'))
+        except Exception as e: print('  month %d: %s' % (m, str(e)[:80]))
     print('months in hand:', sorted(months))
 
 if 'months' in what and months:
