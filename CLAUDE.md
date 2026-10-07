@@ -511,7 +511,13 @@ Conventions that matter:
   **The planet's own maps are one texture of two layers** (`uInfo`, a `sampler2DArray`: `planetMaps` in `main.js`):
   `info.png` and under it `veg.jpg` at the same size - the ground's shader has all sixteen textures, and a layer
   costs none. `info.png` is read back through the card (`pixelsOf`): a 2D canvas keeps colour multiplied by alpha,
-  and its alpha is how dry the country is. The second layer's alpha is the snow of the Earth's own winters (below).
+  and its alpha is how dry the country is. The second layer's alpha is the snow of the Earth's own winters and its
+  green the sea's ice (below; the map's own green, how light the country is by nature, the shader never read).
+  *What it costs* (the build Mac; `costp_*`, `__T.costsPlanet()`): nothing that can be measured. In one page, the
+  picture looked at in four ways or two where the ground runs away from the eye, or no finer than level 3 as it used
+  to be: 12.8 frames a second for the Alps from 19 km every time; and the game before it and with it, each in its own
+  start on the same day: 13 and 13 there, 26 and 26 over a town to the horizon. What it does cost is loading: a view
+  needs some fifty packs where it needed four, and lakes and fine heights come in a little later than they did.
 - **Winter** (`data/snow.png`, `tools/planet/snow.py`; `snowHere` in `terrain.js`, `Trees.lyingAt`). Where snow lies,
   and for how much of the year, is the Earth's own: the Blue Marble has every month, and the builder reads from it
   the share of a cold season's seven months (October to April in the north, April to October in the south) in which
@@ -596,7 +602,11 @@ Conventions that matter:
   *In the mesh.* The sea lies at nought and a lake at its level, and the ground comes up from the water's own
   level, beginning a little inland (`uShoreQ`: a quad and a half of the tile's mesh as it is, never under 60 m): a
   triangle with one corner in the water and one on a hill carried the water up the hill. Without the levels a lake
-  under a mountain climbed it; with them the game cuts the lake's bed into its own (coarse) heights. The byte the
+  under a mountain climbed it; with them the game cuts the lake's bed into its own (coarse) heights. Not where
+  a tile's lakes are smaller than its quads (`waterWide`, `uWaterP.z`): from far off a quad is kilometres, and a tarn
+  a few hundred metres across was a pit miles wide with its walls in shadow - dark blots all over the snows of the
+  Himalaya. There the ground is left as the heights have it; a great lake (the field at its limit in the middle of
+  it) lies level as before. The byte the
   card cannot weigh (two things in one) is fetched from the nearest texel. `shoreAt` (metres; then `wKind`,
   `wOpen`, `wLevel`), `isWater`, `heightAt` and `gpuVertexH` are the CPU's twins: trees, harbours, piers, ships,
   town sites and walls ask them, and ask again whenever more packs have come (`stats.packsW`).
