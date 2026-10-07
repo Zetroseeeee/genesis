@@ -17,7 +17,7 @@ ice. Water takes the snow of the land nearest to it: a lake freezes with its sho
 
 Ice on the sea (green): the share of the year's twelve months in which the sea there is ice - all of them in the
 Arctic Ocean, eight in Hudson Bay, five in the Gulf of Bothnia, four in the Sea of Okhotsk, none off Norway. From the
-Sea Ice Index of the US National Snow and Ice Data Center (the mean of its first ten years, 1979 to 1988): the Blue
+Sea Ice Index of the US National Snow and Ice Data Center (the middle year of its first ten, 1979 to 1988): the Blue
 Marble's own sea is one dark blue the year round.
 
     python3 tools/planet/snow.py --out out --work work      (the Planet workflow: mode "snow")
@@ -32,7 +32,7 @@ ice into its green); the ground's shader lets snow lie and the sea freeze only w
 of the year as it says (terrain.js, at "winter where winters are white" and "ice on the sea"; Trees.lyingAt is the
 snow's twin for boughs and roofs).
 """
-import os, sys, time, urllib.request, urllib.error
+import os, sys, time, warnings, urllib.request, urllib.error
 import numpy as np
 from PIL import Image, ImageFilter
 from scipy.ndimage import gaussian_filter, distance_transform_edt, binary_erosion, binary_dilation, median_filter, grey_closing
@@ -133,7 +133,7 @@ print('the game\'s own heights: %s, to %.0f m; land on the whole %.0f m' % ('x'.
 # and Ice Data Center has: how much of the sea is ice, month by month since 1979, from microwave radiometers that see by
 # night and through cloud, on a grid of 25 km about each pole (Fetterer, Knowles, Meier, Savoie and Windnagel: Sea Ice Index,
 # Version 4, NSIDC, doi:10.7265/a98x-0f50). Its first ten years are taken, which are the nearest it has to a sea nobody had
-# warmed: for each month the mean of them, and a month has ice where four tenths of the sea and more is ice.
+# warmed: for each month the middle year of the ten, and a month has ice where four tenths of the sea and more is ice.
 import rasterio
 from rasterio.warp import transform as reproject
 from concurrent.futures import ThreadPoolExecutor
@@ -153,16 +153,19 @@ ice = np.zeros((H * 2, W * 2), np.float32)
 for hemi in 'NS':
     share, tf, crs = None, None, None
     for m in range(1, 13):
-        acc, n = None, None
+        stack = []
         for y in YEARS:
             f = got[(hemi, y, m)]
             if not f: continue
             with rasterio.open(f) as r: a = r.read(1).astype(np.float32); tf, crs = r.transform, r.crs
             a = np.where(a == 2510, 1000.0, a)                       # (the hole at the pole no satellite sees is ice)
-            ok = a <= 1000; acc = np.where(ok, a, 0.0) if acc is None else acc + np.where(ok, a, 0.0); n = ok.astype(np.float32) if n is None else n + ok
-        if acc is None: continue
-        conc = np.where(n > 0, acc / np.maximum(n, 1.0) / 1000.0, np.nan)      # the mean of the years; nan: land
-        has = ss(0.25, 0.55, conc); share = has if share is None else share + has      # (not less: a radiometer's cell of 25 km on a shore sees the land with the sea, and takes it for a little ice - the Danish straits froze every March)
+            stack.append(np.where(a <= 1000, a / 1000.0, np.nan))
+        if not stack: continue
+        # The middle year of the ten, not their mean: what the sea does in a usual year. (Three of these ten winters were the
+        # hardest of the century in the Baltic, and by the mean the Danish straits froze every March: a white patch by itself
+        # in an open sea. In a usual year they do not freeze.) nan: land.
+        with warnings.catch_warnings(): warnings.simplefilter('ignore'); conc = np.nanmedian(np.stack(stack), 0)
+        has = ss(0.25, 0.55, conc); share = has if share is None else share + has      # (not less: a radiometer's cell of 25 km on a shore sees the land with the sea, and takes it for a little ice)
     share = share / 12.0; sea_ = ~np.isnan(share)
     ix, dist = distance_transform_edt(~sea_, return_distances=True, return_indices=True)[::-1]      # (land takes the nearest sea's, within some four hundred kilometres)
     share = np.where(sea_, share, np.where(dist < 16, share[ix[0], ix[1]], 0.0)); share = np.nan_to_num(share)
@@ -217,7 +220,7 @@ for a in range(90, -90, -10):
 for name, lon, la in [('Tibet', 88, 33), ('Tarim', 83, 39), ('Mongolia', 104, 47), ('Kazakh steppe', 68, 49), ('Moscow', 37, 56), ('St Petersburg', 30.3, 59.9), ('Karelia', 33, 63), ('Helsinki', 25, 60.3), ('Stockholm', 18, 59.4), ('Oslo', 10.8, 60), ('Warsaw', 21, 52.2), ('Paris', 2.3, 48.8), ('Berlin', 13.4, 52.5), ('Kyiv', 30.5, 50.4), ('Novosibirsk', 83, 55), ('Irkutsk', 104.3, 52.3), ('Yakutsk', 129.7, 62), ('Sapporo', 141.4, 43.1), ('Ottawa', -75.7, 45.4), ('Quebec', -71.2, 46.9), ('Duluth', -92.1, 46.8), ('Edmonton', -113.5, 53.5), ('Anchorage', -150, 61.2), ('Beijing', 116.4, 39.9), ('Harbin', 126.6, 45.8), ('Chicago', -87.6, 41.9), ('Denver', -105, 39.7), ('Winnipeg', -97, 50), ('Great Basin', -116, 40), ('Anatolia', 33, 39), ('Iran plateau', 54, 33), ('Namib', 15, -23), ('Karoo', 24, -32), ('Patagonia 45S', -69, -45), ('Patagonia 50S', -70, -50), ('Puna', -67, -22), ('Santiago Andes', -70.1, -33.5), ('NZ Alps', 170, -43.8), ('Alps', 9.5, 46.6), ('Sahara Hoggar', 5.5, 23.3), ('Hokkaido', 143, 43.5), ('Hoggar peaks', 5.6, 23.3), ('Altiplano', -68, -19), ('Rhone valley', 7.6, 46.3), ('Engadin', 9.9, 46.5), ('Po plain', 10, 45.2), ('Norway fjell', 8, 61), ('Norway coast', 5.3, 60.4), ('Kilimanjaro', 37.35, -3.07), ('Atlas', -7.9, 31.1), ('Zagros', 50, 32.5), ('Kunlun', 85, 36), ('Karakoram', 76.5, 35.9)]:
     x, y = int((lon + 180) / 360 * W), int((90 - la) / 180 * H); print('  %-16s %.2f   at %4.0f m; at the sea %5.2f   (winter %s, summer %s)' % (name, snow[y, x], high[y, x], sealevel[y, x], np.rint(winter[y * 2, x * 2] * 255).astype(int), np.rint(summer[y * 2, x * 2] * 255).astype(int)))
 print('ice on the sea (months of the year):')
-for name, lon, la in [('North Pole', 0, 88), ('Baffin Bay', -65, 73), ('Hudson Bay', -85, 60), ('Labrador coast', -57, 56), ('Gulf of St Lawrence', -62, 48), ('Lake Superior', -87.5, 47.7), ('Greenland Sea', -5, 76), ('Norwegian Sea', 5, 68), ('North Sea', 3, 56), ('Barents Sea', 35, 73), ('White Sea', 38, 65.5), ('Gulf of Bothnia', 21, 64), ('Gulf of Finland', 26, 59.9), ('Baltic proper', 19, 56), ('Kara Sea', 70, 75), ('Laptev Sea', 125, 75), ('Sea of Okhotsk', 148, 55), ('Bering Sea north', -170, 62), ('Bering Sea south', -170, 55), ('Sea of Japan north', 139, 46), ('Caspian north', 50.5, 46), ('Lake Baikal', 108, 53.5), ('Black Sea', 34, 43.5), ('Weddell Sea', -40, -72), ('Ross Sea', -175, -75), ('Southern Ocean 60 S', 0, -60), ('Southern Ocean 66 S', 0, -66), ('Drake Passage', -65, -58)]:
+for name, lon, la in [('North Pole', 0, 88), ('Danish belts', 10.8, 55.3), ('Kattegat', 11.5, 57), ('Gulf of Riga', 23.5, 57.7), ('Bothnian Bay', 23, 65), ('Bothnian Sea', 19.5, 62), ('Sea of Azov', 37, 46), ('Baffin Bay', -65, 73), ('Hudson Bay', -85, 60), ('Labrador coast', -57, 56), ('Gulf of St Lawrence', -62, 48), ('Lake Superior', -87.5, 47.7), ('Greenland Sea', -5, 76), ('Norwegian Sea', 5, 68), ('North Sea', 3, 56), ('Barents Sea', 35, 73), ('White Sea', 38, 65.5), ('Gulf of Bothnia', 21, 64), ('Gulf of Finland', 26, 59.9), ('Baltic proper', 19, 56), ('Kara Sea', 70, 75), ('Laptev Sea', 125, 75), ('Sea of Okhotsk', 148, 55), ('Bering Sea north', -170, 62), ('Bering Sea south', -170, 55), ('Sea of Japan north', 139, 46), ('Caspian north', 50.5, 46), ('Lake Baikal', 108, 53.5), ('Black Sea', 34, 43.5), ('Weddell Sea', -40, -72), ('Ross Sea', -175, -75), ('Southern Ocean 60 S', 0, -60), ('Southern Ocean 66 S', 0, -66), ('Drake Passage', -65, -58)]:
     x, y = int((lon + 180) / 360 * W), int((90 - la) / 180 * H); print('  %-20s %4.1f months' % (name, ice[y, x] * 12))
 os.makedirs(OUT, exist_ok=True)
 Image.fromarray(np.dstack([np.rint(np.clip((sealevel + 3.0) / 4.0, 0.0, 1.0) * 255), np.rint(ice * 255), np.rint(snow * 255)]).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'snow.png'), optimize=True)
