@@ -204,7 +204,9 @@
       // As the picture has it: a texel's lightness is how much cloud there is. From where a texel is larger than a pixel or two
       // that is a blur, and the grain takes over: heaps of cloud, as many as leave just so much of the sky covered, their edges
       // eaten at; and what the picture has of thin high cloud stays as a veil over them.
-      float smooth_ = 1.0, a = pow(c, 0.85), thick = c, dK = (1.0 - smoothstep(0.5e-4, 1.6e-4, foot)) * uGrainOn;
+      float a = pow(c, 0.85), thick = c, slope = 0.0, dK = (1.0 - smoothstep(0.5e-4, 1.6e-4, foot)) * uGrainOn;
+      vec3 sW = uSunW - n * dot(n, uSunW); float sl = length(sW); sW /= max(sl, 1e-4);      // (the way to the sun along the shell, in the globe's own frame)
+      vec3 sQ = vec3(sW.x * uShiftCS.x - sW.z * uShiftCS.y, sW.y, sW.z * uShiftCS.x + sW.x * uShiftCS.y);      // (and in the weather's, where the pictures are looked up)
       if (dK > 0.001) {
         // (four sizes of the grain: heaps some five kilometres across, the lumps of heaps four times that, and what eats at
         //  their edges at half a kilometre and a hundred metres; each drifts a little against the weather it belongs to)
@@ -224,49 +226,61 @@
         //  coarser copies. Not sooner: weighed straight, every place of the block has a slope of its own, and the light, which
         //  goes by the slope, made a cloud low in the sky of flat bars, each lit or not.)
         vec3 p1 = p + w, p0 = p.yzx * 0.23 + 3.7 + w * 0.3;
-        float k1 = 1.0 - smoothstep(2.5, 5.0, tpp), k0 = 1.0 - smoothstep(2.5, 5.0, tpp * 0.23), n1 = 0.0, n0 = 0.0; smooth_ = k1;
+        float k1 = 1.0 - smoothstep(2.5, 5.0, tpp), k0 = 1.0 - smoothstep(2.5, 5.0, tpp * 0.23), n1 = 0.0, n0 = 0.0;
         if (k1 < 1.0) n1 = textureGrad(uGrain, p1, dx * 318.0, dy * 318.0).r;
         if (k1 > 0.0) n1 = mix(n1, grain3(p1), k1);
         if (k0 < 1.0) n0 = textureGrad(uGrain, p0, dx.yzx * 73.1, dy.yzx * 73.1).r;
         if (k0 > 0.0) n0 = mix(n0, grain3(p0), k0);
-        float ms = 0.72 * n1 + 0.28 * n0, m = ms - 0.22 * (1.0 - n2) - 0.08 * (1.0 - n3);      // (the heaps; and the heaps with their edges eaten at)
-        float f = min(c * uCover.x, uCover.y);      // (how much of the sky the heaps take: what the picture has; from under them never all of it)
-        float fd = 0.5 - f, thr = 0.35 + 0.72 * fd + 2.8 * fd * fd * fd * fd * fd;      // (the sum's own measure, so that f of the sky is over it: tools/planet/grain.py)
-        float soft = mix(0.22, 0.11, e2), x = (m - thr) / soft, xs = (ms - 0.15 - thr) / 0.11;      // (how far into a heap: under nought outside, one a little way in; and the same of the heap without its eaten edge)
-        float heap = smoothstep(-0.55, 0.55, x) * smoothstep(0.01, 0.06, f), veil = 0.3 * smoothstep(0.25, 1.0, c);      // (and none at all where the picture has a clear sky)
+        float ms = 0.72 * n1 + 0.28 * n0;      // (the heaps)
+        float f = min(c * uCover.x, uCover.y);      // (how much of the sky they take: what the picture has; from under them never all of it)
+        float fd = 0.5 - f, thr = 0.5 + 0.72 * fd + 2.8 * fd * fd * fd * fd * fd;      // (the sum's own measure, so that f of the sky is over it: tools/planet/grain.py)
+        float xs = (ms - thr) / 0.11;      // (how far into a heap: under nought outside, one a little way in)
+        // A heap's rim is eaten at and its heart is not: the grain takes away up to half of what there is of a heap, so where
+        // there is little of it (the rim) it comes and goes with the grain and where there is much it stands. (Taken off the
+        // sum itself, the grain made a heap a cluster of dots.) Seen from the side a heap has a soft edge and no grain.
+        float eat = 0.72 * (1.0 - n2) + 0.28 * (1.0 - n3), b = clamp((ms - thr) / 0.42 + 0.35, 0.0, 1.0), left = (b - eat * 0.55) / (1.0 - eat * 0.55);
+        float heap = mix(smoothstep(-0.55, 0.55, xs * 0.5), smoothstep(0.0, 0.25, left), e2) * smoothstep(0.01, 0.06, f);      // (and none at all where the picture has a clear sky)
+        float veil = 0.3 * smoothstep(0.25, 1.0, c);
         a = mix(a, 1.0 - (1.0 - heap) * (1.0 - veil), dK);      // (a heap hides what is behind it altogether: the sun's disc is thousands of times white, and a hundredth of it through a cloud is still a sun)
         // (How thick, for the light: of the heap without the fine grain of its edge. The light goes by how this changes from
         //  one pixel to the next, and with the grain in it every pixel of a cloud was lit by its own dice.)
         thick = mix(thick, max((1.0 - exp(-max(xs, 0.0) * 0.4)) * smoothstep(-0.55, 0.55, xs), veil * 0.4), dK);
+        // Which way a heap thickens toward the sun, for its light and shade: from two more lookups, 400 m off toward the sun
+        // and away from it. (Not from how its thickness changes from one pixel to the next, which the card knows for nothing:
+        // the block is of bytes, a heap seen from under it changes by less than a byte's step from pixel to pixel, and its
+        // slope was nought, nought, nought and a step - bars of light and shade, when the sun was low and the slope counted.)
+        float lodS = max(log2(max(tpp, 1e-3)), 1.0); vec3 off = sQ * 0.0195;
+        vec2 xq = (0.72 * vec2(textureLod(uGrain, p1 + off, lodS).r, textureLod(uGrain, p1 - off, lodS).r) + 0.28 * n0 - thr) / 0.11;
+        vec2 tq = (1.0 - exp(-max(xq, 0.0) * 0.4)) * smoothstep(-0.55, 0.55, xq);
+        slope = (tq.x - tq.y) * 8150.0 * dK;      // (to the unit of the globe: the two are 1.23e-4 of it apart)
       }
-      // (how the cloud's cover and the place change across the pixel: asked before any pixel is thrown away, while its neighbours still answer)
-      vec3 Px = dFdx(vPosV), Py = dFdy(vPosV); float tx = dFdx(thick), ty = dFdy(thick);
+      // (how the picture's cloud changes across the pixel, and the place with it: asked before any pixel is thrown away, while its neighbours still answer)
+      vec3 Px = dFdx(vPosV), Py = dFdy(vPosV); float tx = dFdx(c), ty = dFdy(c);
       vec3 nV = normalize(vPosV - uAirC), vd = normalize(vPosV); float sunUp = dot(nV, uAirS), cosV = abs(dot(vd, nV));
       // (seen from above, a country under cloud is no country to rule: looked straight down through from where the game is
       //  played, the clouds are thin - uThin - and along the horizon and from far out they are as they are)
       a *= uOpacity * mix(1.0, uThin, smoothstep(0.2, 0.75, cosV));
       if (a < 0.004) discard;
       vec3 sunT = sqrt(vSunT); float day = max(max(sunT.r, sunT.g), sunT.b);
-      vec3 sT = uAirS - nV * sunUp; float sl = length(sT); sT /= max(sl, 1e-4);
-      // Which way a cloud thickens is had from how its cover changes across the picture (the card knows that for nothing):
-      // thicker toward the sun, this pixel is on a heap's far side and in its shade; thinner, on the side the sun is on.
+      // Thicker toward the sun, this pixel is on a heap's far side and in its shade; thinner, on the side the sun is on.
+      // From far, where there is the picture and no heaps, by how the picture's cloud changes across the pixel.
+      vec3 sT = uAirS - nV * sunUp; sT /= max(length(sT), 1e-4);
       float e = dot(Px, Px), fg = dot(Px, Py), g = dot(Py, Py), det = max(e * g - fg * fg, 1e-30);
-      vec3 grad = ((g * tx - fg * ty) * Px + (e * ty - fg * tx) * Py) / det;
-      float rise = dot(grad, sT) * 4.0e-4 * sl / max(sunUp + 0.08, 0.05) * smoothstep(0.1, 0.4, cosV) * smooth_;      // (4e-4: a cloud stands some two and a half kilometres tall; the lower the sun the longer its shade)
+      slope += dot(((g * tx - fg * ty) * Px + (e * ty - fg * tx) * Py) / det, sT) * (1.0 - dK);
+      float rise = slope * 4.0e-4 * sl / max(sunUp + 0.08, 0.05) * smoothstep(0.1, 0.4, cosV);      // (4e-4: a cloud stands some two and a half kilometres tall; the lower the sun the longer its shade)
       vec3 col;
       if (uBelow > 0.5) {
         // From under them: what the sun sends through - bright where the cloud is thin and at its edges, grey under its
         // heart - the side of a heap toward the sun lighter than the far one, the glare of the sun behind an edge, and,
         // when the sun is low, its light on their undersides.
         float through = exp(-thick * 3.0), cs = max(dot(vd, uAirS), 0.0), under = 1.0 - smoothstep(0.02, 0.3, sunUp), side = clamp(0.5 - rise * 0.5, 0.0, 1.0);
-        vec3 body = sunT * (mix(0.44, 1.0, through) * mix(0.78, 1.14, side) * (1.0 - 0.3 * under) + through * (0.8 * pow(cs, 10.0) + 2.4 * pow(cs, 90.0)) + under * 0.42 * (1.0 - through) * mix(0.55, 1.35, side));
+        vec3 body = sunT * (mix(0.38, 1.0, through) * mix(0.78, 1.14, side) * (1.0 - 0.3 * under) + through * (0.8 * pow(cs, 10.0) + 2.4 * pow(cs, 90.0)) + under * 0.42 * (1.0 - through) * mix(0.55, 1.35, side));
         col = body + vec3(0.54, 0.60, 0.72) * 0.12 * (1.0 - through) * min(day, 1.0) + vec3(0.012, 0.016, 0.028);
       } else {
         // From above: lit on the side the sun is on, and in the shade of the weather beyond it toward the sun where more
         // cloud stands there than here.
         float lit = clamp(0.62 - rise * 0.9, 0.0, 1.0);
-        vec3 sW = normalize(uSunW - n * dot(n, uSunW));      // (the way to the sun along the shell, in the globe's own frame: the picture is looked up there)
-        float ahead = coverS(normalize(q + vec3(sW.x * uShiftCS.x - sW.z * uShiftCS.y, sW.y, sW.z * uShiftCS.x + sW.x * uShiftCS.y) * (0.0016 * sl / max(sunUp + 0.1, 0.1))));
+        float ahead = coverS(normalize(q + sQ * (0.0016 * sl / max(sunUp + 0.1, 0.1))));
         lit *= 1.0 - 0.45 * clamp((ahead - c) * 2.5, 0.0, 1.0) * uDown;
         col = sunT * (0.52 + 0.56 * lit) * mix(0.9, 1.0, thick) + vec3(0.30, 0.38, 0.55) * 0.22 * (1.0 - lit) * day + vec3(0.014, 0.018, 0.03);
       }
@@ -287,6 +301,7 @@
     // alt: the eye's height above the sea (to the unit of the globe); time: seconds; sun: the way to it
     update(alt, time, sun) {
       const U = this.uniforms, h = SHELL - 1; U.uSunW.value.copy(sun);
+      if (window.__cloudTime !== undefined) time = window.__cloudTime;      // (a test's: the weather held where it is)
       if (SKY.cloudSmall && U.uCloudS.value !== SKY.cloudSmall) U.uCloudS.value = SKY.cloudSmall;
       if (SKY.cloudHalves && !U.uFine.value) { U.uCloud0.value = SKY.cloudHalves[0]; U.uCloud1.value = SKY.cloudHalves[1]; U.uFine.value = 1; }
       if (SKY.grain && !U.uGrainOn.value) { U.uGrain.value = SKY.grain; U.uGrainOn.value = 1; }

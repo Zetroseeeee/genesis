@@ -4,7 +4,7 @@
     python3 tools/planet/grain.py
 
 The cloud shader (src/sky.js) makes heaps of cloud out of the block of noise in the sky's pack (data/sky/noise3.bin,
-made by tools/planet/sky.py): a sum of four sizes of it, and a heap wherever the sum is over a threshold. The picture of
+made by tools/planet/sky.py): a sum of two sizes of it, a heap wherever the sum is over a threshold, and two finer sizes eating at a heap's rim. The picture of
 the Earth's clouds says how much of the sky is covered at a place; this prints which threshold leaves just so much of the
 sum over it (the sum's quantiles, at the places the shader looks them up: points of the shell) and how well the curve
 the shader uses for it fits. Run it after changing the block, or the sizes and weights of the sum in the shader, and
@@ -50,14 +50,17 @@ n2, n3 = straight(G, p[:, [2, 0, 1]] * 5.03), straight(G, p[:, [1, 2, 0]] * 21.9
 print('the block: mean of the shape %.3f, of what eats at it %.3f (0.5 each: spread evenly)' % (R.mean(), G.mean()))
 print('spread: heaps by the curve %.4f, straight %.4f; lumps %.4f; edges %.4f and %.4f' % (n1.std(), straight(R, p).std(), n0.std(), n2.std(), n3.std()))
 fs = np.array([0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.78, 0.9, 0.95, 0.98])
-curve = lambda f: 0.35 + 0.72 * (0.5 - f) + 2.8 * (0.5 - f) ** 5      # thr in the shader
-
-
-def show(name, m):
-    qs = np.quantile(m, 1 - fs)
-    print(name); print('   share of the sky  ' + ' '.join('%6.2f' % v for v in fs)); print('   threshold for it  ' + ' '.join('%6.3f' % v for v in qs))
-    print('   the curve gives   ' + ' '.join('%6.3f' % curve(v) for v in fs)); print('   which leaves      ' + ' '.join('%6.3f' % (m > curve(v)).mean() for v in fs))
-
-
-show('the whole sum (seen from under or over)', 0.72 * n1 + 0.28 * n0 - 0.22 * (1 - n2) - 0.08 * (1 - n3))
-show('with the edges gone to their mean (seen from the side, or from far)', 0.72 * n1 + 0.28 * n0 - 0.15)
+curve = lambda f: 0.5 + 0.72 * (0.5 - f) + 2.8 * (0.5 - f) ** 5      # thr in the shader
+step = lambda a, b, x: (lambda t: t * t * (3 - 2 * t))(np.clip((x - a) / (b - a), 0, 1))
+ms = 0.72 * n1 + 0.28 * n0; qs = np.quantile(ms, 1 - fs)
+print('share of the sky       ' + ' '.join('%6.2f' % v for v in fs))
+print('threshold for it       ' + ' '.join('%6.3f' % v for v in qs))
+print('the curve gives        ' + ' '.join('%6.3f' % curve(v) for v in fs))
+print('which leaves           ' + ' '.join('%6.3f' % (ms > curve(v)).mean() for v in fs))
+# what the shader makes of it: seen from the side (a soft edge), and from under or over (the rim eaten at)
+eat = 0.72 * (1 - n2) + 0.28 * (1 - n3); far, near = [], []
+for v in fs:
+    t = curve(v); far.append(step(-0.55, 0.55, (ms - t) / 0.22).mean())
+    b = np.clip((ms - t) / 0.42 + 0.35, 0, 1); near.append(step(0.0, 0.25, (b - eat * 0.55) / (1 - eat * 0.55)).mean())
+print('cloud, from the side   ' + ' '.join('%6.3f' % v for v in far))
+print('cloud, the rim eaten   ' + ' '.join('%6.3f' % v for v in near))
