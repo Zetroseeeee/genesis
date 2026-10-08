@@ -433,8 +433,11 @@ Conventions that matter:
   banner on the screen for every host in view (the player's at every height).
 - **Peoples** (`people.js`; `sim.people`). Every region people live in belongs to a people (`ppl`, a Uint16 a region; 0
   where nobody known lives), and every realm is ruled by one (`ruling`). A tribe on empty land is a people of its own,
-  named as the realm is: a daughter of the nearest people within twelve regions (its tongue a little changed: the
-  family likeness), or the first of a new family. A people spreads with the land its realms settle (`claimed`: empty
+  named as the realm is: a daughter of the nearest people within twelve regions that speaks a tongue of its kind (its
+  tongue a little changed: the family likeness), or the first of a new family. The kind of tongue is the place's, drawn
+  by `styleFor` as it always was: inherited down families instead, neighbours shared a tongue twice as often (84 in a
+  hundred, not 45), which moved diplomacy's kindred speech, the hordes of the steppe and the mandates of the river plains,
+  and with them the Bronze Age's wars. A people spreads with the land its realms settle (`claimed`: empty
   land takes the settlers' people); a conquered region keeps its own. Over the centuries a region is taken into the
   people that rules it (`ASSIM` by age, faster in towns and beside the rulers' own regions, by the laws: one state one
   law and schooling quicken it, self-rule leaves people be: `LAW`); a people spread farther from its home than its age
@@ -445,7 +448,8 @@ Conventions that matter:
   other peoples beyond what realms of its age usually rule (`NORM`, measured by `tools/people/probe.js --write` over two
   seeds), so the world's steadiness stays where it was; and a realm that fractures breaks along its peoples (`farSeed`:
   the seed is of another people sooner, and `splitCiv`'s fill keeps to the seed's people). The module throws its own
-  dice. The lens of peoples (I; `world.palMode = 'people'`, the palette 4096 wide) paints every region by its people,
+  dice. Two realms of one people think a little better of each other ('One people'), and the unification of
+  nationalism is a war for one's own people under another flag (`folk` in diplo's host). The lens of peoples (I; `world.palMode = 'people'`, the palette 4096 wide) paints every region by its people,
   draws the lines between peoples, writes their names across their lands and keys the largest; the region's panel says
   who lives there, the realm's its peoples. Saved run by run (`save().peoples`); a world saved before peoples is given
   one people a realm (`settle`). After touching how peoples are taken in, drift or rise, run `tools/people/probe.js` over
