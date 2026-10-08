@@ -152,7 +152,11 @@ if (require.main === module) {
   (async () => {
     if (cmd === 'stage') await stage(store, { app: arg('app'), data: arg('data'), shell: arg('shell'), pkg: arg('pkg', 'package.json'), dmg: arg('dmg'), dmgName: arg('dmg-name'), content: arg('content'), newEpoch: has('new-epoch'), out: arg('out') });
     else if (cmd === 'promote') { const m = JSON.parse(fs.readFileSync(arg('manifest'), 'utf8')); const bad = validate(m); if (bad) throw new Error(bad); await store.publish(m, 'manifest.json'); console.log(`in force: ${m.product} ${m.version} (${m.commit})`); }
-    else if (cmd === 'check') await check(store);
+    else if (cmd === 'check') {
+      // (right after a list is put in force the release's files can take a little while to be served everywhere: the build
+      // that published 0.28.0 was failed by a check that ran too soon, though everything was there a minute later)
+      const tries = +arg('tries', '1'); for (let k = 1; ; k++) { try { await check(store); break; } catch (e) { if (k >= tries) throw e; console.error(`not yet (${e.message}); again in 20 s`); await new Promise((r) => setTimeout(r, 20000)); } }
+    }
     else { console.error('stage | promote | check'); process.exit(2); }
   })().catch((e) => { console.error('FAILED: ' + (e.stderr || e.message)); process.exit(1); });
 }

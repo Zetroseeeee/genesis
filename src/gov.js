@@ -1,7 +1,8 @@
 // Holocene laws screen (classic script; exposes window.GOV): the laws in force field by field and what could replace
 // them, the forms of government, the estates of the realm (who holds power, how content they are and why), what the
-// ruler's authority allows, the reform under way and whatever an estate is demanding. It reads the simulation's rule
-// (sim.rule, rule.js) and calls its few actions: begin a reform, cancel it, grant or refuse a demand.
+// ruler's authority allows, the reform under way and whatever an estate is demanding; and the faith of the realm (the
+// faiths of its people and around it, a faith's page, founding one, taking up another, missionaries, a church of one's
+// own). It reads the simulation's rule and faiths (sim.rule, rule.js; sim.faith, faith.js) and calls their few actions.
 window.GOV = (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
@@ -28,6 +29,7 @@ window.GOV = (function () {
   const SUCC = { chosen: 'chosen by the elders: never disputed', blood: 'an heir by blood: sometimes disputed', seized: 'whoever can take it: often disputed', elected: 'elected for a term of years: never disputed', named: 'named by the one before: seldom disputed' };
 
   let ctx = null, tab = 'laws', selLaw = null, selForm = null, lastSig = '';
+  let selFaith = 0; const founding = { tenets: [], name: '' };      // (the faith on the page: an id, or 'new' for founding one)
   const S = () => ctx.sim(); const RL = () => window.RULE; const RU = () => S().rule;
   const me = () => { const s = S(); return s ? s.playerCiv() : null; };
   const yrs = (n) => n + (n === 1 ? ' year' : ' years');
@@ -61,9 +63,12 @@ window.GOV = (function () {
       const a = e.target.closest('[data-gact]'); if (a) { act(a.dataset.gact, a.dataset.k); return; }
       const j = e.target.closest('[data-kgo]'); if (j && ctx.openTree) { close(); ctx.openTree(j.dataset.kgo); return; }
       const g = e.target.closest('[data-ggo]'); if (g) { show(g.dataset.ggo); return; }
+      const fr = e.target.closest('[data-faith]'); if (fr) { selFaith = fr.dataset.faith === 'new' ? 'new' : +fr.dataset.faith; render(); return; }
+      const tn = e.target.closest('[data-tenet]'); if (tn) { const k = tn.dataset.tenet, i = founding.tenets.indexOf(k); if (i >= 0) founding.tenets.splice(i, 1); else { founding.tenets.push(k); if (founding.tenets.length > 2) founding.tenets.shift(); } render(); return; }
       const card = e.target.closest('.gv-card'); if (card) { if (card.dataset.form) { selForm = card.dataset.form; } else { selLaw = card.dataset.law; } render(); }
     });
-    $('gov').addEventListener('dblclick', (e) => { const card = e.target.closest('.gv-card'); if (card) act('begin', card.dataset.form || card.dataset.law); });
+    $('gov').addEventListener('dblclick', (e) => { const card = e.target.closest('.gv-card'); if (card && (card.dataset.form || card.dataset.law)) act('begin', card.dataset.form || card.dataset.law); });
+    $('gov').addEventListener('input', (e) => { if (e.target.id === 'gv-fname') founding.name = e.target.value; });
   }
   const isOpen = () => $('gov').open;
   // open the screen; at a tab, or at a form or a law by its key
@@ -73,6 +78,8 @@ window.GOV = (function () {
   }
   function show(key) { const R = RL(); if (R.FORM[key]) { selForm = key; setTab('form'); } else if (R.LAW[key]) { selLaw = key; setTab('laws'); requestAnimationFrame(() => { const el = document.querySelector(`#gv-laws .gv-card[data-law="${key}"]`); if (el) el.scrollIntoView({ block: 'nearest' }); }); } }
   function close() { const d = $('gov'); if (d.open) d.close(); }
+  // open the screen at the faith of the realm, or at a faith's page ('new': founding one)
+  function openFaith(f) { if (f !== undefined) selFaith = f; open('faith'); }
   function setTab(t) { tab = t; document.querySelectorAll('#gv-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.gtab === t)); document.querySelectorAll('#gov [data-gpane]').forEach((p) => { p.hidden = p.dataset.gpane !== t; }); render(); }
 
   // ----- what the player does -----
@@ -82,6 +89,11 @@ window.GOV = (function () {
     else if (what === 'cancel') { k.cancel(c); msg = 'The reform is given up'; }
     else if (what === 'grant') { const D = k.ruleOf(c).demand; if (D) { k.grant(c.id, c); msg = `${RL().estateName(D.e, c.era)} have what they asked for`; } }
     else if (what === 'refuse') { const D = k.ruleOf(c).demand; if (D) { k.refuse(c.id, c, false); msg = `${RL().estateName(D.e, c.era)} are refused`; } }
+    else if (what === 'f-found') { const why = s.faithAct('found', founding.tenets.slice(), founding.name.trim() || undefined); if (why) msg = why; else { const f = s.faith.state[c.id]; selFaith = f; founding.tenets = []; founding.name = ''; msg = `${cap(s.faith.nameOf(f))} is founded`; } }
+    else if (what === 'f-name') { founding.name = s.faith.suggest(c.id); }
+    else if (what === 'f-adopt') { const f = +key; const why = s.faithAct('adopt', f); msg = why || `${cap(s.faith.nameOf(f))} is the faith of your realm`; }
+    else if (what === 'f-mission') { const why = s.faithAct('mission', +key); msg = why || `Your missionaries set out for ${s.fullName(s.civs[+key])}`; }
+    else if (what === 'f-church') { const was = s.faith.state[c.id]; const why = s.faithAct('church'); if (!why) selFaith = s.faith.state[c.id]; msg = why || `Your realm breaks with ${s.faith.nameOf(was)}: ${s.faith.nameOf(s.faith.state[c.id])} is its own`; }
     if (msg && ctx.toast) ctx.toast(msg);
     if (ctx.afterAct) ctx.afterAct(); render();
   }
@@ -153,6 +165,71 @@ window.GOV = (function () {
       <p class="kn-note">Every age has its usual laws. What yours give is set against what realms of your age mostly get from theirs: keep the ways of your forebears and you fall behind, reform well and you are ahead.</p>
       ${stand || '<p class="mk-dim">Level with your age in everything.</p>'}</div></div>`;
   }
+  // ----- the faith of the realm (faith.js) -----
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const pct = (v) => (v >= 0.995 ? '100' : v > 0 && v < 0.01 ? '<1' : Math.round(v * 100)) + '%';
+  const rgbCss = (F, f) => { const c = F.rgbOf(f); return `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})`; };
+  const kindOf = (s, F, f) => { const X = F.list[f]; if (!X) return ''; const P = s.people && s.people.list[X.people]; return X.world ? 'A faith for all peoples' : `A faith of its people${P && P.name ? ', the ' + P.name : ''}`; };
+  // a faith as one line of a list: its colour, its name, what it is to the list, and a bar of its share
+  const frow = (s, F, f, sub, share, sel) => `<button class="gv-frow${sel === f ? ' sel' : ''}" data-faith="${f}" title="${esc(f ? cap(F.nameOf(f)) : 'The old ways')}"><i style="background:${f ? rgbCss(F, f) : 'rgb(120 112 98)'}"></i><span><b>${esc(f ? F.shortOf(f) : 'The old ways')}</b><small>${esc(sub)}</small></span>${share === undefined ? '' : `<span class="gv-bar"><i style="width:${(Math.min(1, share) * 100).toFixed(1)}%;background:${f ? rgbCss(F, f) : 'rgb(120 112 98)'}"></i></span><em>${pct(share)}</em>`}</button>`;
+  function renderFaith() {
+    const s = S(), c = me(), F = s.faith; if (!F) { $('gv-faiths').innerHTML = ''; $('gv-fthinfo').innerHTML = ''; return; }
+    const K = s.faithCosts(), mine = F.state[c.id], ofMine = F.faithsOf(c.id, 8); let world = 0; for (const X of F.list) if (X && X.n > 0) world += X.pop;
+    if (selFaith === 'new' && !K.canFound) selFaith = 0;      // (a realm with a faith founds none)
+    if (selFaith !== 'new' && !(selFaith && F.list[selFaith])) selFaith = mine || (ofMine.find((q) => q[0]) || [0])[0] || (K.canFound ? 'new' : 0);
+    // what the realm keeps, and what it could do about it
+    const prophet = F.pending[c.id] >= 0 ? (s.cellName.get(F.pending[c.id]) || 'your capital') : null;
+    const head = mine ? frow(s, F, mine, `${kindOf(s, F, mine)} · your realm's`, ofMine.reduce((a, q) => a + (q[0] === mine ? q[1] : 0), 0), selFaith)
+      : `<div class="gv-fnone"><b>Your realm keeps the old ways</b><small>${prophet ? `A prophet has arisen in ${esc(prophet)}: his faith waits for you to found it.` : K.canFound ? 'Your priests could found a faith of the realm.' : `No faith can be founded before ${esc(discovery('priesthood').name)}.`}</small>${K.canFound ? `<button class="btn ${prophet ? 'primary' : ''}" data-faith="new">Found a faith${prophet ? '' : ` · ${K.found} authority`}</button>` : `<button class="linkish" data-kgo="priesthood">${esc(discovery('priesthood').name)}</button>`}</div>`;
+    const people = ofMine.map(([f, v]) => frow(s, F, f, f === mine ? 'your realm\'s' : f ? (F.list[f].world ? 'for all peoples' : 'of its people') : 'their own gods and dead', v, selFaith)).join('');
+    // the faiths of the realms within reach
+    const around = new Map(); for (const b of s.diplo.reach(c.id)) { const bv = s.civs[b]; if (!bv || b === c.id) continue; const f = F.state[b]; if (!around.has(f)) around.set(f, []); around.get(f).push(bv); }
+    const near = [...around].sort((a, b) => b[1].length - a[1].length).slice(0, 8).map(([f, list]) => frow(s, F, f, `${list.length === 1 ? s.fullName(list[0]) : list.length + ' realms: ' + list.slice(0, 2).map((x) => s.fullName(x)).join(', ') + (list.length > 2 ? ' ...' : '')}`, undefined, selFaith)).join('');
+    const great = F.list.filter((X) => X && X.n > 0).sort((a, b) => b.pop - a.pop).slice(0, 8).map((X) => frow(s, F, X.id, `${X.realms} realm${X.realms === 1 ? '' : 's'} · ${X.world ? 'for all peoples' : 'of its people'}`, X.pop / Math.max(1e-9, world), selFaith)).join('');
+    const fld = (t, note) => `<div class="gv-field">${svg(FLAME)}<b>${t}</b><small>${note}</small></div>`;
+    $('gv-faiths').innerHTML = `<div class="gv-row">${fld('Your faith', 'the faith of the realm')}<div class="gv-flist">${head}</div></div>
+      <div class="gv-row">${fld('Your people', 'what they keep')}<div class="gv-flist">${people || '<span class="mk-dim">Nobody yet</span>'}</div></div>
+      <div class="gv-row">${fld('Around you', 'the realms within reach')}<div class="gv-flist">${near || '<span class="mk-dim">Nobody within reach</span>'}</div></div>
+      <div class="gv-row">${fld('The world', 'its great faiths')}<div class="gv-flist">${great || '<span class="mk-dim">The world keeps the old ways</span>'}</div></div>`;
+    $('gv-fthinfo').innerHTML = selFaith === 'new' ? foundPage(s, c, F, K, prophet) : selFaith ? faithPage(s, c, F, K, selFaith, ofMine, world) : `<div class="gv-head"><span class="ic">${svg(FLAME)}</span><div><h3>The old ways</h3><div class="micro">Each people its own gods</div></div></div><p class="gv-text">Each family keeps its own dead and its own holy places. No faith is preached here, and nobody asks a neighbour what he believes.</p>`;
+  }
+  // founding a faith: two tenets and a name
+  function foundPage(s, c, F, K, prophet) {
+    if (!founding.name) founding.name = F.suggest(c.id);
+    const tenets = F.TENETS.map((T) => `<button class="gv-tenet${founding.tenets.indexOf(T.key) >= 0 ? ' on' : ''}" data-tenet="${T.key}"><b>${esc(T.name)}</b><small>${esc(T.text)}</small></button>`).join('');
+    const ok = founding.tenets.length === 2 && K.canFound && K.auth >= K.found;
+    return `<div class="gv-head"><span class="ic">${svg(FLAME)}</span><div><h3>A new faith</h3><div class="micro">${prophet ? 'A prophet has arisen in ' + esc(prophet) : 'Founded by the priests of your realm'}</div></div></div>
+      <p class="gv-text">${prophet ? 'He preaches, and the court listens.' : 'Your priests would set down what the realm believes.'} ${K.world ? 'It will be a faith for all peoples: its preachers will go over every border.' : `It will be a faith of your people: it goes slowly among others, until your realm knows ${esc(discovery('scripture').name.toLowerCase())}.`}</p>
+      <div class="gv-sect"><div class="micro">Its name</div><div class="gv-fname"><input id="gv-fname" maxlength="40" value="${esc(founding.name)}" spellcheck="false"><button class="btn icon ghost" data-gact="f-name" title="Another name">↻</button></div></div>
+      <div class="gv-acts"><button class="btn primary" data-gact="f-found" ${ok ? '' : 'disabled'}>Found ${esc(founding.name || 'the faith')}</button></div>
+      <div class="gv-state">${founding.tenets.length < 2 ? `Choose ${founding.tenets.length ? 'one more tenet' : 'two tenets'} below. ` : ''}${K.found ? `${K.found} authority <span class="mk-dim">(you hold ${Math.floor(K.auth)})</span>` : 'The prophet asks nothing'} · its holy city will be ${esc(s.cellName.get(prophet ? F.pending[c.id] : c.capital) || 'your capital')}</div>
+      <div class="gv-sect"><div class="micro">Two tenets · ${founding.tenets.length} of 2 chosen</div><div class="gv-tenets">${tenets}</div></div>`;
+  }
+  // a faith's page: what it is, where it came from, its tenets, where it is kept, and what the realm can do about it
+  function faithPage(s, c, F, K, f, ofMine, world) {
+    const X = F.list[f], mine = F.state[c.id] === f; const holder = X.home >= 0 ? s.owner[X.home] : -1, hv = holder >= 0 ? s.civs[holder] : null;
+    const here = (ofMine.find((q) => q[0] === f) || [0, 0])[1];
+    const founder = X.founder >= 0 && s.civs[X.founder] ? ` by ${esc(s.fullName(s.civs[X.founder]))}` : '';
+    const lines = [`First preached at ${esc(s.cellName.get(X.home) || 'a holy city')} in ${s.fmtYear(X.born)}${founder}.`];
+    lines.push(hv ? (hv === c ? (mine ? 'Its holy city is yours.' : 'Its holy city is in your hands, and you keep another faith.') : `Its holy city is held by ${esc(s.fullName(hv))}${F.state[holder] === f ? ', who keep the faith' : ', who keep another'}.`) : 'Its holy city lies in nobody\'s land.');
+    if (X.gone) lines.push(`Nobody has kept it since ${s.fmtYear(X.gone)}.`);
+    const line = F.lineage(f).slice(1); const fam = line.length ? `<div class="gv-sect"><div class="micro">It came out of</div><div class="gv-chips">${line.map((q) => `<button class="kn-chip" data-faith="${q}">${esc(cap(F.nameOf(q)))}</button>`).join('')}</div></div>` : '';
+    const sects = F.list.filter((Y) => Y && Y.parent === f && Y.n > 0); const kids = sects.length ? `<div class="gv-sect"><div class="micro">Churches broken from it</div><div class="gv-chips">${sects.map((Y) => `<button class="kn-chip" data-faith="${Y.id}">${esc(cap(Y.name))}</button>`).join('')}</div></div>` : '';
+    const tenets = `<div class="gv-sect"><div class="micro">Its tenets</div><ul class="gv-gives">${X.tenets.map((k) => F.TK[k] ? `<li><b>${esc(F.TK[k].name)}.</b> ${esc(F.TK[k].text)}</li>` : '').join('')}</ul></div>`;
+    const kept = `<div class="gv-sect"><div class="micro">Where it is kept</div><div class="gv-note">${X.n} regions · ${pct(X.pop / Math.max(1e-9, world))} of the world's people · the faith of ${X.realms} realm${X.realms === 1 ? '' : 's'}${here ? ` · ${pct(here)} of your people` : ''}</div></div>`;
+    let how = '';
+    if (!mine && !X.gone) { const cost = K.adopt(f); how = `<div class="gv-acts"><button class="btn primary" data-gact="f-adopt" data-k="${f}" ${K.auth >= cost ? '' : 'disabled'}>Take it up</button></div><div class="gv-state">${cost} authority <span class="mk-dim">(you hold ${Math.floor(K.auth)})</span>${here ? ` · ${pct(here)} of your people keep it already` : ' · none of your people keep it yet'}${K.shake && F.state[c.id] ? ` · the priests of ${esc(F.nameOf(F.state[c.id]))}, whom most of your people follow, will not forgive it: −${Math.round(K.shake * 100)} stability` : ''}</div>`; }
+    if (mine) {
+      const to = F.missionTo[c.id], tv = to >= 0 ? s.civs[to] : null;
+      const targets = X.world ? s.diplo.reach(c.id).map((b) => s.civs[b]).filter((bv) => bv && bv !== c && F.state[bv.id] !== f).slice(0, 8) : [];
+      const mis = !X.world ? '<div class="gv-note">A faith of its people sends no missionaries.</div>'
+        : `${tv ? `<div class="gv-state on">Your missionaries are in ${esc(s.fullName(tv))} until ${s.fmtYear(F.missionUntil[c.id])}.</div>` : ''}${targets.length ? targets.map((bv) => `<div class="gv-mis"><span>${esc(s.fullName(bv))}<small>${esc(F.state[bv.id] ? cap(F.nameOf(F.state[bv.id])) : 'the old ways')}</small></span><button class="btn" data-gact="f-mission" data-k="${bv.id}" ${c.wealth >= K.mission && to !== bv.id ? '' : 'disabled'}>Send · ${K.mission} coin</button></div>`).join('') : '<div class="gv-note">Every realm within reach keeps it already.</div>'}<div class="gv-note">For ${K.missionYears} years its people hear them three times as often, and its ruler is readier to listen.</div>`;
+      how = `<div class="gv-state on">The faith of your realm.</div><div class="gv-sect"><div class="micro">Missionaries</div>${mis}</div>
+        <div class="gv-sect"><div class="micro">A church of your own</div>${K.canChurch ? `<div class="gv-acts"><button class="btn" data-gact="f-church" ${K.auth >= K.church ? '' : 'disabled'}>Break with it</button></div><div class="gv-state">${K.church} authority <span class="mk-dim">(you hold ${Math.floor(K.auth)})</span> · your people go with you, and the realms near you may follow</div>` : `<div class="gv-note">Not while your capital lies this near its holy city, before books are printed.</div>`}</div>`;
+    }
+    return `<div class="gv-head"><span class="ic" style="color:${rgbCss(F, f)}">${svg(FLAME)}</span><div><h3>${esc(cap(X.name))}</h3><div class="micro">${esc(kindOf(s, F, f))}</div></div></div>
+      <p class="gv-text">${lines.join(' ')}</p>${how}${tenets}${kept}${fam}${kids}`;
+  }
   // the strip under the title: authority, the reform under way, and what an estate demands
   function renderNow() {
     const s = S(), c = me(), R = RL(), k = RU(), Q = k.ruleOf(c); const pace = R.PACE[c.era]; const gain = k.gainOf(c.id, c);
@@ -167,10 +244,10 @@ window.GOV = (function () {
   function render() {
     const s = S(); if (!s || !isOpen()) return; const c = me(); if (!c) return;
     $('gv-sub').textContent = `${s.fullName(c)} · ${RL().FORM[RU().ruleOf(c).gov].name} · ${s.fmtYear(s.year)}`;
-    renderNow(); if (tab === 'laws') renderLaws(); else if (tab === 'form') renderForms(); else renderEstates();
+    renderNow(); if (tab === 'laws') renderLaws(); else if (tab === 'form') renderForms(); else if (tab === 'faith') renderFaith(); else renderEstates();
     lastSig = sig();
   }
-  const sig = () => { const s = S(), c = me(); if (!c) return String(s.year); const Q = RU().ruleOf(c); return `${s.year}:${Q.gov}:${Object.values(Q.laws).join(',')}:${Q.reform ? Q.reform.key : ''}:${Q.demand ? Q.demand.key : ''}:${Math.floor(Q.auth)}`; };
+  const sig = () => { const s = S(), c = me(); if (!c) return String(s.year); const Q = RU().ruleOf(c); const F = s.faith; return `${s.year}:${Q.gov}:${Object.values(Q.laws).join(',')}:${Q.reform ? Q.reform.key : ''}:${Q.demand ? Q.demand.key : ''}:${Math.floor(Q.auth)}:${F ? F.state[c.id] + '/' + F.pending[c.id] + '/' + F.missionTo[c.id] : ''}:${Math.floor(c.wealth)}`; };
   function refresh() { const s = S(); if (!s || !isOpen()) return; if (sig() !== lastSig) render(); }
   // for the top bar and the turn button: authority, the reform under way, what is demanded, the angriest estate that matters
   function tile() {
@@ -184,5 +261,5 @@ window.GOV = (function () {
   }
   // what a discovery opens here, as lines for its page in the knowledge tree
   function opensLines(key) { const R = RL(); return R.opens(key).map((x) => x.cat === undefined ? `A form of government: <button class="linkish" data-ggo="${x.key}">${esc(x.name)}</button>` : `A law of ${esc(R.CAT[x.cat].name.toLowerCase())}: <button class="linkish" data-ggo="${x.key}">${esc(x.name)}</button>`); }
-  return { init, open, close, isOpen, refresh, render, show, tile, opensLines, gives, moodWord, mult, GIVE, NAME, CICON, EICON, svg };
+  return { init, open, openFaith, close, isOpen, refresh, render, show, tile, opensLines, gives, moodWord, mult, GIVE, NAME, CICON, EICON, svg };
 })();

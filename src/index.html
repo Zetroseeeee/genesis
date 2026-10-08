@@ -35,6 +35,9 @@
   .lbl { position: absolute; left: 0; top: 0; transform: translate3d(-50%, -50%, 0); white-space: nowrap; color: #fff; will-change: transform, opacity; opacity: 0; transition: opacity 300ms; font-variant-numeric: tabular-nums; }
   .lbl.show { opacity: 1; }
   .lbl.realm.folk { font-style: italic; text-transform: none; letter-spacing: 0.14em; font-weight: 500; }      /* (a people, under its lens: not a realm) */
+  .lbl.realm.faith { font-family: var(--serif); font-style: italic; text-transform: none; letter-spacing: 0.06em; font-weight: 600; }      /* (a faith, under its lens) */
+  .lbl.holy { font-family: var(--display); font-weight: 700; letter-spacing: 0.04em; text-shadow: 0 0 2px rgb(12 18 28 / 0.95), 0 0 6px rgb(12 18 28 / 0.9); }
+  .lbl.holy .sub { display: block; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 0.72em; letter-spacing: 0.02em; color: #E8E1D2; margin-top: -2px; }
   .lbl.realm { font-family: var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3em; text-shadow: 0 0 2px rgb(12 18 28 / 0.95), 0 0 6px rgb(12 18 28 / 0.9), 0 1px 2px rgb(12 18 28 / 0.9); }
   .lbl.city { font-family: var(--body); font-weight: 600; letter-spacing: 0.02em; padding-left: 12px; text-shadow: 0 0 2px rgb(20 24 30 / 0.95), 0 0 4px rgb(20 24 30 / 0.85), 0 1px 1px rgb(0 0 0 / 0.9); }
   .lbl.city::before { content: ''; position: absolute; left: 0; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: #F3E4B7; box-shadow: 0 0 0 1.5px rgb(0 0 0 / 0.6), 0 0 6px rgb(243 228 183 / 0.8); }
@@ -717,6 +720,21 @@
   .dp-stat .ic { width: 40px; height: 40px; border-radius: 4px; display: grid; place-items: center; background: rgb(255 255 255 / 0.06); color: var(--inf); } .dp-stat .ic svg { width: 24px; height: 24px; }
   .dp-stat > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; } .dp-stat b { font-family: var(--display); font-size: calc(19px * var(--ui-scale)); letter-spacing: 0.04em; font-weight: 600; text-transform: capitalize; } .dp-stat b .num { font-family: var(--body); font-size: 14px; color: var(--text-2); font-weight: 500; margin-left: 4px; } .dp-stat p { margin: 2px 0 0; } .dp-stat .gv-bar i { background: var(--text-2); }
   @media (max-width: 1000px) { .dp-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 0.8fr) minmax(160px, 1fr); } .dp-info { border-left: 0; border-top: 1px solid var(--rule); } .dp-cols { grid-template-columns: minmax(0, 1fr); gap: 20px; } .dp-row { grid-template-columns: 12px minmax(0, 1fr) 84px 96px; } .dp-row .st { display: none; } .dp-war { grid-template-columns: minmax(0, 1fr); gap: 8px; } .dp-war .who.r { justify-content: flex-start; text-align: left; flex-direction: row-reverse; } }
+  /* the faith of the realm (gov.js, the Faith tab) */
+  .gv-flist { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .gv-frow { display: grid; grid-template-columns: 10px minmax(0, 1fr) 112px 40px; gap: 10px; align-items: center; appearance: none; text-align: left; font: inherit; color: var(--text); background: rgb(255 255 255 / 0.025); border: 1px solid transparent; border-radius: var(--radius); padding: 5px 9px; cursor: pointer; }
+  .gv-frow > i { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4); }
+  .gv-frow > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; } .gv-frow b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gv-frow small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .gv-frow .gv-bar { height: 5px; } .gv-frow em { font-style: normal; font-size: 12px; text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums lining-nums; }
+  .gv-frow:hover { border-color: rgb(214 178 94 / 0.5); } .gv-frow.sel { border-color: var(--select); background: rgb(255 255 255 / 0.06); } .gv-frow:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  .gv-fnone { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 0; } .gv-fnone b { font-size: 14px; font-weight: 600; flex: 1 1 100%; } .gv-fnone small { font-size: 12.5px; color: var(--text-2); flex: 1 1 260px; }
+  .gv-tenets { display: grid; grid-template-columns: 1fr; gap: 5px; }
+  .gv-tenet { appearance: none; text-align: left; font: inherit; color: var(--text); background: rgb(18 24 34); border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+  .gv-tenet b { font-size: 13px; font-weight: 600; } .gv-tenet small { font-size: 11.5px; color: var(--text-3); line-height: 1.4; } .gv-tenet:hover { border-color: rgb(214 178 94 / 0.5); }
+  .gv-tenet.on { background: linear-gradient(90deg, rgb(185 139 240 / 0.22), rgb(185 139 240 / 0.06)), rgb(22 29 41); border-color: var(--cul); } .gv-tenet.on small { color: var(--text-2); } .gv-tenet:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  .gv-fname { display: flex; gap: 6px; } .gv-fname input { flex: 1; min-width: 0; font: inherit; font-size: 14px; color: var(--text); background: rgb(0 0 0 / 0.3); border: 1px solid var(--rule); border-radius: var(--radius); padding: 6px 9px; }
+  .gv-fname input:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  .gv-mis { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; } .gv-mis span { display: flex; flex-direction: column; min-width: 0; } .gv-mis small { font-size: 11px; color: var(--text-3); } .gv-mis .btn { min-height: 26px; padding: 3px 10px; white-space: nowrap; } .gv-mis .btn[disabled] { opacity: 0.45; }
   @media (max-width: 900px) { .gv-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(120px, 44%); } .gv-info { border-left: 0; border-top: 1px solid var(--rule); } .gv-ecols { grid-template-columns: minmax(0, 1fr); } .gv-row { grid-template-columns: minmax(0, 1fr); gap: 6px; } .gv-now { flex-wrap: wrap; gap: 6px 14px; padding: 6px 14px; } .gv-demand { margin-left: 0; white-space: normal; flex-wrap: wrap; } }
 
   /* ----- the knowledge screen (tree.js) ----- */
@@ -964,6 +982,7 @@
           <button class="btn" id="v-gov" title="How each realm is governed (O)">Government</button>
           <button class="btn" id="v-rel" title="How each realm stands with you (X)">Relations</button>
           <button class="btn" id="v-ppl" title="Who lives where, and in what tongue (I)">Peoples</button>
+          <button class="btn" id="v-fth" title="Who believes what, and where the holy cities are (J)">Faiths</button>
         </div>
       </div>
     </div>
@@ -1031,11 +1050,12 @@
 <dialog id="gov"><div class="modal panel" tabindex="-1">
   <div class="phead"><h2 class="display">Laws</h2><span class="micro" id="gv-sub"></span><span id="gv-auth"></span><button class="btn icon ghost" id="gv-close" title="Close (Esc)">✕</button></div>
   <div class="gv-now" id="gv-now"></div>
-  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button></div>
+  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button></div>
   <div class="gv-body">
     <section data-gpane="laws" class="gv-split"><div class="gv-list" id="gv-laws"></div><aside class="gv-info" id="gv-info"></aside></section>
     <section data-gpane="form" class="gv-split" hidden><div class="gv-list" id="gv-forms"></div><aside class="gv-info" id="gv-finfo"></aside></section>
     <section data-gpane="estates" id="gv-estates" hidden></section>
+    <section data-gpane="faith" class="gv-split" hidden><div class="gv-list" id="gv-faiths"></div><aside class="gv-info" id="gv-fthinfo"></aside></section>
   </div>
 </div></dialog>
 
@@ -1125,6 +1145,7 @@
 <script src="diplo.js"></script>
 <script src="army.js"></script>
 <script src="people.js"></script>
+<script src="faith.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
