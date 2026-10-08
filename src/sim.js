@@ -213,8 +213,10 @@ function createSim(world, seed) {
   function newCiv(home, opts = {}) {
     if (!freeIds.length) return null;
     const id = freeIds.pop();
-    if (people) people.prepare(home, opts.style ?? styleFor(home));      // (the people it is of: one that lives there, or one gone out from its neighbours, or a new one)
-    const st0 = people ? people.styleAt(home) : -1; const style = opts.style ?? (st0 >= 0 ? st0 : styleFor(home));      // (a realm of a known people is named in its tongue)
+    // (its tongue's kind is the place's, drawn as it always was; the people it is of is one that lives there, or one of that
+    // tongue gone out from its neighbours, or a new one: people.js)
+    const drawn = opts.style ?? styleFor(home); if (people) people.prepare(home, drawn);
+    const st0 = people ? people.styleAt(home) : -1; const style = opts.style ?? (st0 >= 0 ? st0 : drawn);      // (a realm of a known people is named in its tongue)
     const name = opts.name || (st0 >= 0 && people.realmName(home)) || makeName(style, 2, 3);
     const rgb = hsl2rgb(hue(id + 1), 0.62 + rnd() * 0.2, 0.5 + rnd() * 0.15);
     const c = {
@@ -342,7 +344,9 @@ function createSim(world, seed) {
     won: (w, l) => { const Wn = rule.ruleOf(w), Ls = rule.ruleOf(l); Wn.bump[RULE.EK.soldiers] += 0.1; Wn.bump[RULE.EK.nobles] += 0.06; Wn.auth = Math.min(RULE.AUTH_MAX, Wn.auth + 10); Ls.bump[RULE.EK.soldiers] -= 0.1; Ls.bump[RULE.EK.nobles] -= 0.08; Ls.auth = Math.max(0, Ls.auth - 10); },
     // (told in both realms' chronicles; the player's side of it is his own news)
     event: (cv, text, important, other) => { const mine = !!(other && other.player && !cv.player); const a = mine ? other : cv, b = mine ? cv : other; logEvent(a, text, important, 'pact'); if (b) pushOwn(b, { year, text, type: 'pact', loc: b.capital, civ: b.id }); },
-    shake: (cv, by) => { cv.stability = Math.max(0, cv.stability - by); }, tongue: (cv) => STYLES[cv.style] ? STYLES[cv.style].k : '', kind: (cv) => RULE.FORM[rule.ruleOf(cv).gov].kind, blood: (cv) => rule.succession(cv) === 'blood',
+    shake: (cv, by) => { cv.stability = Math.max(0, cv.stability - by); },
+    // (kindred speech is a tongue of the same kind, as it always was; one people under two flags is the same people: people.js)
+    tongue: (cv) => STYLES[cv.style] ? STYLES[cv.style].k : '', folk: (cv) => (people && people.ruling[cv.id]) || 0, kind: (cv) => RULE.FORM[rule.ruleOf(cv).gov].kind, blood: (cv) => rule.succession(cv) === 'blood',
     faithLaw: (cv) => rule.ruleOf(cv).laws.faith, tradeLaw: (cv) => rule.ruleOf(cv).laws.trade, covets: (a, b) => { const g = covetOf(a, b); return g ? GOODS[g].name : ''; }, absorb, formFor,
     setForm: (cv, key) => { const F = RULE.FORM[key]; if (!F) return; if (!rule.known(cv.id, F)) rule.ruleOf(cv).brought = key; rule.setForm(cv.id, cv, F, 'imposed'); },
     alarm: () => {}, trait: (cv) => cv.ruler ? cv.ruler.trait : '', aggression: (cv) => cv.player ? (cv.policy.stance === 'aggressive' ? 0.9 : cv.policy.stance === 'consolidate' ? 0.25 : 0.5) : cv.aggression,      /* (the player's appetite is what his stance says, not a number he cannot see) */ ruler: (cv) => cv.ruler ? `${cv.ruler.title} ${cv.ruler.name}` : fullName(cv), nameOf: (cv) => fullName(cv), income: (cv) => cv.income || 0, fmtYear });

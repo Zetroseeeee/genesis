@@ -24,7 +24,7 @@
   // what share of their people realms of each age usually rule of other peoples (tools/people/norm.js measures it):
   // a realm is restless only for what it holds beyond its age's way, and a little steadier for less
   // NORM-BEGIN
-  const NORM = [0.023, 0.051, 0.07, 0.054, 0.04, 0.033, 0.022, 0.016, 0.01];
+  const NORM = [0.021, 0.056, 0.077, 0.059, 0.046, 0.042, 0.034, 0.023, 0.013];
   // NORM-END
   // a people drifts apart where it has spread farther than this from its home, in regions, by age (roads, books and a
   // common ruler hold a tongue together over more ground)
@@ -89,13 +89,15 @@
       list.push(p); stats.born++; return id;
     }
     // a realm is about to be founded at home: if nobody known lives there, a people for it - a daughter of the nearest
-    // people within reach (those who went out from it: its tongue, a little changed), or the first of a new family
-    // (style: the name style of the place, sim.js's styleFor). Named when the realm is (born).
+    // people within reach that speaks a tongue of its kind (those who went out from it: its tongue, a little changed), or
+    // the first of a new family. style: the kind of tongue of the place, drawn by sim.js's styleFor as it always was (so
+    // that a world's tongues are as many and as mixed as they were: diplomacy's kindred speech and the hordes of the steppe
+    // and mandates of the river plains count on it). Named when the realm is (born).
     const NEAR = 12;
     function prepare(home, style) {
       if (ppl[home]) return ppl[home];
       const y0 = (home / W) | 0, x0 = home - y0 * W; let mother = 0;
-      for (let r = 1; r <= NEAR && !mother; r++) for (let dy = -r; dy <= r && !mother; dy++) { const y = y0 + dy; if (y < 0 || y >= H) continue; for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const q = ppl[y * W + ((x0 + dx + W) % W)]; if (q) { mother = q; break; } } }
+      for (let r = 1; r <= NEAR && !mother; r++) for (let dy = -r; dy <= r && !mother; dy++) { const y = y0 + dy; if (y < 0 || y >= H) continue; for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const q = ppl[y * W + ((x0 + dx + W) % W)]; if (q && (style === undefined || list[q].t.st === style)) { mother = q; break; } } }
       const M = mother ? list[mother] : null;
       const p = make(null, M ? tongue(M.t.st, M.t) : tongue(style || 0), home, mother); if (p) ppl[home] = p; return p;
     }
