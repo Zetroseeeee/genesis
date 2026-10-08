@@ -24,7 +24,8 @@ https://registry.opendata.aws/terrain-tiles/, attribution https://github.com/til
 read at zoom 10 (153 m at the equator) and averaged over each texel's own piece of the Earth. Two places they do not
 give the ground one stands on: Antarctica, where they have the rock under the ice, and the north of 85 degrees, where
 Mercator's tiles end (sea, but for Greenland's tip and some islands); there the old packs are taken (data/e: the ice as the
-old build had it). The old packs had the high Himalaya, the Karakoram, the Andes and the Alps above the snows smooth, as
+old build had it). Greenland's ice they have in places and its rock in others: on the ice, the higher of the two. And a few
+of the tiles are spikes kilometres high in a plain: there too the old packs. The old packs had the high Himalaya, the Karakoram, the Andes and the Alps above the snows smooth, as
 the radar left them (a hole filled by a blur): Everest stood at 5,880 m.
 
 The pack is kept under the name of what it was made from (twelve digits of the SHA-256 of this file): heights-<hash>.tar
@@ -166,6 +167,21 @@ def from_tiles(L, px, py, z=Z):
     return out
 
 
+# ------------------------------------------------------------------------------------------------- the ice
+GREEN = (-75.0, -10.0, 59.0, 84.5)      # lon0, lon1, lat0, lat1: Greenland
+_ice = None
+def ice_at(lon0, lat0, dl, shape):
+    """how much the planet's own map has the place under ice (data/info.png, green: 2048 x 1024), 0 .. 1, at a pack's texels,
+    with a margin: full ice from 0.85, none below 0.45"""
+    global _ice
+    if _ice is None: _ice = np.asarray(Image.open(os.path.join(ROOT, 'data/info.png')).convert('RGBA'), dtype=np.float32)[..., 1] / 255
+    Hh, W = shape; Ih, Iw = _ice.shape
+    fx = ((lon0 + (np.arange(W) + 0.5) * dl + 180) / 360 * Iw - 0.5) % Iw; fy = np.clip((90 - (lat0 - (np.arange(Hh) + 0.5) * dl)) / 180 * Ih - 0.5, 0, Ih - 1.001)
+    x0 = np.floor(fx).astype(int); y0 = np.floor(fy).astype(int); ax = (fx - x0)[None, :]; ay = (fy - y0)[:, None]; x1 = (x0 + 1) % Iw
+    v = (_ice[y0][:, x0] * (1 - ax) + _ice[y0][:, x1] * ax) * (1 - ay) + (_ice[y0 + 1][:, x0] * (1 - ax) + _ice[y0 + 1][:, x1] * ax) * ay
+    t = np.clip((v - 0.45) / 0.4, 0, 1); return (t * t * (3 - 2 * t)).astype(np.float32)
+
+
 # ------------------------------------------------------------------------------------------------- where there is land
 def land_packs():
     """the level-7 packs with any land in them: by the picture's map of land and water (8192 x 4096) and by the old packs,
@@ -194,9 +210,24 @@ def build7(px, py):
         h = old_heights(TOP, px, py); src = 'old'
     else:
         h = from_tiles(TOP, px, py, ZHI if min(abs(lat0), abs(lat1)) > 55 else Z) * TALL; src = 'tiles'
+        o = old_heights(TOP, px, py)
         bad = np.isnan(h)
         if bad.any():                     # north of the tiles' end, or a tile that would not come: the old packs there
-            o = old_heights(TOP, px, py); h[bad] = o[bad]; src += ' + old %.0f %%' % (100 * bad.mean())
+            h[bad] = o[bad]; src += ' + old %.0f %%' % (100 * bad.mean())
+        # Greenland: over most of its ice the tiles have the rock under it (northern Greenland stood at a few hundred metres,
+        # with holes of rock in what ice they have further south). On the ice (the planet's own map of it), wherever the old
+        # packs stand higher, they are taken: the ice one stands on, and the tiles' rock where it stands out of the ice.
+        if lon1 > GREEN[0] and lon0 < GREEN[1] and lat0 > GREEN[2] and lat1 < GREEN[3]:
+            w = ice_at(lon0, lat0, dl, h.shape); up = w * np.maximum(o - h, 0)
+            if up.max() > 50: src += ' + the ice %.0f %%' % (100 * (up > 50).mean())
+            h += up
+        # Spikes: a few tiles have ground kilometres high in a plain (Alaska had one of 26 km; Yemen, New Zealand): where the
+        # tiles stand fifteen hundred metres above the highest of the old packs within two kilometres, in country the old
+        # packs have under three thousand, or higher than anything on Earth, the old packs are taken, and round it.
+        from scipy import ndimage
+        om = ndimage.maximum_filter(o, 11); gl = ((h - om > 1500) & (om < 3000)) | (h > 9150)
+        if gl.any():
+            gl = ndimage.binary_dilation(gl, iterations=4) & (h > o + 200); h[gl] = o[gl]; src += ' + %d spiked texels' % gl.sum()
         if lat1 < -60 and SOUTH == 'old': h[np.arange(h.shape[0]) * dl > lat0 + 60] = old_heights(TOP, px, py)[np.arange(h.shape[0]) * dl > lat0 + 60]
     v = np.clip(np.round(h / STEP), 0, 65535).astype(np.uint16)
     land = v > 0
