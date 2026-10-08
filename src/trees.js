@@ -300,6 +300,7 @@
       const wild = (1 - smooth(0.22, 0.48, warm)) * (1 - Math.min(1, cult * 1.4)) * (1 - smooth(0.35, 0.6, arid));
       let wF = green * (1 - smooth(0.32 + 0.2 * wild, 0.6 + 0.3 * wild, lum)) * (1 - aboveTree);
       let wG = green * smooth(0.28 + 0.2 * wild, 0.55 + 0.3 * wild, lum) + green * aboveTree * 0.6;
+      { const dryF = wF * smooth(0.5, 0.9, arid); wF -= dryF; wG += dryF; }      // (no closed wood in a desert: what is green there is watered fields and grass - the terrain shader's dryF; the trees along a river are the gallery's)
       let wD = warm * (1 - green) * (1 - smooth(1800, 3000, h));
       let wR = smooth(2600, 4300, h) * (1 - green * 0.5) + (1 - green) * (1 - warm) * 0.5;
       wF = Math.pow(Math.max(wF + (nMid[0] - 0.5) * 0.5 + (nMic[1] - 0.5) * 0.25, 0), 3);

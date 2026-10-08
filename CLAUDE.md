@@ -639,6 +639,12 @@ Conventions that matter:
   warm-coloured, which a steppe, a prairie and a savanna are), not the climate's class: by the class the wheat of
   Kansas and of Picardy are one, and the plains were a green wall with a ruled edge. Not in the taiga or beyond.
   Doing the same in the builder, as a filling-in from the woods near by, was tried first and was a blur.
+  *Before the canals* (`dryC` in the shader, at "the country before the canals"; `dryF`, and in `trees.js` the same in
+  `forestAt`). In a desert what the photograph has green is fields watered from canals and wells: Mesopotamia between
+  its rivers, the Nile's valley, the Punjab. Where nobody farms, what is plainly green there is given the dry grass
+  and bare earth of a river's plain (darker than the sand round it), and no closed wood stands where the climate is too
+  dry for one: the photograph's dark fields, weighed as woods by their darkness, made the plain between the Tigris and
+  the Euphrates a forest's canopy from the air in 10,000 BC. The trees along a river there are the gallery's.
   **The planet's own maps are one texture of two layers** (`uInfo`, a `sampler2DArray`: `planetMaps` in `main.js`):
   `info.png` and under it `veg.jpg` at the same size - the ground's shader has all sixteen textures, and a layer
   costs none. `info.png` is read back through the card (`pixelsOf`): a 2D canvas keeps colour multiplied by alpha,

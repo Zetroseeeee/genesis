@@ -640,6 +640,17 @@
           vec3 nat = mix(vec3(0.78, 1.20, 0.40), vec3(0.96, 1.12, 0.44), smoothstep(0.16, 0.30, ln)) * ln;
           base = mix(base, nat, woods * field * (1.0 - ploughed));
         } }
+      // ---------- the country before the canals ----------
+      // In a desert what the photograph has green is fields watered from canals and wells: the plain of Mesopotamia between its
+      // rivers, the Nile's valley, the Punjab, the oases. Where nobody farms they are given back the dry grass and bare earth of
+      // the steppe round them, darker than the sand (a river's plain is); where the game's people have dug the canals the
+      // photograph's own fields show. (Taken for woods, the plain between the Tigris and the Euphrates was a forest's canopy
+      // from the air in 10,000 BC. The trees along a river there are the trees' own: trees.js, gallery.)
+      { float dryC = smoothstep(0.62, 0.85, clim) * (1.0 - ploughed);
+        if (dryC > 0.0) {
+          float gr = clamp((base.g - max(base.r, base.b)) * 7.0, 0.0, 1.0), l0 = dot(base, vec3(0.299, 0.587, 0.114));
+          base = mix(base, vec3(1.16, 1.0, 0.74) * mix(0.29, 0.40, smoothstep(0.08, 0.3, l0)), dryC * gr);
+        } }
       float lum = dot(base, vec3(0.299, 0.587, 0.114));
       float green = clamp((base.g - max(base.r, base.b) * 0.92) * 6.0 + 0.25, 0.0, 1.0);
       // (What is bright and has no colour of its own is not green, however the sum above reads it: a twelfth of a white is
@@ -681,6 +692,10 @@
       float wild = (1.0 - smoothstep(0.22, 0.48, warm)) * (1.0 - clamp(cult * 1.4, 0.0, 1.0)) * (1.0 - smoothstep(0.35, 0.6, clim));
       float wForest = green * (1.0 - smoothstep(0.32 + 0.2 * wild, 0.6 + 0.3 * wild, lum)) * (1.0 - aboveTree) * (1.0 - steep * 0.7);
       float wGrass  = green * smoothstep(0.28 + 0.2 * wild, 0.55 + 0.3 * wild, lum) * (1.0 - steep * 0.6) + green * aboveTree * 0.6 * (1.0 - steep);
+      // (No closed wood where the climate is too dry for one: what the photograph has green in a desert is fields watered from
+      //  canals, reeds and grass. The plain of Mesopotamia between its rivers, all fields today, was a forest's canopy from the
+      //  air in 10,000 BC. The trees that line a river there are the trees' own: trees.js, gallery.)
+      { float dryF = wForest * smoothstep(0.62, 0.85, clim); wForest -= dryF; wGrass += dryF; }
       float wDesert = warm * (1.0 - green) * (1.0 - steep) * (1.0 - smoothstep(1800.0, 3000.0, vH));
       float wRock   = max(steep, smoothstep(treeLine + 400.0, treeLine + 1400.0, vH) * (1.0 - green * 0.5)) + (1.0 - green) * (1.0 - warm) * 0.5;
       // dithered transitions: land cover breaks up instead of fading
