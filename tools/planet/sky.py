@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """The sky as the game has it: the stars, the Milky Way, the Moon and the clouds (the Planet workflow, mode "sky").
 
-    python3 tools/planet/sky.py --out out --work work [stars] [milkyway] [moon] [clouds]
+    python3 tools/planet/sky.py --out out --work work [stars] [milkyway] [moon] [clouds] [noise]
 
-Nothing told: all four, and the pack. Told some: those only, a trial (sky-part.tar, nobody's pack).
+Nothing told: all five, and the pack. Told some: those only, a trial (sky-part.tar, nobody's pack).
 
   stars     Every star to the tenth magnitude, a third of a million of them, as points: where it stands (J2000), how bright it
             is (V), what colour (B-V). The Bright Star Catalogue has the nine thousand the eye can see, with magnitudes
@@ -23,6 +23,8 @@ Nothing told: all four, and the pack. Told some: those only, a trial (sky-part.t
   clouds    The Blue Marble's clouds (NASA Earth Observatory, 2001: a picture of nothing but cloud, 43,200 texels round
             the Earth), made 16,384 round: clouds_0.webp (180 W to 0) and clouds_1.webp (0 to 180 E), 8192 square each, and
             clouds_s.webp, 2048 by 1024, for the shadows on the ground and for the first moments.
+  noise     The grain of a cloud, which no picture of the whole Earth can hold: noise3.bin, a block of 128 cubed that
+            repeats every way, two bytes a place (the shape of heaps of cloud; what eats at their edges).
 
 The pack is kept under the name of what it was made from (twelve digits of the SHA-256 of this file): sky-<hash>.tar and
 sky-<hash>.json in the "planet" release, sky.json for whoever asks for the pack made last. tools/planet/fetch.mjs brings it
@@ -41,7 +43,7 @@ Image.MAX_IMAGE_PIXELS = None
 
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
 OUT, WORK = arg('out', 'out'), arg('work', 'work')
-PARTS = ('stars', 'milkyway', 'moon', 'clouds')
+PARTS = ('stars', 'milkyway', 'moon', 'clouds', 'noise')
 what = [a for a in sys.argv[1:] if a in PARTS]; whole = not what; what = what or list(PARTS)
 H = hashlib.sha256(open(os.path.abspath(__file__), 'rb').read()).hexdigest()[:12]
 UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) holocene-planet-sky'}
@@ -221,7 +223,10 @@ def moon():
         if a.ndim == 2: return map_coordinates(a, [v, u], order=1, mode='wrap')
         return np.stack([map_coordinates(a[..., c], [v, u], order=1, mode='wrap') for c in range(a.shape[2])], -1)
     c = look(col, lon, la); alb = c @ np.array([0.2126, 0.7152, 0.0722], np.float32)
-    sE, sN = look(dE, lon, la) * MOON_STEEP, look(dN, lon, la) * MOON_STEEP
+    # (not along the rim: there the ground is seen all but edge-on, and a slope of a few degrees turned it from the sun or to
+    #  it texel by texel - the full Moon had a ring of grit round it. No shadow shows on the rim of the real one either)
+    rim = np.clip(Z / 0.45, 0, 1); rim = rim * rim * (3 - 2 * rim)
+    sE, sN = look(dE, lon, la) * MOON_STEEP * rim, look(dN, lon, la) * MOON_STEEP * rim
     # which way the ground faces, as the eye on the Earth has it: x to the right, y up, z toward the eye
     P = np.stack([X, Y, Z], -1); cl, sl, cp, sp = np.cos(lon), np.sin(lon), np.cos(la), np.sin(la)
     E = np.stack([cl, np.zeros_like(cl), -sl], -1); N = np.stack([-sp * sl, cp, -sp * cl], -1)
@@ -275,6 +280,52 @@ def clouds():
     return dict(w=CLOUD_W, h=CLOUD_W // 2, halves=['clouds_0.webp', 'clouds_1.webp'], small='clouds_s.webp', day='2001-07-29')
 
 
+# --------------------------------------------------------------------------------------- the grain of a cloud
+NOISE_N = 128
+def noise():
+    """What the clouds' picture cannot hold: its finest texel is two and a half kilometres, and a cloud seen from under it
+    has an edge. A block of noise that repeats in all three directions (so it can be looked up by where a point of the
+    sky's shell is, with no seam and no pole), two bytes a place: the first the shape of heaps of cloud (Perlin's noise
+    swollen by Worley's cells, as Schneider did it for Horizon Zero Dawn), the second what eats at their edges (Worley's
+    cells at three sizes). Each is spread evenly over 0 .. 255, so that a threshold of c leaves just c of the sky covered."""
+    n = NOISE_N; rng = np.random.default_rng(20261008)
+    ax = (np.arange(n, dtype=np.float32) + 0.5) / n; Z, Y, X = np.meshgrid(ax, ax, ax, indexing='ij')
+    def worley(f):
+        pts = rng.random((f, f, f, 3), dtype=np.float32); px, py, pz = X * f, Y * f, Z * f
+        ix, iy, iz = np.floor(px).astype(np.int32), np.floor(py).astype(np.int32), np.floor(pz).astype(np.int32); best = np.full(X.shape, 9.0, np.float32)
+        for dz in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    cx, cy, cz = ix + dx, iy + dy, iz + dz; q = pts[cz % f, cy % f, cx % f]
+                    d = (cx + q[..., 0] - px) ** 2 + (cy + q[..., 1] - py) ** 2 + (cz + q[..., 2] - pz) ** 2; np.minimum(best, d, out=best)
+        return 1.0 - np.clip(np.sqrt(best), 0, 1)      # light at a cell's heart, dark between cells
+    def perlin(f):
+        g = rng.normal(size=(f, f, f, 3)).astype(np.float32); g /= np.linalg.norm(g, axis=-1, keepdims=True)
+        px, py, pz = X * f, Y * f, Z * f; ix, iy, iz = np.floor(px).astype(np.int32), np.floor(py).astype(np.int32), np.floor(pz).astype(np.int32); fx, fy, fz = px - ix, py - iy, pz - iz
+        fade = lambda t: t * t * t * (t * (t * 6 - 15) + 10); u, v, w = fade(fx), fade(fy), fade(fz); out = np.zeros(X.shape, np.float32)
+        for dz in (0, 1):
+            for dy in (0, 1):
+                for dx in (0, 1):
+                    q = g[(iz + dz) % f, (iy + dy) % f, (ix + dx) % f]; dot = q[..., 0] * (fx - dx) + q[..., 1] * (fy - dy) + q[..., 2] * (fz - dz)
+                    out += dot * (u if dx else 1 - u) * (v if dy else 1 - v) * (w if dz else 1 - w)
+        return out
+    even = lambda a: (np.argsort(np.argsort(a.ravel(), kind='stable'), kind='stable').reshape(a.shape) * (256.0 / a.size)).astype(np.uint8)
+    t0 = time.time(); pf = perlin(4) + 0.5 * perlin(8) + 0.25 * perlin(16) + 0.125 * perlin(32); pf = np.clip(pf / 1.2 * 0.5 + 0.5, 0, 1)
+    wl = 0.625 * worley(4) + 0.25 * worley(8) + 0.125 * worley(16); shape = wl + pf * (1.0 - wl)      # (Perlin's noise from 0 .. 1 brought to worley .. 1)
+    eat = 0.625 * worley(8) + 0.25 * worley(16) + 0.125 * worley(32)
+    out = np.stack([even(shape), even(eat)], -1); f = os.path.join(WORK, 'sky', 'noise3.bin'); out.tofile(f)
+    say('the grain of a cloud: %d cubed, two bytes a place, %.1f MB (%.0f s); how alike the two are: r = %.3f; the first against itself half a block off: r = %.3f' % (
+        n, os.path.getsize(f) / 1e6, time.time() - t0, np.corrcoef(out[..., 0].ravel()[::7], out[..., 1].ravel()[::7])[0, 1], np.corrcoef(out[..., 0].ravel()[::7], np.roll(out[..., 0], n // 2, 0).ravel()[::7])[0, 1]))
+    # a slice of each, and what a threshold makes of the first eaten by the second: a third, a half and two thirds of the sky covered
+    a, b = out[0, ..., 0].astype(np.float32) / 255, out[0, ..., 1].astype(np.float32) / 255; tiles = [a, b]
+    b6 = np.tile(out[0, ..., 1], (1, 1))[np.ix_((np.arange(n) * 5) % n, (np.arange(n) * 5) % n)].astype(np.float32) / 255
+    for c in (0.33, 0.5, 0.67): tiles.append(np.clip((a - 0.25 * (1 - b6) - (1 - c)) / 0.12 + 0.5, 0, 1))
+    sh = Image.new('L', ((n * 3 + 4) * len(tiles), n * 3), 60)
+    for i, t in enumerate(tiles): sh.paste(Image.fromarray((np.tile(t, (3, 3)) * 255).astype(np.uint8)), (i * (n * 3 + 4), 0))
+    sh.resize((sh.size[0] // 1, sh.size[1] // 1)).save(os.path.join(OUT, 'planet_noise.jpg'), quality=88)
+    return dict(n=n, channels=2, file='noise3.bin')
+
+
 # ------------------------------------------------------------------------------------------- what was made, to look at
 def sheet(S):
     """The stars as points over NASA's own map of them (Hipparcos and Tycho, drawn by NASA): three pieces of the sky. A ring
@@ -308,6 +359,7 @@ if 'stars' in what: index['stars'], S = stars()
 if 'milkyway' in what: index['milkyway'], glow = milkyway()
 if 'moon' in what: index['moon'] = moon()
 if 'clouds' in what: index['clouds'] = clouds()
+if 'noise' in what: index['noise'] = noise()
 if S is not None: sheet(S)
 if not whole: index['partial'] = what
 json.dump(index, open(os.path.join(WORK, 'sky', 'index.json'), 'w'))
