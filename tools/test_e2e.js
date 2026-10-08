@@ -251,7 +251,8 @@ server.listen(0, async () => {
     const y0 = s.year; await ev(() => document.getElementById('turn').click()); await wait(1500); await frames(3); s = await state(); check(s.t1 === 'Pause' && s.year > y0, `time runs (${s.year - y0} yrs)`);
     await page.keyboard.press('+'); await page.keyboard.press('+'); const sp = await ev(() => document.getElementById('speedval').firstChild.textContent); check(/×/.test(sp), 'speed label: ' + sp);
     await page.keyboard.press(' '); await frames(2); check((await state()).t1 === 'Play', 'space pauses');
-    await ev(() => document.getElementById('opt-continuous').click()); await frames(2); check((await state()).t1 === 'Advance', 'back to turns');
+    await ev(() => document.getElementById('opt-continuous').click()); await frames(2);
+    { const t = await ev(() => { const a = __G.attention(); return { t1: document.getElementById('turn1').textContent, want: a.length ? a[0].t1 : 'Advance' }; }); check(t.t1 === t.want, `back to turns: ${t.t1}`); }      // (or to whatever came up while time ran: a prophet, a flood)
   });
 
   // ---------- build tools ----------
