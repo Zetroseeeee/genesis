@@ -172,7 +172,7 @@
   SKY.CLOUD_F = (AIR_F) => `
     precision highp sampler3D;
     uniform sampler2D uCloudS, uCloud0, uCloud1; uniform sampler3D uGrain; uniform vec3 uAirC, uAirS, uSunW;
-    uniform float uFine, uGrainOn, uBelow, uOpacity, uThin, uTime, uShellR, uDown, uNear, uMoonL, uEyeN; uniform vec2 uShiftCS, uCover, uGrainK;
+    uniform float uFine, uGrainOn, uBelow, uOpacity, uThin, uTime, uShellR, uDown, uNear, uMoonL, uEyeN, uFar1; uniform vec2 uShiftCS, uCover, uGrainK;
     varying vec3 vDirW, vPosV, vSunT; ${AIR_F}
     // the picture of the clouds where a line from the Earth's middle points (q: unit, the weather's turn taken out), with how
     // fast that changes across the pixel: told outright, because the picture's own edge (the date line) and the two halves of the
@@ -227,7 +227,7 @@
       // The heaps and their lumps are looked up by the curve until a place is well under a pixel, then by the card's own
       // coarser copies. Not sooner: weighed straight, every place of the block has a slope of its own, and the light, which
       // goes by the slope, made a cloud low in the sky of flat bars, each lit or not.
-      float g1 = (1.0 - smoothstep(2.0, 6.0, tpp)) * uGrainOn, g0 = (1.0 - smoothstep(3.0, 8.0, tpp * 0.23)) * uGrainOn, n1 = 0.5, n0 = 0.5;
+      float g1 = (1.0 - smoothstep(2.0, 6.0, tpp)) * uGrainOn * uFar1, g0 = (1.0 - smoothstep(3.0, 8.0, tpp * 0.23)) * uGrainOn, n1 = 0.5, n0 = 0.5;
       float k1 = 1.0 - smoothstep(2.5, 5.0, tpp), k0 = 1.0 - smoothstep(2.5, 5.0, tpp * 0.23);
       if (g1 > 0.0) { float v = 0.0; if (k1 < 1.0) v = textureGrad(uGrain, p1, dx * 318.0, dy * 318.0).r; if (k1 > 0.0) v = mix(v, grain3(p1), k1); n1 = mix(0.5, v, g1); }
       // (the lumps, which count for less and are larger, by a cheaper curve: one lookup with its place moved toward the middle of
@@ -242,7 +242,10 @@
       // apart down to the horizon, and the low sky was empty.) As the shell lies to the eye: once from straight under it, three
       // times along it at some ten degrees up.
       float lean = foot / max(min(length(dx), length(dy)), 1e-9), fill = 1.0 + uBelow * 0.35 * clamp(lean - 1.0, 0.0, 12.0);
-      float a = 1.0 - pow(1.0 - pow(cl, 0.85), fill), thick = cl, slope = 0.0, dK = (1.0 - smoothstep(uGrainK.x, uGrainK.y, foot)) * uGrainOn;
+      // (and where the picture's texels are several pixels across and there are no heaps, its cloud has an edge: as it is, between
+      //  its texels, it is a blur, the weather seen through frosted glass)
+      float edge = (1.0 - smoothstep(0.12, 0.45, foot * 2608.0)) * (1.0 - uBelow);
+      float a = 1.0 - pow(1.0 - mix(pow(cl, 0.85), smoothstep(0.14, 0.56, cl), edge), fill), thick = cl, slope = 0.0, dK = (1.0 - smoothstep(uGrainK.x, uGrainK.y, foot)) * uGrainOn * uFar1;
       float f = 1.0 - pow(1.0 - min(c * uCover.x, uCover.y), fill);      // (how much of the sky the heaps take: what the picture has; from under them never all of it, but for the closing up toward the horizon)
       float fd = 0.5 - f, thr = 0.5 + 0.72 * fd + 2.8 * fd * fd * fd * fd * fd;      // (the sum's own measure, so that f of the sky is over it: tools/planet/grain.py)
       float veil = 0.3 * smoothstep(0.25, 1.0, c);
@@ -321,7 +324,7 @@
       const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat); blank.needsUpdate = true;
       const g3 = new THREE.DataTexture3D(new Uint8Array([128, 128]), 1, 1, 1); g3.format = THREE.RGFormat; g3.internalFormat = 'RG8'; g3.type = THREE.UnsignedByteType; g3.unpackAlignment = 1; g3.needsUpdate = true;
       this.uniforms = Object.assign({ uCloudS: { value: blank }, uCloud0: { value: blank }, uCloud1: { value: blank }, uGrain: { value: g3 }, uFine: { value: 0 }, uGrainOn: { value: 0 }, uBelow: { value: 0 }, uOpacity: { value: 0 }, uThin: { value: 1 }, uTime: { value: 0 },
-        uShellR: { value: SHELL }, uDown: { value: 1 }, uShiftCS: { value: new THREE.Vector2(1, 0) }, uSunW: { value: new THREE.Vector3(1, 0, 0) }, uCover: { value: new THREE.Vector2(1.05, 1) }, uNear: { value: 0 }, uMoonL: { value: 0 }, uEyeN: { value: 0 }, uGrainK: { value: new THREE.Vector2(0.5e-4, 1.6e-4) } }, AIRX.uniforms);
+        uShellR: { value: SHELL }, uDown: { value: 1 }, uShiftCS: { value: new THREE.Vector2(1, 0) }, uSunW: { value: new THREE.Vector3(1, 0, 0) }, uCover: { value: new THREE.Vector2(1.05, 1) }, uNear: { value: 0 }, uMoonL: { value: 0 }, uEyeN: { value: 0 }, uFar1: { value: 1 }, uGrainK: { value: new THREE.Vector2(0.5e-4, 1.6e-4) } }, AIRX.uniforms);
       this.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: this.uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, extensions: { derivatives: true }, vertexShader: SKY.CLOUD_V(AIRX.VERT), fragmentShader: SKY.CLOUD_F(AIRX.FRAG) }));
       this.mesh.frustumCulled = false; this.mesh.renderOrder = 6; scene.add(this.mesh); this.on = true; this.shift = 0; this.vis = 0; this.near = 0;
     }
@@ -345,8 +348,11 @@
       // through when looked straight down on, and its shadows on the ground are as much fainter.
       const near = this.near = sm(0.55 * h, 1.15 * h, alt) * (1 - sm(0.15, 0.6, alt));
       U.uBelow.value = below ? 1 : 0; U.uOpacity.value = fade; U.uNear.value = near; U.uCover.value.set(below ? 0.9 : 1.05, below ? 0.78 : 1); U.uThin.value = below ? 1 : 1 - 0.38 * near; U.uDown.value = below ? 0 : 1;
-      // (heaps of cloud are drawn where one is some pixels across: from under them out to where a pixel is a kilometre of the shell, from over them a third as far)
-      U.uGrainK.value.set(below ? 0.5e-4 : 2e-5, below ? 1.6e-4 : 6e-5);
+      // (heaps of cloud are drawn where one is some pixels across: from under them out to where a pixel is a kilometre of the shell,
+      //  from over them a third as far, and only while the eye is within some two hundred kilometres of them: from where the game is
+      //  played the heaps, and the smaller of the two sizes that gather the picture's cloud, cost a fifth of the frame - the eye
+      //  had every pixel of a screen of cloud to go through - for a grain the map is better without)
+      U.uGrainK.value.set(below ? 0.5e-4 : 2e-5, below ? 1.6e-4 : 6e-5); U.uFar1.value = below ? 1 : 1 - sm(0.025, 0.05, alt);
       this.vis = this.on && SKY.ready.clouds ? 1 - 0.38 * near : 0; this.mesh.visible = this.vis > 0 && fade > 0.004;
       // (from under them they are behind everything else that is seen through - smoke, flames, the leaves' edges - and are drawn before it; from above, in front of it all and after)
       this.mesh.renderOrder = below ? -3 : 6;
