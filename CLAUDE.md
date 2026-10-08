@@ -720,8 +720,11 @@ Conventions that matter:
   a tile's lakes are smaller than its quads (`waterWide`, `uWaterP.z`): from far off a quad is kilometres, and a tarn
   a few hundred metres across was a pit miles wide with its walls in shadow - dark blots all over the snows of the
   Himalaya. There the ground is left as the heights have it; a great lake (the field at its limit in the middle of
-  it) lies level as before. The byte the
-  card cannot weigh (two things in one) is fetched from the nearest texel. `shoreAt` (metres; then `wKind`,
+  it) lies level as before. What water a corner lies by, and how high that water stands, are those of the texel
+  of the four about it that lies nearest the water (the least distance): a texel far from any water says nothing of
+  either (sea, at nought), and taken from the nearest texel, or weighed in, it pulled the ground at the edge of a
+  lake's shore toward the sea's level - a trench a kilometre and more deep round every lake of Tibet, which the real
+  heights of 0.24 made plain. `shoreAt` (metres; then `wKind`,
   `wOpen`, `wLevel`), `isWater`, `heightAt` and `gpuVertexH` are the CPU's twins: trees, harbours, piers, ships,
   town sites and walls ask them, and ask again whenever more packs have come (`stats.packsW`).
   **The terrain shader is at 16 textures with it, which is all an Apple GPU allows**: the next one must take the

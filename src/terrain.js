@@ -76,7 +76,17 @@
       // (the water's edge, where the field of it is here: how far inland this corner lies, and what water lies off it)
       float wdv = 1e4, wkv = 0.0, wlv = h;      // (how far to the water's edge, what water it is, how high it stands: its own ground where that is not known)
       if (uWaterP.x > 1.5) { wdv = uWaterP.z; wkv = uWaterP.w; }
-      else if (uWaterP.x > 0.5) { vec2 wc = uWaterRect.xy + vec2(u, v) * uWaterRect.zw, wsz = vec2(textureSize(uWater, 0)); vec3 wt = texture2D(uWater, wc).rgb; wdv = wDec(wt.r) * uWaterP.y; if (uWaterL > 0.5) wlv = wLev(wt.b); wkv = wKO(texelFetch(uWater, ivec2(clamp(floor(wc * wsz), vec2(0.0), wsz - 1.0)), 0).g).x; }      // (the distance and the level weighed between texels by the card; what water it is from the nearest texel: its byte holds two things)
+      else if (uWaterP.x > 0.5) {
+        vec2 wc = uWaterRect.xy + vec2(u, v) * uWaterRect.zw, wsz = vec2(textureSize(uWater, 0)); vec3 wt = texture2D(uWater, wc).rgb; wdv = wDec(wt.r) * uWaterP.y;      // (the distance weighed between texels by the card)
+        // What water it is and how high it stands: those of the texel of the four about this corner that lies nearest the water
+        // (the least distance). A texel far from any water says nothing of either (sea, at nought), and from the nearest texel,
+        // or weighed in with the others, it pulled the ground at the edge of a lake's shore toward the sea's level: a trench a
+        // kilometre and more deep round every lake of Tibet.
+        ivec2 w0 = ivec2(clamp(floor(wc * wsz - 0.5), vec2(0.0), wsz - 2.0));
+        vec3 wa = texelFetch(uWater, w0, 0).rgb, wb = texelFetch(uWater, w0 + ivec2(1, 0), 0).rgb, wc2 = texelFetch(uWater, w0 + ivec2(0, 1), 0).rgb, wd2 = texelFetch(uWater, w0 + ivec2(1, 1), 0).rgb;
+        if (wb.r < wa.r) wa = wb; if (wc2.r < wa.r) wa = wc2; if (wd2.r < wa.r) wa = wd2;
+        wkv = wKO(wa.g).x; if (uWaterL > 0.5) wlv = wLev(wa.b);
+      }
       // The sea lies at nought and a lake at its level, and the ground comes up from the water's own level, a little way in
       // from the shore (SHORE_FLAT, uShoreQ). Where the packs carry no levels a lake lies as the heights have it.
       // (not for fresh water where the tile's lakes are smaller than its quads, uWaterP.z: see update())
@@ -1900,8 +1910,8 @@
       let wdv = null, wkv = 0, wlv = h; { const wb = t.wPack;
         if (wb && wb.pack) { const p = wb.pack, r = wb.rect, fx = (r[0] + u * r[2]) * p.w - 0.5, fy = (r[1] + v * r[3]) * p.h - 0.5, x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)), d = p.dist, i = (y0 * p.w + x0) * 3, j = i + p.w * 3;
           wdv = wDecF((d[i] * (1 - ax) + d[i + 3] * ax) * (1 - ay) + (d[j] * (1 - ax) + d[j + 3] * ax) * ay) * p.scale;
-          if (this.uWaterL.value) wlv = wLevF((d[i + 2] * (1 - ax) + d[i + 5] * ax) * (1 - ay) + (d[j + 2] * (1 - ax) + d[j + 5] * ax) * ay);
-          { const xn = Math.max(0, Math.min(p.w - 1, Math.floor((r[0] + u * r[2]) * p.w))), yn = Math.max(0, Math.min(p.h - 1, Math.floor((r[1] + v * r[3]) * p.h))); wkv = (d[(yn * p.w + xn) * 3 + 1] >> 4) / 15; } }
+          { let m = i; if (d[i + 3] < d[m]) m = i + 3; if (d[j] < d[m]) m = j; if (d[j + 3] < d[m]) m = j + 3;      // (what water and how high: the texel of the four nearest the water, as the vertex shader has it)
+            wkv = (d[m + 1] >> 4) / 15; if (this.uWaterL.value) wlv = wLevF(d[m + 2]); } }
         else if (wb) { wdv = wb.flat === 'L' ? 480 : -3600; wkv = wb.flat === 'F' ? 1 : 0; } }
       const sq = U.uShoreQ.value; if (wdv !== null && !(t.wPack && t.wPack.pack && U.uWaterP.value.z > 0.5 && wkv > 0.5)) { const sh = sm01(sq, sq + SHORE_RISE, wdv); h = wlv * wkv * (1 - sh) + h * sh; }
       const camAlt = this.globals.uCamAlt.value; const q = this.globals.uQuality.value;
@@ -1976,9 +1986,12 @@
         const span = per * 360 / (2 << l), fx = ap + (lon + 180 - px * span) / span * per * ts - 0.5, fy = ap + (90 - py * span - lat) / span * per * ts - 0.5;
         const x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0));
         const D = this.wDec, d = p.dist, i = (y0 * p.w + x0) * 3, j = i + p.w * 3;
-        this.wKind = (((d[i + 1] >> 4) * (1 - ax) + (d[i + 4] >> 4) * ax) * (1 - ay) + ((d[j + 1] >> 4) * (1 - ax) + (d[j + 4] >> 4) * ax) * ay) / 15;
+        // (what water it is and how high it stands: the texel of the four nearest the water - one far from any says nothing of
+        //  either, and weighed in it pulled the ground at the edge of a lake's shore toward the sea's level)
+        let m = i; if (d[i + 3] < d[m]) m = i + 3; if (d[j] < d[m]) m = j; if (d[j + 3] < d[m]) m = j + 3;
+        this.wKind = (d[m + 1] >> 4) / 15;
         this.wOpen = (((d[i + 1] & 15) * (1 - ax) + (d[i + 4] & 15) * ax) * (1 - ay) + ((d[j + 1] & 15) * (1 - ax) + (d[j + 4] & 15) * ax) * ay) / 15;
-        this.wPending = false; this.wLevel = this.uWaterL.value ? wLevF((d[i + 2] * (1 - ax) + d[i + 5] * ax) * (1 - ay) + (d[j + 2] * (1 - ax) + d[j + 5] * ax) * ay) : -1;      // (-1: not known)
+        this.wPending = false; this.wLevel = this.uWaterL.value ? wLevF(d[m + 2]) : -1;      // (-1: not known)
         return ((D[d[i]] * (1 - ax) + D[d[i + 3]] * ax) * (1 - ay) + (D[d[j]] * (1 - ax) + D[d[j + 3]] * ax) * ay) * lv.scale;
       }
       return null;
