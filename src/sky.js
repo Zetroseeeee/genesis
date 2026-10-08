@@ -313,7 +313,8 @@
       if (window.__cloudTime !== undefined) time = window.__cloudTime;      // (a test's: the weather held where it is)
       if (SKY.cloudSmall && U.uCloudS.value !== SKY.cloudSmall) U.uCloudS.value = SKY.cloudSmall;
       if (SKY.cloudHalves && !U.uFine.value) { U.uCloud0.value = SKY.cloudHalves[0]; U.uCloud1.value = SKY.cloudHalves[1]; U.uFine.value = 1; }
-      if (SKY.grain && !U.uGrainOn.value) { U.uGrain.value = SKY.grain; U.uGrainOn.value = 1; }
+      if (SKY.grain && U.uGrain.value !== SKY.grain) U.uGrain.value = SKY.grain;
+      U.uGrainOn.value = SKY.grain && !this.grainOff ? 1 : 0;      // (grainOff: a test's, to ask what the heaps cost)
       this.shift = (time * SKY.drift) % TAU; U.uShiftCS.value.set(Math.cos(this.shift), Math.sin(this.shift)); U.uTime.value = time % 4096;
       // Under the shell the clouds are the sky's; above it the Earth's. Between - the eye going up through them - there are
       // none: a shell has no inside to be in.

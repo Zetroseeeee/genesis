@@ -106,6 +106,14 @@ window.__T.costsWinter = function () {
   const list = window.__costOld ? [['as it is', () => {}], ['the old rules', use(flat)]] : [['as it is', () => {}], ['the old rules', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is again', use(arr)], ['the old rules again', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a third time', use(arr)], ['the old rules, a third', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a fourth', use(arr)]];
   __T.cost(list, 4, 5000);      // (window.__costOld: stop at the old rules, to see what they draw)
 };
+// What the sky costs (sky.js), turn and turn about: as it is; without the clouds; the clouds without their heaps and grain (the
+// picture of the Earth's clouds alone, as from far out: two lookups a pixel and not twenty); without the stars
+window.__T.costsSky = function () {
+  const W = __G.world, C = W.cloudLayer, St = W.starField; if (!C) return 'no clouds';
+  const all = () => { W.cloudsOn = true; C.grainOff = false; if (St) St.points.material.visible = true; };
+  __T.cost([['as it is', all], ['no clouds', () => { W.cloudsOn = false; }], ['clouds, no heaps', () => { W.cloudsOn = true; C.grainOff = true; }], ['no stars', () => { C.grainOff = false; if (St) St.points.material.visible = false; }],
+    ['as it is again', all], ['no clouds again', () => { W.cloudsOn = false; }], ['clouds, no heaps again', () => { W.cloudsOn = true; C.grainOff = true; }], ['as it is a third time', all]], 4, 2000);
+};
 // What the ground has to show and what it is still waiting for, written into the picture once a second: __T.watch(). The frame
 // rate of the last second, the packs by kind and state, and what every tile in the picture is drawn with: the picture, the heights
 // and the water's edge by level ('-' none, 'f' no shore near). A view is whole when nothing is loading and the levels stand still.
