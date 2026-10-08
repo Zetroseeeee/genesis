@@ -13,7 +13,8 @@ green are the high and low bytes of how high the ground stands, in steps of a me
 old packs were and every lake in the game with them (TALL). Level 7 is 306 m to a texel at the equator, every level below
 it half as fine; each is the mean of the four texels under it, so the levels agree. Levels 0 to 5 are kept wherever there
 is land; 6 and 7 where they add most to the level below them (the mean slope of the difference: nought on a plain, tenths
-in the high mountains), each until it has spent its share of the pack (budget6=, budget7=: megabytes). Sixty-four packs
+in the high mountains), each until it has spent its share of the pack (budget6=, budget7=: megabytes), and wherever the
+old packs had them (the game's cradles, as the old build chose them: no country is coarser than it was). Sixty-four packs
 to a bundle (<level>_b<x>_<y>.bin: "HWB1", how many, a table of where each pack begins and how long it is, then the packs -
 src/terrain.js reads a pack out of its bundle): some forty files, where an update gives out no more than four hundred. index.json says which packs
 there are, by level: P a pack, S nothing but sea, L land that is drawn from the level below.
@@ -412,11 +413,17 @@ def whole(keep):
     cand[6] = [(px, py) for (px, py) in have[6] if any((cx, cy) in have7 and (cx, cy) not in old for cy in (2 * py, 2 * py + 1) for cx in (2 * px, 2 * px + 1))]
     adds = {TOP: {k: stats[k]['adds'] for k in cand[TOP]}, 6: {k: gain(load_png(have[6][k])) for k in cand[6]}}
     sizes = {(L, k): os.path.getsize(have[L][k]) * 0.72 for L in (6, TOP) for k in cand[L]}      # (what a pack will weigh in WebP: some seven tenths of its PNG)
+    # Where the old packs had a level the new ones have it too, outside the budgets: the old build kept 6 and 7 where the
+    # game's first peoples live (the Levant, Mesopotamia, Greece, Italy, the Andes ...), and by relief alone the Levant was
+    # left at level 5 - its wadis and ridges gone where the old packs had them.
+    free = {TOP: {tuple(k) for k in IDX.get('l7', []) if (TOP, tuple(k)) in sizes}}
+    free[6] = {tuple(k) for k in IDX.get('l6', []) if (6, tuple(k)) in sizes} | {(px >> 1, py >> 1) for (px, py) in free[TOP] if (6, (px >> 1, py >> 1)) in sizes}
+    say('the old packs had level 7 in %d of these packs and level 6 in %d: kept outside the budgets' % (len(free[TOP]), len(free[6])))
     kept = {}
     for L, budget in ((TOP, float(words.get('budget7', 200))), (6, float(words.get('budget6', 180)))):
-        order = sorted(cand[L], key=lambda k: -adds[L][k]); kept[L] = set()
-        if L == 6: kept[6] = {(px >> 1, py >> 1) for (px, py) in kept[TOP] if (px >> 1, py >> 1) in have[6]}
-        spent = sum(sizes[(L, k)] for k in kept[L]) / 1e6
+        order = sorted(cand[L], key=lambda k: -adds[L][k]); kept[L] = set(free[L])
+        if L == 6: kept[6] |= {(px >> 1, py >> 1) for (px, py) in kept[TOP] if (px >> 1, py >> 1) in have[6]}
+        spent = sum(sizes[(L, k)] for k in kept[L] - free[L] if (L, k) in sizes) / 1e6
         for k in order:
             if k in kept[L]: continue
             if spent + sizes[(L, k)] / 1e6 > budget: break
