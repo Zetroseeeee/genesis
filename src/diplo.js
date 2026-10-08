@@ -25,7 +25,7 @@ window.DIPLO = (function () {
     kingship: 'A far weaker neighbour can be asked to <b>bend the knee</b>, and a beaten one made to',
     embassies: 'Your envoys reach <b>the neighbours of your neighbours</b>',
     radio: 'Your envoys reach <b>every realm on Earth</b>',
-    nationalism: '<b>Unification</b> is a reason for war against realms of your own speech',
+    nationalism: '<b>Unification</b> is a reason for war against realms of your own people',
   };
   const TRIBUTE = 0.1, REPARATION = 0.12, REPARATION_TURNS = 3, CLAIM_TURNS = 3, UNION_TURNS = 6, NEVER = 1e12;
   // how much readier a realm that rules itself is to fight a neighbour it has a reason against than one it has none; and how much less ready to fight
@@ -158,7 +158,8 @@ window.DIPLO = (function () {
       const m = memOf(a, b.id); if (Math.abs(m) >= 0.5) put(m > 0 ? 'Old favours' : 'Old wrongs', Math.round(m));
       if (a.religion && b.religion) { if (a.religion === b.religion) put('The same faith', 6); else { const fl = host.faithLaw(a), base = fl === 'orthodoxy' ? -16 : fl === 'established' ? -10 : fl === 'tolerance' || fl === 'secular' || fl === 'godless' ? 0 : -6; put('Another faith', Math.round(base * (host.trait(a) === 'pious' ? 1.5 : 1))); } }
       const ka = host.kind(a), kb = host.kind(b); if (ka === kb && ka !== 'kin') put('Ruled alike', 4); else if (a.era >= 6 || b.era >= 6) put('Ruled by another creed', -creedGap(ka, kb));
-      const near = touches(a, b.id); { const ta = host.tongue(a); if (ta && ta === host.tongue(b)) put('Kindred speech', 5); else if (near && (a.era >= 6 || b.era >= 6)) put('Another nation on their border', -8); }      // (once peoples think of themselves as nations)
+      const near = touches(a, b.id); { const fa = host.folk ? host.folk(a) : 0; if (fa && fa === host.folk(b)) put('One people', 3); }      // (two realms of one people: people.js)
+      { const ta = host.tongue(a); if (ta && ta === host.tongue(b)) put('Kindred speech', 5); else if (near && (a.era >= 6 || b.era >= 6)) put('Another nation on their border', -8); }      // (once peoples think of themselves as nations)
       const ts = tradeShare(a, b.id); if (ts > 0.005) put('Trade between you', Math.min(10, Math.round(50 * ts)));
       const p = da.pact[b.id]; let bind = false;
       if (p) { if (p.nap > y) { put('A sworn peace', 4); bind = true; } if (p.trade > y) put('A trade agreement', 5); if (p.alliance > y) { put('An alliance', 20); bind = true; } else if (p.defence > y) { put('A defensive pact', 12); bind = true; } if (p.marriage > y) { put('A royal marriage', 12); bind = true; } }
@@ -318,7 +319,7 @@ window.DIPLO = (function () {
       const out = [], da = D(a), y = year(); const add = (key) => out.push(Object.assign({ key, just: true }, CAUSES[key]));
       if (da.claim[b.id * 4 + 3] > y) add('rebel'); if (da.claim[b.id * 4 + 1] > y) add('reconquest'); if (da.claim[b.id * 4] > y) add('claim'); if (da.claim[b.id * 4 + 2] > y) add('refused');
       const fl = host.faithLaw(a); if (a.religion && b.religion && b.religion !== a.religion && (fl === 'established' || fl === 'orthodoxy')) add('holy');
-      if (touches(a, b.id) && host.covets(a, b)) add('covet'); if (host.knows(a.id, 'nationalism') && host.tongue(a) && host.tongue(a) === host.tongue(b)) add('kin');
+      if (touches(a, b.id) && host.covets(a, b)) add('covet'); if (host.knows(a.id, 'nationalism')) { const fa = host.folk ? host.folk(a) : host.tongue(a); if (fa && fa === (host.folk ? host.folk(b) : host.tongue(b))) add('kin'); }      // (one people under two flags)
       if ((a.era >= 6 || b.era >= 6) && creedGap(host.kind(a), host.kind(b)) >= 14) add('creed');
       out.push(Object.assign({ key: 'none', just: a.era < 2 }, CAUSES.none)); return out;
     }

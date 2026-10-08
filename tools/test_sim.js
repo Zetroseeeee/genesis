@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -408,12 +408,12 @@ log('9. knowledge');
   let waited = 0; for (let y = 0; y < 60; y++) { sim.tick(); if (k.cur[c.id] < 0) waited++; }
   check(waited >= 20 && waited <= 30 && k.mind(c).self && k.cur[c.id] >= 0, `left without a word the scholars wait a generation, then choose for themselves (${waited} idle years; last their own choice: ${k.mind(c).self})`);
   // everybody learns; nobody knows what stands on something they do not know, nor what their age has not reached
-  for (let y = 0; y < 7900; y++) sim.tick();
+  let toldKnow = false; for (let y = 0; y < 7900; y++) { sim.tick(); if (!toldKnow && y % 100 === 0) toldKnow = sim.allEvents.some(e => e.type === 'know'); }      // (the chronicle keeps its last few thousand: a first discovery is told early, and later news pushes it out)
   { let open = 0, early = 0, over = 0, n = 0, most = 0; for (const cv of sim.civs) { if (!cv) continue; n++; most = Math.max(most, k.count[cv.id]); let spent = 0; for (const D of L) { if (!k.has[cv.id * k.ND + D.id]) continue; spent += D.cost; if (D.era > cv.era) early++; for (const q of D.need) if (!k.has[cv.id * k.ND + q]) open++; } if (spent > (cv.tech - KN.T0) * 1.5 + 0.004) over++; }
     check(open === 0 && early === 0, `what a realm knows always stands on what it knows, within its age (${open} without footing, ${early} ahead of their age)`); check(over === 0, `nobody has learned more than its knowledge could pay for (${over} realms)`);
     log(`   ${sim.fmtYear(sim.year)}: ${n} realms, the most learned knows ${most} discoveries; the player ${k.count[c.id]}, in the ${sim.ERAS[c.era][0]}`); check(most > 25, `the world has learned things (${most})`); }
   { const M = sim.market; let craft = 0, land = 0; for (const cv of sim.civs) { if (!cv) continue; for (let r = 0; r < E.NR; r++) if (M.mk[cv.id * E.NR + r] > 0 && !k.rmask[cv.id * E.NR + r]) craft++; for (let g = 1; g < E.NG; g++) if (E.GOODS[g].raw && M.out[cv.id * E.NG + g] > 0 && !k.gmask[cv.id * E.NG + g]) land++; } check(craft === 0 && land === 0, `nobody makes what it has not learned to make, nor works land it cannot (${craft} crafts, ${land} goods)`); }
-  { const firsts = L.filter(D => D.first && k.first[D.id] && k.first[D.id].name); check(firsts.length > 0 && firsts.every(D => k.first[D.id].y <= sim.year && k.first[D.id].y > -9990), `the world remembers who was first (${firsts.slice(0, 3).map(D => D.name + ': ' + k.first[D.id].name + ', ' + sim.fmtYear(k.first[D.id].y)).join('; ')})`); check(sim.worldEvents.some(e => e.type === 'know') || sim.allEvents.some(e => e.type === 'know'), 'and the chronicle records it'); }
+  { const firsts = L.filter(D => D.first && k.first[D.id] && k.first[D.id].name); check(firsts.length > 0 && firsts.every(D => k.first[D.id].y <= sim.year && k.first[D.id].y > -9990), `the world remembers who was first (${firsts.slice(0, 3).map(D => D.name + ': ' + k.first[D.id].name + ', ' + sim.fmtYear(k.first[D.id].y)).join('; ')})`); check(toldKnow || sim.worldEvents.some(e => e.type === 'know') || sim.allEvents.some(e => e.type === 'know'), 'and the chronicle records it'); }
   // edges are measured against the age: a realm that keeps step stands level
   { const far = sim.civs.filter(Boolean).sort((a, b) => b.tech - a.tech)[0]; const st = k.standing(far.id, far.tech); const fs = st.filter(r => r.key !== 'stab').map(r => r.key === 'build' ? 1 / r.f : r.f); check(fs.every(v => v > 0.6 && v < 1.7), `edges stay near what the age expects (${Math.min(...fs).toFixed(2)} to ${Math.max(...fs).toFixed(2)} for ${sim.fullName(far)})`);
     const sim9 = createSim(wd, 5); const z = sim9.spawnTribe(sim9.LI.find(i => sim9.fert[i] > 0.6), { tech: 1 }); for (const D of L) sim9.know.learn(z.id, z, D.id, true); sim9.know.refresh(z.id, 1); const all = sim9.know.standing(z.id, 1); check(all.every(r => r.key === 'stab' ? Math.abs(r.f) < 1e-6 : Math.abs(r.f - 1) < 1e-6), 'a people that knows everything at the end of the last age stands exactly level'); }
@@ -745,6 +745,73 @@ log('12. armies');
   log(`   ${sim.fmtYear(sim.year)}: ${AR.list.length} hosts in the field for ${wars / 2} wars, ${AR.stats.battles} battles; a year of hosts takes ${AR.stats.ms.toFixed(2)} ms`);
   check(AR.list.length > 0 && AR.list.every(a => a.ai && sim.civs[a.c] && sim.isAtWar(sim.civs[a.c], a.foe)), 'the autopilot keeps hosts only on fronts of its wars');
   check(AR.stats.ms < 4, `hosts are quick enough (${AR.stats.ms.toFixed(2)} ms a year)`);
+}
+}
+if (want(13)) {
+// ---------- 13. peoples: who lives where; kin and strangers; taken in, drifting apart, rising; saved ----------
+log('13. peoples');
+{
+  const sim = createSim(wd, 41); const W2 = sim.W, PP = sim.people; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  // a tribe on empty land is a new people, named as it is; another settling near it is of its kin; one far off a new family
+  const A = sim.spawnTribe(i0, {}); const pA = PP.ruling[A.id];
+  check(pA > 0 && PP.ppl[i0] === pA && PP.list[pA].name === A.name && PP.list[pA].fam === pA, `a tribe on empty land is a new people: the ${PP.list[pA] && PP.list[pA].name}`);
+  const B = sim.spawnTribe(i0 + 6, { style: A.style }); const pB = PP.ruling[B.id];      // (of the same kind of tongue as the place gave A)
+  check(pB > 0 && pB !== pA && PP.list[pB].parent === pA && PP.list[pB].fam === pA, `a tribe of its kind of tongue settling near is of its kin: the ${PP.list[pB].name}, daughters of the ${PP.list[pA].name}`);
+  { const j = i0 - 2 * W2; const D2 = sim.owner[j] < 0 && sim.land[j] ? sim.spawnTribe(j, { style: (A.style + 1) % 12 }) : null; if (D2) { const pD = PP.ruling[D2.id]; check(PP.list[pD].fam === pD && PP.list[pD].parent === 0, 'one of another kind of tongue, however near, is the first of a new family'); } }
+  check(B.style === PP.list[pB].t.st, 'and its realm is named in its tongue');
+  const far = sim.LI.find(i => ok(i) && sim.cellDist(i, i0) > 40 && sim.owner[i] < 0 && PP.ppl[i] === 0);
+  const C = sim.spawnTribe(far, {}); const pC = PP.ruling[C.id];
+  check(pC > 0 && PP.list[pC].fam === pC && PP.list[pC].parent === 0, 'one far away is the first of a new family');
+  // settlers bring their people; a conquered region keeps its own
+  sim.claim(i0 + 1, A, i0); check(PP.ppl[i0 + 1] === pA, 'empty land a realm settles is its people\'s');
+  for (let d = 5; d <= 8; d++) for (const e of [-W2, 0, W2]) { if (sim.owner[i0 + d + e] < 0) sim.claim(i0 + d + e, B, i0 + 6); sim.pop[i0 + d + e] = 2; }
+  for (let d = 1; d <= 4; d++) for (const e of [-W2, 0, W2]) { if (sim.owner[i0 + d + e] !== A.id) sim.claim(i0 + d + e, A, i0); sim.pop[i0 + d + e] = 2; }
+  sim.recount(); const took = i0 + 5; sim.claim(took, A, i0 + 4); sim.recount();
+  check(sim.owner[took] === A.id && PP.ppl[took] === pB, 'a conquered region keeps its own people');
+  // the strangers a realm rules cost it some steadiness, measured against its age
+  for (const x of [A, B, C]) { x.aggression = 0; x.dip.think = 1e12; }
+  for (let y = 0; y < 6; y++) sim.tick();
+  const fsA = PP.foreignShare[A.id], sp = sim.stabilityParts(A);
+  check(fsA > 0 && fsA < 1 && sp.peoples < 0, `a realm ruling others is the less steady for it (${Math.round(fsA * 100)}% others: ${(sp.peoples * 100).toFixed(1)} stability)`);
+  check(PP.peoplesOf(A.id, 4).length >= 2 && PP.peoplesOf(A.id, 4)[0][0] === pA, 'its peoples, the largest first: ' + PP.peoplesOf(A.id, 4).map(([p, s]) => PP.nameOf(p) + ' ' + Math.round(s * 100) + '%').join(', '));
+  // laws: one state, one law and schooling take others in faster; self-rule leaves them be and quiets them
+  const R = sim.rule.ruleOf(A); const was = { admin: R.laws.admin, learning: R.laws.learning };
+  R.laws.admin = 'central'; R.laws.learning = 'schooling'; const fast = PP.lawF(A.id, 'assim'); R.laws.admin = 'selfrule'; const slow = PP.lawF(A.id, 'assim'), calm = PP.lawF(A.id, 'minor'); R.laws.admin = was.admin; R.laws.learning = was.learning;
+  check(fast > 2 && slow < 1 && calm < 1, `laws: one state and schools take others in ${fast.toFixed(1)} times as fast; self-rule ${slow.toFixed(1)}, and quiets them (${calm.toFixed(2)})`);
+  // over the centuries a region among the rulers' own is taken into their people
+  A.tech = sim.ERAS[6][1] + 0.01; A.era = 6; R.laws.admin = 'central'; R.laws.learning = 'schooling';      // (an industrial state with schools: in the Stone Age it would take a thousand years)
+  const before = PP.stats.assimilated; for (let y = 0; y < 900 && PP.ppl[took] !== pA; y++) { if (sim.owner[took] !== A.id) sim.claim(took, A, i0 + 4); sim.tick(); }
+  check(PP.ppl[took] === pA && PP.stats.assimilated > before, `in time a region among the rulers' own is taken into their people (${PP.stats.assimilated - before} regions taken in)`);
+  // a province of another people breaks away with its people, named in its tongue
+  { const s2 = createSim(wd, 43), P2 = s2.people; const j0 = s2.LI.find(i => s2.fert[i] > 0.5 && [-1, 1, 2, 3, 4, 5, 6, 7, 8, 9].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && s2.owner[i + d] < 0));
+    const X = s2.spawnTribe(j0, {}); const pX = P2.ruling[X.id]; const far2 = s2.LI.find(i => ok(i) && s2.cellDist(i, j0) > 40 && s2.owner[i] < 0); const Y = s2.spawnTribe(far2, {}); const pY = P2.ruling[Y.id];
+    for (let d = 1; d <= 9; d++) for (const e of [-W2, 0, W2]) { s2.owner[j0 + d + e] = X.id; s2.pop[j0 + d + e] = 2; P2.ppl[j0 + d + e] = d >= 6 ? pY : pX; }
+    s2.recount(); const nc = s2.splitCiv(X, j0 + 8, 9, 'as the realm fractures');
+    const cells = []; for (let d = 1; d <= 9; d++) for (const e of [-W2, 0, W2]) if (nc && s2.owner[j0 + d + e] === nc.id) cells.push(j0 + d + e);
+    check(!!nc && P2.ruling[nc.id] === pY && cells.length >= 6 && cells.every(i => P2.ppl[i] === pY) && nc.style === P2.list[pY].t.st, `a province of another people breaks away with its people (${cells.length} regions, all theirs: ${nc && s2.fullName(nc)})`);
+    const ev = X.events.slice(-3).map(e => e.text).join(' / '); check(new RegExp('The ' + P2.list[pY].name + ' of .* break away').test(ev), 'and the chronicle says who rose: ' + ev.slice(0, 140)); }
+  // a people spread far beyond its home drifts apart into a daughter people of its own tongue
+  { const s3 = createSim(wd, 47), P3 = s3.people; const k0 = s3.LI.find(i => s3.fert[i] > 0.3 && s3.owner[i] < 0); const Z = s3.spawnTribe(k0, {}); const pZ = P3.ruling[Z.id];
+    const row = []; for (let d = 1; d < 120 && row.length < 60; d++) { const i = k0 + d; if (ok(i) && s3.owner[i] < 0) row.push(i); } for (const i of row) { P3.ppl[i] = pZ; s3.pop[i] = 1; }
+    P3.list[pZ].born = s3.year - 400; let y = 0; for (; y < 100 && !P3.stats.drifted; y++) s3.tick();
+    const d = P3.list.find(p => p && p.parent === pZ && p.fam === pZ); check(P3.stats.drifted > 0 && !!d && d.t.st === P3.list[pZ].t.st, `a people spread far drifts apart: the ${d ? d.name : '?'} of the ${P3.list[pZ].name} (${y} years)`); }
+  // saved and loaded: the map of peoples, their tongues and who rules whom
+  { const saved = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(saved); const Q = s2.people; let same = true; for (let i = 0; i < N; i++) if (Q.ppl[i] !== PP.ppl[i]) { same = false; break; }
+    check(same && Q.list.length === PP.list.length && Q.ruling[A.id] === PP.ruling[A.id] && Q.list[pA].name === PP.list[pA].name && JSON.stringify(Q.list[pB].t) === JSON.stringify(PP.list[pB].t), `saved and loaded: ${PP.list.length - 1} peoples and the map of them`);
+    delete saved.peoples; const s3 = createSim(wd, 1); s3.load(saved); const R3 = s3.people; let all = true; for (const k of s3.LI) { const o = s3.owner[k]; if (o >= 0 && s3.civs[o] && R3.ppl[k] !== R3.ruling[o]) { all = false; break; } }
+    check(all && R3.list.length > 1, 'a world saved before there were peoples: every realm\'s land its own people\'s'); }
+  invariants(sim, 'the world of peoples in ' + sim.fmtYear(sim.year));
+}
+// the peoples of a whole world: many, of fewer families, quick enough
+{
+  const sim = createSim(wd, 12345); const PP = sim.people; for (let y = 0; y < 3000; y++) sim.tick();
+  let ms = 0; for (let y = 0; y < 100; y++) { sim.tick(); ms += PP.stats.ms; }
+  const alive = PP.list.filter(p => p && p.n > 0), fams = new Set(alive.map(p => p.fam)); let bad = 0; for (const cv of sim.civs) if (cv && !(PP.foreignShare[cv.id] >= 0 && PP.foreignShare[cv.id] <= 1 && PP.restless[cv.id] <= 0.02 && PP.restless[cv.id] > -0.5)) bad++;
+  log(`   ${sim.fmtYear(sim.year)}: ${alive.length} peoples in ${fams.size} families, ${PP.stats.drifted} drifted apart, ${PP.stats.assimilated} regions taken in; a year of peoples takes ${(ms / 100).toFixed(3)} ms`);
+  check(alive.length > 80 && fams.size < alive.length, `a world of peoples (${alive.length}) in fewer families (${fams.size})`);
+  check(!bad, `every realm's share of other peoples and its unrest are within bounds (${bad} not)`);
+  check(ms / 100 < 1, `peoples are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);
