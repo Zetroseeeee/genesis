@@ -162,8 +162,8 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   never write `ls | head` under `pipefail`: with more files than `head` takes, `ls` fails on the closed pipe (the
   first whole build was thrown away by its own listing, after 33 minutes).
 - `REF=<branch> MODE=heights tools/planet/pack.sh [budget6=150 budget7=200]` — makes the heights on GitHub
-  (`tools/planet/heights.py`: the Terrain Tiles on AWS, out of reach from here; an hour and a half for the whole Earth,
-  four hundred thousand tiles) and brings back its log and `shots/peek/planet_heights.jpg` (the great summits at
+  (`tools/planet/heights.py`: the Terrain Tiles on AWS, out of reach from here; an hour and a quarter for the whole
+  Earth, four hundred thousand tiles; 531 MB in 41 bundles) and brings back its log and `shots/peek/planet_heights.jpg` (the great summits at
   level 7, shaded) and `planet_heights_world.jpg`. `only=7/47/10,7/33/7` or `bbox=` makes a trial of some level-7
   packs instead: a sheet of them shaded beside the old packs, what each would weigh in every encoding, and no pack.
   `node tools/planet/fetch.mjs` (in `npm run fetch`) brings the pack into `data/h/`: fetched, never committed, under

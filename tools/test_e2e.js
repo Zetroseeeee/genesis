@@ -642,7 +642,8 @@ server.listen(0, async () => {
     const r0 = await ev(() => { const T = __G.terrain, H = T.heights; return { have: !!H, top: H ? H.maxLevel : -1, levels: H ? Object.keys(H.levels).length : 0, steps: H ? Object.values(H.levels).map((l) => l.step).join(' ') : '' }; });
     check(r0.have && r0.top === 7 && r0.levels === 8, `the heights are here, levels 0 to ${r0.top} (steps ${r0.steps} m)`);
     await ev(() => { __G.mapcam.fly = null; __T.cam(86.925, 27.988, 0.004, 0.0, 0); });
-    await page.waitForFunction(() => { for (const p of __G.terrain.packs.values()) if (p.kind === 'e' && p.L === 7 && p.state === 'ready') return true; return false; }, null, { timeout: 120000 }).catch(() => {});
+    // (Everest's own pack, 7/47/11: a pack of level 7 elsewhere - the capital's - is often there first)
+    await page.waitForFunction(() => { for (const p of __G.terrain.packs.values()) if (p.kind === 'e' && p.L === 7 && p.px === 47 && p.py === 11 && p.state === 'ready') return true; return false; }, null, { timeout: 120000 }).catch(() => {});
     const r = await ev(() => {
       const T = __G.terrain, out = { at: [], old: 0, top: 0 };
       for (let l = 0; l <= 7; l++) out.at.push(Math.round(T.rawHeight(86.925, 27.988, l)));
