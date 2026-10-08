@@ -41,6 +41,10 @@ jobs:
         run: npm run pack:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: The old heights
+        # (the app does not carry them, and the tour holds the new heights against them: __T.oldHeights, hts_*_old, costh_*.
+        #  Without them the old packs were blank ground, and a comparison of the heights with nothing at all.)
+        run: cp -R data/e release/mac-arm64/Holocene.app/Contents/Resources/data/e
       - name: Sign (ad hoc)
         run: codesign --force --deep --sign - release/mac-arm64/Holocene.app
       - name: Take the pictures

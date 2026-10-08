@@ -638,6 +638,28 @@ server.listen(0, async () => {
   });
 
   // ---------- rendering sweep ----------
+  await scenario('heights: two bytes a texel, Everest at 8,800 m and more, every level agrees with the one above', async (check) => {
+    const r0 = await ev(() => { const T = __G.terrain, H = T.heights; return { have: !!H, top: H ? H.maxLevel : -1, levels: H ? Object.keys(H.levels).length : 0, steps: H ? Object.values(H.levels).map((l) => l.step).join(' ') : '' }; });
+    check(r0.have && r0.top === 7 && r0.levels === 8, `the heights are here, levels 0 to ${r0.top} (steps ${r0.steps} m)`);
+    await ev(() => { __G.mapcam.fly = null; __T.cam(86.925, 27.988, 0.004, 0.0, 0); });
+    // (Everest's own pack, 7/47/11: a pack of level 7 elsewhere - the capital's - is often there first)
+    await page.waitForFunction(() => { for (const p of __G.terrain.packs.values()) if (p.kind === 'e' && p.L === 7 && p.px === 47 && p.py === 11 && p.state === 'ready') return true; return false; }, null, { timeout: 120000 }).catch(() => {});
+    const r = await ev(() => {
+      const T = __G.terrain, out = { at: [], old: 0, top: 0 };
+      for (let l = 0; l <= 7; l++) out.at.push(Math.round(T.rawHeight(86.925, 27.988, l)));
+      for (let dy = -10; dy <= 10; dy++) for (let dx = -10; dx <= 10; dx++) out.top = Math.max(out.top, T.rawHeight(86.925 + dx * 0.0015, 27.988 + dy * 0.0015, 7));
+      for (const p of T.packs.values()) if (p.kind === 'e' && Array.isArray(p.info)) out.old++;
+      return out; });
+    check(r.top > 8500 && r.top < 9300, `the top of Everest at level 7: ${Math.round(r.top)} m (the Earth's 8,849 m, 2.8 % taller, over 306 m)`);
+    check(r.at[7] > 7000 && r.at[5] > 5000, `under its summit, level by level: ${r.at.join(', ')} m`);
+    check(r.old === 0, `no old pack drawn (${r.old})`);
+    // (no country coarser than it was: wherever the old packs had level 6 or 7, so do the heights; and every pack has its rim)
+    const c = await ev(() => { const T = __G.terrain, H = T.heights, E = T.index.elev, out = { miss: [], apron: H.apron };
+      for (const L of [6, 7]) for (const [x, y] of E['l' + L] || []) { const l = H.levels[L]; if (l.packs[y * l.nx + x] !== 'P') out.miss.push(`${L}/${x}/${y}`); }
+      return out; });
+    check(c.miss.length === 0, `the old packs' levels 6 and 7 all kept (${c.miss.join(' ') || 'none missing'})`); check(c.apron === 2, `a rim of ${c.apron} texels`);
+  });
+
   await scenario('render: orbit→street at the capital, instance caps respected, no GL errors', async (check) => {
     const caps = await ev(() => { const out = {}; for (const k in __G.world.inst) out[k] = __G.world.inst[k].instanceMatrix.count; return out; });
     for (const [dist, tilt] of [[2.5, 0], [0.3, 0.3], [0.03, 0.6], [0.003, 0.9], [0.0003, 1.1], [0.00005, 1.3]]) {

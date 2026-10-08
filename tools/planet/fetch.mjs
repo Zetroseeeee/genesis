@@ -14,6 +14,9 @@
 // into data/sky/, in the same way: sky-<hash>.tar under the name of its builder (the SHA-256 of tools/planet/sky.py), and
 // the pack made last where that one has not been made (with PLANET_STRICT=1: an error). SKYPART=1 takes the trial made
 // last (sky-part.tar). Without it the game has a sky with no stars in it, a plain Moon and no clouds.
+// And the heights (tools/planet/heights.py, mode "heights": the ground's heights from the Terrain Tiles, two bytes a texel,
+// 306 m to a texel where there is relief) into data/h/, likewise: heights-<hash>.tar under the name of its builder.
+// Without them the game draws the old heights (data/e, in the repository: one byte a texel, the high mountains smooth).
 //   node tools/planet/fetch.mjs          fetch what is not here
 //   node tools/planet/fetch.mjs check    is what is here whole? (the game's build asks)
 import fs from 'node:fs';
@@ -34,21 +37,26 @@ const packsOf = function* (ix) { for (const [lv, l] of Object.entries(ix.levels)
 const count = (ix) => Object.values(ix.levels).reduce((n, l) => n + (l.packs.match(/P/g) || []).length, 0);
 // is what is here whole? every pack the list names lies in its bundle, and is a picture
 function whole(dir, all) {
-  const ix = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')), n = ix.bundle; if (!n || !ix.levels) throw new Error('index.json is not the list of a pack in bundles');
+  const ix = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')); if (!ix.levels || !(ix.bundle || ix.levels[0] && ix.levels[0].bundle)) throw new Error('index.json is not the list of a pack in bundles');
+  const png = ix.ext === 'png';      // (the heights: PNGs, and a bundle's size by level)
   if (all) { if (ix.partial) throw new Error('a trial of some blocks, not the whole Earth'); for (let l = 0; l <= ix.maxLevel; l++) if (!ix.levels[l] || ix.levels[l].packs.length !== ix.levels[l].nx * ix.levels[l].ny || ix.levels[l].packs.includes('?')) throw new Error('level ' + l + ' is not whole'); }
   const heads = new Map(); let packs = 0, bytes = 0;
   try {
     for (const [lv, px, py] of packsOf(ix)) {
+      const n = ix.levels[lv].bundle || ix.bundle;
       const f = path.join(dir, `${lv}_b${Math.floor(px / n)}_${Math.floor(py / n)}.bin`); let h = heads.get(f);
       if (!h) { const fd = fs.openSync(f, 'r'), head = Buffer.alloc(8 + n * n * 8); h = { head, fd, size: fs.fstatSync(fd).size }; heads.set(f, h); fs.readSync(fd, head, 0, head.length, 0); if (head.toString('latin1', 0, 4) !== MAGIC || head.readUInt32LE(4) !== n * n) throw new Error(path.basename(f) + ' is not a bundle'); bytes += h.size; }
       const at = 8 + ((py % n) * n + px % n) * 8, off = h.head.readUInt32LE(at), len = h.head.readUInt32LE(at + 4), sig = Buffer.alloc(12);
       if (!len || off + len > h.size) throw new Error(`the pack ${lv}_${px}_${py} is not in its bundle`);
-      fs.readSync(h.fd, sig, 0, 12, off); if (sig.toString('latin1', 0, 4) !== 'RIFF' || sig.toString('latin1', 8, 12) !== 'WEBP') throw new Error(`the pack ${lv}_${px}_${py} is not a picture`);
+      fs.readSync(h.fd, sig, 0, 12, off); if (png ? sig.toString('latin1', 1, 4) !== 'PNG' : sig.toString('latin1', 0, 4) !== 'RIFF' || sig.toString('latin1', 8, 12) !== 'WEBP') throw new Error(`the pack ${lv}_${px}_${py} is not a picture`);
       packs++;
     }
   } finally { for (const h of heads.values()) fs.closeSync(h.fd); }
   return { ix, packs, bundles: heads.size, bytes };
 }
+// the heights (tools/planet/heights.py, the workflow's mode "heights"): bundles of PNGs like the picture's, in data/h
+const HTS = process.env.HEIGHTS_DIR ? path.resolve(process.env.HEIGHTS_DIR) : path.join(ROOT, 'data/h');
+const HH = crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, 'tools/planet/heights.py'))).digest('hex').slice(0, 12);
 // the sky's pack: is what is here whole? every file its list names lies here, and is what it is called
 const SKY = process.env.SKY_DIR ? path.resolve(process.env.SKY_DIR) : path.join(ROOT, 'data/sky');
 const HS = crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT, 'tools/planet/sky.py'))).digest('hex').slice(0, 12);
@@ -68,6 +76,8 @@ if (process.argv[2] === 'check') {
   let bad = 0;
   try { const { ix, packs, bundles, bytes } = whole(DIR, true); if (packs < 800) throw new Error('only ' + packs + ' packs'); console.log(`planet: the picture of the Earth, ${packs} packs in ${bundles} bundles (${(bytes / 1e6).toFixed(0)} MB), down to level ${ix.maxLevel}, made ${ix.made} (${ix.hash})`); }
   catch (e) { console.error('planet: ' + e.message); bad = 1; }
+  try { const { ix, packs, bundles, bytes } = whole(HTS, true); if (packs < 300) throw new Error('only ' + packs + ' packs'); console.log(`planet: the heights, ${packs} packs in ${bundles} bundles (${(bytes / 1e6).toFixed(0)} MB), down to level ${ix.maxLevel}, made ${ix.made} (${ix.hash})`); }
+  catch (e) { console.error('planet: the heights: ' + e.message); bad = 1; }
   try { const { ix, bytes } = skyWhole(SKY, true); console.log(`planet: the sky, ${ix.stars.n} stars, the Milky Way, the Moon and the clouds at ${ix.clouds.w} (${(bytes / 1e6).toFixed(0)} MB), made ${ix.made} (${ix.hash})`); }
   catch (e) { console.error('planet: the sky: ' + e.message); bad = 1; }
   process.exit(bad);
@@ -109,5 +119,6 @@ function bring(o) {      // o: what it is called, its folder, its builder's hash
 }
 let bad = 0;
 bad |= bring({ name: 'planet', what: 'the picture of the Earth', mode: 'imagery', dir: DIR, home: path.join(ROOT, 'data/i'), hash: H, part, look: (d) => whole(d), say: (ix) => `${count(ix)} packs down to level ${ix.maxLevel}`, without: 'the game will have no Earth to show' });
+bad |= bring({ name: 'heights', what: 'the heights', mode: 'heights', dir: HTS, home: path.join(ROOT, 'data/h'), hash: HH, part: process.env.HEIGHTSPART === '1', look: (d) => whole(d), say: (ix) => `${count(ix)} packs down to level ${ix.maxLevel}`, without: 'the game will draw the old heights' });
 bad |= bring({ name: 'sky', what: 'the sky', mode: 'sky', dir: SKY, home: path.join(ROOT, 'data/sky'), hash: HS, part: process.env.SKYPART === '1', look: (d) => skyWhole(d), say: count2, without: 'the game will have no stars, a plain Moon and no clouds' });
 process.exit(bad);
