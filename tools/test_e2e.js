@@ -202,6 +202,8 @@ server.listen(0, async () => {
     r = await ev(() => ({ on: document.getElementById('v-gov').classList.contains('on'), hidden: document.getElementById('govkey').hidden, lens: __G.globals.uLens.value, pal: __G.world.palMode })); check(!r.on && r.hidden && r.lens === 0 && r.pal === 'realm', 'O turns it off again');
   });
   await scenario('turn: Advance runs years, stops on target, shows report', async (check) => {
+    // (whatever already waits on the turn button - a flood, a revolt in this world - is seen to first, as a player would)
+    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'menu']) { const d = document.getElementById(id); if (d && d.open) d.close(); } const r = document.getElementById('report-close'); if (r && !document.getElementById('report').hidden) r.click(); __G.mapcam.fly = null; }); await frames(2);
     const y0 = (await state()).year;
     await ev(() => document.getElementById('turn').click()); await frames(2);
     let s = await state(); check(/state-running/.test(s.turn), 'button in running state: ' + s.turn);

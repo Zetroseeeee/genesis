@@ -197,7 +197,7 @@ function createSim(world, seed) {
     if (/plague|Fire falls|Famine|meteor|uprising|coup|revolt|shakes/.test(text)) return 'disaster';
     if (/enters the|golden age/i.test(text)) return 'era';
     if (/prophet|adopts|Faith|Way of|Cult|Creed|Church|ism\b/.test(text)) return 'faith';
-    if (/breaks away|independence|becomes .* of|is no more|settle|arrive|found/.test(text)) return 'state';
+    if (/breaks? away|independence|becomes .* of|is no more|settle|arrive|found/.test(text)) return 'state';
     return 'city';
   }
   function pushWorld(e) { worldEvents.push(e); if (worldEvents.length > 600) worldEvents.splice(0, worldEvents.length - 600); }
@@ -476,7 +476,7 @@ function createSim(world, seed) {
     nc.era = eraOf(nc.tech);
     nc.religion = c.religion;
     for (const i of cells) owner[i] = nc.id;
-    nc.capital = seedCell; cellsOf[nc.id] = cells.length;
+    nc.capital = seedCell; cellsOf[nc.id] = cells.length; cellsOf[c.id] = Math.max(0, cellsOf[c.id] - cells.length);      // (the parent's count is right again at once: the rest of the year reads it)
     const pn = own && own !== people.ruling[c.id] ? people.nameOf(own) : '';      // (a people of its own, not the rulers': it is they who rise)
     logEvent(c, pn ? `The ${pn} of ${cellName.get(seedCell) || 'the provinces'} break away from ${fullName(c)} and found ${fullName(nc)}${why ? ', ' + why : ''}` : `${fullName(nc)} breaks away from ${fullName(c)}${why ? ' ' + why : ''}`, cells.length > 25 || c.player);
     pushOwn(nc, { year, text: `${fullName(nc)} declares independence from ${fullName(c)}`, type: 'state', loc: nc.capital, civ: nc.id });

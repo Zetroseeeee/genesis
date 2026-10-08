@@ -756,8 +756,9 @@ log('13. peoples');
   // a tribe on empty land is a new people, named as it is; another settling near it is of its kin; one far off a new family
   const A = sim.spawnTribe(i0, {}); const pA = PP.ruling[A.id];
   check(pA > 0 && PP.ppl[i0] === pA && PP.list[pA].name === A.name && PP.list[pA].fam === pA, `a tribe on empty land is a new people: the ${PP.list[pA] && PP.list[pA].name}`);
-  const B = sim.spawnTribe(i0 + 6, {}); const pB = PP.ruling[B.id];
-  check(pB > 0 && pB !== pA && PP.list[pB].parent === pA && PP.list[pB].fam === pA, `a tribe settling near is of its kin: the ${PP.list[pB].name}, daughters of the ${PP.list[pA].name}`);
+  const B = sim.spawnTribe(i0 + 6, { style: A.style }); const pB = PP.ruling[B.id];      // (of the same kind of tongue as the place gave A)
+  check(pB > 0 && pB !== pA && PP.list[pB].parent === pA && PP.list[pB].fam === pA, `a tribe of its kind of tongue settling near is of its kin: the ${PP.list[pB].name}, daughters of the ${PP.list[pA].name}`);
+  { const j = i0 - 2 * W2; const D2 = sim.owner[j] < 0 && sim.land[j] ? sim.spawnTribe(j, { style: (A.style + 1) % 12 }) : null; if (D2) { const pD = PP.ruling[D2.id]; check(PP.list[pD].fam === pD && PP.list[pD].parent === 0, 'one of another kind of tongue, however near, is the first of a new family'); } }
   check(B.style === PP.list[pB].t.st, 'and its realm is named in its tongue');
   const far = sim.LI.find(i => ok(i) && sim.cellDist(i, i0) > 40 && sim.owner[i] < 0 && PP.ppl[i] === 0);
   const C = sim.spawnTribe(far, {}); const pC = PP.ruling[C.id];
