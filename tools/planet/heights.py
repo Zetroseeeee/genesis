@@ -374,5 +374,4 @@ if __name__ == '__main__':
         trial(packs)
     else:
         whole(KEEP)
-    say('done')
-    open(os.path.join(OUT, 'planet_heights.log'), 'w').write('\n'.join(LOG) + '\n')
+    say('done')      # (the workflow keeps what is printed: planet_heights.log)
