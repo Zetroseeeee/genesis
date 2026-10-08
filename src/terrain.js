@@ -1473,7 +1473,7 @@
         let tex = new THREE.Texture(bmp);
         tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false;
         if (p.kind === 'e' && this.heights) {
-          // The heights: how high the ground stands in steps of half a metre, the high byte in red and the low in green. They go to
+          // The heights: how high the ground stands in steps (a metre at level 7, doubling with every level below), the high byte in red and the low in green. They go to
           // the card as a texture of two channels, low then high (uElevK weighs them), and the very same bytes read two at a time
           // are what is asked here (a Uint16Array over them: low byte first). Read out of the picture a strip at a time, as the
           // water's packs are, with the frame let through between two.
@@ -1486,7 +1486,7 @@
             if (y0 + ROWS < p.h && !this.opts.slow) await new Promise((r) => setTimeout(r, 0));
           }
           if (bmp.close) bmp.close();
-          p.data = new Uint16Array(two.buffer); p.min = 0; p.scale = this.heights.step; p.k = HEIGHTS_K; p.top = (top + 1) * 256 * p.scale;
+          p.data = new Uint16Array(two.buffer); p.min = 0; p.scale = this.heights.levels[p.L].step || this.heights.step; p.k = HEIGHTS_K; p.top = (top + 1) * 256 * p.scale;
           tex = new THREE.DataTexture(two, p.w, p.h, THREE.RGFormat, THREE.UnsignedByteType); tex.internalFormat = 'RG8'; tex.unpackAlignment = 2;
           tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
         } else if (p.kind === 'e') {

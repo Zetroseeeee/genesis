@@ -43,6 +43,8 @@ jobs:
           case "$MODE" in probe|imagery|snow|clouds|sky|heights) ;; *) echo "bad mode"; exit 1;; esac
           case "$ARGS" in *[!A-Za-z0-9.,/=_:\ -]*) echo "bad args"; exit 1;; esac
           mkdir -p out work
+          # (the heights of the whole Earth want room: what the runner carries for other languages is not needed here)
+          if [ "$MODE" = heights ]; then sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true; fi
           df -h . | tail -1; nproc; free -g | sed -n 2p
           # shellcheck disable=SC2086
           python3 "tools/planet/$MODE.py" --out out --work work $ARGS 2>&1 | tee "out/planet_$MODE.log"
