@@ -567,7 +567,9 @@
       float snowHere = clamp(natv.a * 4.0 - 3.0 + 0.25 * (hE + hW + hS + hN) * 0.0005, 0.0, 1.25);
       float winterSnow = winter * mix(0.12, 1.0, smoothstep(0.05, 0.5, snowHere));
       float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winterSnow - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0));
-      float ice = max(info.g, white * max(smoothstep(snowLine0 - 900.0, snowLine0 + 200.0, vH), smoothstep(0.7, 0.8, latN0)));
+      // (The map of ice is of cells fourteen kilometres across: right for an ice sheet, which is flat, and a white blanket with a
+      //  rounded edge over the high Himalaya, ridge and rock face and all. On sloping ground the photograph says where the ice is.)
+      float ice = max(info.g * mix(1.0, white, smoothstep(0.06, 0.18, slope)), white * max(smoothstep(snowLine0 - 900.0, snowLine0 + 200.0, vH), smoothstep(0.7, 0.8, latN0)));
       // biome weights
       float aboveTree = smoothstep(treeLine - 300.0, treeLine + 200.0, vH);
       float steep = smoothstep(0.12, 0.42, slope);
