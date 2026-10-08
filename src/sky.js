@@ -177,12 +177,21 @@
     // the picture of the clouds where a line from the Earth's middle points (q: unit, the weather's turn taken out), with how
     // fast that changes across the pixel: told outright, because the picture's own edge (the date line) and the two halves of the
     // fine one would each be a line of wrong texels if the card were left to work it out
-    float cover(vec3 q, vec3 dx, vec3 dy, out vec2 uv) {
+    // (by a cubic B-spline between its texels, from four lookups: where they are many pixels across and the cloud is given an
+    //  edge, weighed straight the edge followed them - a lattice of rounded squares)
+    float cubic2(sampler2D t, vec2 uv) {
+      vec2 st = uv * 8192.0 - 0.5, i = floor(st), f = st - i, f2 = f * f, f3 = f2 * f, m = 1.0 - f;
+      vec2 w0 = m * m * m / 6.0, w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0, w3 = f3 / 6.0, w2 = 1.0 - w0 - w1 - w3;
+      vec2 g0 = w0 + w1, g1 = w2 + w3, h0 = (i - 0.5 + w1 / g0) / 8192.0, h1 = (i + 1.5 + w3 / g1) / 8192.0;
+      return g0.y * (g0.x * textureLod(t, vec2(h0.x, h0.y), 0.0).r + g1.x * textureLod(t, vec2(h1.x, h0.y), 0.0).r)
+           + g1.y * (g0.x * textureLod(t, vec2(h0.x, h1.y), 0.0).r + g1.x * textureLod(t, vec2(h1.x, h1.y), 0.0).r); }
+    float cover(vec3 q, vec3 dx, vec3 dy, out vec2 uv, bool curve) {
       float k = 1.0 / max(q.x * q.x + q.z * q.z, 1e-4), kl = 0.31830989 / sqrt(max(1.0 - q.y * q.y, 1e-4));
       uv = vec2(atan(-q.z, q.x) * 0.15915494 + 0.5, asin(clamp(q.y, -1.0, 1.0)) * 0.31830989 + 0.5);
       vec2 gx = vec2((q.z * dx.x - q.x * dx.z) * k * 0.15915494, dx.y * kl), gy = vec2((q.z * dy.x - q.x * dy.z) * k * 0.15915494, dy.y * kl);
       if (uFine > 0.5) {
         vec2 u2 = vec2(clamp(fract(uv.x * 2.0), 0.00007, 0.99993), uv.y); gx.x *= 2.0; gy.x *= 2.0;
+        if (curve) return uv.x < 0.5 ? cubic2(uCloud0, u2) : cubic2(uCloud1, u2);
         return uv.x < 0.5 ? textureGrad(uCloud0, u2, gx, gy).r : textureGrad(uCloud1, u2, gx, gy).r; }
       return textureGrad(uCloudS, uv, gx, gy).r; }
     // The grain looked up between its places by a curve and not a straight line (a cubic B-spline, from eight lookups the card
@@ -209,7 +218,10 @@
     void main() {
       vec3 n = normalize(vDirW), q = vec3(n.x * uShiftCS.x - n.z * uShiftCS.y, n.y, n.z * uShiftCS.x + n.x * uShiftCS.y);
       vec3 dx = dFdx(q), dy = dFdy(q); float foot = max(length(dx), length(dy));      // (how much of the shell a pixel takes, to the unit of the globe)
-      vec2 uv; float c = less(cover(q, dx, dy, uv));
+      // (where the picture's texels are several pixels across and there are no heaps, its cloud has an edge: as it is, between
+      //  its texels, it is a blur, the weather seen through frosted glass)
+      float edge = (1.0 - smoothstep(0.12, 0.45, foot * 2608.0)) * (1.0 - uBelow);
+      vec2 uv; float c = less(cover(q, dx, dy, uv, edge > 0.0));
       // (how the picture's cloud changes across the pixel, and the place with it: asked before any pixel is thrown away, while its neighbours still answer)
       vec3 Px = dFdx(vPosV), Py = dFdy(vPosV); float tx = dFdx(c), ty = dFdy(c);
       // Where the picture has a clear sky there is nothing to draw, and nothing more is asked: over a country that is being ruled
@@ -244,9 +256,6 @@
       // apart down to the horizon, and the low sky was empty.) As the shell lies to the eye: once from straight under it, three
       // times along it at some ten degrees up.
       float lean = foot / max(min(length(dx), length(dy)), 1e-9), fill = 1.0 + uBelow * 0.35 * clamp(lean - 1.0, 0.0, 12.0);
-      // (and where the picture's texels are several pixels across and there are no heaps, its cloud has an edge: as it is, between
-      //  its texels, it is a blur, the weather seen through frosted glass)
-      float edge = (1.0 - smoothstep(0.12, 0.45, foot * 2608.0)) * (1.0 - uBelow);
       float a = 1.0 - pow(1.0 - mix(pow(cl, 0.85), smoothstep(0.14, 0.56, cl), edge), fill), thick = cl, slope = 0.0, dK = (1.0 - smoothstep(uGrainK.x, uGrainK.y, foot)) * uGrainOn * uFar1;
       float f = 1.0 - pow(1.0 - min(c * uCover.x, uCover.y), fill);      // (how much of the sky the heaps take: what the picture has; from under them never all of it, but for the closing up toward the horizon)
       float fd = 0.5 - f, thr = 0.5 + 0.72 * fd + 2.8 * fd * fd * fd * fd * fd;      // (the sum's own measure, so that f of the sky is over it: tools/planet/grain.py)
