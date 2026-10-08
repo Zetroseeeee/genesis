@@ -1,7 +1,7 @@
 if (window.__G && __G.settings) __G.settings.qualityPinned = true; // software GL would otherwise drop to balanced and hide movers
 // helpers evaluated inside the page for screenshot tests
 window.__T = {
-  cam(lon, lat, dist, tilt, heading) { const M = __G.mapcam; M.fly = null; M.lon = M.tLon = lon; M.lat = M.tLat = lat; M.dist = M.tDist = dist; M.tilt = M.tTilt = tilt; M.heading = M.tHeading = heading; M.autoTilt = false; },
+  cam(lon, lat, dist, tilt, heading) { const M = __G.mapcam; M.fly = null; M.lon = M.tLon = lon; M.lat = M.tLat = lat; M.dist = M.tDist = dist; M.tilt = M.tTilt = tilt; M.lift = M.tLift = 0; M.heading = M.tHeading = heading; M.autoTilt = false; },
   // a realm's knowledge set by hand needs the discoveries that go with it: everything up to its age (or the one given)
   // (and, for any realm but the player's, the laws of that age: a realm of a late age under the laws of a band is far behind its time.
   //  laws = true gives them to the player's realm too, false to nobody)
