@@ -161,6 +161,14 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   with a warning). Look at `shots/peek/water_sheet.jpg` and the end of `shots/peek/water_build.log`. In a workflow
   never write `ls | head` under `pipefail`: with more files than `head` takes, `ls` fails on the closed pipe (the
   first whole build was thrown away by its own listing, after 33 minutes).
+- `REF=<branch> MODE=heights tools/planet/pack.sh [budget6=150 budget7=200]` — makes the heights on GitHub
+  (`tools/planet/heights.py`: the Terrain Tiles on AWS, out of reach from here; an hour and a half for the whole Earth,
+  four hundred thousand tiles) and brings back its log and `shots/peek/planet_heights.jpg` (the great summits at
+  level 7, shaded) and `planet_heights_world.jpg`. `only=7/47/10,7/33/7` or `bbox=` makes a trial of some level-7
+  packs instead: a sheet of them shaded beside the old packs, what each would weigh in every encoding, and no pack.
+  `node tools/planet/fetch.mjs` (in `npm run fetch`) brings the pack into `data/h/`: fetched, never committed, under
+  the name of its builder (twelve digits of the SHA-256 of `tools/planet/heights.py`): **after any change to the
+  builder - a comment too - the pack must be made before `main` is pushed** (the game's build stops without it).
 - `node tools/terrain/voids.mjs scan` — holes in the elevation packs (`data/e`): ground at zero where the simulation's
   grid has land well above the sea. It must report none. `fix` fills them (real heights from the Terrain Tiles on AWS;
   Antarctica from the half-degree grid, made to meet the ice beside it); that host is out of reach from here, so the
@@ -199,11 +207,22 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 
 Conventions that matter:
 - **Units.** The globe has radius 1 (Earth radius = 6,371,000 m = `R_M`). Town plans are in metres from the town centre.
-- **Heights.** An elevation pack is eight bits: metres = min + byte × scale (`elev.packs` in `data/index.json`, 7–27 m
-  to the step; under a low sun the steps show as contour lines on ice and plains). The packs stand 2.8 % taller than
-  the Earth (every lake in them does, at every level: it came with their first build), and the ground is drawn twice
-  as tall again (`exag: 2.0`). Ground put into a pack must be raised the same (`TALL` in `tools/terrain/voids.mjs`),
-  or it meets the old ground in a step.
+- **Heights** (`data/h`, `tools/planet/heights.py`; since 0.24). Two bytes a texel, high in red and low in green, in
+  steps of a metre at level 7 (306 m to a texel) doubling with every level below (`levels[L].step` in their list): the
+  slope a step can tell is the same at every level, and there are no contour lines under a low sun. They are the
+  Terrain Tiles' (SRTM and the rest, read at zoom 10 and averaged over each texel's piece of the Earth), and each level
+  is the mean of the one above, so the levels agree. Levels 0 to 5 everywhere there is land, 6 and 7 where they add
+  most to the level below within a budget (`budget6`, `budget7`); a pack's mark in the list says P, S (sea) or L (land
+  drawn from the level below: `terrain.eMark`). The card gets them as a texture of two channels, low then high
+  (`uElevK` weighs red and green: (255, 65280); the old packs (255, 0)), and the CPU the very same bytes as a
+  Uint16Array. **No mipmaps on an elevation texture**: a mipmap of the high byte rounded to whole steps is 256 low
+  steps off. They stand 2.8 % taller than the Earth, as the old packs did (every lake in the game does: it came with the
+  first build), and the ground is drawn twice as tall again (`exag: 2.0`): Everest stands at 18 km. Two places the tiles
+  do not give the ground one stands on, and the old packs are taken: Antarctica (at zoom 10 the tiles have the rock
+  under the ice; Greenland's ice they have), and north of 85 degrees. The old packs (`data/e`: eight bits, min + byte ×
+  scale, levels 6 and 7 only where `data/index.json` lists them) stay in the repository for the water's builder and
+  as what the game draws where `data/h` is not here; the app does not carry them. They had the high Himalaya, the
+  Karakoram, the Andes and the Alps above the snows smooth, as the radar left them: Everest stood at 5,880 m.
 - **A pack is a texture of its own** and is not smoothed across its edge: whatever is in two packs' facing texels
   shows as a line if it differs. The picture of the Earth (`data/i`) and the water's edge (`data/w`) therefore carry
   a rim of two texels of their neighbours all round (`apron` in their lists; `bindPack` and `bindWater` leave it out

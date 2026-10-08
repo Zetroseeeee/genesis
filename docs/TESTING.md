@@ -75,6 +75,12 @@ finest level of the picture (6), `stats.packsI` how many of its packs are here; 
 whether what lies in `data/i` is whole. A page just started takes minutes to fetch and read its packs on a software renderer:
 ask nothing of it until an `/eval` answers at once, or the answers queue up behind one another and the pictures are of half
 a planet.
+The heights: `__G.terrain.heights` (the list of `data/h`: by level its step in metres and a mark for every pack, P a pack,
+S sea, L land drawn from the level below; `eMark(L, px, py)`), `rawHeight(lon, lat, level)` (metres at a level, as far as its
+pack has come), `stats.elevLevels` (which level each drawn tile is drawn with). `__T.oldHeights(true)` lets every elevation
+pack go and draws the old ones (`data/e`), `false` the heights again; `__T.costsHeights()` writes the frame rates of the two
+turn and turn about (`costh_*` in the tour; `hts_*` and `hts_*_old` are the great summits with each). Without `data/h` the game
+draws the old packs and says so in the console.
 The sky: `window.SKY` (`ready`: which of its pieces have come; `index`: the pack's list; `cloudAt(lon, lat, shift)` the
 picture's cloud at a place, in radians; `less(c, near)`), `__G.world.cloudLayer` (`near`, `vis`, `shift`, `grainOff`: no
 heaps; `uniforms`), `__G.world.starField`. `window.__skyYear = 2000` puts the stars where the catalogues have them (the test

@@ -106,6 +106,18 @@ window.__T.costsWinter = function () {
   const list = window.__costOld ? [['as it is', () => {}], ['the old rules', use(flat)]] : [['as it is', () => {}], ['the old rules', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is again', use(arr)], ['the old rules again', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a third time', use(arr)], ['the old rules, a third', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a fourth', use(arr)]];
   __T.cost(list, 4, 5000);      // (window.__costOld: stop at the old rules, to see what they draw)
 };
+// The old heights (data/e: one byte a texel, the high mountains smooth) in place of the new (data/h), or back: every elevation
+// pack is let go and the ground asks again - to hold the two against each other in one page
+window.__T.oldHeights = function (on) {
+  const T = __G.terrain; if (T._heights === undefined) T._heights = T.heights; T.heights = on ? null : T._heights; T.elevMax = T.heights ? T.heights.maxLevel : 7;
+  for (const [k, p] of [...T.packs]) if (p.kind === 'e') { if (p.texture) p.texture.dispose(); T.packs.delete(k); }
+  for (const t of T.tiles.values()) t.ePack = null;
+  return T.heights ? 'the heights' : 'the old packs';
+};
+// What the heights cost against the old packs, turn and turn about (a new pack for every tile each time: settle long)
+window.__T.costsHeights = function () {
+  __T.cost([['the heights', () => { __T.oldHeights(false); }], ['the old packs', () => { __T.oldHeights(true); }], ['the heights again', () => { __T.oldHeights(false); }], ['the old packs again', () => { __T.oldHeights(true); }], ['the heights a third time', () => { __T.oldHeights(false); }]], 4, 12000);
+};
 // What the sky costs (sky.js), turn and turn about: as it is; without the clouds; the clouds without their heaps and grain (the
 // picture of the Earth's clouds alone, as from far out: two lookups a pixel and not twenty); without the stars
 window.__T.costsSky = function () {
