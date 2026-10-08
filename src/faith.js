@@ -165,11 +165,20 @@
       // (a family keeps a hue of its own, its churches beside it, each a step to one side and lighter or darker, so that they can be told
       // apart on the map; a teaching for all peoples out of a people's faith is a family of its own; faiths for all peoples bright, a
       // people's faith quieter)
-      const side = rnd() < 0.5 ? -1 : 1, hue = P ? (P.hue + side * (0.05 + rnd() * 0.06) + 1) % 1 : (id * GOLD + 0.41) % 1;
+      const side = rnd() < 0.5 ? -1 : 1, free = !P && o.world ? freeHue() : -1, hue = P ? (P.hue + side * (0.03 + rnd() * 0.05) + 1) % 1 : free >= 0 ? free : (id * GOLD + 0.41) % 1;
       const F = { id, name: o.name, base: o.base || '', world: !!o.world, parent: o.parent || 0, fam: P ? P.fam : id, born: year(), home: o.home, founder: o.founder ?? -1, people: o.people ?? (h.people ? h.people.ppl[o.home] : 0),
-        tenets: o.tenets || [], hue, sat: P ? Math.min(0.85, Math.max(0.4, P.sat + (rnd() - 0.5) * 0.24)) : (o.world ? 0.68 : 0.5) + rnd() * 0.12, lit: P ? Math.min(0.66, Math.max(0.38, P.lit + (rnd() < 0.5 ? -1 : 1) * (0.05 + rnd() * 0.07))) : 0.47 + rnd() * 0.1,
+        tenets: o.tenets || [], hue, sat: P ? Math.min(0.85, Math.max(0.4, P.sat + (rnd() - 0.5) * 0.24)) : (o.world ? 0.68 : 0.5) + rnd() * 0.12, lit: P ? Math.min(0.68, Math.max(0.36, P.lit + (P.lit > 0.52 ? -1 : P.lit < 0.44 ? 1 : rnd() < 0.5 ? -1 : 1) * (0.08 + rnd() * 0.07))) : 0.47 + rnd() * 0.1,
         n: 0, pop: 0, peak: 0, realms: 0, gone: 0 };
       factors(F); list.push(F); holyAt.set(o.home, id); holyCell[o.home] = 1; return id;
+    }
+    // the hue farthest from those of the great families kept now (every family for all peoples, and the large ones of
+    // their peoples): a new faith for all peoples spreads over much of the map, and in the hue of another great one it
+    // could not be told from it (or -1 where there are none yet)
+    function freeHue() {
+      const hs = []; for (const F of list) if (F && !F.gone && F.fam === F.id && (F.world || F.n >= 100)) hs.push(F.hue);
+      if (!hs.length) return -1; let best = -1, bd = -1; const ph = rnd();
+      for (let k = 0; k < 48; k++) { const h0 = (ph + k / 48) % 1; let d = 1; for (const x of hs) { const dd = Math.abs(h0 - x); const e = Math.min(dd, 1 - dd); if (e < d) d = e; } if (d > bd) { bd = d; best = h0; } }
+      return best;
     }
     function setState(c, f) { state[c] = f; const cv = civs[c]; if (cv) cv.religion = f ? list[f].name : null; if (prepped) prep(c); }
     // a faith is founded in a realm, at a holy city (its capital unless said): the faith of the realm from now on

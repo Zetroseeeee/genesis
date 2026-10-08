@@ -201,9 +201,9 @@ window.GOV = (function () {
     return `<div class="gv-head"><span class="ic">${svg(FLAME)}</span><div><h3>A new faith</h3><div class="micro">${prophet ? 'A prophet has arisen in ' + esc(prophet) : 'Founded by the priests of your realm'}</div></div></div>
       <p class="gv-text">${prophet ? 'He preaches, and the court listens.' : 'Your priests would set down what the realm believes.'} ${K.world ? 'It will be a faith for all peoples: its preachers will go over every border.' : `It will be a faith of your people: it goes slowly among others, until your realm knows ${esc(discovery('scripture').name.toLowerCase())}.`}</p>
       <div class="gv-sect"><div class="micro">Its name</div><div class="gv-fname"><input id="gv-fname" maxlength="40" value="${esc(founding.name)}" spellcheck="false"><button class="btn icon ghost" data-gact="f-name" title="Another name">↻</button></div></div>
-      <div class="gv-sect"><div class="micro">Two tenets · ${founding.tenets.length} of 2 chosen</div><div class="gv-tenets">${tenets}</div></div>
       <div class="gv-acts"><button class="btn primary" data-gact="f-found" ${ok ? '' : 'disabled'}>Found ${esc(founding.name || 'the faith')}</button></div>
-      <div class="gv-state">${K.found ? `${K.found} authority <span class="mk-dim">(you hold ${Math.floor(K.auth)})</span>` : 'The prophet asks nothing'} · its holy city will be ${esc(s.cellName.get(prophet ? F.pending[c.id] : c.capital) || 'your capital')}</div>`;
+      <div class="gv-state">${founding.tenets.length < 2 ? `Choose ${founding.tenets.length ? 'one more tenet' : 'two tenets'} below. ` : ''}${K.found ? `${K.found} authority <span class="mk-dim">(you hold ${Math.floor(K.auth)})</span>` : 'The prophet asks nothing'} · its holy city will be ${esc(s.cellName.get(prophet ? F.pending[c.id] : c.capital) || 'your capital')}</div>
+      <div class="gv-sect"><div class="micro">Two tenets · ${founding.tenets.length} of 2 chosen</div><div class="gv-tenets">${tenets}</div></div>`;
   }
   // a faith's page: what it is, where it came from, its tenets, where it is kept, and what the realm can do about it
   function faithPage(s, c, F, K, f, ofMine, world) {

@@ -1148,8 +1148,9 @@ function createSim(world, seed) {
     cellDist, claim, splitCiv,      // (a region changing hands, a province breaking away: for the tests)
     // where a realm's yearly income comes from (the same sum the tick makes), for the ledger
     incomeParts(cv) {
-      const c = cv.id, ro = c * NRF, base = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * tv(cv, 'income', 1) * KF[c * NKF + KK.income] * RF[ro + RK.tax], living = market.LS[c];
-      const parts = { taxes: base, ports: base * ports[c] * 0.05, markets: base * Math.min(0.3, markets[c] * 0.04), mines: base * Math.min(0.3, mines[c] * 0.05), living: base * 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1)), customs: market.rev[c] * RF[ro + RK.customs], upkeep: popOf[c] * 0.05 * (cv.policy.military - 1) * (cv.policy.military > 1 ? RF[ro + RK.upkeep] : 1), scholars: popOf[c] * SCHOLARS * (cv.policy.research - 1) };
+      // (how the people lived and what the customs took as the year's income was reckoned: the market moves on after it, and the ledger is the income's)
+      const c = cv.id, ro = c * NRF, base = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * tv(cv, 'income', 1) * KF[c * NKF + KK.income] * RF[ro + RK.tax], living = cv.trade ? cv.trade.living : market.LS[c], rev = cv.trade ? cv.trade.customs : market.rev[c];
+      const parts = { taxes: base, ports: base * ports[c] * 0.05, markets: base * Math.min(0.3, markets[c] * 0.04), mines: base * Math.min(0.3, mines[c] * 0.05), living: base * 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1)), customs: rev * RF[ro + RK.customs], upkeep: popOf[c] * 0.05 * (cv.policy.military - 1) * (cv.policy.military > 1 ? RF[ro + RK.upkeep] : 1), scholars: popOf[c] * SCHOLARS * (cv.policy.research - 1) };
       parts.state = (parts.taxes + parts.ports + parts.markets + parts.mines + parts.living) * RF[ro + RK.cost];      // (what the realm's laws spend: schools, doles, officials)
       parts.tribute = diplo.trIn[c] - diplo.trOut[c];      // (what vassals and the beaten pay it, less what it pays a lord or a victor)
       parts.net = parts.taxes + parts.ports + parts.markets + parts.mines + parts.living + parts.customs - parts.upkeep - parts.scholars - parts.state + parts.tribute; return parts;

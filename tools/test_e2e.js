@@ -367,7 +367,16 @@ server.listen(0, async () => {
     const after = await ev(() => { const S = __G.sim; const c = S.playerCiv(); return { mode: document.body.dataset.mode, year: S.year, name: c && c.name, cells: c && S.cellsOf[c.id], civs: S.st.civCount, lon: __G.mapcam.lon, lat: __G.mapcam.lat, ruin: S.ruins.get(S.LI[123])?.name, turn: document.getElementById('turn1').textContent, left: document.getElementById('left').classList.contains('open') }; });
     check(after.mode === 'play', 'play mode after load'); check(after.year === before.year, `year ${after.year} == ${before.year}`); check(after.name === before.name, 'player name'); check(Math.abs(after.cells - before.cells) <= 1, `cells ${after.cells} ~ ${before.cells}`); check(after.civs === before.civs, `civs ${after.civs} == ${before.civs}`);
     check(Math.abs(after.lon - before.lon) < 1e-6 && Math.abs(after.lat - before.lat) < 1e-6, 'camera restored'); check(after.ruin === 'Testruin', 'ruins restored');
-    // (the turn button is ready: for the next turn, or for envoys who were waiting when the world was saved and still are - they are answered first)
+    // (the turn button is ready: for the next turn, or for envoys who were waiting when the world was saved and still are - they are answered first;
+    // anything else that waited on it - scholars waiting for a word, a flood, a prophet - is seen to first, as a player would; the button itself
+    // is redrawn with the HUD, so what waits on it is read from the attention list)
+    if (after.turn !== 'Advance' && after.turn !== 'Envoys') {
+      const q = await ev(() => { const S = __G.sim, c = S.playerCiv(); const t = TREE.tile(); if (t && t.waiting) S.know.mind(c).auto = true;
+        for (let n = 0; n < 10; n++) { const a = __G.attention(); if (!a.length || a[0].kind === 'envoy') break; if (a[0].act) a[0].act(); else break; }
+        for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'menu']) { const d = document.getElementById(id); if (d && d.open) d.close(); }
+        const a = __G.attention(); return a.length ? a[0].t1 : 'Advance'; });
+      after.turn = q === 'Advance' || q === 'Envoys' ? q : after.turn + ' (still: ' + q + ')'; await frames(2);
+    }
     check(after.turn === 'Advance' || after.turn === 'Envoys', 'turn button ready: ' + after.turn);
     if (after.turn === 'Envoys') { const t = await ev(() => { const S = __G.sim, c = S.playerCiv(); for (const o of [...c.dip.offers]) S.diplo.answer(c, o.id, false); ENVOYS.refresh(); return c.dip.offers.length; }); await frames(4); check(t === 0 && (await state()).t1 === 'Advance', 'envoys answered, the turn button is ready'); }
     // and a turn still runs after loading
