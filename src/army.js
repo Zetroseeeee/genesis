@@ -35,6 +35,11 @@
     const news = [];      // what has happened to the player's hosts and ships since main.js last looked: { year, text, cell, kind }
     let seq = 0; const say = (c, text, cell, kind) => { if (c && c.player) { news.push({ year: year(), text, cell, kind, seq: ++seq }); if (news.length > 40) news.shift(); } };
     const year = () => h.year();
+    // the hosts' own dice: what they do in the world's own wars is for the eye, and must not move its history by a hair (the
+    // world's numbers are fitted to its seeds: drawing from the world's dice, the hosts' battles made one world a century slow
+    // and half as many in 2000 AD, as a world one throw apart may be)
+    let rs = ((h.seed || 1) ^ 0x5bd1e995) >>> 0;
+    const rnd = () => { rs += 0x6D2B79F5; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const eraOf = (c) => Math.min(8, Math.max(0, c.era | 0));
     const cellLL = (i) => { const y = (i / W) | 0, x = i - y * W; return [(x + 0.5) / W * 360 - 180, 90 - (y + 0.5) / H * 180]; };
 
@@ -236,7 +241,7 @@
       const c = civs[a.c], pa = power(a) * k, pd = garrison(n, false) + 1e-6, r = pa / (pa + pd);
       const p = Math.min(0.95, Math.max(0.05, 0.15 + 0.8 * Math.pow(r, 1.5)));
       a.men = Math.max(0, Math.round(a.men * (1 - (0.01 + 0.07 * (1 - r)))));
-      if (h.rnd() < p) { h.conquer(n, c, a.cell, false); stats.taken++; a.morale = Math.min(1.2, a.morale + 0.02); return true; }
+      if (rnd() < p) { h.conquer(n, c, a.cell, false); stats.taken++; a.morale = Math.min(1.2, a.morale + 0.02); return true; }
       a.morale = Math.max(0.2, a.morale - 0.05); return false;
     }
     function siegeStep(a) {
@@ -245,6 +250,7 @@
       const pa = power(a), pd = garrison(n, true) + 1e-6, r = pa / (pa + pd);
       const rate = Math.min(0.6, Math.max(0.01, 0.4 * Math.pow(r, 1.5) * h.KF(c.id, 'siege') / h.KF(o, 'defence') / Math.max(1, walls[n])));
       a.siege += rate; a.men = Math.max(0, Math.round(a.men * (1 - 0.02 - 0.03 * (1 - r))));      // (disease in the camp, and sallies)
+      h.battles.push({ i: n, from: a.cell, year: year(), a: c.id, b: o, siege: true, host: true, taken: false });      // (events.js draws the engines before the walls; the enemy's host on that front comes to relieve the town)
       if (a.siege >= 1) {
         const name = h.cellName.get(n) || 'the town', foe = civs[o];
         h.conquer(n, c, a.cell, true); stats.taken++;
@@ -281,10 +287,10 @@
       for (const ks of Object.keys(c.wars)) {
         const e = civs[+ks]; if (!e || !h.ports[e.id]) continue;
         let close = false; for (let k = 0; k < 4; k++) { const p = h.portCells[e.id * 4 + k]; if (p >= 0 && cellDist(p, f.cell) <= 4) close = true; }
-        if (!close || h.rnd() > 0.5) continue;
+        if (!close || rnd() > 0.5) continue;
         const pf = f.ships * naval(c) * Math.max(0.02, h.strengthOf[c.id]), pe = (4 + 3 * h.ports[e.id]) * naval(e) * Math.max(0.02, h.strengthOf[e.id]), r = pf / (pf + pe);
         stats.battles++;
-        const win = h.rnd() < Math.pow(r, 1.5) / (Math.pow(r, 1.5) + Math.pow(1 - r, 1.5));
+        const win = rnd() < Math.pow(r, 1.5) / (Math.pow(r, 1.5) + Math.pow(1 - r, 1.5));
         f.ships = Math.max(0, Math.round(f.ships * (win ? 1 - 0.1 * (1 - r) : 0.55 + 0.2 * r)));
         h.battles.push({ i: f.cell, from: f.from, year: year(), a: c.id, b: e.id, sea: true, taken: false });
         { const text = win ? `${f.name} beats the ships of ${h.fullName(e)} at sea` : `${f.name} is beaten at sea by the ships of ${h.fullName(e)}`; h.logEvent(c, text, true, 'war', f.cell); say(c, text, f.cell, win ? 'won' : 'lost'); }
@@ -307,11 +313,11 @@
     // ---------- battle ----------
     function battle(a, b) {
       const pa = power(a) * terrain(a, b), pb = power(b) * terrain(b, a), r = pa / (pa + pb);
-      const ka = Math.pow(r, 1.5), kb = Math.pow(1 - r, 1.5), aWins = h.rnd() < ka / (ka + kb);
+      const ka = Math.pow(r, 1.5), kb = Math.pow(1 - r, 1.5), aWins = rnd() < ka / (ka + kb);
       const W1 = aWins ? a : b, L1 = aWins ? b : a, rw = aWins ? r : 1 - r;
       const mw = W1.men, ml = L1.men;
-      W1.men = Math.round(W1.men * (1 - (0.06 + 0.16 * (1 - rw)) * (0.7 + 0.6 * h.rnd())));
-      L1.men = Math.round(L1.men * (1 - (0.22 + 0.25 * rw) * (0.7 + 0.6 * h.rnd())));
+      W1.men = Math.round(W1.men * (1 - (0.06 + 0.16 * (1 - rw)) * (0.7 + 0.6 * rnd())));
+      L1.men = Math.round(L1.men * (1 - (0.22 + 0.25 * rw) * (0.7 + 0.6 * rnd())));
       const lostW = mw - W1.men, lostL = ml - L1.men;
       W1.morale = Math.min(1.2, W1.morale + 0.1); L1.morale = Math.max(0.2, L1.morale - 0.3); W1.won++; L1.lost++;
       stats.battles++;
@@ -387,11 +393,11 @@
       return { n: nextId,
         a: list.map((a) => [a.id, a.c, a.men, a.raised, a.cell, a.goal, ST.indexOf(a.state), a.foe, Math.round(a.siege * 100), a.siegeAt, Math.round(a.morale * 100), a.era, a.ai ? 1 : 0, a.since, a.name, a.won, a.lost]),
         f: fleets.map((f) => [f.id, f.c, f.ships, f.built, f.port, f.cell, f.era, f.since, f.name]),
-        r: [...rest.entries()] };
+        r: [...rest.entries()], rs };
     }
     function load(s) {
       list.length = 0; fleets.length = 0; rest.clear(); if (!s) return;
-      nextId = s.n || 1;
+      nextId = s.n || 1; if (s.rs !== undefined) rs = s.rs >>> 0;
       for (const q of s.a || []) { const [id, c, men, raised, cell, goal, st, foe, sg, sAt, mo, era, ai, since, name, won, lost] = q; if (!civs[c]) continue; const a = { id, c, men, raised, cell, from: cell, goal, path: [], state: ST[st] || 'camp', foe, siege: sg / 100, siegeAt: sAt, morale: mo / 100, era, since, moved: since, ai: !!ai, fleet: -1, name, won: won || 0, lost: lost || 0 }; if (a.state === 'sea' || a.state === 'embark') a.state = 'camp'; list.push(a); if (!a.ai && a.goal >= 0) { const r = roadBy(civs[c], cell, goal, false); a.path = r || []; if (a.state === 'march' && !r) a.state = 'camp'; } }
       for (const q of s.f || []) { const [id, c, ships, built, port, cell, era, since, name] = q; if (!civs[c]) continue; fleets.push({ id, c, ships, built, port, cell, from: cell, path: [], state: 'port', carry: -1, era, since, name }); }
       for (const [k, v] of s.r || []) rest.set(+k, v);

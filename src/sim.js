@@ -341,7 +341,7 @@ function createSim(world, seed) {
     faithLaw: (cv) => rule.ruleOf(cv).laws.faith, tradeLaw: (cv) => rule.ruleOf(cv).laws.trade, covets: (a, b) => { const g = covetOf(a, b); return g ? GOODS[g].name : ''; }, absorb, formFor,
     setForm: (cv, key) => { const F = RULE.FORM[key]; if (!F) return; if (!rule.known(cv.id, F)) rule.ruleOf(cv).brought = key; rule.setForm(cv.id, cv, F, 'imposed'); },
     alarm: () => {}, trait: (cv) => cv.ruler ? cv.ruler.trait : '', aggression: (cv) => cv.player ? (cv.policy.stance === 'aggressive' ? 0.9 : cv.policy.stance === 'consolidate' ? 0.25 : 0.5) : cv.aggression,      /* (the player's appetite is what his stance says, not a number he cannot see) */ ruler: (cv) => cv.ruler ? `${cv.ruler.title} ${cv.ruler.name}` : fullName(cv), nameOf: (cv) => fullName(cv), income: (cv) => cv.income || 0, fmtYear });
-  army = ARMY.create({ W, H, N, land, owner, level, walls, pop, flags, special, civs, nbOf, cellDist, elev, year: () => year, rnd, isAtWar: (c, o) => c.wars[o] !== undefined, diplo,
+  army = ARMY.create({ W, H, N, land, owner, level, walls, pop, flags, special, civs, nbOf, cellDist, elev, year: () => year, seed, isAtWar: (c, o) => c.wars[o] !== undefined, diplo,
     strengthOf, mightOf, popOf, cellsOf, ports, portCells, battles, cellName, fullName, logEvent, conquer, neighbours: (c) => lastNb[c] || nearNb[c],
     KF: (c, key) => KF[c * NKF + KK[key]], knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1 });
   function pickTrait(c) {

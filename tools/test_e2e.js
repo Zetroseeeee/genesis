@@ -585,6 +585,53 @@ server.listen(0, async () => {
     await page.keyboard.press('o'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, key: document.getElementById('govkey').hidden, lens: __G.globals.uLens.value })); check(r.mode === 'realm' && r.key && r.lens === 0, 'and off again');
     await ev(() => { __G.select(__G.sim.playerCiv().capital); });
   });
+  await scenario('armies: a levy takes the field, its banner and card, a march on an enemy town, a siege and its fall, the key, halt and home', async (check) => {
+    // a neighbour with one walled town, set down beside the player's land, and war with it (this scenario can run by itself)
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (TREE.isOpen()) TREE.close(); if (GOV.isOpen()) GOV.close(); if (ENVOYS.isOpen()) ENVOYS.close(); });
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), D = S.diplo, W = S.W; const mine = (i) => S.owner[i] === c.id;
+      let foe = null; for (const i of S.LI) { if (foe) break; if (!S.land[i] || (S.flags[i] & 8) || S.owner[i] >= 0 || S.fert[i] <= 0.05 || ![i - 1, i + 1, i - W, i + W].some(mine)) continue; foe = S.spawnTribe(i, {}); }
+      for (const i of S.LI) { if (foe) break; const o = S.owner[i]; if (o < 0 || o === c.id || !S.land[i] || (S.flags[i] & 8) || S.civs[o].capital === i || ![i - 1, i + 1, i - W, i + W].some(mine)) continue; S.owner[i] = -1; foe = S.spawnTribe(i, {}); if (!foe) S.owner[i] = o; }
+      if (!foe) return { foe: false };
+      const cap = foe.capital; S.level[cap] = Math.max(S.level[cap], 1); S.walls[cap] = 1; S.pop[cap] = 1.5; foe.aggression = 0; foe.dip.think = 1e12; foe.truce = {};
+      for (const k of Object.keys(c.wars)) { const e = S.civs[+k]; if (e) D.conclude(c, e, 'white'); } c.truce = {};
+      S.know.learn(c.id, c, KNOW.ID.chiefs, true); S.pop[c.capital] = Math.max(S.pop[c.capital], 20); c.wealth = Math.max(c.wealth, 5000); S.recount(); S.touchAll();
+      D.declare(c, foe, 'none'); window.__war = foe.id; window.__warCap = cap;
+      const msg = S.act('levy', c.capital); const hs = S.army.of(c.id);
+      return { foe: true, war: S.isAtWar(c, foe.id), msg, hosts: hs.length, men: hs[0] ? hs[0].men : 0, again: S.cannot('levy', c.capital) }; });
+    check(r.foe && r.war, 'a neighbour to make war on'); check(/takes the field/.test(r.msg) && r.hosts === 1 && r.men >= 40, `the levy takes the field: ${r.msg}`); check(/already in the field/.test(r.again), 'one levy at a time: ' + r.again);
+    // its banner, over the capital: the player's own, in gold; a click on it opens the host's card
+    await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.6, 0); }); await wait(300); await frames(4);
+    r = await ev(() => ({ mine: document.querySelectorAll('#hosts .hostb.mine').length, text: (document.querySelector('#hosts .hostb.mine') || { textContent: '' }).textContent }));
+    check(r.mine === 1 && /\d/.test(r.text), `a banner for the player's host (${r.text})`);
+    await ev(() => document.querySelector('#hosts .hostb.mine').click()); await frames(2);
+    r = await ev(() => { const a = __G.sim.army.byId(__G.hostSel); return { open: !document.getElementById('hostcard').hidden, title: document.getElementById('hc-title').textContent, name: a ? a.name : '', tiles: [...document.querySelectorAll('#hc-tiles .tile .micro')].map(x => x.textContent).join('|'), acts: !document.getElementById('hc-acts').hidden, sub: document.getElementById('hc-sub').textContent }; });
+    check(r.open && r.title === r.name && r.acts && /yours/.test(r.sub), `the banner opens its card: ${r.title} · ${r.sub}`); check(r.tiles === 'Men|Spirit|Arms|Years left', 'with its men, spirit, arms and years: ' + r.tiles);
+    // March: the button asks where; a click on the enemy's town sends the host there, and its road is drawn
+    await ev(() => document.getElementById('hc-march').click()); await frames(1);
+    r = await ev(() => ({ banner: document.getElementById('banner').hidden ? '' : document.getElementById('bannertext').textContent, on: document.getElementById('hc-march').classList.contains('on') }));
+    check(r.on && /Click where your host should march/.test(r.banner), 'March asks where to: ' + r.banner);
+    await ev(() => { const [lon, lat] = __G.sim.army.cellLL(window.__warCap); __T.cam(lon, lat, 0.01, 0, 0); }); await wait(300); await frames(3);
+    { const vp = page.viewportSize(); await page.mouse.click(vp.width / 2, vp.height / 2); } await frames(3);
+    r = await ev(() => { const S = __G.sim, a = S.army.byId(__G.hostSel); return { goal: a.goal, cap: window.__warCap, state: a.state, path: a.path.length, road: __G.troops.road.geometry.drawRange.count, toast: (window.__toasts || []).slice(-1)[0] || '', banner: document.getElementById('banner').hidden, card: document.getElementById('hc-state').textContent }; });
+    check(r.goal === r.cap && r.state === 'march' && r.path > 0, `the host marches on the enemy's town (${r.state}, ${r.path} regions; ${r.toast})`); check(r.road > 0 && r.banner, `its road is drawn (${r.road} marks) and the question is gone`); check(/Marching on/.test(r.card) && /to go/.test(r.card), 'the card says so: ' + r.card);
+    // the years: it comes to the walls, lays siege, and the town falls to it
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), id = __G.hostSel, cap = window.__warCap; let siege = 0, years = 0; const kinds = new Set();
+      for (; years < 40 && S.owner[cap] !== c.id; years++) { __G.run(1); const a = S.army.byId(id); if (!a) break; if (a.state === 'siege') siege++; }
+      for (const n of S.army.news) kinds.add(n.kind); const a = S.army.byId(id); const att = __G.attention().find((x) => x.t1 === 'Host');
+      return { years, siege, taken: S.owner[cap] === c.id, kinds: [...kinds].join(','), alive: !!a, at: a ? a.cell : -1, cap, log: c.events.slice(-12).map(e => e.text || e).join(' / '), att: att ? att.t2 : '' }; });
+    check(r.siege > 0 && r.taken, `the host lays siege to the walled town and takes it (${r.siege} years of siege, ${r.years} years in all)`); check(/siege/.test(r.kinds) && /taken/.test(r.kinds), 'what befell the host is news: ' + r.kinds);
+    check(r.alive && r.at === r.cap && /after a siege/.test(r.log), 'it stands in the town it took, and the chronicle says so'); check(/after a siege/.test(r.att), 'the turn button lays it before the player: ' + r.att);
+    // Y finds the host; Halt stops a march; Home ends the levy
+    await ev(() => { document.getElementById('hc-x').click(); }); await frames(1); check(await ev(() => __G.hostSel < 0 && document.getElementById('hostcard').hidden), 'the card closes');
+    await page.keyboard.press('y'); await frames(2);
+    r = await ev(() => ({ sel: __G.hostSel, mine: (__G.sim.army.of(__G.sim.player)[0] || {}).id, fly: !!__G.mapcam.fly, open: !document.getElementById('hostcard').hidden })); check(r.sel === r.mine && r.open && r.fly, 'Y selects the host and flies to it');
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.army.byId(__G.hostSel); const why = S.army.order(a.id, c.capital); document.getElementById('hc-halt').click(); return { why, state: a.state, path: a.path.length, goal: a.goal }; });
+    check(r.why === null && r.state === 'camp' && r.path === 0 && r.goal === -1, 'Halt: the host makes camp where it stands');
+    await ev(() => document.getElementById('hc-home').click()); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { hosts: S.army.of(c.id).length, card: document.getElementById('hostcard').hidden, again: S.cannot('levy', c.capital), fleet: S.cannot('fleet', c.capital), toast: (window.__toasts || []).slice(-1)[0] || '' }; });
+    check(r.hosts === 0 && r.card && r.again === null, `Home: the levy is over and may be raised again (${r.toast})`); check(/Needs|harbour/.test(r.fleet), 'a fleet needs shipwrights and a harbour: ' + r.fleet);
+    await ev(() => { __G.select(__G.sim.playerCiv().capital); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);

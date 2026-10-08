@@ -158,12 +158,14 @@
         const nA = Math.min(500, 140 + Math.round(sim.mightOf[b.a] * 0.6)), nB = Math.min(500, 140 + Math.round(sim.mightOf[b.b] * 0.6));
         const colA = A.rgb, colB = B.rgb;
         const mkLine = (civCol, n, off, dir) => { const pts = []; const vc = this._vc; for (let k = 0; k < n; k++) { const across = (hash(b.i, k + off) - 0.5) * width; const rank = hash(b.i, k + off + 1000) * 60; const x0 = fx + (px * across + ux * (dir * (90 + rank))) * mLon, y0 = fy + (py * across + uy * (dir * (90 + rank))) * mLat; pts.push(x0, y0, T.meshHeightAt(x0, y0, vc)); } this.columns.push({ pts, col: civCol, n, phase: hash(b.i, off), dir: -dir, ux, uy, mLon, mLat, speed: era >= 6 ? 0.6 : 0.9 }); };
-        mkLine(colA, nA, 11, 1); mkLine(colB, nB, 77, -1);
+        // (where hosts of army.js fought or lie before the walls, they are drawn themselves, with their camps: troops.js)
+        const own = b.field || b.host;
+        if (!own) { mkLine(colA, nA, 11, 1); mkLine(colB, nB, 77, -1); }
         // dust between the lines; musket/cannon smoke from the Renaissance; campfires behind the attacker
-        this.emit(era >= 5 ? 14 : 24, fx, fy, 2, 4, width * 0.5, 18, 26, b.i * 3 + 1);
-        if (era >= 5) this.emit(50, fx, fy, 2, 7, width * 0.5, 14, 24, b.i * 3 + 2);
+        if (!b.host) this.emit(era >= 5 ? 14 : 24, fx, fy, 2, 4, width * 0.5, 18, 26, b.i * 3 + 1);
+        if (era >= 5 && !b.host) this.emit(50, fx, fy, 2, 7, width * 0.5, 14, 24, b.i * 3 + 2);
         const campD = fieldD + 700 + R * 0.4; const cx = tLon + ux * campD * mLon, cy = tLat + uy * campD * mLat;
-        const nT = Math.min(90, 14 + Math.round(nA / 6));
+        const nT = own ? 0 : Math.min(90, 14 + Math.round(nA / 6));
         for (let k = 0; k < nT; k++) { const a = hash(b.i, k + 300) * Math.PI * 2, rr = Math.sqrt(hash(b.i, k + 400)) * (120 + nT * 6); const lo = cx + Math.cos(a) * rr * mLon, la = cy + Math.sin(a) * rr * mLat; if (T.heightAt(lo, la) < 0.5) continue; this.place(k === 0 ? 'bigtent' : 'tent', lo, la, k === 0 ? 14 : 6.5 + hash(b.i, k + 500) * 2.5, k === 0 ? 8 : 4.2, k === 0 ? 12 : 6.5, hash(b.i, k + 600) * 3, k === 0 ? (((colA[0] * 255) << 16) | ((colA[1] * 255) << 8) | (colA[2] * 255)) : [0xd9cfb4, 0xc9b99a, 0xb9a88a][k % 3], era); if (k % 5 === 0) this.emit(8, lo + 6 * mLon, la, 1, 0, 3, 40, 6, b.i * 5 + k); }
         // siege: engines before the walls, breach dust on the rampart
         if (b.siege && sim.walls[b.i]) { const nE = 3 + Math.min(6, sim.walls[b.i] * 2); for (let k = 0; k < nE; k++) { const across = (k - (nE - 1) / 2) * 40; const lo = tLon + (ux * (R * 1.15 + 90) + px * across) * mLon, la = tLat + (uy * (R * 1.15 + 90) + py * across) * mLat; if (T.heightAt(lo, la) < 0.5) continue; this.place(era >= 5 ? 'cannon' : 'catapult', lo, la, era >= 5 ? 3.2 : 5, era >= 5 ? 1.6 : 4, era >= 5 ? 2.4 : 3, Math.atan2(-uy, -ux * 1) , era >= 5 ? 0x3a3a3a : 0x6a553a, era); } this.emit(30, tLon + ux * R * 1.06 * mLon, tLat + uy * R * 1.06 * mLat, 4, 4, 90, 40, 60, b.i * 11); if (era >= 5) this.emit(16, tLon + ux * (R * 1.15 + 80) * mLon, tLat + uy * (R * 1.15 + 80) * mLat, 2, 7, 120, 20, 30, b.i * 13); }

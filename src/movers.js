@@ -362,5 +362,5 @@
       this.stats = { agents: this.agents.length, walkers: n, ships: this.ships.length, planes: this.planes.length };
     }
   }
-  window.MOVERS = { Movers };
+  window.MOVERS = { Movers, SHADOW_VERT: PS_VERT, SHADOW_FRAG: PS_FRAG };      // (troops.js gives its soldiers the same streak)
 })();

@@ -1036,7 +1036,7 @@
       else if (e.key === '`') { const d = $('debug'); d.style.display = d.style.display === 'block' ? 'none' : 'block'; }
       else if (e.key === 'p' || e.key === 'P') $('v-pol').click(); else if (e.key === 'l' || e.key === 'L') $('v-labels').click(); else if (e.key === 't' || e.key === 'T') $('v-trade').click(); else if (e.key === 'o' || e.key === 'O') $('v-gov').click(); else if (e.key === 'x' || e.key === 'X') $('v-rel').click();
       else if (e.key === 'n' || e.key === 'N') mapcam.tHeading = 0; else if (e.key === 'u' || e.key === 'U') { mapcam.tTilt = 0; mapcam.tLift = 0; mapcam.autoTilt = false; }
-      else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'a' || e.key === 'A') { if (mode === 'play') findHost(); } else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
+      else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'y' || e.key === 'Y') { if (mode === 'play') findHost(); } else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
     });
     $('btn-chronicle').addEventListener('click', writeChronicle); $('btn-chronicle-stop').addEventListener('click', () => { if (chronCtl) chronCtl.abort(); });
     let compassIdle = 0; const wake = () => { $('compass').classList.remove('idle'); clearTimeout(compassIdle); compassIdle = setTimeout(() => $('compass').classList.add('idle'), 3000); }; renderer.domElement.addEventListener('pointermove', wake); renderer.domElement.addEventListener('wheel', wake, { passive: true }); wake();
