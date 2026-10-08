@@ -30,7 +30,10 @@ jobs:
         with:
           node-version: 20
       - name: What it needs
-        run: python3 -m pip install --quiet --disable-pip-version-check --break-system-packages numpy scipy pillow rasterio || python3 -m pip install --quiet --disable-pip-version-check numpy scipy pillow rasterio
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check --break-system-packages numpy scipy pillow rasterio || python3 -m pip install --quiet --disable-pip-version-check numpy scipy pillow rasterio
+          # (readers of NASA's maps of the stars, which are OpenEXR: either will do, and a run that needs neither goes on without)
+          for p in OpenEXR opencv-python-headless; do python3 -m pip install --quiet --disable-pip-version-check --break-system-packages "$p" || python3 -m pip install --quiet --disable-pip-version-check "$p" || echo "no $p"; done
       - name: Make
         env:
           MODE: ${{ github.event.inputs.mode }}
