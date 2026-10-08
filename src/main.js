@@ -16,7 +16,7 @@
   const SPEEDS = [1, 3, 10, 30, 100, 300, 1000];
 
   // ---------- state ----------
-  let sim = null, terrain = null, world = null, mapcam = null, decal = null, trees = null, life = null, movers = null, fx = null;
+  let sim = null, terrain = null, world = null, mapcam = null, decal = null, trees = null, life = null, movers = null, fx = null, troops = null;
   let mode = 'intro', tool = null, speedIdx = 3, paused = true, selected = -1, selectedCiv = -1, hoverCell = -1, pendingFound = null;
   // turn system: the world stands still between presses of the big button
   const turnRun = { active: false, start: 0, target: 0, evIdx: 0, capital: -1, wars: '', era: 0, towns: 0, townSet: null, reason: '' };
@@ -169,11 +169,11 @@
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
       trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL) trees.slice = 1e9; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png', 'data/snow.png').catch((e) => console.warn('veg', e));
-      life = new LIFE.Life({ scene, terrain }); if (softGL) life.budget = 0.5; movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
+      life = new LIFE.Life({ scene, terrain }); if (softGL) life.budget = 0.5; movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world }); troops = new TROOPS.Troops({ scene, terrain, world }); troops.onPick = (id) => selectHost(id);
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
       mapcam.onClick = onClick; mapcam.locked = true; mapcam.autoTilt = settings.autoTilt;
-      window.__G = { settings, loadSettings, get sim() { return sim; }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, startTurn, endTurn, turnRun, attention: () => computeAttention(), terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
+      window.__G = { settings, loadSettings, get sim() { return sim; }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, get troops() { return troops; }, selectHost: (id) => selectHost(id), get hostSel() { return hostSel; }, startTurn, endTurn, turnRun, attention: () => computeAttention(), terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
       buildEconomy(); buildDock(); buildMinimapBase(); bindUI();
       newWorld((Math.random() * 2 ** 31) | 0);
       previewSave(); homeAim(false);                // a saved world is shown on the home screen as it was left
@@ -271,6 +271,7 @@
     const i = cellOf(hit.lon, hit.lat);
     if (mode === 'choose') { if (!sim.land[i] || (sim.flags[i] & 8)) { toast('Your people need land to stand on'); return; } if (sim.owner[i] >= 0) { toast('Someone already lives here'); return; } showFoundCard(hit, i, cx, cy); return; }
     if (placing) { cancelPlacing(); return; }
+    if (marching >= 0) { orderMarch(i); return; }
     if (tool) {
       let msg;
       if (tool === 'settle') {
@@ -290,8 +291,40 @@
     if (sim.owner[i] < 0 && !sim.land[i]) { deselect(); return; }
     select(i);
   }
-  function select(i) { selected = i; selectedCiv = sim.owner[i]; const y = (i / W) | 0, x = i - y * W; globals.uSel.value.set(x, y); $('left').classList.add('open'); updateInspector(true); }
+  function select(i) { if (hostSel >= 0) closeHost(); selected = i; selectedCiv = sim.owner[i]; const y = (i / W) | 0, x = i - y * W; globals.uSel.value.set(x, y); $('left').classList.add('open'); updateInspector(true); }
   function deselect() { selected = -1; selectedCiv = -1; globals.uSel.value.set(-9, -9); $('left').classList.remove('open'); cancelPlacing(); }
+  // ---------- hosts in the field (army.js; troops.js draws them): a card for the one selected, the player's orders ----------
+  let hostSel = -1, marching = -1, hostCardKey = '';
+  function selectHost(id) {
+    if (!sim || !sim.army.byId(id)) return; if (selected >= 0) deselect(); hostSel = id; troops.selected = id; marching = -1; $('hostcard').hidden = false; hostCardKey = ''; updateHostCard();
+  }
+  function closeHost() { hostSel = -1; if (troops) troops.selected = -1; $('hostcard').hidden = true; if (marching >= 0) { marching = -1; banner(null); } }
+  // the player's host: selected and flown to, or how to raise one
+  function findHost() {
+    const c = sim.playerCiv(); if (!c) return; const a = sim.army.of(c.id)[0];
+    if (!a) { toast(sim.cannot('levy', c.capital) || 'No host in the field. Raise the levy in a town of yours (B).'); return; }
+    selectHost(a.id); const [lon, lat] = sim.army.cellLL(a.cell); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.004), 0.03), { duration: 1.4 });
+  }
+  function orderMarch(i) {
+    const a = sim.army.byId(marching); marching = -1; banner(null); if (!a) return;
+    const why = sim.army.order(a.id, i); const name = sim.cellName.get(i) || (sim.owner[i] >= 0 && sim.civs[sim.owner[i]] ? 'the land of ' + sim.civs[sim.owner[i]].name : 'there');
+    toast(why || `${a.name} marches on ${name}`); hostCardKey = ''; updateHostCard();
+  }
+  const HOST_ST = { march: 'On the march', siege: 'Laying siege', camp: 'Encamped', sea: 'At sea', embark: 'Waiting for its ships' };
+  function updateHostCard() {
+    if (hostSel < 0 || !sim) return; const A = sim.army, a = A.byId(hostSel); if (!a) { closeHost(); return; }
+    const c = sim.civs[a.c]; if (!c) { closeHost(); return; } const mine = a.c === sim.player;
+    const goalName = (i) => i >= 0 ? sim.cellName.get(i) || (sim.owner[i] >= 0 && sim.civs[sim.owner[i]] ? 'the land of ' + sim.civs[sim.owner[i]].name : 'open country') : '';
+    const st = a.state === 'march' ? `Marching on ${goalName(a.goal)} · ${a.path.length} region${a.path.length === 1 ? '' : 's'} to go${a.legs ? ', then over the sea' : ''}` : a.state === 'siege' ? `Besieging ${goalName(a.siegeAt)} · ${Math.round(a.siege * 100)}% of the way to its fall` : a.state === 'sea' ? `At sea, on its way to ${goalName(a.goal)}` : a.state === 'embark' ? `At the harbour, boarding the fleet` : a.ai ? `On the front against ${a.foe >= 0 && sim.civs[a.foe] ? sim.fullName(sim.civs[a.foe]) : 'the enemy'}` : `Encamped near ${goalName(a.cell) || 'its last march'}`;
+    const left = mine ? Math.max(0, c.army - sim.year) : 0;
+    const key = [a.id, a.men, Math.round(a.morale * 20), a.state, a.path.length, Math.round(a.siege * 50), left, a.won, a.lost, marching].join(':'); if (key === hostCardKey) return; hostCardKey = key;
+    $('hc-sw').style.background = c.color; $('hc-title').textContent = a.name; $('hc-sub').textContent = `${HOST_ST[a.state] || ''} · ${sim.fullName(c)}${mine ? ' · yours' : ''}`;
+    const tile = (k, v, d) => `<div class="tile"><span class="micro">${k}</span><span class="k">${v}</span>${d ? `<span class="d">${d}</span>` : ''}</div>`;
+    $('hc-tiles').innerHTML = tile('Men', fmtInt(a.men), `raised ${fmtInt(a.raised)}`) + `<div class="tile"><span class="micro">Spirit</span><span class="k">${Math.round(a.morale * 100)}%</span><div class="bar"><i style="transform:scaleX(${clamp(a.morale, 0, 1).toFixed(2)});background:${a.morale > 0.6 ? 'var(--pos)' : a.morale > 0.35 ? 'var(--warn)' : 'var(--neg)'}"></i></div></div>`
+      + tile('Arms', c.era >= 1 ? `${Math.round(sim.satOf(c.id, 'arms') * 100)}%` : '—', c.era >= 1 ? 'of what it wants' : 'stone and wood') + tile(mine ? 'Years left' : 'Battles', mine ? String(left) : `${a.won} won`, mine ? 'of the levy' : `${a.lost} lost`);
+    $('hc-state').textContent = st + (mine && a.won + a.lost ? ` · battles: ${a.won} won, ${a.lost} lost` : '');
+    $('hc-acts').hidden = !mine; $('hc-march').classList.toggle('on', marching === a.id);
+  }
   let hoverT = 0;
   renderer.domElement.addEventListener('pointermove', (e) => {
     const now = performance.now(); if (now - hoverT < 40) return; hoverT = now;
@@ -391,6 +424,8 @@
     const fresh = wars.filter(k => !seen.wars.has(k));
     for (const k of fresh) { const w = sim.civs[k]; out.push({ id: 'war' + k, kind: 'war', cls: 'war', t1: 'War', t2: `${sim.fullName(w)} · at war with you`, body: 'Fly to their capital. How the war stands and what peace would take: War and peace, in their panel. Or raise a levy and fight.', act: () => { seen.wars.add(k); if (w.capital >= 0) { const [lon, lat] = placeOf(w.capital); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.02), 0.08)); select(w.capital); } } }); }
     for (const k of [...seen.wars]) if (!wars.includes(k)) seen.wars.delete(k);
+    // news of the host in the field: the newest of it, until it is looked at
+    { const N = sim.army.news; const n = N.length ? N[N.length - 1] : null; if (n && sim.year - n.year <= Math.max(30, TURN_YEARS[c.era] * 2) && !seen.ack.has('host' + n.seq)) out.push({ id: 'host' + n.seq, kind: 'war', cls: n.kind === 'won' || n.kind === 'taken' ? 'good' : 'war', t1: 'Host', t2: n.text, act: () => { seen.ack.add('host' + n.seq); const a = sim.army.of(c.id)[0]; const [lon, lat] = sim.army.cellLL(n.cell); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.004), 0.03)); if (a) selectHost(a.id); } }); }
     // envoys waiting on an answer: the weightiest first (a peace offered, a call to arms, a demand), then what is merely proposed
     { const t = ENVOYS.tile(); if (t) { const heavy = (o) => o.kind === 'peace' || o.kind === 'call' || o.kind === 'submit' ? 0 : 1; for (const o of t.offers.filter((o) => !seen.ack.has('offer' + o.id)).sort((a, b) => heavy(a) - heavy(b)).slice(0, 3)) out.push({ id: 'offer' + o.id, kind: 'envoy', cls: heavy(o) ? 'good' : 'warn', t1: 'Envoys', t2: o.text, body: `Answer them in Diplomacy. They wait until ${sim.fmtYear(o.until)}, then go home.`, act: () => { seen.ack.add('offer' + o.id); ENVOYS.open('envoys'); } }); } }
     if (turnRun.capital >= 0 && turnRun.capital !== c.capital && !seen.ack.has('cap' + c.capital)) out.push({ id: 'cap', kind: 'capital', cls: 'war', t1: 'Capital', t2: `The court now sits at ${sim.cellName.get(c.capital) || 'a new seat'}`, act: () => { seen.ack.add('cap' + c.capital); goHome(); } });
@@ -457,6 +492,7 @@
     // everything logged since the last look (several years can pass between frames)
     const since = turnRun.seq || 0; const recent = c.events.filter(e => (e.seq || 0) > since); turnRun.seq = sim.evSeq;
     if (recent.some(e => /breaks away/.test(e.text))) { endTurn('split'); return; }
+    { const N = sim.army.news; const fresh = N.filter((n) => n.seq > (turnRun.hostSeq || 0)); if (fresh.length) { turnRun.hostSeq = N[N.length - 1].seq; if (fresh.some((n) => n.kind === 'broken' || n.kind === 'lost' || n.kind === 'taken' || n.kind === 'siege')) { endTurn('host'); return; } } }
     { const Q = sim.rule.ruleOf(c); if (Q.rose > turnRun.rose) { turnRun.rose = Q.rose; endTurn('rising'); return; } if (Q.demand && Q.demand.since > turnRun.start && !seen.ack.has('demand' + Q.demand.since)) { endTurn('demand'); return; } }
     { const t = TREE.tile(); if (t && t.waiting && recent.some(e => e.type === 'know')) { seen.ack.delete('study'); endTurn('study'); return; } }
     // (envoys with something that cannot wait: a peace offered, a call to arms, a demand to submit. What is merely proposed waits for the turn's end)
@@ -500,7 +536,7 @@
     const c = sim.playerCiv(); const box = $('report'); if (!c) { box.hidden = true; return; }
     const ev = sim.worldEvents.slice(turnRun.evIdx); const mine = ev.filter(e => e.mine).map(e => { e._s = scoreEvent(e); return e; }).sort((a, b) => b._s - a._s).slice(0, 5).sort((a, b) => a.year - b.year); const others = ev.filter(e => !e.mine).map(e => { e._s = scoreEvent(e); return e; }).sort((a, b) => b._s - a._s).slice(0, 3).sort((a, b) => a.year - b.year);
     const list = [...mine, ...others];
-    const why = { war: 'War declared on you', capital: 'Your capital changed', era: 'A new era', stab: 'Unrest', split: 'A province broke away', stopped: 'Stopped early', gone: 'Your people are gone', disaster: 'Disaster strikes your lands', study: 'A discovery: your scholars await your word', demand: 'An estate of your realm makes a demand', rising: 'An estate of your realm has risen', envoy: 'Envoys wait on your answer' }[turnRun.reason] || '';
+    const why = { war: 'War declared on you', capital: 'Your capital changed', era: 'A new era', stab: 'Unrest', split: 'A province broke away', stopped: 'Stopped early', gone: 'Your people are gone', disaster: 'Disaster strikes your lands', study: 'A discovery: your scholars await your word', demand: 'An estate of your realm makes a demand', rising: 'An estate of your realm has risen', envoy: 'Envoys wait on your answer', host: (() => { const N = sim.army.news; return N.length ? N[N.length - 1].text : 'News of your host'; })() }[turnRun.reason] || '';
     $('report-title').textContent = `${sim.fmtYear(turnRun.start)} → ${sim.fmtYear(sim.year)}`;
     const wy = $('report-why'); wy.hidden = !why; wy.textContent = why; wy.className = 'why ' + (turnRun.reason || '');
     // a painted strip for the moment that stopped the clock
@@ -639,7 +675,7 @@
   // ---------- dock ----------
   const ICONS = {
     mine: '<path d="M4 20l9-9M11 4c3-1 7 0 9 3M9 6c-1 3 0 7 3 9"/><path d="M13 11l1-1"/>',
-    settle: '<path d="M6 21V4h10l-2 3 2 3H6"/>', develop: '<path d="M12 21V9M12 13c-3 0-5-2-5-5 3 0 5 2 5 5zm0-4c3 0 5-2 5-5-3 0-5 2-5 5z"/><path d="M4 21h16"/>', fortify: '<path d="M4 21V9h3V6h3v3h4V6h3v3h3v12z"/><path d="M10 21v-5h4v5"/>', port: '<circle cx="12" cy="5" r="2"/><path d="M12 7v14M5 13c0 4 3 7 7 7s7-3 7-7M3 13h4M17 13h4"/>', academy: '<path d="M4 21h16M6 21V10M10 21V10M14 21V10M18 21V10M3 10l9-6 9 6z"/>', temple: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', capital: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/><path d="M4 21h16"/>', market: '<path d="M4 10l2-5h12l2 5M4 10h16v3H4zM6 13v8h12v-8M10 21v-5h4v5"/>', wonder: '<path d="M12 3l3 6 6 1-4.5 4.2 1.2 6.3L12 17.5 6.3 20.5l1.2-6.3L3 10l6-1z"/>', levy: '<path d="M12 3l8 3v6c0 5-3 8-8 9-5-1-8-4-8-9V6z"/><path d="M12 8v8M8 12h8"/>',
+    settle: '<path d="M6 21V4h10l-2 3 2 3H6"/>', develop: '<path d="M12 21V9M12 13c-3 0-5-2-5-5 3 0 5 2 5 5zm0-4c3 0 5-2 5-5-3 0-5 2-5 5z"/><path d="M4 21h16"/>', fortify: '<path d="M4 21V9h3V6h3v3h4V6h3v3h3v12z"/><path d="M10 21v-5h4v5"/>', port: '<circle cx="12" cy="5" r="2"/><path d="M12 7v14M5 13c0 4 3 7 7 7s7-3 7-7M3 13h4M17 13h4"/>', academy: '<path d="M4 21h16M6 21V10M10 21V10M14 21V10M18 21V10M3 10l9-6 9 6z"/>', temple: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', capital: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/><path d="M4 21h16"/>', market: '<path d="M4 10l2-5h12l2 5M4 10h16v3H4zM6 13v8h12v-8M10 21v-5h4v5"/>', wonder: '<path d="M12 3l3 6 6 1-4.5 4.2 1.2 6.3L12 17.5 6.3 20.5l1.2-6.3L3 10l6-1z"/>', levy: '<path d="M12 3l8 3v6c0 5-3 8-8 9-5-1-8-4-8-9V6z"/><path d="M12 8v8M8 12h8"/>', fleet: '<path d="M12 3v12M12 4l6 9h-6M4 16h16l-2 4H6z"/>',
     spawn: '<circle cx="12" cy="6" r="3"/><path d="M5 21c0-5 3-8 7-8s7 3 7 8"/>', plague: '<path d="M12 3a7 7 0 0 0-7 7c0 3 2 5 3 6v4h8v-4c1-1 3-3 3-6a7 7 0 0 0-7-7z"/><circle cx="9.5" cy="10.5" r="1"/><circle cx="14.5" cy="10.5" r="1"/>', meteor: '<path d="M20 4l-9 9M20 4l-5 1M20 4l-1 5"/><circle cx="8" cy="16" r="4"/>', bounty: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>', prophet: '<path d="M12 3l2.7 6 6.3.6-4.8 4.3 1.5 6.4L12 17l-5.7 3.3 1.5-6.4L3 9.6l6.3-.6z"/>', enlighten: '<path d="M9 21h6M10 18h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
   };
   const GODS = [
@@ -665,7 +701,7 @@
   }
 
   // ---------- the city build panel: what a town can raise, and where ----------
-  const BUILD_ORDER = ['farm', 'walls', 'port', 'market', 'temple', 'academy', 'mine', 'workshop', 'weaver', 'smithy', 'brewery', 'granary', 'warehouse', 'shipyard', 'factory', 'refinery', 'lab', 'wonder', 'capital', 'levy'];
+  const BUILD_ORDER = ['farm', 'walls', 'port', 'market', 'temple', 'academy', 'mine', 'workshop', 'weaver', 'smithy', 'brewery', 'granary', 'warehouse', 'shipyard', 'factory', 'refinery', 'lab', 'wonder', 'capital', 'levy', 'fleet'];
   Object.assign(ICONS, { workshop: `<path d="${MARKET.ICON.tools}"/>`, weaver: `<path d="${MARKET.ICON.cloth}"/>`, smithy: '<path d="M4 9h13c0 3-2 4-5 4v3h3v3H7v-3h3v-3C7 13 5 11 4 9zM17 9h3"/>', brewery: `<path d="${MARKET.ICON.beer}"/>`, granary: '<path d="M5 21V10l7-6 7 6v11zM9 21v-6h6v6M9 11h6"/>', warehouse: '<path d="M3 21V9l9-5 9 5v12zM7 21v-8h10v8M7 17h10"/>', shipyard: `<path d="${MARKET.ICON.ships}"/>`, factory: '<path d="M3 21V11l6 3v-3l6 3V6h4v15zM7 17h2M12 17h2"/>', refinery: '<path d="M5 21V8h4v13M11 21V4h4v17M17 21v-9h3v9M3 21h18"/>', lab: `<path d="${MARKET.ICON.electronics}"/>` });
   const BUILD_ICON = (k) => ICONS[k] || ICONS[{ farm: 'develop', walls: 'fortify' }[k]] || ICONS.settle;
   const buildName = (k, i) => k === 'mine' ? sim.workName(i) : sim.BUILD[k].name;
@@ -942,6 +978,11 @@
     ENVOYS.init({ sim: () => sim, toast, fmtPop, afterAct: () => refreshAll(true), redraw: () => { world.refreshTextures(); world.updateBuildings(mapcam, true); }, openTree: (key) => TREE.open('tree', key), onWar: (id) => seen.wars.add(id),
       flyTo: (i) => { const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.02), 0.08), { duration: 1.8 }); select(i); } });
     $('l-dip').addEventListener('click', () => { if (sim && mode === 'play' && sim.playerCiv()) ENVOYS.open(); });
+    // the host card: march (the next click on the map is where), halt, send home, close
+    $('hc-march').addEventListener('click', () => { if (hostSel < 0) return; if (marching === hostSel) { marching = -1; banner(null); } else { marching = hostSel; banner('Click where your host should march: an enemy town to take, or a place on the way', true); } hostCardKey = ''; updateHostCard(); });
+    $('hc-halt').addEventListener('click', () => { if (hostSel < 0) return; sim.army.halt(hostSel); toast('Your host halts and makes camp'); hostCardKey = ''; updateHostCard(); });
+    $('hc-home').addEventListener('click', () => { if (hostSel < 0) return; sim.army.disband(hostSel); toast('Your host goes home: the levy is over'); closeHost(); refreshAll(true); });
+    $('hc-x').addEventListener('click', () => closeHost());
     $('left').addEventListener('click', (e) => { const ch = e.target.closest('.goodchip[data-good]'); if (ch && mode === 'play') MARKET.open('board', +ch.dataset.good); const kg = e.target.closest('[data-kgo]'); if (kg && mode === 'play') TREE.open('tree', kg.dataset.kgo); const go = e.target.closest('[data-gopen]'); if (go && mode === 'play') GOV.open('laws'); const gg = e.target.closest('[data-ggo]'); if (gg && mode === 'play' && sim.playerCiv()) GOV.open(null, gg.dataset.ggo); const dg = e.target.closest('[data-dgo]'); if (dg && mode === 'play' && sim.playerCiv()) ENVOYS.open('realms', +dg.dataset.dgo); });
     $('lensbtn').addEventListener('click', () => { $('lensmenu').hidden = !$('lensmenu').hidden; });
     $('opt-continuous').checked = settings.continuous; $('opt-continuous').addEventListener('change', (e) => { settings.continuous = e.target.checked; if (turnRun.active) endTurn('stopped'); paused = true; applySettings(); updateTurnButton(); updateClock(); });
@@ -991,11 +1032,11 @@
       if (e.code === 'Space' || e.key === 'Enter') { if ($('chron').open || $('menu').open) return; e.preventDefault(); onTurnClick(); }
       else if (e.key === '+' || e.key === '=') { if (settings.continuous) setSpeedIdx(speedIdx + 1); } else if (e.key === '-' || e.key === '_') { if (settings.continuous) setSpeedIdx(speedIdx - 1); }
       else if (e.key === 'b' || e.key === 'B') { if (mode === 'play') openCity(); } else if (e.key === 'g' || e.key === 'G') $('l-build').click(); else if (e.key === 'r' || e.key === 'R') { if (mode === 'play') openRealm(); } else if (e.key === 'c' || e.key === 'C') { if (mode === 'play') openChronicle('log'); } else if (e.key === 'm' || e.key === 'M') { if (mode === 'play') MARKET.open(); } else if (e.key === 'k' || e.key === 'K') { if (mode === 'play') TREE.open(); } else if (e.key === 'v' || e.key === 'V') { if (mode === 'play' && sim.playerCiv()) GOV.open(); } else if (e.key === 'f' || e.key === 'F') { if (mode === 'play' && sim.playerCiv()) ENVOYS.open(); }
-      else if (e.key === 'Escape') { if (mapcam.fly) mapcam.fly = null; else if (placing) cancelPlacing(); else if (tool) setTool(null); else if (!$('found').hidden) { $('found').hidden = true; pendingFound = null; } else if ($('chron').open) $('chron').close(); else if ($('menu').open) $('menu').close(); else if (!$('lensmenu').hidden) $('lensmenu').hidden = true; else if (document.body.classList.contains('dockopen')) $('l-build').click(); else if (selected >= 0) deselect(); else if (mode === 'play') openMenu(); }
+      else if (e.key === 'Escape') { if (mapcam.fly) mapcam.fly = null; else if (marching >= 0) { marching = -1; banner(null); } else if (hostSel >= 0) closeHost(); else if (placing) cancelPlacing(); else if (tool) setTool(null); else if (!$('found').hidden) { $('found').hidden = true; pendingFound = null; } else if ($('chron').open) $('chron').close(); else if ($('menu').open) $('menu').close(); else if (!$('lensmenu').hidden) $('lensmenu').hidden = true; else if (document.body.classList.contains('dockopen')) $('l-build').click(); else if (selected >= 0) deselect(); else if (mode === 'play') openMenu(); }
       else if (e.key === '`') { const d = $('debug'); d.style.display = d.style.display === 'block' ? 'none' : 'block'; }
       else if (e.key === 'p' || e.key === 'P') $('v-pol').click(); else if (e.key === 'l' || e.key === 'L') $('v-labels').click(); else if (e.key === 't' || e.key === 'T') $('v-trade').click(); else if (e.key === 'o' || e.key === 'O') $('v-gov').click(); else if (e.key === 'x' || e.key === 'X') $('v-rel').click();
       else if (e.key === 'n' || e.key === 'N') mapcam.tHeading = 0; else if (e.key === 'u' || e.key === 'U') { mapcam.tTilt = 0; mapcam.tLift = 0; mapcam.autoTilt = false; }
-      else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
+      else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'a' || e.key === 'A') { if (mode === 'play') findHost(); } else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
     });
     $('btn-chronicle').addEventListener('click', writeChronicle); $('btn-chronicle-stop').addEventListener('click', () => { if (chronCtl) chronCtl.abort(); });
     let compassIdle = 0; const wake = () => { $('compass').classList.remove('idle'); clearTimeout(compassIdle); compassIdle = setTimeout(() => $('compass').classList.add('idle'), 3000); }; renderer.domElement.addEventListener('pointermove', wake); renderer.domElement.addEventListener('wheel', wake, { passive: true }); wake();
@@ -1244,6 +1285,7 @@
     const day = world.updateSky(mapcam, globals.uSun.value, now / 1000);
     if (life && mode === 'play') life.update(mapcam, sim, now, world.bUniforms.uDay.value, devH, camera.fov);      // (after the sky: smoke and fires take this frame's light, not the last one's)
     if (movers && mode === 'play') movers.update(mapcam, sim, decal, now, dt, world.bUniforms.uDay.value, devH, camera.fov);
+    if (troops) { if (mode === 'play') { troops.update(mapcam, sim, now, dt, project); updateHostCard(); } else troops.clear(); }
     if (fx && mode === 'play') { fx.update(mapcam, sim, now, dt, world.bUniforms.uDay.value, devH, camera.fov); if (fx.shake > 0.001) { const a = fx.shake * fx.shake * mapcam.dist * 0.02; camera.position.x += (Math.random() - 0.5) * a; camera.position.y += (Math.random() - 0.5) * a; camera.position.z += (Math.random() - 0.5) * a; camera.updateMatrixWorld(); } }
     if (world.cloudTex && globals.uClouds.value !== world.cloudTex) globals.uClouds.value = world.cloudTex;
     globals.uCloudShift.value = world.cloudShift; globals.uCloudVis.value = world.cloudVis; globals.uCloudNear.value = world.cloudNear;
