@@ -429,7 +429,7 @@
             // life, as a painter would have it. By day a pale ghost, by night brighter than white (post.js gives it its glow), from
             // out in space as bright as lit rock is. And the light of the faint stars, the Milky Way, where the Moon is not.
             vec4 mo = moonDisc(dir, sun); float md = dot(dir, uMoonW), nightG = 1.0 - smoothstep(-0.17, -0.05, sunEl);
-            vec3 beyond = mo.rgb * mo.a * mix(1.25, mix(0.2, 2.3, nightG), uAlpha) + milky(dir) * (uStars * mix(0.3, 0.22, uAlpha)) * (1.0 - mo.a);
+            vec3 beyond = mo.rgb * mo.a * mix(1.25, mix(0.2, 1.6, nightG), uAlpha) + milky(dir) * (uStars * mix(0.3, 0.22, uAlpha)) * (1.0 - mo.a);
             add += vec3(0.8, 0.85, 0.95) * pow(max(md, 0.0), 600.0) * 0.25 * night * (0.5 - 0.5 * dot(sun, uMoonW));
             // aurora: curtains to the pole on clear nights at high latitude
             float auroraLat = smoothstep(52.0, 66.0, abs(uLat));
