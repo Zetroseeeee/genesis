@@ -78,7 +78,9 @@ a planet.
 `node tools/glerr.js "<script>" [wait ms]` says which call to the card fails (the suite's "GL error 1281" names none): every
 call that can raise one is asked at once, and the first twelve are printed with their arguments, the picture last handed to the
 card and where the call came from. `__T.costsPlanet()` writes frame rates with the picture looked at in fewer ways and no finer
-than it used to be (`costp_*` in the tour). `__T.watch()` writes into the picture, once a second, the frame rate, the packs by kind and
+than it used to be (`costp_*` in the tour); `__T.costsWinter()` with the shader as it is, compiled without the maps' second layer
+(the rules for snow and ice the game had until 0.21) and over a second layer of the old rules' numbers, turn and turn about (`costi_*`;
+`window.__costOld = 1` stops at the old rules, to see what they draw). `__T.watch()` writes into the picture, once a second, the frame rate, the packs by kind and
 state and what every tile in view is drawn with (the picture, the heights and the water's edge by level): a view is whole
 when nothing is loading and the levels stand still (`load_*` in the tour; on the build Mac the ground of a view from 300 km
 is whole in six to nine seconds, the trees of a town in forty-five). The frame rate the smoke run reports is of the three seconds before its picture: where packs are still
