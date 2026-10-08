@@ -165,8 +165,14 @@
       float lum = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(lum), col, mix(0.94, 0.86, deep));
       float shade = mix(1.0, 0.2 + 0.8 * low, wood) * mix(1.0, 0.4, under);
       float sky = (0.5 + 0.5 * dot(n, uUpV)) * mix(1.0, 0.35 + 0.65 * low, wood);
-      float sunSide = max(dot(n, uSunV), 0.0);
-      float diff = mix(0.45, 0.16, wood) + mix(0.55, 0.92, wood) * sunSide + 0.25 * max(dot(uUpV, uSunV), 0.0) * mix(1.0, low, wood);     // the photograph is already softly lit: the sun adds a bright side
+      float sunSide = max(dot(n, uSunV), 0.0), sinE = max(dot(uUpV, uSunV), 0.0);
+      // A low sun. The photograph's own soft light is a day sky's: under a low sun only the side turned to it is lit (as it
+      // was, a lone birch at dusk glowed whole, brighter than anything in the picture). And in a wood a low sun reaches only
+      // the tops: a tree twenty metres tall throws its shadow three hundred metres at four degrees, over the next eight, and
+      // a wood at sunset was a carpet of glowing crowns on dark ground. (reach: how far down a tree the sun comes, from the top)
+      float baseK = mix(0.3, 1.0, smoothstep(0.03, 0.3, sinE)), reach = clamp(sinE * 6.0, 0.0, 1.0);
+      float litW = mix(1.0, smoothstep(0.88 - reach, 1.08 - reach, mix(vUv.y, 1.0, 0.5 * vTop)), deep);
+      float diff = mix(0.45, 0.16, wood) * baseK + mix(0.55, 0.92, wood) * sunSide * litW + 0.25 * sinE * mix(1.0, low, wood);     // the photograph is already softly lit: the sun adds a bright side
       diff *= (1.0 - 0.6 * vHid * mix(1.0, 1.0 - 0.8 * low, deep)) * shade;      // (in a wood the neighbours' shadow is on a tree's foot, which is dark by 'shade' already: its top is in the sun)
       vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky) * mix(1.0, 0.4, wood), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
       vec3 lit = col * (amb * mix(1.0, 0.3 + 0.7 * low, wood) + diff * 0.72 * uSunCol) * (1.0 + 0.25 * vTop) * mix(vec3(1.0), vec3(1.03, 1.0, 0.9), vTop);      // (from above it is the lit top of the crown that is seen, not the side the picture was taken from: lighter, and a little yellower, as the canopy on the ground has it)

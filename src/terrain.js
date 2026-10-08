@@ -1341,6 +1341,10 @@
       float sunUp = dot(upV, sunV);
       float day = smoothstep(-0.15, 0.25, sunUp);
       float diff = mix(max(dot(nV, sunV), 0.0), max(sunUp, 0.0), wetAll * (1.0 - foam));      // (what comes up out of water is lit by how high the sun stands, not by the lie of a wave)
+      // (Grass and the crowns of a wood stand up out of the ground: under a low sun their blades and leaves are lit as walls are,
+      //  not as the flat ground under them. Lit as flat ground, a meadow at sunset was black beside the golden walls of a town.)
+      { float stand = (wGrass + 0.5 * wForest) * (1.0 - max(max(snow, ice), snowCov)) * (1.0 - wetAll) * landW;
+        if (stand > 0.01) diff = max(diff, stand * 0.3 * smoothstep(-0.01, 0.06, sunUp) * (0.6 + 0.4 * max(dot(nV, sunV) * 4.0, 0.0))); }
       // ---------- terrain self-shadowing: march the heightmap toward the sun ----------
       float shadow = 1.0;
       float shadowMix = smoothstep(0.15, 0.08, uCamAlt) * step(0.5, uQuality);
