@@ -13,9 +13,9 @@ green are the high and low bytes of how high the ground stands, in steps of a me
 old packs were and every lake in the game with them (TALL). Level 7 is 306 m to a texel at the equator, every level below
 it half as fine; each is the mean of the four texels under it, so the levels agree. Levels 0 to 5 are kept wherever there
 is land; 6 and 7 where they add most to the level below them (the mean slope of the difference: nought on a plain, tenths
-in the high mountains), each until it has spent its share of the pack (budget6=, budget7=: megabytes). Sixteen packs of
-levels 6 and 7 to a bundle, sixty-four of the others (<level>_b<x>_<y>.bin: "HWB1", how many, a table of where each pack
-begins and how long it is, then the packs - src/terrain.js reads a pack out of its bundle). index.json says which packs
+in the high mountains), each until it has spent its share of the pack (budget6=, budget7=: megabytes). Sixty-four packs
+to a bundle (<level>_b<x>_<y>.bin: "HWB1", how many, a table of where each pack begins and how long it is, then the packs -
+src/terrain.js reads a pack out of its bundle): some forty files, where an update gives out no more than four hundred. index.json says which packs
 there are, by level: P a pack, S nothing but sea, L land that is drawn from the level below.
 
 Where it comes from. The Terrain Tiles on AWS Open Data ("terrarium": metres = R x 256 + G + B / 256 - 32768; Mapzen's
@@ -222,10 +222,11 @@ def build7(px, py):
             if up.max() > 50: src += ' + the ice %.0f %%' % (100 * (up > 50).mean())
             h += up
         # Spikes: a few tiles have ground kilometres high in a plain (Alaska had one of 26 km; Yemen, New Zealand): where the
-        # tiles stand fifteen hundred metres above the highest of the old packs within two kilometres, in country the old
-        # packs have under three thousand, or higher than anything on Earth, the old packs are taken, and round it.
+        # tiles stand two thousand metres above the highest of the old packs within two kilometres, in country the old packs
+        # have under 2,500, or higher than anything on Earth, the old packs are taken, and round it. (Not at fifteen hundred:
+        # the peaks of Fiordland stand so far above what the old packs had of them, a blur of fjords and mountains.)
         from scipy import ndimage
-        om = ndimage.maximum_filter(o, 11); gl = ((h - om > 1500) & (om < 3000)) | (h > 9150)
+        om = ndimage.maximum_filter(o, 11); gl = ((h - om > 2000) & (om < 2500)) | (h > 9150)
         if gl.any():
             gl = ndimage.binary_dilation(gl, iterations=4) & (h > o + 200); h[gl] = o[gl]; src += ' + %d spiked texels' % gl.sum()
         if lat1 < -60 and SOUTH == 'old': h[np.arange(h.shape[0]) * dl > lat0 + 60] = old_heights(TOP, px, py)[np.arange(h.shape[0]) * dl > lat0 + 60]
@@ -379,7 +380,7 @@ def whole(keep):
                  packTiles=PER, tile=TILE, maxLevel=TOP, tall=TALL, ext='webp', levels={})
     tar = tarfile.open(os.path.join(OUT, 'heights-%s.tar' % H), 'w'); total = 0
     for L in range(0, TOP + 1):
-        nx, ny, W, Hh = grid(L); n = 4 if L >= 6 else 8; marks = []
+        nx, ny, W, Hh = grid(L); n = 8; marks = []
         for py in range(ny):
             for px in range(nx):
                 if (px, py) not in have[L]: marks.append('S')
