@@ -135,7 +135,7 @@
     vec3 milky(vec3 dir) {
       vec3 d = dir * uSkyM;      // (the turn undone: a rotation's inverse is itself laid on its side)
       vec3 s = textureLod(uMilky, vec2(0.5 - atan(-d.z, d.x) * 0.15915494, 0.5 + asin(clamp(d.y, -1.0, 1.0)) * 0.31830989), 0.0).rgb;
-      return max(-log(max(1.0 - s * s, 0.02)) * 0.25 - 0.004, 0.0) * uMilkyOn; }
+      return max(-log(max(1.0 - s * s, 0.02)) * 0.25 - 0.011, 0.0) * uMilkyOn; }      // (less the map's faint floor, the light between the stars, which was a brown murk over the whole night)
     vec4 moonDisc(vec3 dir, vec3 sun) {
       float md = dot(dir, uMoonW); if (md < uMoonK.x) return vec4(0.0);
       vec3 nA = normalize(uEclW - uMoonW * dot(uEclW, uMoonW)), rt = cross(uMoonW, nA), off = dir - uMoonW * md;
@@ -172,7 +172,7 @@
   SKY.CLOUD_F = (AIR_F) => `
     precision highp sampler3D;
     uniform sampler2D uCloudS, uCloud0, uCloud1; uniform sampler3D uGrain; uniform vec3 uAirC, uAirS, uSunW;
-    uniform float uFine, uGrainOn, uBelow, uOpacity, uThin, uTime, uShellR, uDown, uNear, uMoonL; uniform vec2 uShiftCS, uCover, uGrainK;
+    uniform float uFine, uGrainOn, uBelow, uOpacity, uThin, uTime, uShellR, uDown, uNear, uMoonL, uEyeN; uniform vec2 uShiftCS, uCover, uGrainK;
     varying vec3 vDirW, vPosV, vSunT; ${AIR_F}
     // the picture of the clouds where a line from the Earth's middle points (q: unit, the weather's turn taken out), with how
     // fast that changes across the pixel: told outright, because the picture's own edge (the date line) and the two halves of the
@@ -196,6 +196,7 @@
                    + g1.y * (g0.x * textureLod(uGrain, vec3(h0.x, h1.y, h0.z), 0.0).r + g1.x * textureLod(uGrain, vec3(h1.x, h1.y, h0.z), 0.0).r))
            + g1.z * (g0.y * (g0.x * textureLod(uGrain, vec3(h0.x, h0.y, h1.z), 0.0).r + g1.x * textureLod(uGrain, vec3(h1.x, h0.y, h1.z), 0.0).r)
                    + g1.y * (g0.x * textureLod(uGrain, vec3(h0.x, h1.y, h1.z), 0.0).r + g1.x * textureLod(uGrain, vec3(h1.x, h1.y, h1.z), 0.0).r)); }
+    vec3 soft3(vec3 p) { vec3 t = p * 128.0 + 0.5, i = floor(t), f = t - i; return (i + f * f * (3.0 - 2.0 * f) - 0.5) * 0.0078125; }
     float coverS(vec3 q) { return textureLod(uCloudS, vec2(atan(-q.z, q.x) * 0.15915494 + 0.5, asin(clamp(q.y, -1.0, 1.0)) * 0.31830989 + 0.5), 1.0).r; }
     // Over a country that is being ruled the weather is less than the picture has it: its thin cloud is gone and its thick
     // cloud stands, white, with the country to be seen between (SKY.less is the same sum for the shadows on the ground). All
@@ -220,7 +221,9 @@
       float g1 = (1.0 - smoothstep(2.0, 6.0, tpp)) * uGrainOn, g0 = (1.0 - smoothstep(3.0, 8.0, tpp * 0.23)) * uGrainOn, n1 = 0.5, n0 = 0.5;
       float k1 = 1.0 - smoothstep(2.5, 5.0, tpp), k0 = 1.0 - smoothstep(2.5, 5.0, tpp * 0.23);
       if (g1 > 0.0) { float v = 0.0; if (k1 < 1.0) v = textureGrad(uGrain, p1, dx * 318.0, dy * 318.0).r; if (k1 > 0.0) v = mix(v, grain3(p1), k1); n1 = mix(0.5, v, g1); }
-      if (g0 > 0.0) { float v = 0.0; if (k0 < 1.0) v = textureGrad(uGrain, p0, dx.yzx * 73.1, dy.yzx * 73.1).r; if (k0 > 0.0) v = mix(v, grain3(p0), k0); n0 = mix(0.5, v, g0); }
+      // (the lumps, which count for less and are larger, by a cheaper curve: one lookup with its place moved toward the middle of
+      //  its cell, smooth where it meets the next, that leaves only a little flat at the middle - which the heaps hide)
+      if (g0 > 0.0) n0 = mix(0.5, textureGrad(uGrain, mix(p0, soft3(p0), k0), dx.yzx * 73.1, dy.yzx * 73.1).r, g0);
       float ms = 0.72 * n1 + 0.28 * n0;      // (the heaps)
       // From far, where a heap is a pixel or less: the picture's cloud, gathered where the heaps stand and thinned between
       // them (not at all where the picture has all cloud or none). Laid on as it is, between its texels, it was a blur.
@@ -277,12 +280,14 @@
       slope += dot(((g * tx - fg * ty) * Px + (e * ty - fg * tx) * Py) / det, sT) * (1.0 - dK);
       float rise = slope * 4.0e-4 * sl / max(sunUp + 0.08, 0.05) * smoothstep(0.1, 0.4, cosV);      // (4e-4: a cloud stands some two and a half kilometres tall; the lower the sun the longer its shade)
       // (by night: grey in the dark as everything is, and silver under a moon - uMoonL, how much of a full moon's light there is)
-      vec3 col, night = vec3(0.030, 0.036, 0.055) + vec3(0.17, 0.20, 0.28) * uMoonL * (1.0 - smoothstep(-0.12, 0.02, sunUp));
+      vec3 col, night = (vec3(0.030, 0.036, 0.055) + vec3(0.17, 0.20, 0.28) * uMoonL) * (1.0 - smoothstep(-0.12, 0.02, sunUp)) * uEyeN;
       if (uBelow > 0.5) {
         // From under them: what the sun sends through - bright where the cloud is thin and at its edges, grey under its
         // heart - the side of a heap toward the sun lighter than the far one, the glare of the sun behind an edge, and,
         // when the sun is low, its light on their undersides.
-        float through = exp(-thick * 3.0), cs = max(dot(vd, uAirS), 0.0), under = 1.0 - smoothstep(0.02, 0.3, sunUp), side = clamp(0.5 - rise * 0.5, 0.0, 1.0);
+        // (the side toward the sun and the side away from it go over into one another softly: at sunset, when the slope counts eight
+        //  times, cut off at its ends the light was stripes across a cloud)
+        float through = exp(-thick * 3.0), cs = max(dot(vd, uAirS), 0.0), under = 1.0 - smoothstep(0.02, 0.3, sunUp), side = 0.5 - 0.5 * rise / (1.0 + abs(rise));
         vec3 body = sunT * (mix(0.38, 1.0, through) * mix(0.78, 1.14, side) * (1.0 - 0.3 * under) + through * (0.8 * pow(cs, 10.0) + 2.4 * pow(cs, 90.0)) + under * 0.42 * (1.0 - through) * mix(0.55, 1.35, side));
         col = body + vec3(0.54, 0.60, 0.72) * 0.12 * (1.0 - through) * min(day, 1.0) + night * mix(0.6, 1.0, through);
       } else {
@@ -303,13 +308,15 @@
       const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat); blank.needsUpdate = true;
       const g3 = new THREE.DataTexture3D(new Uint8Array([128, 128]), 1, 1, 1); g3.format = THREE.RGFormat; g3.internalFormat = 'RG8'; g3.type = THREE.UnsignedByteType; g3.unpackAlignment = 1; g3.needsUpdate = true;
       this.uniforms = Object.assign({ uCloudS: { value: blank }, uCloud0: { value: blank }, uCloud1: { value: blank }, uGrain: { value: g3 }, uFine: { value: 0 }, uGrainOn: { value: 0 }, uBelow: { value: 0 }, uOpacity: { value: 0 }, uThin: { value: 1 }, uTime: { value: 0 },
-        uShellR: { value: SHELL }, uDown: { value: 1 }, uShiftCS: { value: new THREE.Vector2(1, 0) }, uSunW: { value: new THREE.Vector3(1, 0, 0) }, uCover: { value: new THREE.Vector2(1.05, 1) }, uNear: { value: 0 }, uMoonL: { value: 0 }, uGrainK: { value: new THREE.Vector2(0.5e-4, 1.6e-4) } }, AIRX.uniforms);
+        uShellR: { value: SHELL }, uDown: { value: 1 }, uShiftCS: { value: new THREE.Vector2(1, 0) }, uSunW: { value: new THREE.Vector3(1, 0, 0) }, uCover: { value: new THREE.Vector2(1.05, 1) }, uNear: { value: 0 }, uMoonL: { value: 0 }, uEyeN: { value: 0 }, uGrainK: { value: new THREE.Vector2(0.5e-4, 1.6e-4) } }, AIRX.uniforms);
       this.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: this.uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, extensions: { derivatives: true }, vertexShader: SKY.CLOUD_V(AIRX.VERT), fragmentShader: SKY.CLOUD_F(AIRX.FRAG) }));
       this.mesh.frustumCulled = false; this.mesh.renderOrder = 6; scene.add(this.mesh); this.on = true; this.shift = 0; this.vis = 0; this.near = 0;
     }
     // alt: the eye's height above the sea (to the unit of the globe); time: seconds; sun: the way to it; moon: how much of a full moon's light there is
     update(alt, time, sun, moon) {
       const U = this.uniforms, h = SHELL - 1; U.uSunW.value.copy(sun); U.uMoonL.value = window.__moonLight !== undefined ? window.__moonLight : moon || 0;
+      // (the night's light is seen only by an eye opened to it: down under the night sky, not from out where the day is in the picture too)
+      { const st = window.AIR && AIR.opened > 1 ? Math.log2(AIR.opened) : 0, t = Math.min(1, Math.max(0, (st - 1) / 6)); U.uEyeN.value = t * t * (3 - 2 * t); }
       if (window.__cloudTime !== undefined) time = window.__cloudTime;      // (a test's: the weather held where it is)
       if (SKY.cloudSmall && U.uCloudS.value !== SKY.cloudSmall) U.uCloudS.value = SKY.cloudSmall;
       if (SKY.cloudHalves && !U.uFine.value) { U.uCloud0.value = SKY.cloudHalves[0]; U.uCloud1.value = SKY.cloudHalves[1]; U.uFine.value = 1; }

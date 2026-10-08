@@ -606,7 +606,10 @@ server.listen(0, async () => {
   // ---------- the sky ----------
   await scenario('sky: the stars stand where they stood, the Moon and the clouds are there, the eye can be lifted to them', async (check) => {
     await page.waitForFunction(() => window.SKY && SKY.ready.stars && SKY.ready.clouds && SKY.ready.moon && SKY.ready.milkyway, null, { timeout: 60000 }).catch(() => {});
-    const r = await ev(() => { const S = window.SKY, W = __G.world, out = { ready: Object.keys(S.ready).join(' '), stars: W.starField.n, india: S.cloudAt(80, 20, 0), sahara: S.cloudAt(10, 24, 0) };
+    const r = await ev(() => { const S = window.SKY, W = __G.world, out = { ready: Object.keys(S.ready).join(' '), stars: W.starField.n, india: 0, sahara: 0 };
+      // (the picture's cloud over a country, its mean: a point of it may well lie in a gap between two storms)
+      const mean = (l0, l1, b0, b1) => { let a = 0, n = 0; for (let l = l0; l <= l1; l += 1) for (let b = b0; b <= b1; b += 1) { a += S.cloudAt(l, b, 0); n++; } return a / n; };
+      out.india = mean(72, 88, 15, 28); out.sahara = mean(0, 20, 18, 28);
       const star = (h, d) => { const a = h * 15 * Math.PI / 180, e = d * Math.PI / 180; return new THREE.Vector3(Math.cos(e) * Math.cos(a), Math.sin(e), -Math.cos(e) * Math.sin(a)); }, deg = (x) => Math.acos(Math.min(1, Math.max(-1, x))) * 180 / Math.PI;
       // where the pole of the sky stands among the stars of 2000: by the Pole Star now, by Thuban when the pyramids were built, a hand's breadth from Vega in the world's first year
       const m = new THREE.Matrix4(), x = new THREE.Vector3(1, 0, 0), off = (y, v) => { S.turn(x, 0.25, y, m); return deg(v.clone().applyMatrix4(m).y); };
