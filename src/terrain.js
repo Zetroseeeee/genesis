@@ -9,6 +9,37 @@
   const WET = (a) => { const t = Math.min(1, Math.max(0, (a - 0.66) / 0.3)); return t * t * (3 - 2 * t); };
   // the code of the water's edge (tools/water/build.py writes it into data/w/index.json; a pack made otherwise is not read)
   const WCODE = { step: 16, near: 480, deep: 3600, quad: 1.55, land: 158, knee: 98, water: 58 };
+
+  // Catmull-Rom of the heights at a place in the pack: how high (in steps), and how that changes a texel at a time along the
+  // pack's x (east) and y (south). It goes through every texel and is smooth across them: weighed between two texels (as a
+  // card weighs four) the ground was a sheet of facets with a crease along every texel's edge, and from a few kilometres
+  // a mountain was a cut stone.
+  const ELEV_CR = `
+    vec3 elevCR(vec2 puv) {
+      vec2 sz = vec2(textureSize(uElev, 0)), p = puv * sz - 0.5, b = floor(p), t = p - b, t2 = t * t, t3 = t2 * t;
+      vec2 w0 = -0.5 * t3 + t2 - 0.5 * t, w1 = 1.5 * t3 - 2.5 * t2 + 1.0, w2 = -1.5 * t3 + 2.0 * t2 + 0.5 * t, w3 = 0.5 * t3 - 0.5 * t2;
+      vec2 d0 = -1.5 * t2 + 2.0 * t - 0.5, d1 = 4.5 * t2 - 5.0 * t, d2 = -4.5 * t2 + 4.0 * t + 0.5, d3 = 1.5 * t2 - t;
+      ivec2 mx = ivec2(sz) - 1, ib = ivec2(b); int x0 = clamp(ib.x - 1, 0, mx.x), x1 = clamp(ib.x, 0, mx.x), x2 = clamp(ib.x + 1, 0, mx.x), x3 = clamp(ib.x + 2, 0, mx.x);
+      vec3 o = vec3(0.0);
+      for (int j = 0; j < 4; j++) {
+        int yy = clamp(ib.y + j - 1, 0, mx.y); float wy = j == 0 ? w0.y : j == 1 ? w1.y : j == 2 ? w2.y : w3.y, dy = j == 0 ? d0.y : j == 1 ? d1.y : j == 2 ? d2.y : d3.y;
+        float r0 = dot(texelFetch(uElev, ivec2(x0, yy), 0).rg, uElevK), r1 = dot(texelFetch(uElev, ivec2(x1, yy), 0).rg, uElevK), r2 = dot(texelFetch(uElev, ivec2(x2, yy), 0).rg, uElevK), r3 = dot(texelFetch(uElev, ivec2(x3, yy), 0).rg, uElevK);
+        float rv = r0 * w0.x + r1 * w1.x + r2 * w2.x + r3 * w3.x;
+        o += vec3(rv * wy, (r0 * d0.x + r1 * d1.x + r2 * d2.x + r3 * d3.x) * wy, rv * dy);
+      }
+      return o;
+    }`;
+  // the CPU's twin of elevCR, the height alone: d the pack's steps (w by h texels), fx and fy a place in its texels (texel
+  // centres at whole numbers)
+  function elevCRAt(d, w, h, fx, fy) {
+    const bx = Math.floor(fx), by = Math.floor(fy), tx = fx - bx, ty = fy - by;
+    const W = (t) => { const t2 = t * t, t3 = t2 * t; return [-0.5 * t3 + t2 - 0.5 * t, 1.5 * t3 - 2.5 * t2 + 1, -1.5 * t3 + 2 * t2 + 0.5 * t, 0.5 * t3 - 0.5 * t2]; };
+    const wx = W(tx), wy = W(ty); let v = 0;
+    for (let j = 0; j < 4; j++) { const yy = Math.min(h - 1, Math.max(0, by + j - 1)) * w; let r = 0;
+      for (let i = 0; i < 4; i++) r += d[yy + Math.min(w - 1, Math.max(0, bx + i - 1))] * wx[i];
+      v += r * wy[j]; }
+    return v;
+  }
   // ---------- shared tile geometry (u, v, skirt) ----------
   function buildTileGeometry(GRID) {
     const n = GRID + 1; const pos = []; const idx = [];
@@ -56,13 +87,23 @@
   // the weights of an elevation texture's red and green, to steps: the heights' two bytes (low, high), the old packs' one
   const HEIGHTS_K = [255, 65280], OLD_K = [255, 0];
   const SHORE_FLAT = 60;
+  // The gullies of a mountainside (the fragment shader's gullyIn): metres to a texel of the noise across a slope and down it, how
+  // deep they cut (times the first), how dark their beds lie. Each of four frames, a quarter of a right angle apart, has its phase
+  // at a tile's centre worked out here in double precision, so that tiles meet.
+  const GULLY = { across: 12, down: 120, deep: 1.0, dark: 0.25 };
+  function gullyPhases(gx, gy) {
+    const fr = (x) => ((x % 1) + 1) % 1, kx = R_M / (GULLY.across * 512), ky = R_M / (GULLY.down * 512), out = [];
+    for (let i = 0; i < 4; i++) { const an = i * Math.PI / 4, dx = Math.cos(an), dy = Math.sin(an), cx = -dy, cy = dx; out.push(new THREE.Vector2(fr((gx * cx + gy * cy) * kx), fr((gx * dx + gy * dy) * ky))); }
+    return out;
+  }
   // the air between the eye and the ground (air.js), worked out at the corners of the mesh: it changes slowly, and the mesh is fine where the eye is near
   const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.LAND : '4.0';
   const VERT = `
     uniform float uLon0, uDLon, uLat0, uDLat, uLatC, uLonC; uniform vec2 uGeoC, uPhaseB;
     uniform float uDLon0, uDLat0, uMercA, uTanA, uCosA;   // tile-centre-relative offsets and the Mercator terms for the fine (metre-scale) texture frame
-    uniform sampler2D uElev, uNoise, uImg, uWater; uniform vec4 uElevRect, uImgRect, uWaterRect, uWaterP; uniform vec2 uElevTexel, uElevK; uniform float uElevMin, uElevScale, uExag, uSkirt, uCamAlt, uQuality, uShoreQ, uWaterL;
-    varying vec2 vUV, vGL, vGLf;
+    uniform sampler2D uElev, uNoise, uImg, uWater; uniform vec4 uElevRect, uImgRect, uWaterRect, uWaterP; uniform vec2 uElevTexel, uElevK; uniform float uElevMin, uElevScale, uExag, uSkirt, uCamAlt, uQuality, uShoreQ, uWaterL, uElevCR;
+    varying vec2 vUV, vGL, vGLf; varying vec3 vNrmV;
+    ${ELEV_CR}
     ${WDEC} varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     ${AIR_V}
     const float R_MV = ${R_M.toFixed(1)};
@@ -71,8 +112,11 @@
       vNM = normalMatrix;
       float u = position.x, v = position.y;
       float lon = uLon0 + u * uDLon; float lat = uLat0 + v * uDLat;
-      float ev = dot(texture2D(uElev, uElevRect.xy + vec2(u, v) * uElevRect.zw).rg, uElevK);      // (steps above uElevMin: the heights' two bytes, or the old packs' one)
+      vec2 epuv = uElevRect.xy + vec2(u, v) * uElevRect.zw; vec3 ecr = uElevCR > 0.5 ? elevCR(epuv) : vec3(dot(texture2D(uElev, epuv).rg, uElevK), 0.0, 0.0);      // (steps above uElevMin: the heights' two bytes, or the old packs' one; and how they change a texel at a time. uElevCR 0: weighed between four texels, as before 0.25)
+      float ev = ecr.x;
       float h = max(uElevMin + ev * uElevScale, 0.0);
+      { vec2 esz = vec2(textureSize(uElev, 0)) * uElevRect.zw, tm = vec2(abs(uDLon) * R_MV * max(cos(lat), 0.02), abs(uDLat) * R_MV) / esz;      // (metres to a texel east and north)
+        vNrmV = vec3(-ecr.y * uElevScale / tm.x * uExag, ecr.z * uElevScale / tm.y * uExag, 1.0); }      // (the ground's normal at this corner, east, north, up: the pack's y runs south)
       // (the water's edge, where the field of it is here: how far inland this corner lies, and what water lies off it)
       float wdv = 1e4, wkv = 0.0, wlv = h;      // (how far to the water's edge, what water it is, how high it stands: its own ground where that is not known)
       if (uWaterP.x > 1.5) { wdv = uWaterP.z; wkv = uWaterP.w; }
@@ -135,9 +179,13 @@
 
   const FRAG = `
     precision highp float;
-    uniform sampler2D uElev; uniform vec4 uElevRect; uniform vec2 uElevTexel, uElevK; uniform float uElevMin, uElevScale, uExag;
+    uniform sampler2D uElev; uniform vec4 uElevRect; uniform vec2 uElevTexel, uElevK; uniform float uElevMin, uElevScale, uExag, uElevCR;
     uniform sampler2D uImg; uniform vec4 uImgRect; uniform vec2 uImgK;
     uniform vec4 uWaterK;      // (x: how ragged the shore; y, z, w: to try things by)
+    // The gullies of a mountainside: four frames of the noise turned by a quarter of a right angle each, stretched down the slope
+    // (uGulK.x metres to a texel of the noise across it, y down it); their phases at the tile's centre (worked out in double
+    // precision for the tile, so that tiles meet); z how deep they cut (the shading), w how dark they lie.
+    uniform vec2 uGulPh[4]; uniform vec4 uGulK;
     // The sky as still water would mirror it: its light at five heights above the horizon (the root of the height's sine: 0, a
     // quarter .. 1) toward the sun, across and away from it, worked out once a frame where the camera stands (main.js: skyMirror).
     uniform float uWild;      // (how far the country nobody farms is given back the colours it had before the plough: 1 wholly, 0 the photograph as it is)
@@ -173,7 +221,7 @@
     uniform vec2 uSimRes, uSel, uHover; uniform float uFertView, uPolitical, uLens, uLabelsOn;
     uniform sampler2D uClouds; uniform float uCloudShift, uCloudVis, uCloudNear; uniform vec2 uPhaseB, uPhaseRot;
     uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality, uGlow;      // uGlow: 1 where the picture can hold light brighter than white (post.js lets it bleed), else 0
-    varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
+    varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM; varying vec3 vNrmV;
     const float PI = 3.14159265;
     ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
     ${AIR_F}
@@ -350,6 +398,19 @@
     // geographic texture coordinate at scale k = m*50 (per radian): tile-centre phase (double precision, CPU) + precise local offset
     vec2 gc(float m) { return fract(uPhaseB * m) + vGL * (m * 50.0); }
     float hash21(vec2 p) { p = mod(p, 1024.0); vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+    // One frame of the gullies (i: 0 .. 3, a quarter of a right angle each): how much of a gully this place is (1 in the bed of
+    // one, 0 on the rib between two) and how that changes across the slope, a metre at a time. Looked up at a level of the noise
+    // worked out from the frame itself (between two frames the card's own reckoning of it is nonsense).
+    vec2 gullyIn(int i, vec2 q, vec2 qx, vec2 qy) {
+      float an = float(i) * 0.78539816; vec2 d = vec2(cos(an), sin(an)), c = vec2(-d.y, d.x);
+      vec2 k = vec2(${R_M.toFixed(1)} / (uGulK.x * 512.0), ${R_M.toFixed(1)} / (uGulK.y * 512.0));
+      vec2 uv = uGulPh[i] + vec2(dot(q, c), dot(q, d)) * k;
+      vec2 ux = vec2(dot(qx, c), dot(qx, d)) * k * 512.0, uy = vec2(dot(qy, c), dot(qy, d)) * k * 512.0;
+      float lod = max(0.5 * log2(max(dot(ux, ux), dot(uy, uy))), 0.0);
+      float e = 0.5 / 512.0, n0 = textureLod(uNoise, uv, lod).b, n1 = textureLod(uNoise, uv + vec2(e, 0.0), lod).b;
+      float r0 = 1.0 - abs(2.0 * n0 - 1.0), r1 = 1.0 - abs(2.0 * n1 - 1.0); r0 *= r0 * r0; r1 *= r1 * r1;
+      return vec2(r0, (r1 - r0) / (0.5 * uGulK.x));
+    }
     void main() {
       // ---------- geometry ----------
       float cl = cos(vLat);
@@ -362,6 +423,10 @@
       float dhdx = (hE - hW) / (2.0 * tuv.x * tileWm);
       float dhdy = (hN - hS) / (2.0 * tuv.y * tileHm);     // toward north
       vec3 nEnu = normalize(vec3(-dhdx * uExag, -dhdy * uExag, 1.0));
+      // (Close to, a texel of the heights is many pixels across and the creases between texels show as facets: there the corners'
+      //  own normal, from the smooth surface the mesh is drawn on, weighed across each quad of the mesh.)
+      if (uElevCR > 0.5) { vec2 eT = fwidth(vUV * uElevRect.zw * vec2(textureSize(uElev, 0))); float nearE = smoothstep(0.35, 0.12, max(eT.x, eT.y));
+        if (nearE > 0.0) nEnu = normalize(mix(nEnu, normalize(vNrmV), nearE)); }
       float slope = 1.0 - nEnu.z;                           // 0 flat .. ~1 cliff
       // variation noise in geographic space (stable across tiles and LODs)
       #ifdef USE_GROUND
@@ -519,6 +584,28 @@
         vec2 add = (g1 * 0.021 * (0.08 + st) + g2 * 0.0127 * (0.08 + st * 1.2)) * bumpA * (0.55 + 0.9 * nMac.r);
         nEnu = normalize(vec3(nEnu.xy - add, nEnu.z));
         slope = 1.0 - nEnu.z;
+      }
+      // ---------- the gullies of a mountainside ----------
+      // Frost and water cut every steep slope into gullies that run straight down it, ribs of rock between them; from a few
+      // kilometres off they are what a mountainside is made of. The noise is stretched down the slope: four frames of it, a
+      // quarter of a right angle apart, the two either side of the slope's own way weighed by how near it they lie.
+      float gully = 0.0, gullyW = 0.0;
+      {
+        vec2 qx = dFdx(vGL), qy = dFdy(vGL); float px = sqrt(max(dot(qx, qx), dot(qy, qy))) * ${R_M.toFixed(1)};      // (metres to a pixel)
+        gullyW = smoothstep(0.18, 0.42, slope) * (1.0 - smoothstep(uGulK.x * 0.6, uGulK.x * 2.0, px)) * step(0.5, uQuality) * step(0.001, uGulK.z + uGulK.w);      // (none at all where they neither cut nor darken: __T.costsNear)
+        if (gullyW > 0.01) {
+          // (down the slope, as the ground lies over a kilometre or so: by the ground's own normal the way changed at every crease
+          //  between the heights' texels, and the gullies with it, in facets)
+          vec2 t4 = tuv * 2.5; vec2 g4 = vec2((hAt(vUV + vec2(t4.x, 0.0)) - hAt(vUV - vec2(t4.x, 0.0))) / (2.0 * t4.x * tileWm), (hAt(vUV - vec2(0.0, t4.y)) - hAt(vUV + vec2(0.0, t4.y))) / (2.0 * t4.y * tileHm));
+          vec2 dn = -g4 / max(length(g4), 1e-6);
+          float a4 = mod(atan(dn.y, dn.x), PI) * (4.0 / PI); float f0 = floor(a4), f = smoothstep(0.0, 1.0, a4 - f0); int i0 = int(f0) & 3, i1 = (i0 + 1) & 3;
+          vec2 g0 = gullyIn(i0, vGL, qx, qy), g1 = gullyIn(i1, vGL, qx, qy);
+          gully = mix(g0.x, g1.x, f) * gullyW;
+          // (the bed of a gully lies lower than its ribs: the slope across it leans the ground's normal)
+          float an0 = f0 * 0.78539816, an1 = an0 + 0.78539816; vec2 c0 = vec2(-sin(an0), cos(an0)), c1 = vec2(-sin(an1), cos(an1));
+          vec2 lean = (c0 * g0.y * (1.0 - f) + c1 * g1.y * f) * uGulK.z * uGulK.x * gullyW;
+          nEnu = normalize(vec3(nEnu.xy + lean, nEnu.z));
+        }
       }
       // ---------- land colour: biome splatting driven by imagery + terrain ----------
       vec3 base = img.rgb;
@@ -706,6 +793,8 @@
         dl = clamp(dl, 0.12, 0.9); dl2 = dl; gHU = hU;
         forestFar = 1.0 - gndFarK(7.0);      // (how much of a wood's floor is seen, and not its canopy: only the floor lies in the trees' shade)
         land = mix(land, tex, gOn * uGndK.y);
+        land *= 1.0 - min(uGulK.w, 1.0) * gully * (1.0 - wForest);      // (the bed of a gully: shade, damp, fallen stone)
+        if (uGulK.w > 1.5) land = vec3(gully, gullyW, 0.0);
         // autumn and winter colours for the deciduous belt; grass dries off in winter
         land = mix(land, land * vec3(1.38, 0.96, 0.5), fall * (wForest * 0.8 + wGrass * 0.12));
         land = mix(land, mix(land, vec3(0.42, 0.36, 0.3), 0.6), bare * wForest * 0.7);
@@ -1436,6 +1525,10 @@
       // picture's own map of land and water. Where it has not been fetched, or a pack of it is still on its way, the
       // picture's map serves as it always did.
       this.uWaterL = { value: 0 };      // (1: the packs say how high every lake stands)
+      // the gullies of a mountainside (the fragment shader's gullyIn): metres to a texel of the noise across a slope and down it, how
+      // deep they cut, how dark their beds lie
+      this.uGulK = { value: new THREE.Vector4(GULLY.across, GULLY.down, GULLY.deep, GULLY.dark) };
+      this.uElevCR = { value: 1 };      // (1: the ground drawn on the heights' Catmull-Rom surface, elevCR; 0 as before 0.25, to compare)
       this.water = opts.water && opts.water.levels && opts.water.code ? opts.water : null; this.wMin = 99; this.wMax = -1;
       if (this.water && Object.keys(WCODE).some((k) => Math.abs(this.water.code[k] - WCODE[k]) > 1e-6)) { console.warn('water: the pack has another code than this game reads; the coasts are the picture\'s own'); this.water = null; }
       if (this.water && this.water.level && (Math.abs(this.water.level.max - WLEV.max) > 1e-6 || Math.abs(this.water.level.pow - WLEV.pow) > 1e-6)) { console.warn('water: the pack counts its lakes\' levels another way than this game reads; lakes lie as the heights have them'); this.water = Object.assign({}, this.water, { level: null }); }
@@ -1690,6 +1783,7 @@
         uPhF: { value: new THREE.Vector2(fr(gX * k0), fr(gY * k0)) }, uPhN: { value: new THREE.Vector2(m16(gX * k0), m16(gY * k0)) }, uPhR: { value: new THREE.Vector2(fr(rX * kR), fr(rY * kR)) }, uK0: { value: k0 }, uKR: { value: kR },
         uElev: { value: this.flatTex }, uElevRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uElevTexel: { value: new THREE.Vector2(1, 1) }, uElevMin: { value: 0 }, uElevScale: { value: 0 }, uElevK: { value: new THREE.Vector2(255, 0) },
         uImg: { value: this.blankImg }, uImgRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uImgK: { value: new THREE.Vector2(4096, 4096) },
+        uGulK: this.uGulK, uGulPh: { value: gullyPhases(gx, gy) }, uElevCR: this.uElevCR,
         uWater: { value: this.waterTex }, uWaterRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uWaterP: { value: new THREE.Vector4(0, 1, 0, 0) }, uShoreQ: { value: SHORE_FLAT }, uWaterL: this.uWaterL,      // (P: 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; and for 2 the distance and the kind)
         uExag: { value: this.exag }, uSkirt: { value: Math.max(b.w, b.h) * GEO.D2R * 0.06 + 0.00002 },
       };
@@ -1863,10 +1957,10 @@
       const lon0 = -180 + px * per * 360 / tilesX, lat0 = 90 - py * per * 180 / tilesY;
       const ap = this.heights ? this.heights.apron || 0 : 0;      // (the heights' packs carry a rim of their neighbours' texels)
       const fx = ap + ((lon - lon0) / lonW) * (best.w - 2 * ap) - 0.5, fy = ap + ((lat0 - lat) / latH) * (best.h - 2 * ap) - 0.5;
-      const x0 = Math.max(0, Math.min(best.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(best.h - 2, Math.floor(fy)));
-      const ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0));
-      const d = best.data, w = best.w;
-      const v = (d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay;
+      let v;
+      if (this.uElevCR.value) v = elevCRAt(best.data, best.w, best.h, fx, fy);      // (Catmull-Rom, as the vertex shader draws the ground: elevCR)
+      else { const x0 = Math.max(0, Math.min(best.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(best.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)), d = best.data, w = best.w;
+        v = (d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay; }
       let h0 = Math.max(0, best.min + v * best.scale);
       if (this.dispOn !== null) { const sd = this.shoreAt(lon, lat); this._sd = sd; if (sd !== null) { const sh = sm01(SHORE_FLAT, SHORE_FLAT + SHORE_RISE, sd); h0 = (this.wLevel >= 0 ? this.wLevel : h0) * this.wKind * (1 - sh) + h0 * sh; } }      // (the sea lies at nought: see SHORE_RISE; not for rawHeight)
       return h0 > 1 ? h0 + this.dispAt(lon, lat, h0, bestL) : h0;
@@ -1903,8 +1997,10 @@
     gpuVertexH(t, u, v) {
       const U = t.uniforms; const eb = t.ePack; if (!eb || eb.absent || !eb.pack || !eb.pack.data) return 0;
       const p = eb.pack; const R = U.uElevRect.value; const TX = U.uElevTexel.value;
-      const samp = (uu, vv) => { let fx = uu * p.w - 0.5, fy = vv * p.h - 0.5; const x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy))); const ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)); const d = p.data, w = p.w; return (d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay; };
+      const sampB = (uu, vv) => { const fx = uu * p.w - 0.5, fy = vv * p.h - 0.5, x0 = Math.max(0, Math.min(p.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(p.h - 2, Math.floor(fy))), ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0)), d = p.data, w = p.w; return (d[y0 * w + x0] * (1 - ax) + d[y0 * w + x0 + 1] * ax) * (1 - ay) + (d[(y0 + 1) * w + x0] * (1 - ax) + d[(y0 + 1) * w + x0 + 1] * ax) * ay; };
+      const samp = this.uElevCR.value ? (uu, vv) => elevCRAt(p.data, p.w, p.h, uu * p.w - 0.5, vv * p.h - 0.5) : (uu, vv) => sampB(uu, vv);      // (Catmull-Rom, as the vertex shader has it: elevCR)
       const hAt = (uu, vv) => Math.max(U.uElevMin.value + samp(R.x + uu * R.z, R.y + vv * R.w) * U.uElevScale.value, 0);
+      const hAtB = (uu, vv) => Math.max(U.uElevMin.value + sampB(R.x + uu * R.z, R.y + vv * R.w) * U.uElevScale.value, 0);      // (weighed between four texels, as the vertex shader's hAtV has it for the small relief's slope)
       let h = hAt(u, v);
       // (the water's edge as the vertex shader has it: the tile's own pack, weighed between its texels as the card weighs them)
       let wdv = null, wkv = 0, wlv = h; { const wb = t.wPack;
@@ -1920,8 +2016,8 @@
         const b = GEO.tileBounds(t.L, t.tx, t.ty); const lonR = (b.lon0 + u * b.w) * GEO.D2R, latR = (b.lat0 - v * b.h) * GEO.D2R;
         const cl0 = Math.cos(latR); const geo = U.uGeoC.value, ph = U.uPhaseB.value; const glx = lonR * cl0 - geo.x, gly = latR - geo.y;
         const tux = TX.x * 1.6 / R.z, tuy = TX.y * 1.6 / R.w; const dLon = Math.abs(U.uDLon.value), dLat = Math.abs(U.uDLat.value);
-        const dhx = (hAt(u + tux, v) - hAt(u - tux, v)) / (2 * tux * dLon * R_M * Math.max(cl0, 0.02));
-        const dhy = (hAt(u, v - tuy) - hAt(u, v + tuy)) / (2 * tuy * dLat * R_M);
+        const dhx = (hAtB(u + tux, v) - hAtB(u - tux, v)) / (2 * tux * dLon * R_M * Math.max(cl0, 0.02));
+        const dhy = (hAtB(u, v - tuy) - hAtB(u, v + tuy)) / (2 * tuy * dLat * R_M);
         const sl = 1 - 1 / Math.sqrt(1 + (dhx * dhx + dhy * dhy) * this.exag * this.exag);
         const tt = Math.min(1, Math.max(0, (sl - 0.05) / 0.3)); const st = tt * tt * (3 - 2 * tt);
         const n = this.noiseData; const fr = (x) => x - Math.floor(x);

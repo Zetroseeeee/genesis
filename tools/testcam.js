@@ -115,6 +115,12 @@ window.__T.oldHeights = function (on) {
   return T.heights ? 'the heights' : 'the old packs';
 };
 // What the heights cost against the old packs, turn and turn about (a new pack for every tile each time: settle long)
+// What the near ground costs (terrain.js: the heights' Catmull-Rom surface, elevCR; the gullies, gullyIn), turn and turn about
+window.__T.costsNear = function () {
+  const T = __G.terrain, K = T.uGulK.value, k0 = K.clone();
+  const set = (cr, gul) => { T.uElevCR.value = cr; if (gul) K.copy(k0); else K.set(k0.x, k0.y, 0, 0); };
+  __T.cost([['as it is', () => set(1, 1)], ['no gullies', () => set(1, 0)], ['weighed between four', () => set(0, 0)], ['as it is again', () => set(1, 1)], ['no gullies again', () => set(1, 0)], ['weighed between four again', () => set(0, 0)], ['as it is a third time', () => set(1, 1)]], 4, 3000);
+};
 window.__T.costsHeights = function () {
   __T.cost([['the heights', () => { __T.oldHeights(false); }], ['the old packs', () => { __T.oldHeights(true); }], ['the heights again', () => { __T.oldHeights(false); }], ['the old packs again', () => { __T.oldHeights(true); }], ['the heights a third time', () => { __T.oldHeights(false); }]], 4, 12000);
 };
