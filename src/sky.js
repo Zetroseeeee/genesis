@@ -227,7 +227,7 @@
       // The heaps and their lumps are looked up by the curve until a place is well under a pixel, then by the card's own
       // coarser copies. Not sooner: weighed straight, every place of the block has a slope of its own, and the light, which
       // goes by the slope, made a cloud low in the sky of flat bars, each lit or not.
-      float g1 = (1.0 - smoothstep(2.0, 6.0, tpp)) * uGrainOn * uFar1, g0 = (1.0 - smoothstep(3.0, 8.0, tpp * 0.23)) * uGrainOn, n1 = 0.5, n0 = 0.5;
+      float g1 = (1.0 - smoothstep(2.0, 6.0, tpp)) * uGrainOn, g0 = (1.0 - smoothstep(3.0, 8.0, tpp * 0.23)) * uGrainOn, n1 = 0.5, n0 = 0.5;
       float k1 = 1.0 - smoothstep(2.5, 5.0, tpp), k0 = 1.0 - smoothstep(2.5, 5.0, tpp * 0.23);
       if (g1 > 0.0) { float v = 0.0; if (k1 < 1.0) v = textureGrad(uGrain, p1, dx * 318.0, dy * 318.0).r; if (k1 > 0.0) v = mix(v, grain3(p1), k1); n1 = mix(0.5, v, g1); }
       // (the lumps, which count for less and are larger, by a cheaper curve: one lookup with its place moved toward the middle of
@@ -276,11 +276,11 @@
       // to pixel, and its slope was nought, nought, nought and a step - bars of light and shade when the sun was low and the
       // slope counted; and from far, where a heap is a pixel, the slope from pixel to pixel was dice.)
       // (not where the heaps are a pixel or two across: there the slope is less than the light can show, and two lookups a pixel are not nothing)
-      if (g1 > 0.2) {
+      if (g1 * uFar1 > 0.2) {
         float lodS = max(log2(max(tpp, 1e-3)), 1.0); vec3 off = sQ * 0.0195;
         vec2 mq = 0.72 * mix(vec2(0.5), vec2(textureLod(uGrain, p1 + off, lodS).r, textureLod(uGrain, p1 - off, lodS).r), g1) + 0.28 * n0, xq = (mq - thr) / 0.11;
         vec2 tq = mix(clamp(c + (mq - 0.5) * gather, 0.0, 1.0), max((1.0 - exp(-max(xq, 0.0) * 0.4)) * smoothstep(-0.55, 0.55, xq), vec2(veil * 0.4)), dK);
-        slope = (tq.x - tq.y) * 8150.0 * smoothstep(0.2, 0.45, g1);      // (to the unit of the globe: the two are 1.23e-4 of it apart)
+        slope = (tq.x - tq.y) * 8150.0 * smoothstep(0.2, 0.45, g1 * uFar1);      // (to the unit of the globe: the two are 1.23e-4 of it apart)
       }
       vec3 nV = normalize(vPosV - uAirC), vd = normalize(vPosV); float sunUp = dot(nV, uAirS), cosV = abs(dot(vd, nV));
       // (seen from above, a country under cloud is no country to rule: looked straight down through from where the game is
@@ -350,8 +350,8 @@
       U.uBelow.value = below ? 1 : 0; U.uOpacity.value = fade; U.uNear.value = near; U.uCover.value.set(below ? 0.9 : 1.05, below ? 0.78 : 1); U.uThin.value = below ? 1 : 1 - 0.38 * near; U.uDown.value = below ? 0 : 1;
       // (heaps of cloud are drawn where one is some pixels across: from under them out to where a pixel is a kilometre of the shell,
       //  from over them a third as far, and only while the eye is within some two hundred kilometres of them: from where the game is
-      //  played the heaps, and the smaller of the two sizes that gather the picture's cloud, cost a fifth of the frame - the eye
-      //  had every pixel of a screen of cloud to go through - for a grain the map is better without)
+      //  played the heaps and the light's two lookups cost a fifth of the frame - the eye had every pixel of a screen of cloud to
+      //  go through - for a grain the map is better without)
       U.uGrainK.value.set(below ? 0.5e-4 : 2e-5, below ? 1.6e-4 : 6e-5); U.uFar1.value = below ? 1 : 1 - sm(0.025, 0.05, alt);
       this.vis = this.on && SKY.ready.clouds ? 1 - 0.38 * near : 0; this.mesh.visible = this.vis > 0 && fade > 0.004;
       // (from under them they are behind everything else that is seen through - smoke, flames, the leaves' edges - and are drawn before it; from above, in front of it all and after)
