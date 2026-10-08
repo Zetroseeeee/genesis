@@ -2,7 +2,7 @@
 // a house is skipped if its model would stand in a neighbour's).   node tools/density.js [eras, default 1] [cultures]
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
-require('../src/geo.js'); (0, eval)(fs.readFileSync('src/town.js', 'utf8')); (0, eval)(fs.readFileSync('src/econ.js', 'utf8')); (0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/sim.js', 'utf8'));
+require('../src/geo.js'); (0, eval)(fs.readFileSync('src/town.js', 'utf8')); (0, eval)(fs.readFileSync('src/econ.js', 'utf8')); (0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/sim.js', 'utf8'));
 const W = 720, H = 360, N = W * H; const png = PNG.sync.read(fs.readFileSync('data/world.png'));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
 for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.data[i * 4 + 1] / 255; wd.flags[i] = png.data[i * 4 + 2]; wd.land[i] = png.data[i * 4 + 2] & 1; }

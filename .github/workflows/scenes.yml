@@ -59,7 +59,7 @@ jobs:
             name=$(echo "$name" | xargs); [ -z "$name" ] && continue
             if [ -n "$ONLY" ]; then case " $ONLY " in *" $name "*) ;; *) continue;; esac; fi
             scene=$(echo "$scene" | xargs); settle=$(echo "${settle:-30}" | xargs)
-            { cat tools/testcam.js; echo; echo "window.__scene = ${opts:-null};"; cat "$scene"; echo; echo "${script:-}"; } > "out/$name.js"
+            { cat tools/testcam.js; echo; echo "window.__scene = ${opts:-null};"; for f in $scene; do cat "$f"; echo; done; echo "${script:-}"; } > "out/$name.js"
             GENESIS_SMOKE_SHOT="$PWD/out/scene-$name.png" GENESIS_SMOKE_SCRIPT="$PWD/out/$name.js" GENESIS_SMOKE_SETTLE="$settle" \
               release/mac-arm64/Holocene.app/Contents/MacOS/Holocene --smoke < /dev/null 2>/dev/null | grep GENESIS-SMOKE | sed "s/^/$name /" >> out/scenes.log || true
             tail -n 1 out/scenes.log | cut -c1-400

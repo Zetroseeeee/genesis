@@ -101,7 +101,7 @@
     g.wallstub = merge([box(1, 0.55, 1, 0, 0, 0), box(0.3, 0.45, 1.04, -0.35, 0.55), box(0.2, 0.2, 1.04, 0.3, 0.55)]);
     g.pillars = merge([cyl(0.06, 0.07, 1, 6, -0.4, 0, 0), cyl(0.06, 0.07, 0.7, 6, -0.13, 0, 0), cyl(0.06, 0.07, 1, 6, 0.13, 0, 0), cyl(0.06, 0.07, 0.45, 6, 0.4, 0, 0), box(1, 0.08, 0.3, 0, 0)]);
     g.tent = merge([cone(0.55, 1, 6).scale(1, 1, 0.8), box(0.9, 0.04, 0.9, 0, 0)]);
-    g.bigtent = merge([box(1, 0.5, 1), gableRoof(1.1, 0.5, 1.1, 0, 0.5), box(0.04, 1.4, 0.04, 0, 0, 0)]);
+    g.bigtent = merge([cyl(0.5, 0.5, 0.42, 14), cone(0.6, 0.55, 14, 0, 0.42), box(0.03, 1.32, 0.03, 0, 0, 0)]);      // a captain's pavilion: round, a cone of cloth on a low wall, the pole through it
     g.catapult = merge([box(0.5, 0.15, 0.9), box(0.08, 0.7, 0.08, 0, 0.15, -0.2).rotateX(-0.5).translate(0, 0.1, 0.1), box(0.6, 0.05, 0.05, 0, 0.7, 0.05)]);
     g.cannon = merge([cyl(0.09, 0.13, 1, 8).rotateZ(Math.PI / 2).translate(0.1, 0.4, 0), cyl(0.3, 0.3, 0.1, 10).rotateX(Math.PI / 2).translate(-0.2, 0.3, 0.32), cyl(0.3, 0.3, 0.1, 10).rotateX(Math.PI / 2).translate(-0.2, 0.3, -0.32)]);
     g.crane = merge([box(0.5, 0.1, 0.5), box(0.3, 0.9, 0.3, 0, 0.1), box(0.3, 0.08, 2.4, 0, 0.9, 0.4), box(0.1, 0.6, 0.1, 0, 0.98, 1.0)]);

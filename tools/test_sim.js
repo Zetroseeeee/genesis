@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -142,7 +142,7 @@ log('2. player actions and god powers');
   const mineCell = sim.LI.find(j => sim.owner[j] === c.id && sim.goods[j] && sim.knows(c, j) && sim.level[j]);
   r.mineNo = sim.act('mine', i0); check(/yields nothing to work|Already|cannot yet/.test(r.mineNo) || /under construction/.test(r.mineNo), `work on the capital's own good: "${r.mineNo}"`);
   if (mineCell !== undefined && !sim.inProgress(mineCell, 'mine') && !(sim.special[mineCell] & 512)) { const why = sim.cannot('mine', mineCell); if (!why) { r.mine = sim.act('mine', mineCell, 0); check(new RegExp(sim.workName(mineCell) + ' under construction').test(r.mine), `${sim.workName(mineCell)}: "${r.mine}"`); finish(sim.durOf('mine', c.era) + 1); check(!!(sim.special[mineCell] & 512) && sim.slotOf(mineCell, 'mine') === 0, 'mine finished on plot 1'); } }
-  r.levy = sim.act('levy', -1); check(/Army raised/.test(r.levy) && c.army > sim.year, `levy: "${r.levy}"`);
+  r.levy = sim.act('levy', -1); check(/takes the field/.test(r.levy) && c.army > sim.year && sim.army.of(c.id).length === 1, `levy: "${r.levy}"`);
   const other = sim.settlementsOf(c.id).find(j => j !== i0 && sim.level[j] >= 2);
   if (other !== undefined) { r.capital = sim.act('capital', other); check(/Capital moved/.test(r.capital) && c.capital === other, `capital: "${r.capital}"`); sim.act('capital', i0); }
   c.wealth = 0; c.army = -99999; r.poor = sim.act('levy', -1); check(/Not enough/.test(r.poor), `no money: "${r.poor}"`); c.wealth = 1e6;
@@ -690,6 +690,61 @@ log('11. diplomacy');
   { const T = {}; for (const k of ['tick', 'step', 'warsEnd', 'warWith', 'heir']) { const f = dp[k]; T[k] = 0; dp[k] = function () { const t = process.hrtime.bigint(); const r = f.apply(this, arguments); T[k] += Number(process.hrtime.bigint() - t) / 1e6; return r; }; }
     for (let y = 0; y < 300; y++) sim.tick(); let sum = 0; for (const k in T) sum += T[k]; log(`   diplomacy takes ${(sum / 300).toFixed(3)} ms a year for ${sim.st.civCount} realms (${Object.entries(T).map(([k, v]) => k + ' ' + (v / 300).toFixed(3)).join(', ')})`);
     check(sum / 300 < 1.0, `diplomacy is quick enough (${(sum / 300).toFixed(3)} ms a year)`); }      // (0.75 here in the Iron Age with three hundred realms, a tenth of it this clock's own: a thirtieth of the year)
+}
+}
+if (want(12)) {
+// ---------- 12. hosts and fleets: they march, take land, lay siege, give battle, and are saved ----------
+log('12. armies');
+{
+  const sim = createSim(wd, 33); const W2 = sim.W; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  // a strip of land: the player at one end, an enemy beside him, a neutral realm beyond
+  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  const c = sim.setPlayer(i0, 'Hosts', null); const A = sim.spawnTribe(i0 + 4, {}), B = sim.spawnTribe(i0 + 9, {});
+  for (let d = 2; d <= 6; d++) for (const e of [-W2, 0, W2]) { sim.owner[i0 + d + e] = A.id; sim.pop[i0 + d + e] = 1.2; }
+  for (let d = 7; d <= 10; d++) for (const e of [-W2, 0, W2]) { sim.owner[i0 + d + e] = B.id; sim.pop[i0 + d + e] = 1.2; }
+  for (const d of [-1, 1]) for (const e of [-W2, 0, W2]) { sim.owner[i0 + d + e] = c.id; sim.pop[i0 + d + e] = 2; }
+  sim.pop[i0] = 6; A.capital = i0 + 5; B.capital = i0 + 9; sim.pop[i0 + 5] = 4;
+  const all = [c, A, B]; for (const x of all) { x.aggression = 0; if (x !== c) x.dip.think = 1e12; x.tech = sim.ERAS[2][1] + 0.01; x.era = 2; teach(sim, x, 2); }
+  sim.touchAll(); sim.tick(); c.wealth = 1e6;
+  const AR = sim.army;
+  // the levy takes the field as a host
+  const msg = sim.act('levy', i0); const h = AR.of(c.id)[0];
+  check(!!h && h.men > 40 && !h.ai && /host|army/.test(h.name), `the levy takes the field: "${msg}" (${h ? h.men : 0} men)`);
+  check(AR.order(h.id, i0 + 9) && /not at war|will not let/.test(AR.order(h.id, i0 + 9)), 'a host may not march into a realm it is not at war with: ' + AR.order(h.id, i0 + 9));
+  // war; the enemy keeps a host on the front; the player's marches on the enemy's capital, region by region
+  check(sim.diplo.declare(c, A, 'none') === null && sim.isAtWar(c, A.id), 'war on the neighbour');
+  check(AR.order(h.id, A.capital) === null && h.path.length >= 4 && h.state === 'march', `the host is sent to their capital: ${h.path.length} regions`);
+  const cells0 = sim.cellsOf[c.id]; let foeHost = null, y0 = sim.year;
+  for (let y = 0; y < 60 && sim.owner[A.capital] !== c.id; y++) { sim.tick(); foeHost = foeHost || AR.list.find(a => a.ai && a.c === A.id); }
+  check(!!foeHost, 'the enemy keeps a host on the front');
+  check(AR.stats.taken > 0 && sim.cellsOf[c.id] > cells0, `the host takes the enemy's regions as it comes to them (${AR.stats.taken} taken in ${sim.year - y0} years)`);
+  check(AR.stats.battles > 0, `hosts that meet give battle (${AR.stats.battles})`);
+  // a walled town is besieged, and falls
+  if (sim.civs[A.id] && sim.owner[A.capital] === A.id) {
+    const cap = A.capital; sim.walls[cap] = 2; sim.level[cap] = Math.max(1, sim.level[cap]);
+    const hh = AR.of(c.id)[0] || (sim.act('levy', i0), AR.of(c.id)[0]); hh.men = Math.max(hh.men, 5000); hh.morale = 1;
+    AR.order(hh.id, cap); let sieged = false;
+    for (let y = 0; y < 120 && sim.owner[cap] === A.id; y++) { sim.tick(); if (hh.state === 'siege') sieged = true; if (!AR.byId(hh.id)) break; }
+    check(sieged, 'a walled town is besieged');
+    check(sim.owner[cap] === c.id || sim.civs[A.id] !== A, `and falls (${sim.owner[cap] === c.id ? 'taken' : sim.civs[A.id] !== A ? 'the realm is gone' : 'held by ' + sim.owner[cap]})`); sim.tick();      // (a realm whose capital fell picks another the next year)
+  } else check(true, 'the capital fell to the march');
+  // save and load keep the hosts in the field
+  const hs = AR.list.length, saved = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(saved);
+  check(s2.army.list.length === hs && s2.army.list.every(a => typeof a.men === 'number' && a.cell >= 0), `saved and loaded: ${hs} hosts`);
+  // disbanded, the levy is over
+  const h3 = AR.of(c.id)[0]; if (h3) { AR.disband(h3.id); check(!AR.of(c.id).length && c.army <= sim.year, 'a host sent home ends the levy'); }
+  // a fleet needs a harbour
+  check(/harbour/i.test(sim.act('fleet', i0 + 1) || ''), 'a fleet needs a harbour: ' + sim.act('fleet', i0 + 1));
+  invariants(sim, 'the world of hosts in ' + sim.fmtYear(sim.year));
+}
+// the autopilot's hosts in a whole world: on every front, quick enough
+{
+  const sim = createSim(wd, 12345); for (let y = 0; y < 3000; y++) sim.tick();
+  const AR = sim.army; let ms = 0; for (let y = 0; y < 100; y++) { const t = process.hrtime.bigint(); sim.tick(); ms += Number(process.hrtime.bigint() - t) / 1e6; }
+  const wars = sim.civs.reduce((n, x) => n + (x ? Object.keys(x.wars).length : 0), 0);
+  log(`   ${sim.fmtYear(sim.year)}: ${AR.list.length} hosts in the field for ${wars / 2} wars, ${AR.stats.battles} battles; a year of hosts takes ${AR.stats.ms.toFixed(2)} ms`);
+  check(AR.list.length > 0 && AR.list.every(a => a.ai && sim.civs[a.c] && sim.isAtWar(sim.civs[a.c], a.foe)), 'the autopilot keeps hosts only on fronts of its wars');
+  check(AR.stats.ms < 4, `hosts are quick enough (${AR.stats.ms.toFixed(2)} ms a year)`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

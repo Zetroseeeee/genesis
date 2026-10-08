@@ -11,6 +11,7 @@ function createSim(world, seed) {
   const KNOW = window.KNOW;      // discoveries (know.js, loaded before this file)
   const RULE = window.RULE;      // forms of government, laws and estates (rule.js, loaded before this file)
   const DIPLO = window.DIPLO;    // pacts, causes of war and terms of peace (diplo.js, loaded before this file)
+  const ARMY = window.ARMY;      // hosts and fleets (army.js, loaded before this file)
   const { land, fert, elev, flags } = world;   // land Uint8, fert Float32 0..1, elev Uint8, flags Uint8 (1 land,2 river,4 coast,8 ice)
 
   // ---------- RNG ----------
@@ -160,6 +161,7 @@ function createSim(world, seed) {
   }
   let rule = null;      // (how each realm is governed: made further down, once the counts it reads exist)
   let diplo = null;     // (what realms have sworn to one another, and why they fight: likewise)
+  let army = null;      // (the hosts in the field and the fleets at sea: army.js)
   function fullName(c) { return rule ? rule.fullName(c) : c.name; }
   function religionName(st) {
     const base = makeName(st, 1, 2);
@@ -339,6 +341,9 @@ function createSim(world, seed) {
     faithLaw: (cv) => rule.ruleOf(cv).laws.faith, tradeLaw: (cv) => rule.ruleOf(cv).laws.trade, covets: (a, b) => { const g = covetOf(a, b); return g ? GOODS[g].name : ''; }, absorb, formFor,
     setForm: (cv, key) => { const F = RULE.FORM[key]; if (!F) return; if (!rule.known(cv.id, F)) rule.ruleOf(cv).brought = key; rule.setForm(cv.id, cv, F, 'imposed'); },
     alarm: () => {}, trait: (cv) => cv.ruler ? cv.ruler.trait : '', aggression: (cv) => cv.player ? (cv.policy.stance === 'aggressive' ? 0.9 : cv.policy.stance === 'consolidate' ? 0.25 : 0.5) : cv.aggression,      /* (the player's appetite is what his stance says, not a number he cannot see) */ ruler: (cv) => cv.ruler ? `${cv.ruler.title} ${cv.ruler.name}` : fullName(cv), nameOf: (cv) => fullName(cv), income: (cv) => cv.income || 0, fmtYear });
+  army = ARMY.create({ W, H, N, land, owner, level, walls, pop, flags, special, civs, nbOf, cellDist, elev, year: () => year, seed, isAtWar: (c, o) => c.wars[o] !== undefined, diplo,
+    strengthOf, mightOf, popOf, cellsOf, ports, portCells, battles, cellName, fullName, logEvent, conquer, neighbours: (c) => lastNb[c] || nearNb[c],
+    KF: (c, key) => KF[c * NKF + KK[key]], knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1 });
   function pickTrait(c) {
     const w = { conqueror: 1 + (c.aggression > 0.6 ? 1 : 0), builder: 1, pious: c.religion ? 1.4 : 0.6, scholar: c.era >= 3 ? 1.3 : 0.4, merchant: c.era >= 2 ? 1.2 : 0.3, tyrant: 0.5, steward: 1, navigator: c.era >= 3 && ports[c.id] ? 1.4 : 0.2 };
     let sum = 0; for (const k in w) sum += w[k]; let r = rnd() * sum; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return 'steward';
@@ -360,7 +365,7 @@ function createSim(world, seed) {
     for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c.id && level[i] >= 2) markRuin(i, c.era, c.culture); }
     // (its enemies' wars with it are over now: left on their lists until they next looked, they passed to whoever was born under its number)
     for (const k in c.wars) { const e = civs[+k]; if (e && e.wars[c.id] !== undefined) { delete e.wars[c.id]; warCnt[e.id] = -1; } }
-    c.alive = false; civCount--; st.civCount = civCount; civs[c.id] = null; freeIds.push(c.id); mightOf[c.id] = 0; diplo.died(c.id);
+    c.alive = false; civCount--; st.civCount = civCount; civs[c.id] = null; freeIds.push(c.id); mightOf[c.id] = 0; diplo.died(c.id); army.died(c.id);
     pushWorld({ year, text: `${fullName(c)} is no more${why ? ' — ' + why : ''}.`, civ: c.id, type: 'state', loc: c.capital, dead: true });
   }
 
@@ -417,6 +422,18 @@ function createSim(world, seed) {
     if (from >= 0) { const m = Math.min(pop[from] * 0.15, 3); pop[from] -= m; pop[i] += m; }
   }
 
+  // a region taken in war, from the border fights (sim's pass 2) or by a host (army.js): it changes hands, the fight is
+  // remembered (events.js draws it), and a town may be sacked
+  function conquer(n, c, from, siege) {
+    const on = owner[n], e = civs[on]; if (!e || on === c.id) return;
+    claim(n, c, from); cellsOf[on]--; cellsOf[c.id]++;
+    battles.push({ i: n, from, year, a: c.id, b: on, siege: !!siege, taken: true });
+    if (level[n] >= 2) {
+      const sackP = Math.min(0.7, 0.18 * (c.policy.stance === 'aggressive' ? 1.5 : 1) * (c.tech + 0.05 < e.tech ? 2 : 1) * tv(c, 'sack', 1));
+      if (rnd() < sackP) { pop[n] *= 0.12; rubble.set(n, year); logEvent(c, `${fullName(c)} sacks ${cellName.get(n) || 'the city'}; its people are scattered`, level[n] >= 3 || e.player || c.player, 'war', n); } else { pop[n] *= 0.85; rubble.set(n, year); }
+    }
+    if (rnd() < 0.05) logEvent(c, `${fullName(c)} takes ${cellName.get(n) || 'land'} from ${fullName(e)}`, false);
+  }
   // ---------- war & diplomacy ----------
   function declareWar(a, b, why) {
     a.wars[b.id] = year; b.wars[a.id] = year; warCnt[a.id] = warCnt[b.id] = -1; a.warStart[b.id] = cellsOf[a.id]; b.warStart[a.id] = cellsOf[b.id];
@@ -595,9 +612,10 @@ function createSim(world, seed) {
           } else if (on !== o && isAtWar(c, on)) {
             const e = civs[on];
             const sa = strengthOf[o], sb = strengthOf[on];
-            const pWin = 0.11 * Math.pow(sa / (sa + sb + 0.001), 2.2) / (1 + walls[n] * 1.5 * KF[on * NKF + KK.defence] / KF[o * NKF + KK.siege]);      // (walls count for what their builders know of holding them, against what the attacker knows of breaking them)
+            let pWin = 0.11 * Math.pow(sa / (sa + sb + 0.001), 2.2) / (1 + walls[n] * 1.5 * KF[on * NKF + KK.defence] / KF[o * NKF + KK.siege]);      // (walls count for what their builders know of holding them, against what the attacker knows of breaking them)
+            pWin *= army.focus(o, on, n);      // (where a host of either stands, in a war of the player's: army.js)
             if (rnd() < 0.08) battles.push({ i: n, from: i, year, a: o, b: on, siege: walls[n] > 0 });
-            if (rnd() < pWin) { claim(n, c, i); cellsOf[on]--; cellsOf[o]++; budget[o] -= 0.5; battles.push({ i: n, from: i, year, a: o, b: on, siege: walls[n] > 0, taken: true }); if (level[n] >= 2) { const sackP = Math.min(0.7, 0.18 * (c.policy.stance === 'aggressive' ? 1.5 : 1) * (c.tech + 0.05 < e.tech ? 2 : 1) * tv(c, 'sack', 1)); if (rnd() < sackP) { pop[n] *= 0.12; rubble.set(n, year); logEvent(c, `${fullName(c)} sacks ${cellName.get(n) || 'the city'}; its people are scattered`, level[n] >= 3 || e.player || c.player, 'war', n); } else { pop[n] *= 0.85; rubble.set(n, year); } } if (rnd() < 0.05) logEvent(c, `${fullName(c)} takes ${cellName.get(n) || 'land'} from ${fullName(e)}`, false); }
+            if (rnd() < pWin) { conquer(n, c, i, walls[n] > 0); budget[o] -= 0.5; }
           }
         }
       }
@@ -620,6 +638,8 @@ function createSim(world, seed) {
         if (n3 >= 0 && land[n3] && owner[n3] === o) { const Kn = capacity(n3, c); if (pop[n3] < 0.5 * Kn) { const m = Math.min(p * 0.05, (Kn - pop[n3]) * 0.3); pop[i] -= m; pop[n3] += m; } }
       }
     }
+    // the hosts in the field and the fleets at sea: they march, give battle, lay siege, and the player's take land (army.js)
+    army.step();
     // diplomacy every 10 ticks (staggered)
     for (let c = 0; c < MAXC; c++) {
       const a = civs[c]; if (!a || tickCount % 10 !== c % 10) continue;
@@ -801,7 +821,8 @@ function createSim(world, seed) {
     lab: { cost: 400, dur: 10, slot: true, ind: true, name: 'Electronics works', desc: 'Clean rooms and assembly lines. Electronics cost a third less to make.' },
     wonder: { cost: 420, dur: 60, slot: true, name: 'Wonder', desc: 'A work of ages in the capital. +5% stability, remembered forever.' },
     capital: { cost: 200, dur: 0, slot: false, name: 'Move capital', desc: 'The court moves to this town.' },
-    levy: { cost: 120, dur: 0, slot: false, name: 'Levy', desc: 'Raise a great army for a generation or two.' },
+    levy: { cost: 120, dur: 0, slot: false, name: 'Levy', desc: 'Raise a host for a generation or two. It takes the field here, and goes where you send it: it takes enemy land region by region, lays siege to walled towns and fights the hosts it meets.' },
+    fleet: { cost: 100, dur: 0, slot: false, name: 'Fleet', desc: 'Ships of war at this harbour. They carry your host over the sea where no road runs by land, and fight the ships they meet.' },
   };
   const COST = {}; for (const k in BUILD) COST[k] = BUILD[k].cost; COST.develop = COST.farm; COST.fortify = COST.walls;
   const DUR_ERA = [1.4, 1.2, 1.1, 1, 1, 0.9, 0.6, 0.4, 0.3];
@@ -824,6 +845,7 @@ function createSim(world, seed) {
     const B = BUILD[kind]; if (!B) return 'Unknown work';
     const lack = (work, lv) => { const D = know.lacks(c.id, work, lv); return D ? `Needs ${D.name}` : null; };
     if (kind === 'levy') return lack('levy') || (year < c.army ? 'An army is already in the field' : null);
+    if (kind === 'fleet') return lack('fleet') || (i < 0 || owner[i] !== c.id ? 'Not your land' : !(special[i] & 1) ? 'Needs a harbour' : army.fleetsOf(c.id).length >= 3 ? 'Three fleets are all your harbours can keep' : null);
     if (i < 0 || !land[i]) return 'That is not land';
     if (kind === 'settle') {
       if (owner[i] === c.id) return 'Already yours';
@@ -854,7 +876,8 @@ function createSim(world, seed) {
   // start a work: pay now, finish in dur years (finishWorks applies the effect)
   function startWork(c, kind, i, slot, cost) {
     const B = BUILD[kind]; c.wealth -= cost;
-    if (kind === 'levy') { const n = levyYears(c); c.army = year + n; logEvent(c, `${c.ruler.title} ${c.ruler.name} raises a great army`, false); return `Army raised for ${n} years`; }
+    if (kind === 'levy') { const n = levyYears(c); c.army = year + n; logEvent(c, `${c.ruler.title} ${c.ruler.name} raises a great army`, false); const a = army.raise(c, i); return a ? `${a.name} takes the field for ${n} years: ${army.fmtMen(a.men)}` : `Army raised for ${n} years`; }
+    if (kind === 'fleet') { const f = army.buildFleet(c, i); return `${f.name} puts to sea: ${f.ships} ships`; }
     if (kind === 'settle') { claim(i, c, -1); pop[i] += 0.4; return `Settled ${cellName.get(i) || 'new land'}`; }
     if (kind === 'capital') { c.capital = i; logEvent(c, `The court moves to ${cellName.get(i)}`, false); return 'Capital moved'; }
     let sl = -1; if (B.slot) { const free = freeSlots(i); if (!free.length) { c.wealth += cost; return 'No room left around the town'; } sl = free.includes(slot) ? slot : free[rint(free.length)]; }
@@ -951,7 +974,7 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(cellsOf[c.id] > 20 || c.player ? -30 : -8), rulers: c.rulers.slice(-10) } : null), worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
-      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : undefined,
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : undefined,
     };
   }
   function load(s) {
@@ -988,6 +1011,7 @@ function createSim(world, seed) {
     // the market as it was left; a world saved before there was one gets thirty quiet years to find its prices
     if (!market.load(s.econ)) { for (let c = 0; c < MAXC; c++) if (civs[c]) market.born(c, -1, 0); touchAll(); market.warm(30); } else touchAll();
     for (let c = 0; c < MAXC; c++) if (civs[c]) know.around(c, lastNb[c]);
+    army.load(s.armies);      // (a world saved before there were hosts has none in the field)
   }
   // who touches whom by land, read off the map (the tick keeps it up from border contacts afterwards)
   function touchAll() {
@@ -1022,7 +1046,7 @@ function createSim(world, seed) {
     popOf, cellsOf, strengthOf, mightOf, acad, temples, ports, markets, wonders, worldEvents, allEvents, history, ERAS, COST,
     volcanoes, fires, floods, quakes, battles, plagues, ruins, rubble, get comet() { return comet; },
     goods, gera, GOODS, GOOD_ID, market, rawPop, held, urban, satOf, touchAll, IND, ind, indN, indAt, workName, eff,
-    know, insightParts, reachFor, townsOf, rule, diplo, covetOf, spanOf, levyYears, stabilityParts: stabParts, govName: (c) => RULE.FORM[rule.ruleOf(c).gov].name,
+    know, insightParts, reachFor, townsOf, rule, diplo, get army() { return army; }, covetOf, spanOf, levyYears, stabilityParts: stabParts, govName: (c) => RULE.FORM[rule.ruleOf(c).gov].name,
     // the year in which history's first realm had come to know this much (for the page: how far ahead of its time a realm is)
     // the year in which the first peoples knew this much, by this world's calendar (history's own, unless the world came from before the calendar)
     histYear(t) { return histYearOf(t) - calShift; }, get calShift() { return calShift; }, foodMult, get foodOld() { return foodTab === FOOD_015; },

@@ -184,6 +184,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/know.js` | `KNOW` | The discoveries (174, in nine ages and six branches), what each opens and gives; one world's knowledge: who knows what, who studies what |
 | `src/rule.js` | `RULE` | Forms of government (24), laws (100 in twelve fields), the seven estates, authority; one world's rule: what every realm has chosen, who holds power in it, reforms, demands, risings |
 | `src/diplo.js` | `DIPLO` | What two realms can swear, why they go to war and what a winner may ask; one world's diplomacy: what every realm thinks of every other and why, pacts, vassals, claims, wars with friends on both sides, offers to the player |
+| `src/army.js` | `ARMY` | Hosts and fleets: the autopilot's host on every front, the player's levy that marches where he sends it (by road over land, by fleet over the sea), battles, assaults and sieges; pure data |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
@@ -199,6 +200,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand |
+| `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
 | `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
 | `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
@@ -395,6 +397,35 @@ Conventions that matter:
   stand with the player (`DIPLO.STAND`; `world.palMode = 'rel'`). A world saved before diplomacy begins with clean
   records. Tests and scenes that need the others to keep still set their `aggression = 0` and `dip.think = 1e12`
   (`tools/scenes/dip.js` lays a whole table by hand: a war with friends on both sides, a vassal, a claim, envoys).
+- **Armies** (`army.js`; `sim.army`). Land still changes hands by the border fights of the simulation (pass 2): every
+  world's numbers were fitted to them. Every realm at war with a neighbour keeps a host on that front (`syncAI`), raised
+  from its people (`MOB`, a share by age: every hunter of a band, few of a kingdom's peasants, the mass armies of the
+  nineteenth and twentieth centuries): it goes to where the newest fight over that border is (`fronts`, read off
+  `sim.battles`), keeps to its own side, and two hostile hosts within a region of each other give battle (men and spirit
+  lost, the beaten one falls back, a broken one goes home and its front waits `REST` years). In the world's own wars
+  that is for the eye: land changes hands as it always did. **The hosts have their own dice** (`rs` in `army.js`, saved
+  with them): drawing from the world's, their battles made one world a century slow and half as many people in 2000 AD,
+  as any world one throw apart may be (four worlds measured 3.4 to 6.8 billion either way): a world fitted to its seeds
+  must not move by a hair for what is only seen. A world without a player is the very world it was before the hosts
+  (`tools/diplo/probe.js` prints what it printed, line for line): keep it so.
+  The player's levy (`levy`: `army.raise`) is a host he leads, half again the share of the age: it marches where he
+  sends it (`order`: A* over the regions it may enter, `mayPass` - its own, its enemies', nobody's, an ally's, its lord's
+  or its vassals' - mountains slower), `SPEED` regions a year; it storms an enemy region as it comes to it (`STORM` a
+  year, against a garrison of the region's people: `GARRISON`), lays siege to a walled town (`siegeStep`: by its might
+  against the garrison, what it knows of siege against what they know of defence, over the walls; the camp loses men to
+  sickness and sallies), and fights the hosts it meets. In a war of the player's a host also weighs on the border fights
+  about it (`focus`: its realm's attacks within `FOCUS_R` regions twice as likely, the enemy's 0.4). Where no road runs
+  by land, a fleet (`fleet`: Shipbuilding, a harbour, three at most) carries it: to the harbour, over the sea (`SAIL`
+  regions a year; ships near an enemy's harbours may fight it: `seaFight`), ashore (by storm from the boats at two
+  thirds of its might). It goes home when its years are up (`levyYears`), when it is broken, or when sent (Home).
+  What befalls it is news (`army.news`: siege, taken, lost, won, broken): the turn stops for it and the turn button
+  lays the last before the player ('Host'). Y finds his host; its banner opens its card (March, Halt, Home).
+  `troops.js` draws a host within `SEE` (76 km): `3 √men` soldiers (24 to 480) in blocks of six ranks abreast while it
+  stands, a column four abreast on the march, at the place's own scale (`scaleAt`: as its trees and townsfolk are, K
+  in open country), arms and helmets by age, the realm's colour as dyed wool, a standard before them, a camp behind
+  them while it rests, the walkers' shadow streak; a siege is also a battle with `host` set (events.js draws the
+  engines and the dust, not lines and camps of its own, where hosts stand); a fleet's ships off its harbour town. A
+  banner on the screen for every host in view (the player's at every height).
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

@@ -31,7 +31,7 @@
     y_mine: ['stone', 'salt', 'copper', 'tin', 'iron', 'gold', 'gems', 'silver', 'obsidian', 'jade', 'amber', 'saltpetre', 'coal', 'uranium', 'bauxite', 'rareearth', 'lithium'], y_well: ['oil', 'gas'],
   };
   // the works a discovery can open (the simulation's BUILD kinds), and the plain abilities
-  const WORKS = ['farm', 'walls', 'port', 'market', 'temple', 'academy', 'workshop', 'weaver', 'smithy', 'brewery', 'granary', 'warehouse', 'shipyard', 'factory', 'refinery', 'lab', 'wonder', 'levy'];
+  const WORKS = ['farm', 'walls', 'port', 'market', 'temple', 'academy', 'workshop', 'weaver', 'smithy', 'brewery', 'granary', 'warehouse', 'shipyard', 'factory', 'refinery', 'lab', 'wonder', 'levy', 'fleet'];
   const CANS = ['quarry', 'ores', 'colonies', 'faith'];
 
   // ---------- the discoveries ----------
@@ -86,7 +86,7 @@
     ['terraces', 'Terraces', 2, 'land', 0.8, 'irrigation', { food: 0.08 }, 'Hillsides cut into steps and walled with stone, so the rain stays where the roots are.', ''],
     ['qanats', 'Wells and qanats', 2, 'land', 0.9, 'irrigation mining', { food: 0.07, grow: 0.02 }, 'Water is found deep under dry ground and led for miles through tunnels to the fields.', ''],
     ['glass', 'Glassmaking', 2, 'craft', 0.8, 'pottery', { recipes: ['glass'] }, 'Sand and ash melted together: beads, then cups, then panes.', ''],
-    ['shipbuilding', 'Shipbuilding', 2, 'craft', 1.1, 'sailing', { recipes: ['ships'], works: ['shipyard'], sea: 0.2 }, 'Keel, ribs and planking joined by shipwrights who do nothing else. Hulls that can take the open sea.', 'c'],
+    ['shipbuilding', 'Shipbuilding', 2, 'craft', 1.1, 'sailing', { recipes: ['ships'], works: ['shipyard', 'fleet'], sea: 0.2 }, 'Keel, ribs and planking joined by shipwrights who do nothing else. Hulls that can take the open sea.', 'c'],
     ['seafaring', 'Seafaring', 2, 'trade', 1.0, 'sailing', { sea: 0.3, can: ['colonies'] }, 'Captains leave the coast and steer by sun and stars. Colonies are planted on far shores.', ''],
     ['coinage', 'Coinage', 2, 'trade', 1.1, 'weights mining', { income: 0.12, trade: 0.15 }, 'A lump of metal stamped by the king is worth what it says. No one needs scales any more.', 'f'],
     ['roads', 'Roads', 2, 'trade', 1.0, 'masonry wheel', { reach: 0.15, trade: 0.15 }, 'Paved, drained and measured, with posts for fresh horses a day apart.', ''],

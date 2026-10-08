@@ -229,6 +229,21 @@
   .bqueue .bw .y { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
   /* plots: where a work can go, drawn on the map around the selected town */
   #plots { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  /* hosts in the field (troops.js): a pennant on a pole above each, the player's edged in gold; the card of the selected one */
+  #hosts { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .hostb { position: absolute; left: 0; top: 0; margin: -38px 0 0 -7px; display: flex; align-items: center; gap: 5px; padding: 3px 7px 3px 5px; border-radius: 3px; background: rgb(10 13 20 / 0.8); border: 1px solid rgb(255 255 255 / 0.16); color: var(--text); font: 600 11px/1 var(--body); font-variant-numeric: tabular-nums lining-nums; cursor: pointer; pointer-events: auto; white-space: nowrap; box-shadow: 0 3px 10px rgb(0 0 0 / 0.45); transition: background .12s; }
+  .hostb::after { content: ''; position: absolute; left: 6px; top: 100%; width: 1px; height: 18px; background: linear-gradient(rgb(255 255 255 / 0.7), rgb(255 255 255 / 0)); }
+  .hostb i { width: 10px; height: 14px; flex: none; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%); }
+  .hostb .st { width: 12px; height: 12px; flex: none; }
+  .hostb .st svg { width: 12px; height: 12px; fill: none; stroke: var(--text-2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .hostb.mine { border-color: var(--gold); }
+  .hostb.mine .st svg { stroke: var(--gold-2); }
+  .hostb.sel, .hostb:hover { background: rgb(214 178 94 / 0.28); }
+  #hostcard { position: fixed; z-index: 6; top: calc(max(10px, env(safe-area-inset-top, 0px)) + 52px); left: max(12px, env(safe-area-inset-left, 0px)); width: 320px; max-width: 33vw; display: flex; flex-direction: column; overflow: hidden; }
+  #hostcard[hidden] { display: none; }
+  #hostcard .hcstate { font-size: var(--fs-cap); color: var(--text-2); line-height: 1.45; }
+  #hostcard .row { gap: 6px; flex-wrap: wrap; }
+  #hostcard .btn.on { background: rgb(214 178 94 / 0.25); border-color: var(--gold); }
   .plot { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; border: 2px solid var(--gold); background: rgb(10 13 20 / 0.72); color: var(--gold-2); display: grid; place-items: center; font: 600 18px/1 var(--body); cursor: pointer; pointer-events: auto; box-shadow: 0 0 0 4px rgb(214 178 94 / 0.18), 0 4px 12px rgb(0 0 0 / 0.5); transition: transform .12s; }
   .plot:hover { transform: scale(1.18); background: rgb(214 178 94 / 0.25); }
   .plot.used { border-color: rgb(255 255 255 / 0.25); color: var(--text-3); background: rgb(10 13 20 / 0.6); cursor: default; box-shadow: none; }
@@ -847,6 +862,15 @@
 <svg id="flows" aria-hidden="true"></svg>
 <div id="labels"></div>
 <div id="plots"></div>
+<div id="hosts"></div>
+<div id="hostcard" class="panel" hidden>
+  <div class="phead"><span class="sw" id="hc-sw" style="background:#5b6779"></span><div class="titles"><h2 id="hc-title">—</h2><div class="sub" id="hc-sub"></div></div><button class="btn icon ghost" id="hc-x" title="Close (Esc)" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="pbody">
+    <div class="tiles" id="hc-tiles"></div>
+    <div class="hcstate" id="hc-state"></div>
+    <div class="row" id="hc-acts"><button class="btn" id="hc-march" title="Then click where it should go">March…</button><button class="btn ghost" id="hc-halt">Halt</button><button class="btn ghost" id="hc-home" title="The levy ends">Send home</button></div>
+  </div>
+</div>
 <div id="debug"></div>
 <div id="loading"><div class="lw">Holocene</div><div class="bar"><i id="loadbar" style="transform:scaleX(.04)"></i></div><div id="loadstep">terrain index</div></div>
 
@@ -1035,7 +1059,7 @@
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-autotilt" checked> Tilt the camera automatically when zooming in</label>
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-textures" checked> Painted materials on buildings and ground (needs WebGL2)</label>
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-continuous"> Continuous time (WorldBox style) instead of turns</label>
-    <div class="hint">Controls · Enter or space: advance / stop · B: city · R: realm · M: market · K: knowledge · V: laws · F: diplomacy · G: powers · C: chronicle · T, O, X: trade, government and relations on the map · drag: move · scroll: zoom to cursor · right-drag or shift-drag: tilt and turn · WASD/arrows: move · Q E: turn · Page Up/Down: tilt · N: north up · U: top-down · H: home · Esc: cancel/close · F9: hide HUD</div>
+    <div class="hint">Controls · Enter or space: advance / stop · B: city · R: realm · M: market · K: knowledge · V: laws · F: diplomacy · Y: your host · G: powers · C: chronicle · T, O, X: trade, government and relations on the map · drag: move · scroll: zoom to cursor · right-drag or shift-drag: tilt and turn · WASD/arrows: move · Q E: turn · Page Up/Down: tilt · N: north up · U: top-down · H: home · Esc: cancel/close · F9: hide HUD</div>
     <details class="hint sources" id="m-sources"><summary>Where the world comes from</summary>
       <p><b>The picture of the Earth.</b> NASA's Blue Marble Next Generation (R. Stöckli, E. Vermote, N. Saleous, R. Simmon and D. Herring, NASA Earth Observatory, 2005): the land as the MODIS instrument saw it through 2004, at 500 m. Each hemisphere is shown in its summer; the towns of our own day are painted over with the country round them.</p>
       <p><b>Winter.</b> Where snow lies and for how long is read from the twelve months of the same Blue Marble. Where the sea freezes and for how long is from the Sea Ice Index, Version 4 (F. Fetterer, K. Knowles, W. N. Meier, M. Savoie and A. K. Windnagel; National Snow and Ice Data Center, Boulder, Colorado; doi:10.7265/a98x-0f50): the usual year of its first ten, 1979 to 1988.</p>
@@ -1097,6 +1121,7 @@
 <script src="know.js"></script>
 <script src="rule.js"></script>
 <script src="diplo.js"></script>
+<script src="army.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -1115,4 +1140,5 @@
 <script src="tree.js"></script>
 <script src="gov.js"></script>
 <script src="envoys.js"></script>
+<script src="troops.js"></script>
 <script src="main.js"></script>
