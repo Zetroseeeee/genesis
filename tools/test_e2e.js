@@ -652,6 +652,11 @@ server.listen(0, async () => {
     check(r.top > 8500 && r.top < 9300, `the top of Everest at level 7: ${Math.round(r.top)} m (the Earth's 8,849 m, 2.8 % taller, over 306 m)`);
     check(r.at[7] > 7000 && r.at[5] > 5000, `under its summit, level by level: ${r.at.join(', ')} m`);
     check(r.old === 0, `no old pack drawn (${r.old})`);
+    // (no country coarser than it was: wherever the old packs had level 6 or 7, so do the heights; and every pack has its rim)
+    const c = await ev(() => { const T = __G.terrain, H = T.heights, E = T.index.elev, out = { miss: [], apron: H.apron };
+      for (const L of [6, 7]) for (const [x, y] of E['l' + L] || []) { const l = H.levels[L]; if (l.packs[y * l.nx + x] !== 'P') out.miss.push(`${L}/${x}/${y}`); }
+      return out; });
+    check(c.miss.length === 0, `the old packs' levels 6 and 7 all kept (${c.miss.join(' ') || 'none missing'})`); check(c.apron === 2, `a rim of ${c.apron} texels`);
   });
 
   await scenario('render: orbit→street at the capital, instance caps respected, no GL errors', async (check) => {
