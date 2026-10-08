@@ -75,6 +75,16 @@ finest level of the picture (6), `stats.packsI` how many of its packs are here; 
 whether what lies in `data/i` is whole. A page just started takes minutes to fetch and read its packs on a software renderer:
 ask nothing of it until an `/eval` answers at once, or the answers queue up behind one another and the pictures are of half
 a planet.
+The sky: `window.SKY` (`ready`: which of its pieces have come; `index`: the pack's list; `cloudAt(lon, lat, shift)` the
+picture's cloud at a place, in radians; `less(c, near)`), `__G.world.cloudLayer` (`near`, `vis`, `shift`, `grainOff`: no
+heaps; `uniforms`), `__G.world.starField`. `window.__skyYear = 2000` puts the stars where the catalogues have them (the test
+world's year is 10,000 BC, when the sky turned about a point near Vega), `__moonAge` (0 new, pi full) and `__moonLight` set the
+Moon, `__cloudTime` holds the weather (20084 is a sky half covered over the Congo; 0 the picture's own July over India).
+`__T.faceStar(ra hours, dec)` and `__T.faceMoon()` lift the eye to them; `__forest(..., sun, lift)` takes the eye's lift as
+its eighth. Under a live page, `/load?file=sky.js` then `/eval "__T.resky()"` gives the stars and the clouds the shaders as
+they are now. `__T.costsSky()` writes frame rates without the clouds, without their heaps and without the stars, turn and
+turn about (`costc_*` in the tour). A software renderer takes the lighter half of the pack (no heaps, no fine picture of the
+clouds); `SKY=1` in the harnesses (`window.GENESIS_SKY`) gives it all. `python3 tools/planet/grain.py`: the clouds' threshold.
 `node tools/glerr.js "<script>" [wait ms]` says which call to the card fails (the suite's "GL error 1281" names none): every
 call that can raise one is asked at once, and the first twelve are printed with their arguments, the picture last handed to the
 card and where the call came from. `__T.costsPlanet()` writes frame rates with the picture looked at in fewer ways and no finer

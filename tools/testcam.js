@@ -1,7 +1,7 @@
 if (window.__G && __G.settings) __G.settings.qualityPinned = true; // software GL would otherwise drop to balanced and hide movers
 // helpers evaluated inside the page for screenshot tests
 window.__T = {
-  cam(lon, lat, dist, tilt, heading) { const M = __G.mapcam; M.fly = null; M.lon = M.tLon = lon; M.lat = M.tLat = lat; M.dist = M.tDist = dist; M.tilt = M.tTilt = tilt; M.heading = M.tHeading = heading; M.autoTilt = false; },
+  cam(lon, lat, dist, tilt, heading) { const M = __G.mapcam; M.fly = null; M.lon = M.tLon = lon; M.lat = M.tLat = lat; M.dist = M.tDist = dist; M.tilt = M.tTilt = tilt; M.lift = M.tLift = 0; M.heading = M.tHeading = heading; M.autoTilt = false; },
   // a realm's knowledge set by hand needs the discoveries that go with it: everything up to its age (or the one given)
   // (and, for any realm but the player's, the laws of that age: a realm of a late age under the laws of a band is far behind its time.
   //  laws = true gives them to the player's realm too, false to nobody)
@@ -106,6 +106,14 @@ window.__T.costsWinter = function () {
   const list = window.__costOld ? [['as it is', () => {}], ['the old rules', use(flat)]] : [['as it is', () => {}], ['the old rules', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is again', use(arr)], ['the old rules again', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a third time', use(arr)], ['the old rules, a third', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a fourth', use(arr)]];
   __T.cost(list, 4, 5000);      // (window.__costOld: stop at the old rules, to see what they draw)
 };
+// What the sky costs (sky.js), turn and turn about: as it is; without the clouds; the clouds without their heaps and grain (the
+// picture of the Earth's clouds alone, as from far out: two lookups a pixel and not twenty); without the stars
+window.__T.costsSky = function () {
+  const W = __G.world, C = W.cloudLayer, St = W.starField; if (!C) return 'no clouds';
+  const all = () => { W.cloudsOn = true; C.grainOff = false; if (St) St.points.material.visible = true; };
+  __T.cost([['as it is', all], ['no clouds', () => { W.cloudsOn = false; }], ['clouds, no heaps', () => { W.cloudsOn = true; C.grainOff = true; }], ['no stars', () => { C.grainOff = false; if (St) St.points.material.visible = false; }],
+    ['as it is again', all], ['no clouds again', () => { W.cloudsOn = false; }], ['clouds, no heaps again', () => { W.cloudsOn = true; C.grainOff = true; }], ['as it is a third time', all]], 4, 2000);
+};
 // What the ground has to show and what it is still waiting for, written into the picture once a second: __T.watch(). The frame
 // rate of the last second, the packs by kind and state, and what every tile in the picture is drawn with: the picture, the heights
 // and the water's edge by level ('-' none, 'f' no shore near). A view is whole when nothing is loading and the levels stand still.
@@ -130,6 +138,20 @@ window.__T.aniso = function (n, ...texs) {
   R.state.reset(); return k;
 };
 
+// The eye turned to a place in the sky (the game's camera looks at the ground; mapcam.lift raises it): a direction in the globe's
+// frame, the Moon, or a star by its right ascension (hours) and declination (degrees) as the catalogues have it for 2000.
+// window.__moonAge holds the Moon at an age (0 new, pi full) as __sunLock holds the sun; window.__skyYear gives the sky of a year
+// (2000: the stars as the catalogues have them) whatever the world's own.
+window.__T.face = function (d) { const M = __G.mapcam, f = GEO.enu(M.lon, M.lat), el = Math.asin(Math.max(-1, Math.min(1, d.dot(f.up)))), az = Math.atan2(d.dot(f.east), d.dot(f.north)); M.autoTilt = false; M.tilt = M.tTilt = 1.45; M.heading = M.tHeading = az; M.lift = M.tLift = Math.max(0, Math.min(1.55, el + (Math.PI / 2 - 1.45))); return { height: +(el * 180 / Math.PI).toFixed(1), bearing: +(az * 180 / Math.PI).toFixed(1) }; };
+window.__T.faceMoon = function () { return __T.face(__G.world._moon); };
+window.__T.faceStar = function (raH, dec) { const a = raH * 15 * Math.PI / 180, de = dec * Math.PI / 180; return __T.face(new THREE.Vector3(Math.cos(de) * Math.cos(a), Math.sin(de), -Math.cos(de) * Math.sin(a)).applyMatrix4(__G.world.skyTurn)); };
+// The sky's shaders and sums, taken anew from src/sky.js into a page that is running (tools/live.js: /load?file=sky.js, then
+// __T.resky()): the clouds and the stars are given the new ones. (The Moon and the Milky Way are drawn by the sky's own shader
+// in world.js, which needs a new page.)
+window.__T.resky = function (more) { const W = __G.world, C = W.cloudLayer, out = [];      // (more: uniforms the new shader has and the page's clouds do not yet know, { name: value })
+  if (C) { Object.setPrototypeOf(C, SKY.Clouds.prototype); const m = C.mesh.material; if (more) for (const k in more) if (!C.uniforms[k]) C.uniforms[k] = { value: more[k] }; m.vertexShader = SKY.CLOUD_V(AIR.VERT); m.fragmentShader = SKY.CLOUD_F(AIR.FRAG); m.needsUpdate = true; out.push('clouds'); }
+  if (W.starField) { Object.setPrototypeOf(W.starField, SKY.Stars.prototype); const m = W.stars.material; m.vertexShader = SKY.STAR_V; m.fragmentShader = SKY.STAR_F; m.needsUpdate = true; out.push('stars'); }
+  return out.join(' '); };
 // The ground's shaders, taken anew from src/terrain.js into a page that is running (tools/live.js: /load?file=terrain.js, then
 // __T.reshade()): every tile is given the new ones, and tiles made from now on get them too. Seconds, where a new page takes minutes.
 window.__T.reshade = function (more) { const T = __G.terrain; Object.setPrototypeOf(T, TERRAIN.Terrain.prototype); if (more) for (const k in more) if (!T.globals[k]) T.globals[k] = { value: more[k] };      // (more: uniforms the new shader has and the page's game does not yet know, { name: value })

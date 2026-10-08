@@ -11,6 +11,10 @@
           what colour its sea is, how far its JPEG is from it, and how many bytes a pack of it takes squeezed this way and that
   ice     where the sea's ice is to be had month by month (the Sea Ice Index of the US National Snow and Ice Data Center):
           what lies in its folders, and what one month's file is
+  stars   where a list of the stars is to be had (the Bright Star Catalogue, Hipparcos, Tycho-2): which doors answer,
+          and with what
+  sky     the sky's own pictures as they come: NASA's map of the stars and of the Milky Way (how bright its texels are,
+          and a sheet of them developed this way and that), the Moon, and the Blue Marble's clouds at their finest
 Nothing told: urls. (months and sheet were asked of the picture the game had until 0.21, which the repository no longer holds:
 it was the Blue Marble Next Generation's July.)
 """
@@ -22,7 +26,7 @@ Image.MAX_IMAGE_PIXELS = None
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 arg = lambda n, d=None: sys.argv[sys.argv.index('--' + n) + 1] if '--' + n in sys.argv else d
 OUT, WORK = arg('out', 'out'), arg('work', 'work')
-what = [a for a in sys.argv[1:] if a in ('urls', 'months', 'sheet', 'tiff', 'ice')] or ['urls']
+what = [a for a in sys.argv[1:] if a in ('urls', 'months', 'sheet', 'tiff', 'ice', 'stars', 'sky')] or ['urls']
 if not os.path.exists(os.path.join(ROOT, 'data', 'i', '3_0_0.webp')) and ('months' in what or 'sheet' in what):
     print('months, sheet: the picture they were asked about (the one the game had until 0.21) is no longer in the repository'); what = [a for a in what if a not in ('months', 'sheet')]
 UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) holocene-planet-probe'}
@@ -90,6 +94,19 @@ if 'urls' in what:
         ('moon heights 16 ppd', SVS + 'a004700/a004720/ldem_16_uint.tif'),
         ('bright stars (harvard)', 'http://tdc-www.harvard.edu/catalogs/bsc5.dat.gz'),
         ('bright stars (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/V/50/catalog.gz'),
+        ('bright stars, read me (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/V/50/ReadMe'),
+        ('hipparcos (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/239/hip_main.dat'),
+        ('hipparcos gz (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/239/hip_main.dat.gz'),
+        ('hipparcos, read me (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/239/ReadMe'),
+        ('hipparcos 2007 (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/311/hip2.dat.gz'),
+        ('stars 8k print jpg', SVS + 'a004800/a004851/starmap_2020_8k_print.jpg'),
+        ('milky way 8k exr', SVS + 'a004800/a004851/milkyway_2020_8k.exr'),
+        ('milky way 8k print jpg', SVS + 'a004800/a004851/milkyway_2020_8k_print.jpg'),
+        ('hipparcos and tycho 4k exr', SVS + 'a004800/a004851/hiptyc_2020_4k.exr'),
+        ('moon colour 1k jpg', SVS + 'a004700/a004720/lroc_color_poles_1k.jpg'),
+        ('moon colour 8k', SVS + 'a004700/a004720/lroc_color_poles_8k.tif'),
+        ('moon heights 4 ppd', SVS + 'a004700/a004720/ldem_4.tif'),
+        ('moon heights 3 ppd jpg', SVS + 'a004700/a004720/ldem_3_8bit.jpg'),
         ('gebco 2023 page', 'https://www.gebco.net/data_and_products/gridded_bathymetry_data/'),
     ]:
         st, h = ask(url)
@@ -233,3 +250,155 @@ if 'ice' in what:
                 print('  %s: %s, %s, crs %s, transform %s, nodata %s' % (conc[0], a.shape, a.dtype, r.crs, tuple(round(x, 1) for x in r.transform)[:6], r.nodata))
                 print('  values: %s' % ', '.join('%d x%d' % (int(x), int(n)) for x, n in list(zip(v, c))[:8]), '...', ', '.join('%d x%d' % (int(x), int(n)) for x, n in list(zip(v, c))[-8:]))
 
+
+
+def head_bytes(url, n=400, timeout=90):
+    """the first bytes of what a door gives (status, type, bytes) - a HEAD says little where files are made on asking"""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=dict(UA, Range='bytes=0-%d' % (n - 1))), timeout=timeout) as r:
+            return r.status, (r.headers.get('Content-Type') or '')[:30], r.headers.get('Content-Length') or r.headers.get('Content-Range') or '', r.read(n)
+    except urllib.error.HTTPError as e: return e.code, '', '', b''
+    except Exception as e: return str(e)[:70], '', '', b''
+
+
+if 'stars' in what:
+    print('== lists of the stars ==')
+    import gzip, urllib.parse
+    q = lambda adql: urllib.parse.quote(adql)
+    doors = [
+        ('bsc5 (harvard)', 'http://tdc-www.harvard.edu/catalogs/bsc5.dat.gz'),
+        ('bsc5 (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/V/50/catalog.gz'),
+        ('bsc5 (cds, short path)', 'https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz'),
+        ('bsc5 (heasarc)', 'https://heasarc.gsfc.nasa.gov/FTP/heasarc/dbase/tdat_files/heasarc_bsc5p.tdat.gz'),
+        ('hipparcos (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/239/hip_main.dat'),
+        ('hipparcos (cds, short path)', 'https://cdsarc.cds.unistra.fr/ftp/I/239/hip_main.dat'),
+        ('hipparcos gz (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/239/hip_main.dat.gz'),
+        ('hipparcos (heasarc)', 'https://heasarc.gsfc.nasa.gov/FTP/heasarc/dbase/tdat_files/heasarc_hipparcos.tdat.gz'),
+        ('tycho-2 part 00 (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/259/tyc2.dat.00.gz'),
+        ('tycho-2 part 00 (cds, short)', 'https://cdsarc.cds.unistra.fr/ftp/I/259/tyc2.dat.00.gz'),
+        ('tycho-2 supplement 1 (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/259/suppl_1.dat.gz'),
+        ('tycho-2 read me (cds)', 'https://cdsarc.cds.unistra.fr/ftp/cats/I/259/ReadMe'),
+        ('tycho-2 (heasarc)', 'https://heasarc.gsfc.nasa.gov/FTP/heasarc/dbase/tdat_files/heasarc_tycho2.tdat.gz'),
+        ('heasarc folder', 'https://heasarc.gsfc.nasa.gov/FTP/heasarc/dbase/tdat_files/'),
+        ('vizier tap, tycho-2', 'https://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=' + q('SELECT TOP 5 RAmdeg, DEmdeg, BTmag, VTmag FROM "I/259/tyc2" WHERE VTmag < 3')),
+        ('vizier tap, count < 10', 'https://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=' + q('SELECT COUNT(*) FROM "I/259/tyc2" WHERE VTmag < 10')),
+        ('vizier asu, tycho-2', 'https://vizier.cds.unistra.fr/viz-bin/asu-tsv?-source=I/259/tyc2&-out=RAmdeg,DEmdeg,BTmag,VTmag&VTmag=%3C2.5&-out.max=20'),
+        ('vizier asu (cfa)', 'https://vizier.cfa.harvard.edu/viz-bin/asu-tsv?-source=I/259/tyc2&-out=RAmdeg,DEmdeg,BTmag,VTmag&VTmag=%3C2.5&-out.max=20'),
+        ('hyg (github)', 'https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv'),
+    ]
+    for name, url in doors:
+        st, ty, ln, b = head_bytes(url)
+        gz = b[:2] == b'\x1f\x8b'; txt = ''
+        if gz:
+            try: txt = gzip.GzipFile(fileobj=io.BytesIO(get(url, timeout=120, tries=1)[:200000])).read(300).decode('latin1', 'replace')
+            except Exception as e:
+                try:
+                    import zlib; txt = zlib.decompressobj(31).decompress(b)[:300].decode('latin1', 'replace')
+                except Exception as e2: txt = '(gzip, not read: %s)' % str(e2)[:50]
+        else: txt = b[:300].decode('latin1', 'replace')
+        print('%-30s %-5s %-26s %-22s %s' % (name, st, ty, ln, 'gzip' if gz else ''), flush=True)
+        print('      | ' + txt.replace('\r', '').replace('\n', '\n      | ')[:420], flush=True)
+
+
+def read_exr(f):
+    """(H, W, 3) float32 from an OpenEXR file, by whichever reader is here"""
+    err = []
+    try:
+        import OpenEXR
+        if hasattr(OpenEXR, 'File'):
+            with OpenEXR.File(f) as x:
+                ch = x.channels()
+                if 'RGB' in ch: return np.asarray(ch['RGB'].pixels, np.float32)
+                if 'RGBA' in ch: return np.asarray(ch['RGBA'].pixels, np.float32)[..., :3]
+                return np.stack([np.asarray(ch[c].pixels, np.float32) for c in ('R', 'G', 'B')], -1)
+        import Imath
+        x = OpenEXR.InputFile(f); dw = x.header()['dataWindow']; W, H = dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1
+        return np.stack([np.frombuffer(x.channel(c, Imath.PixelType(Imath.PixelType.FLOAT)), np.float32).reshape(H, W) for c in 'RGB'], -1)
+    except Exception as e: err.append('OpenEXR: ' + str(e)[:120])
+    try:
+        os.environ['OPENCV_IO_ENABLE_OPENEXR'] = '1'
+        import cv2
+        a = cv2.imread(f, cv2.IMREAD_UNCHANGED)
+        if a is None: raise ValueError('not read')
+        return np.ascontiguousarray(a[..., 2::-1].astype(np.float32))
+    except Exception as e: err.append('cv2: ' + str(e)[:120])
+    raise RuntimeError('; '.join(err))
+
+
+if 'sky' in what:
+    os.makedirs(WORK, exist_ok=True); A = SVS + 'a004800/a004851/'; M = SVS + 'a004700/a004720/'
+    def stats(name, a):
+        lum = a @ np.array([0.2126, 0.7152, 0.0722], np.float32); q = [0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 0.999, 0.9999, 0.99999]
+        print('  %s: %s %s, min %.3g max %.3g mean %.3g; quantiles %s' % (name, a.shape, a.dtype, a.min(), a.max(), a.mean(), ' '.join('%g:%.3g' % (x, v) for x, v in zip(q, np.quantile(lum[::2, ::2], q)))), flush=True)
+        H = a.shape[0]
+        for lab, (y0, y1) in (('the poles\' caps', (0, H // 12)), ('the middle band', (H * 5 // 12, H * 7 // 12))):
+            print('     %s: mean colour %s' % (lab, np.round(a[y0:y1].reshape(-1, 3).mean(0), 5)))
+        return lum
+    print('== the stars and the Milky Way (NASA SVS 4851) ==')
+    pics = {}
+    for name, file in (('milky way 4k', 'milkyway_2020_4k.exr'), ('stars 4k', 'starmap_2020_4k.exr'), ('hipparcos and tycho 4k', 'hiptyc_2020_4k.exr'), ('stars 8k', 'starmap_2020_8k.exr')):
+        try:
+            a = read_exr(fetch(A + file, file)); pics[name] = a; stats(name, a)
+        except Exception as e: print('  %s: %s' % (name, str(e)[:200]))
+    def dev(a, k, g=1.0):      # light to the screen: what is k times as bright as the unit is nearly white; g bends the dark end up
+        return (np.clip(1.0 - np.exp(-np.maximum(a, 0) * k), 0, 1) ** g * 255 + 0.5).astype(np.uint8)
+    if 'milky way 4k' in pics and 'stars 4k' in pics:
+        mw, st = pics['milky way 4k'], pics['stars 4k']; H, W = mw.shape[:2]
+        # where the Milky Way's heart is in the picture (the brightest stretch of the glow), and where its pole
+        lum = mw @ np.array([0.2126, 0.7152, 0.0722], np.float32); sm = np.array(Image.fromarray((np.clip(lum / max(np.quantile(lum, 0.999), 1e-9), 0, 1) * 255).astype(np.uint8)).resize((360, 180), Image.BOX)).astype(np.float32)
+        y, x = np.unravel_index(sm.argmax(), sm.shape); print('  the glow is brightest at column %d of 360, row %d of 180 (if the picture is centred on RA 0 with RA growing leftward, the Galaxy\'s heart, RA 17h45 Dec -29, is at column %.0f, row 119)' % (x, y, (180 - 266.4) % 360))
+        med = float(np.median(lum)); p999 = float(np.quantile(lum, 0.999))
+        rows = []
+        for src, lab in ((mw, 'glow'), (st, 'stars')):
+            for k in (0.5 / p999, 1.5 / p999, 4.0 / p999):
+                for g in (1.0, 0.6):
+                    im = Image.fromarray(dev(src, k, g)).resize((1024, 512), Image.LANCZOS); rows.append(('%s k=%.3g g=%.1f' % (lab, k, g), im))
+        print('  the glow\'s median %.3g, its 99.9th hundredth %.3g; the sheet\'s tiles: %s' % (med, p999, ' | '.join(r[0] for r in rows)))
+        sh = Image.new('RGB', (1024 * 3 + 8, 512 * 4 + 12), (40, 0, 0))
+        for i, (_, im) in enumerate(rows): sh.paste(im, ((i % 3) * 1028, (i // 3) * 516))
+        sh.save(os.path.join(OUT, 'planet_sky.jpg'), quality=88); print('planet_sky.jpg')
+        # at its own fineness: Orion (RA 5h30, Dec 0) and the Galaxy's heart, glow and stars side by side, and the 8k if it is here
+        def at(a, ra_h, dec, n):
+            h, w = a.shape[:2]; cx, cy = int(((180 - ra_h * 15) % 360) / 360 * w), int((90 - dec) / 180 * h); return a[max(0, cy - n // 2):cy + n // 2, max(0, cx - n // 2):cx + n // 2]
+        tiles = []
+        for ra, dec in ((5.5, 0), (17.75, -29), (12.9, 27)):
+            tiles += [dev(at(mw, ra, dec, 512), 1.5 / p999, 0.6), dev(at(st, ra, dec, 512), 1.5 / p999, 0.6)]
+            if 'stars 8k' in pics: tiles.append(np.array(Image.fromarray(dev(at(pics['stars 8k'], ra, dec, 1024), 1.5 / p999, 0.6)).resize((512, 512), Image.BOX)))
+            if 'hipparcos and tycho 4k' in pics: tiles.append(dev(at(pics['hipparcos and tycho 4k'], ra, dec, 512), 1.5 / p999, 0.6))
+        n = len(tiles) // 3; sh = Image.new('RGB', (516 * n, 516 * 3), (40, 0, 0))
+        for i, t in enumerate(tiles): sh.paste(Image.fromarray(t), ((i % n) * 516, (i // n) * 516))
+        sh.save(os.path.join(OUT, 'planet_sky_native.jpg'), quality=90); print('planet_sky_native.jpg: Orion, the Galaxy\'s heart, the Galaxy\'s pole; glow, stars, stars 8k, hipparcos and tycho')
+    print('== the Moon (NASA SVS 4720) ==')
+    try:
+        mo = Image.open(fetch(M + 'lroc_color_poles_2k.tif', 'moon_2k.tif')); print('  colour 2k: %s %s' % (mo.size, mo.mode)); a = np.array(mo.convert('RGB')); print('  mean colour %s, min %d, max %d' % (a.reshape(-1, 3).mean(0).round(1), a.min(), a.max()))
+        mo.convert('RGB').save(os.path.join(OUT, 'planet_moon.jpg'), quality=90); print('planet_moon.jpg')
+        try:
+            hi = Image.open(fetch(M + 'ldem_4.tif', 'ldem_4.tif')); b = np.array(hi); print('  heights 4 to the degree: %s %s %s, min %.4g max %.4g mean %.4g' % (hi.size, hi.mode, b.dtype, b.min(), b.max(), b.mean()))
+        except Exception as e: print('  heights: %s' % str(e)[:160])
+    except Exception as e: print('  the Moon: %s' % str(e)[:200])
+    print('== the clouds (Blue Marble, 2001: visibleearth 57747) ==')
+    try:
+        c8 = Image.open(fetch(EO + '57000/57747/cloud_combined_8192.tif', 'cloud_8192.tif')); print('  8192: %s %s' % (c8.size, c8.mode)); a8 = np.array(c8)
+        print('  8192: shape %s; per channel mean %s min %s max %s' % (a8.shape, np.round(a8.reshape(-1, a8.shape[-1] if a8.ndim == 3 else 1).mean(0), 1), a8.reshape(-1, a8.shape[-1] if a8.ndim == 3 else 1).min(0), a8.reshape(-1, a8.shape[-1] if a8.ndim == 3 else 1).max(0)))
+        t0 = time.time(); ce = Image.open(fetch(EO + '57000/57747/cloud.E.2001210.21600x21600.png', 'cloud_E.png')); print('  east at its finest: %s %s' % (ce.size, ce.mode), flush=True)
+        ae = np.array(ce); print('  east: shape %s dtype %s (%.0f s to read); per channel mean %s' % (ae.shape, ae.dtype, time.time() - t0, np.round(ae.reshape(-1, ae.shape[-1] if ae.ndim == 3 else 1)[::97].mean(0), 1)), flush=True)
+        g = ae if ae.ndim == 2 else ae[..., 0]
+        hist = np.bincount(g[::7, ::7].ravel(), minlength=256); cum = np.cumsum(hist) / hist.sum()
+        print('  east: share of the sky under each brightness: ' + ' '.join('%d:%.3f' % (v, cum[v]) for v in (0, 2, 8, 16, 32, 64, 96, 128, 160, 192, 224, 250, 254)))
+        # which half is which, and where it begins: the 8192 picture's two halves against this one made small
+        g8 = a8 if a8.ndim == 2 else a8[..., 0]; small = np.array(Image.fromarray(g).resize((1024, 1024), Image.BOX)).astype(np.float32)
+        halves = {'the left half of the whole': np.array(Image.fromarray(g8[:, :4096]).resize((1024, 1024), Image.BOX)).astype(np.float32), 'the right half': np.array(Image.fromarray(g8[:, 4096:]).resize((1024, 1024), Image.BOX)).astype(np.float32)}
+        for lab, h in halves.items(): print('  east against %s: r = %.4f' % (lab, np.corrcoef(small.ravel(), h.ravel())[0, 1]))
+        # pieces at the finest, beside the 8192 picture's and the game's old one (data/clouds.jpg, 4096 round, until 0.23; the 8192 made as small where it is gone) made as large
+        old = os.path.join(ROOT, 'data', 'clouds.jpg'); tiles = []
+        gm = np.array(Image.open(old).convert('L')) if os.path.exists(old) else np.array(Image.fromarray(g8).resize((4096, 2048), Image.BOX))
+        for lon, lat in ((75, 20), (140, 35), (100, -45), (30, 5)):
+            x, y = int(lon / 180 * 21600), int((90 - lat) / 180 * 21600); n = 700; fine = g[y:y + n, x:x + n]
+            x8, y8 = int((lon + 180) / 360 * 8192), int((90 - lat) / 180 * 4096); n8 = int(n * 8192 / 43200 + 0.5); mid = np.array(Image.fromarray(g8[y8:y8 + n8, x8:x8 + n8]).resize((n, n), Image.BICUBIC))
+            xg, yg = int((lon + 180) / 360 * gm.shape[1]), int((90 - lat) / 180 * gm.shape[0]); ng = int(n * gm.shape[1] / 43200 + 0.5); low = np.array(Image.fromarray(gm[yg:yg + ng, xg:xg + ng]).resize((n, n), Image.BICUBIC))
+            half = np.array(Image.fromarray(g[y:y + n * 2, x:x + n * 2]).resize((n, n), Image.BOX))      # what 16384 round the Earth would hold of twice the piece, as large
+            tiles += [fine, mid, low, half]
+        sh = Image.new('L', (704 * 4, 704 * 4), 60)
+        for i, t in enumerate(tiles): sh.paste(Image.fromarray(t), ((i % 4) * 704, (i // 4) * 704))
+        sh.save(os.path.join(OUT, 'planet_clouds.jpg'), quality=88); print('planet_clouds.jpg: India, Japan, the southern ocean, the Congo: at 930 m, the 8192 picture, the game\'s old one, twice the piece at half the fineness')
+    except Exception as e: print('  the clouds: %s' % str(e)[:300])

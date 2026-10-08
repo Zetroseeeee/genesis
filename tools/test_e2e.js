@@ -603,6 +603,40 @@ server.listen(0, async () => {
     await page.setViewportSize({ width: 1024, height: 640 }); await wait(300);
   });
 
+  // ---------- the sky ----------
+  await scenario('sky: the stars stand where they stood, the Moon and the clouds are there, the eye can be lifted to them', async (check) => {
+    await page.waitForFunction(() => window.SKY && SKY.ready.stars && SKY.ready.clouds && SKY.ready.moon && SKY.ready.milkyway, null, { timeout: 60000 }).catch(() => {});
+    const r = await ev(() => { const S = window.SKY, W = __G.world, out = { ready: Object.keys(S.ready).join(' '), stars: W.starField.n, india: 0, sahara: 0 };
+      // (the picture's cloud over a country, its mean: a point of it may well lie in a gap between two storms)
+      const mean = (l0, l1, b0, b1) => { let a = 0, n = 0; for (let l = l0; l <= l1; l += 1) for (let b = b0; b <= b1; b += 1) { a += S.cloudAt(l, b, 0); n++; } return a / n; };
+      out.india = mean(72, 88, 15, 28); out.sahara = mean(0, 20, 18, 28);
+      const star = (h, d) => { const a = h * 15 * Math.PI / 180, e = d * Math.PI / 180; return new THREE.Vector3(Math.cos(e) * Math.cos(a), Math.sin(e), -Math.cos(e) * Math.sin(a)); }, deg = (x) => Math.acos(Math.min(1, Math.max(-1, x))) * 180 / Math.PI;
+      // where the pole of the sky stands among the stars of 2000: by the Pole Star now, by Thuban when the pyramids were built, a hand's breadth from Vega in the world's first year
+      const m = new THREE.Matrix4(), x = new THREE.Vector3(1, 0, 0), off = (y, v) => { S.turn(x, 0.25, y, m); return deg(v.clone().applyMatrix4(m).y); };
+      out.polaris = off(2000, star(2.530, 89.264)); out.thuban = off(-2787, star(14.073, 64.376)); out.vega = off(-10000, star(18.616, 38.784));
+      // the sun's own place among the stars is where the sun is: at the solstice of June at six hours, as far north as it goes
+      const sun = GEO.toVec(40, Math.asin(0.4) * 180 / Math.PI); S.turn(sun, 0.5, 2000, m); out.sun = deg(star(6, Math.asin(0.4) * 180 / Math.PI).applyMatrix4(m).dot(sun));
+      // and half a year on the same hour of the day has the other half of the sky: a star that stood south at midnight stands there at noon
+      const sun2 = GEO.toVec(40, -Math.asin(0.4) * 180 / Math.PI); S.turn(sun2, 0.0, 2000, m); out.sunWinter = deg(star(18, -Math.asin(0.4) * 180 / Math.PI).applyMatrix4(m).dot(sun2));
+      // the Moon: opposite the sun when full, beside it when new, never far from the sun's path
+      const mo = new THREE.Vector3(); S.turn(sun, 0.5, 2000, m); out.full = deg(S.moonAt(sun, m.ecl, Math.PI, mo).dot(sun)); out.fresh = deg(S.moonAt(sun, m.ecl, 0.001, mo).dot(sun)); out.offPath = Math.abs(90 - deg(S.moonAt(sun, m.ecl, 1.3, mo).dot(m.ecl)));
+      return out; });
+    check(/stars/.test(r.ready) && /clouds/.test(r.ready) && /moon/.test(r.ready) && /milkyway/.test(r.ready), 'the pack is here: ' + r.ready); check(r.stars > 8000, 'the stars the eye can see: ' + r.stars);
+    check(r.india > 0.3 && r.sahara < 0.2, `cloud over India in the monsoon (${r.india.toFixed(2)}), little over the Sahara (${r.sahara.toFixed(2)})`);
+    check(r.polaris < 1 && r.thuban < 0.6 && r.vega > 10 && r.vega < 15, `the pole: ${r.polaris.toFixed(2)} from the Pole Star now, ${r.thuban.toFixed(2)} from Thuban in 2787 BC, ${r.vega.toFixed(1)} from Vega in 10,000 BC`);
+    check(r.sun < 0.05 && r.sunWinter < 0.05, `the sun stands among the stars where the year puts it (${r.sun.toFixed(3)}, ${r.sunWinter.toFixed(3)} degrees off)`);
+    check(r.full > 170 && r.fresh < 6 && r.offPath < 5.5, `the Moon: full ${r.full.toFixed(0)} degrees from the sun, new ${r.fresh.toFixed(1)}, ${r.offPath.toFixed(1)} off the sun's path`);
+    // from far out the clouds are the Earth's; from the ground the sky's; and the eye is lifted to them and comes down again
+    await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 2.5, 0, 0); }); await wait(400); await frames(4);
+    const far = await ev(() => { const C = __G.world.cloudLayer; return { vis: C.mesh.visible, below: C.uniforms.uBelow.value, op: C.uniforms.uOpacity.value }; }); check(far.vis && far.below === 0 && far.op > 0.99, 'clouds from orbit: ' + JSON.stringify(far));
+    await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.0003, 1.3, 0); }); await wait(600); await frames(4);
+    const low = await ev(() => { const C = __G.world.cloudLayer; return { vis: C.mesh.visible, below: C.uniforms.uBelow.value, op: C.uniforms.uOpacity.value }; }); check(low.vis && low.below === 1 && low.op > 0.99, 'clouds from the ground: ' + JSON.stringify(low));
+    await ev(() => { const M = __G.mapcam; M.autoTilt = false; M.tTilt = 1.4; for (let i = 0; i < 12; i++) M.tiltBy(0.06); }); await wait(900); await frames(4);
+    const up = await ev(() => { const M = __G.mapcam, c = __G.camera, d = new THREE.Vector3(); c.getWorldDirection(d); return { tilt: M.tilt, lift: M.lift, el: Math.asin(d.dot(c.position.clone().normalize())) * 180 / Math.PI, gl: __G.renderer.getContext().getError() }; });
+    check(up.tilt > 1.44 && up.lift > 0.5 && up.el > 20, `the eye lifted to the sky: ${up.el.toFixed(0)} degrees above the level`); check(up.gl === 0, 'no GL error: ' + up.gl);
+    await page.keyboard.press('u'); await wait(900); await frames(3); const dn = await ev(() => ({ tilt: __G.mapcam.tilt, lift: __G.mapcam.lift })); check(dn.lift < 0.02 && dn.tilt < 0.05, 'U looks straight down again');
+  });
+
   // ---------- rendering sweep ----------
   await scenario('render: orbit→street at the capital, instance caps respected, no GL errors', async (check) => {
     const caps = await ev(() => { const out = {}; for (const k in __G.world.inst) out[k] = __G.world.inst[k].instanceMatrix.count; return out; });

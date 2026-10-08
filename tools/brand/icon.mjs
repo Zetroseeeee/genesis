@@ -1,5 +1,5 @@
 // The app icon: the real Earth as night falls over Mesopotamia, and the first fire. Rendered from the game's own
-// picture of the planet (data/i, data/info.png, data/clouds.jpg) with the game's own sea colours, so the icon is the game.
+// picture of the planet (data/i, data/info.png, the clouds of data/sky) with the game's own sea colours, so the icon is the game.
 //   node tools/brand/icon.mjs [sheet.jpg] [draft]      (needs sharp: tools/models/node_modules)
 // Writes build/icon.png (1024, the macOS app icon: a rounded tile with the margins Apple asks for) and
 // src/mark.png (256, the same picture for use inside the game). With a first argument it also writes a sheet of the
@@ -51,7 +51,7 @@ async function plane(file, channel) {
 const CLOUDS = 1;
 const nearLand = await (async () => { const { data, info } = await sharp(earth.pack(0, 0, 0)).ensureAlpha().extract({ left: AP, top: AP, width: 1024, height: 512 }).blur(3).raw().toBuffer({ resolveWithObject: true }); return (lon, lat) => { const x = Math.min(info.width - 1, Math.max(0, Math.floor((lon + 180) / 360 * info.width))), y = Math.min(info.height - 1, Math.max(0, Math.floor((90 - lat) / 180 * info.height))); return data[(y * info.width + x) * 4 + 3] / 255; }; })();
 const shelfAt = await plane('data/info.png', 0);      // 1 at the shore, 0 over the deep
-const cloudAt = await plane('data/clouds.jpg', 0);
+const cloudAt = await plane('data/sky/clouds_s.webp', 0);      // (the Blue Marble's clouds, 2048 by 1024: tools/planet/sky.py)
 
 const vec = (lon, lat) => [Math.cos(lat * D2R) * Math.sin(lon * D2R), Math.sin(lat * D2R), Math.cos(lat * D2R) * Math.cos(lon * D2R)];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

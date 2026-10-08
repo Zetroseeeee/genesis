@@ -6,7 +6,7 @@
     constructor(camera, dom, terrain) {
       this.camera = camera; this.dom = dom; this.terrain = terrain;
       this.lon = 30; this.lat = 20; this.dist = 2.7; this.tilt = 0; this.heading = 0;
-      this.tLon = 30; this.tLat = 20; this.tDist = 2.7; this.tTilt = 0; this.tHeading = 0;
+      this.tLon = 30; this.tLat = 20; this.tDist = 2.7; this.tTilt = 0; this.tHeading = 0; this.lift = 0; this.tLift = 0;
       this.autoTilt = true; this.minDist = 0.3 * KM; this.maxDist = 6;
       this.fly = null; this.vel = { lon: 0, lat: 0 };
       this.exag = terrain.exag;
@@ -25,7 +25,7 @@
       el.addEventListener('pointermove', (e) => {
         if (!drag || drag.id !== e.pointerId) return;
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
-        if (drag.btn === 2 || drag.mod) { this.tHeading -= dx * 0.005; this.tTilt = clamp(this.tTilt - dy * 0.005, 0, 1.45); this.autoTilt = false; }
+        if (drag.btn === 2 || drag.mod) { this.tHeading -= dx * 0.005; this.tiltBy(-dy * 0.005); this.autoTilt = false; }
         else this.pan(dx, dy);
       });
       const up = (e) => { if (drag && drag.id === e.pointerId) { const d = drag; drag = null; if (d.moved < 6 && d.btn === 0 && this.onClick) this.onClick(e.clientX, e.clientY); } };
@@ -39,7 +39,7 @@
         if (e.key === 'ArrowLeft' || e.key === 'a') this.pan(s, 0); if (e.key === 'ArrowRight' || e.key === 'd') this.pan(-s, 0);
         if (e.key === 'ArrowUp' || e.key === 'w') this.pan(0, s); if (e.key === 'ArrowDown' || e.key === 's') this.pan(0, -s);
         if (e.key === 'q') this.tHeading += 0.06; if (e.key === 'e') this.tHeading -= 0.06;
-        if (e.key === 'PageUp') { this.tTilt = clamp(this.tTilt + 0.06, 0, 1.45); this.autoTilt = false; } if (e.key === 'PageDown') { this.tTilt = clamp(this.tTilt - 0.06, 0, 1.45); this.autoTilt = false; }      // (R and F open the realm and the envoys)
+        if (e.key === 'PageUp') { this.tiltBy(0.06); this.autoTilt = false; } if (e.key === 'PageDown') { this.tiltBy(-0.06); this.autoTilt = false; }      // (R and F open the realm and the envoys)
         if (e.key === '=' || e.key === '+') this.tDist = clamp(this.tDist * 0.8, this.minDist, this.maxDist); if (e.key === '-') this.tDist = clamp(this.tDist * 1.25, this.minDist, this.maxDist);
       });
     }
@@ -64,7 +64,7 @@
         this.tLat = clamp(this.tLat + (hit.lat - this.tLat) * (1 - factor) * 0.9, -88, 88);
       }
       this.tDist = nd;
-      if (this.autoTilt) this.tTilt = this.autoTiltFor(nd);
+      if (this.autoTilt) { this.tTilt = this.autoTiltFor(nd); this.tLift = 0; }
     }
     autoTiltFor(d) { // 0 far -> ~52 deg at ground
       const t = clamp((Math.log(0.25) - Math.log(d)) / (Math.log(0.25) - Math.log(0.0015)), 0, 1);
@@ -93,7 +93,7 @@
         const lp = Math.log(f.peak), l0 = Math.log(f.d0), l1 = Math.log(f.d1);
         const ld = s < 0.5 ? l0 + (lp - l0) * (e * 2) : lp + (l1 - lp) * ((e - 0.5) * 2);
         this.tDist = this.dist = Math.exp(Math.min(ld, Math.max(lp, Math.max(l0, l1))));
-        this.tTilt = this.tilt = f.tilt0 + (f.tilt1 - f.tilt0) * e; this.tHeading = this.heading = f.h0 + (f.h1 - f.h0) * e;
+        this.tTilt = this.tilt = f.tilt0 + (f.tilt1 - f.tilt0) * e; this.tHeading = this.heading = f.h0 + (f.h1 - f.h0) * e; this.tLift = 0;
         if (f.t >= f.dur) { this.fly = null; if (f.onDone) f.onDone(); }
       } else {
         if (this.idleSpin) this.tLon = GEO.wrapLon(this.tLon + dt * this.spin);
@@ -104,8 +104,12 @@
         this.dist = Math.exp(Math.log(this.dist) + (Math.log(this.tDist) - Math.log(this.dist)) * k);
         this.tilt += (this.tTilt - this.tilt) * k; this.heading += (this.tHeading - this.heading) * k;
       }
+      this.lift += (this.tLift - this.lift) * (1 - Math.exp(-dt * 9));
       this.apply();
     }
+    // Tilting: from straight down to all but level, the eye looking at the ground it stands over; and on from there the eye is
+    // lifted off the ground to the sky (lift: up to the stars overhead), which is where the clouds, the Moon and the stars are.
+    tiltBy(d) { const w = this.tTilt + this.tLift + d; this.tTilt = clamp(w, 0, 1.45); this.tLift = clamp(w - 1.45, 0, 1.25); }
     apply() {
       const cam = this.camera; const T = this.terrain;
       const hT = T.heightAt(this.lon, this.lat);
@@ -123,6 +127,7 @@
       cam.position.copy(pos);
       cam.up.copy(forward).multiplyScalar(Math.cos(this.tilt)).addScaledVector(f.up, Math.sin(this.tilt)).normalize();
       cam.lookAt(target);
+      if (this.lift > 1e-4) cam.rotateX(this.lift);      // the eye lifted from the ground to the sky
       const alt = pos.length() - 1; // approx altitude (units)
       cam.near = Math.max(alt * 0.05, 2e-6); cam.far = pos.length() + 3; cam.updateProjectionMatrix();
       this.alt = alt; this.target = target; this.forward = forward;

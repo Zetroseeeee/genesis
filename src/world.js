@@ -375,45 +375,15 @@
     // ---------- sky / clouds / atmosphere ----------
     initSky() {
       const scene = this.scene;
-      { // stars: a sphere of points round the camera, drawn at the far plane (so anything at all hides them), fixed to the
-        // heavens while the camera moves. Most are faint; a share of them crowd one great circle, the Milky Way.
-        const n = 5200; const pos = new Float32Array(n * 3); const mag = new Float32Array(n * 2); let sd = 20261004; const rnd = () => { sd = (Math.imul(sd, 1664525) + 1013904223) >>> 0; return sd / 4294967296; };
-        const pole = new THREE.Vector3(0.48, 0.47, -0.74).normalize(), ax = new THREE.Vector3(0, 1, 0).cross(pole).normalize(), ay = pole.clone().cross(ax), v = new THREE.Vector3();
-        for (let i = 0; i < n; i++) {
-          if (i < n * 0.42) { const a = rnd() * Math.PI * 2, off = (rnd() + rnd() + rnd() - 1.5) * 0.3; v.copy(ax).multiplyScalar(Math.cos(a)).addScaledVector(ay, Math.sin(a)).addScaledVector(pole, off).normalize(); }
-          else { const t = rnd() * Math.PI * 2, y = rnd() * 2 - 1, r = Math.sqrt(1 - y * y); v.set(r * Math.cos(t), y, r * Math.sin(t)); }
-          pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
-          const m = Math.pow(rnd(), 5.0); mag[i * 2] = 0.16 + 0.84 * m; mag[i * 2 + 1] = rnd();      // brightness (few are bright), colour (blue-white to amber)
-        }
-        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aMag', new THREE.BufferAttribute(mag, 2));
-        this.starUniforms = { uAlpha: { value: 1 }, uPx: { value: 1 }, uLow: { value: 0 }, uTime: { value: 0 }, uUp: { value: new THREE.Vector3(0, 1, 0) } };
-        this.stars = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: this.starUniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-          vertexShader: `attribute vec2 aMag; uniform float uPx, uLow, uTime; uniform vec3 uUp; varying vec3 vCol;
-            void main(){ vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); p.z = p.w * 0.9999995; gl_Position = p; float b = aMag.x; gl_PointSize = (1.5 + 2.4 * b * b) * uPx;
-              // from the ground (uLow): none in the thick air along the horizon, and they twinkle
-              float seen = mix(1.0, smoothstep(0.02, 0.24, dot(normalize(position), uUp)) * (0.78 + 0.22 * sin(uTime * 2.3 + aMag.y * 97.0)), uLow);
-              vCol = mix(vec3(0.74, 0.83, 1.0), vec3(1.0, 0.86, 0.68), smoothstep(0.55, 1.0, aMag.y)) * (0.42 + 0.9 * b + 1.4 * b * b * b) * seen; }`,      // (the few brightest are brighter than white: post.js gives them a little glow)
-          fragmentShader: `uniform float uAlpha; varying vec3 vCol; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.08, d); gl_FragColor = vec4(vCol * a * uAlpha, 1.0); }`,
-        })); this.stars.frustumCulled = false; this.stars.renderOrder = -4; scene.add(this.stars);
-      }
-      // clouds: a shell a little above the highest ground, white in the sun, warm along the edge of night and dark after it, and
-      // behind the same air as everything else
-      const cl = new THREE.TextureLoader().load('data/clouds.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; this.cloudTex = t; });
-      this.cloudTex = null; this.cloudShift = 0; this.cloudVis = 0;
-      const AIR_V = window.AIR ? AIR.VERT : '\n varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }';
-      this.cloudUniforms = Object.assign({ uMap: { value: cl }, uSun: { value: new THREE.Vector3(1, 0, 0) }, uOpacity: { value: 0.6 } }, window.AIR ? AIR.uniforms : {});
-      this.cloudMat = new THREE.ShaderMaterial({ uniforms: this.cloudUniforms, transparent: true, depthWrite: false,
-        vertexShader: `varying vec2 vUv; varying vec3 vWn; ${AIR_V}
-          void main(){ vUv = uv; vWn = normalize((modelMatrix * vec4(position, 0.0)).xyz); vec4 mv = modelViewMatrix * vec4(position, 1.0); air(mv.xyz, 5.0, vAirT, vAirL); gl_Position = projectionMatrix * mv; }`,
-        fragmentShader: `uniform sampler2D uMap; uniform vec3 uSun; uniform float uOpacity; varying vec2 vUv; varying vec3 vWn; ${AIR_F}
-          void main(){
-            float a = texture2D(uMap, vUv).g * uOpacity; if (a < 0.004) discard;
-            float sunUp = dot(normalize(vWn), uSun);
-            vec3 col = mix(vec3(0.07, 0.08, 0.115), mix(vec3(1.0, 0.6, 0.42), vec3(1.0), smoothstep(0.0, 0.3, sunUp)), smoothstep(-0.04, 0.2, sunUp));      // (a little moonlight on them at night: the dark side has a shape)
-            gl_FragColor = vec4(airOver(col, vAirT, vAirL), a); }`,
-      });
-      this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.004, 192, 96), this.cloudMat); this.clouds.rotation.y = Math.PI; scene.add(this.clouds);
-      this.cloudsOn = true;
+      // The stars (sky.js): a third of a million points round the camera, each where it stands and as bright as it is, drawn at the
+      // far plane (so anything at all hides them), turning as the sky turns: with the hour, the time of year and the year itself.
+      this.starField = new SKY.Stars(scene); this.stars = this.starField.points; this.starUniforms = this.starField.uniforms;
+      this.skyTurn = new THREE.Matrix4(); this.seasonPhase = 0.45; this.viewH = 1000; this._moon = new THREE.Vector3(0, 1, 0);
+      // The clouds (sky.js): the Earth's own, on a shell a little above the highest ground, white in the sun, the colours of the
+      // sun's light along the edge of night and dark after it, behind the same air as everything else; seen from under, too.
+      this.cloudLayer = window.AIR ? new SKY.Clouds(scene, AIR) : null; this.cloudTex = null; this.cloudShift = 0; this.cloudVis = 0; this.cloudNear = 0; this.cloudsOn = true;
+      SKY.onPiece = (n) => { if (n === 'stars') { try { this.starField.set(SKY.starData, SKY.index.stars); } catch (e) { console.warn('the stars: ' + e.message); } SKY.starData = null; } };
+      if (SKY.starData) SKY.onPiece('stars');
       // The sky: every line of sight that ends on nothing, out through the air (air.js): blue by day, the colours of dusk, the
       // planet's glowing rim from outside, black in space. It is a mesh of directions round the camera, drawn last and only where
       // nothing else was (at the far plane), and the air is worked out at its corners, which are set where the sky changes
@@ -421,7 +391,9 @@
       // height or the top of the air: the horizon's haze from the ground, the whole thin rim from orbit), then rings by angle on up
       // to straight overhead. What turns with the angle to the sun is done per pixel (the haze's bright ring round the sun), and
       // so are the sun's own disc, the moon, the northern lights and a comet when there is one.
-      this.skyUniforms = Object.assign({ uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamPos: { value: new THREE.Vector3() }, uAlpha: { value: 0 }, uMoon: { value: new THREE.Vector3(0, 1, 0) }, uTime: { value: 0 }, uComet: { value: 0 }, uLat: { value: 0 } }, window.AIR ? AIR.uniforms : {});
+      const dark1 = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat); dark1.needsUpdate = true;
+      this.skyUniforms = Object.assign({ uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamPos: { value: new THREE.Vector3() }, uAlpha: { value: 0 }, uTime: { value: 0 }, uComet: { value: 0 }, uLat: { value: 0 },
+        uMilky: { value: dark1 }, uMoonTex: { value: dark1 }, uSkyM: { value: new THREE.Matrix3() }, uMoonW: { value: new THREE.Vector3(0, 1, 0) }, uEclW: { value: new THREE.Vector3(0, 1, 0) }, uMoonK: { value: new THREE.Vector4(Math.cos(SKY.moonSize), SKY.moonSize, 0, 0) }, uMilkyOn: { value: 0 }, uStars: { value: 0 } }, window.AIR ? AIR.uniforms : {});
       const NP = 24, NA = 40, NS = 96, skyGeo = new THREE.BufferGeometry();
       { const rings = NP + NA + 2, sky = new Float32Array(rings * (NS + 1) * 2), idx = [];
         for (let r = 0; r < rings; r++) for (let k = 0; k <= NS; k++) { sky[(r * (NS + 1) + k) * 2] = r; sky[(r * (NS + 1) + k) * 2 + 1] = k / NS * Math.PI * 2; }
@@ -443,7 +415,8 @@
             vV = d; vW = transpose(mat3(viewMatrix)) * d;
             airParts(d, 1e9, ${window.AIR ? AIR.SKY : '16.0'}, vT, vLR, vLM, vLS);
             vec4 p = projectionMatrix * vec4(d, 1.0); p.z = p.w * 0.9999998; gl_Position = p; }`,
-        fragmentShader: `uniform vec3 uSun, uCamPos, uMoon, uAirS; uniform vec4 uAirE; uniform float uAlpha, uTime, uComet, uLat; varying vec3 vW, vV, vT, vLR, vLM, vLS;
+        fragmentShader: `uniform vec3 uSun, uCamPos, uAirS; uniform vec4 uAirE; uniform float uAlpha, uTime, uComet, uLat, uStars; varying vec3 vW, vV, vT, vLR, vLM, vLS;
+          ${SKY.GLSL}
           ${window.AIR ? AIR.PHASE : 'float airPhR(float c) { return 0.0; } float airPhM(float c) { return 0.0; }'}
           float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
@@ -452,10 +425,12 @@
             float cSun = dot(rd, uAirS); vec3 T = vT, L = vLR * airPhR(cSun) + vLM * airPhM(cSun) + vLS;
             float el = dot(dir, up); float sunEl = dot(sun, up);
             float night = (1.0 - smoothstep(-0.17, -0.05, sunEl)) * uAlpha; vec3 add = vec3(0.0);      // (what belongs to a sky seen from the ground fades as the camera leaves it: uAlpha)
-            // the moon: a lit disc with a soft halo, phase from its angle to the sun
-            vec3 moon = normalize(uMoon); float md = dot(dir, moon);
-            if (md > 0.99975) { vec3 e = normalize(cross(moon, up)); vec3 n2 = normalize(cross(e, moon)); vec3 off = dir - moon * md; vec2 uv = vec2(dot(off, e), dot(off, n2)) / 0.022; float r2 = dot(uv, uv); if (r2 < 1.0) { vec3 nrm = vec3(uv, sqrt(1.0 - r2)); vec3 toSun = normalize(vec3(dot(sun, e), dot(sun, n2), dot(sun, moon))); float lit = max(dot(nrm, toSun), 0.0); float mare = 0.75 + 0.25 * vn(uv * 4.0 + 7.0); add += vec3(0.93, 0.93, 0.9) * mare * (0.22 + 1.1 * lit) * (1.0 - smoothstep(0.92, 1.0, r2)) * (0.22 + 0.78 * night); } }      // (two and a half degrees across: five times life, as a painter would have it; by day a pale ghost)
-            add += vec3(0.8, 0.85, 0.95) * pow(max(md, 0.0), 600.0) * 0.25 * night;
+            // The Moon (sky.js): its near side as it is, lit by where the sun stands; two and a half degrees across - five times
+            // life, as a painter would have it. By day a pale ghost, by night brighter than white (post.js gives it its glow), from
+            // out in space as bright as lit rock is. And the light of the faint stars, the Milky Way, where the Moon is not.
+            vec4 mo = moonDisc(dir, sun); float md = dot(dir, uMoonW), nightG = 1.0 - smoothstep(-0.17, -0.05, sunEl);
+            vec3 beyond = mo.rgb * mo.a * mix(1.25, mix(0.2, 1.6, nightG), uAlpha) + milky(dir) * (uStars * mix(0.3, 0.22, uAlpha)) * (1.0 - mo.a);
+            add += vec3(0.8, 0.85, 0.95) * pow(max(md, 0.0), 600.0) * 0.25 * night * (0.5 - 0.5 * dot(sun, uMoonW));
             // aurora: curtains to the pole on clear nights at high latitude
             float auroraLat = smoothstep(52.0, 66.0, abs(uLat));
             if (auroraLat > 0.0 && night > 0.3) {
@@ -472,24 +447,34 @@
             // thousands of times brighter than white: post.js spreads that into the glare round it
             vec3 ds = rd - uAirS; float u = dot(ds, ds) / 5.6e-5;
             vec3 disc = vec3(1300.0 * uAirE.z) * (1.0 - smoothstep(0.82, 1.0, u)) * (0.45 + 0.55 * sqrt(max(1.0 - u, 0.0)));
-            vec3 lin = L + (add * add + disc) * T;
+            vec3 lin = L + (add * add + disc + beyond) * T;
             gl_FragColor = vec4(sqrt(max(lin, 0.0)), 1.0); }`,      // (light to the colours of the screen as airOver does it: a root)
       }));
       this.sky.renderOrder = 40; this.sky.frustumCulled = false; scene.add(this.sky);
     }
     updateSky(cam, sun, time) {
-      this.clouds.rotation.y = Math.PI + time * 0.0012; this.cloudShift = time * 0.0012;
-      const fade = Math.min(1, Math.max(0, (cam.alt - 0.006) / 0.02));
-      this.cloudUniforms.uOpacity.value = 0.6 * fade; this.cloudUniforms.uSun.value.copy(sun); this.clouds.visible = this.cloudsOn && fade > 0.01; this.cloudVis = this.cloudsOn ? 1 : 0;
+      // how the sky stands: its hour from where the sun is over the Earth and among the stars (the time of year), and the year
+      // (the world's own: its first nights turn about a point near Vega). The Moon goes round the Earth's path, through all its
+      // phases in some forty minutes of play, and its age is its phase.
+      const turn = SKY.turn(sun, this.seasonPhase, window.__skyYear !== undefined ? window.__skyYear : this.sim ? this.sim.year : -10000, this.skyTurn), moon = SKY.moonAt(sun, turn.ecl, window.__moonAge !== undefined ? window.__moonAge : 2.6 + time * 0.0025, this._moon);
+      // (how much moonlight there is where the eye is: the Moon's lit share, which is not its light - a half moon gives a tenth of a full one's - and none from under the horizon)
+      const moonUp = moon.dot(this._pv.copy(cam.camera.position).normalize()), moonLit = 0.5 - 0.5 * moon.dot(sun); this.moonLight = Math.pow(moonLit, 2.2) * Math.min(1, Math.max(0, (moonUp + 0.05) / 0.25));
+      if (this.cloudLayer) { this.cloudLayer.on = this.cloudsOn; this.cloudLayer.update(cam.alt, time, sun, this.moonLight); this.cloudShift = this.cloudLayer.shift; this.cloudVis = this.cloudLayer.vis; this.cloudNear = this.cloudLayer.near; if (SKY.cloudSmall) this.cloudTex = SKY.cloudSmall; }
       const skyA = Math.min(1, Math.max(0, (0.06 - cam.alt) / 0.04));
       this.skyUniforms.uAlpha.value = skyA; this.skyUniforms.uSun.value.copy(sun);
-      // the moon circles the sky once a game-month, offset from the sun so phases run their course
-      { const a = time * 0.0025; const ax = new THREE.Vector3(0.06, 1, 0.04).normalize(); this.skyUniforms.uMoon.value.copy(sun).applyAxisAngle(ax, 2.6 + a).normalize(); this.skyUniforms.uTime.value = time; this.skyUniforms.uLat.value = cam.lat; this.skyUniforms.uComet.value = this.cometOn ? 1 : 0; }
+      { const U = this.skyUniforms; U.uTime.value = time; U.uLat.value = cam.lat; U.uComet.value = this.cometOn ? 1 : 0; U.uSkyM.value.setFromMatrix4(turn); U.uMoonW.value.copy(moon); U.uEclW.value.copy(turn.ecl);
+        if (SKY.milky && !U.uMilkyOn.value) { U.uMilky.value = SKY.milky; U.uMilkyOn.value = 1; }
+        if (SKY.moon && !U.uMoonK.value.w) { U.uMoonTex.value = SKY.moon; U.uMoonK.value.w = 1; }
+        // (which level of the Moon's picture: its disc is so many pixels across)
+        const px = 2 * SKY.moonSize / (cam.camera.fov * Math.PI / 180 / Math.max(1, this.viewH)); U.uMoonK.value.z = Math.max(0, Math.log2(1008 / Math.max(1, px))); }
       this.skyUniforms.uCamPos.value.copy(cam.camera.position);
       const camUp0 = cam.camera.position.clone().normalize(); const dayHere = Math.min(1, Math.max(0, (camUp0.dot(sun) + 0.12) / 0.32));
       // (from the ground the stars come out as the sky darkens; from high up the field is only dimmed on the day side, where the lit ground fills the eye)
       { const su = this.starUniforms, dark = 1 - Math.min(1, Math.max(0, (camUp0.dot(sun) + 0.17) / 0.12)); su.uAlpha.value = (1 - skyA) * (1 - 0.55 * dayHere) + skyA * dark * dark * (3 - 2 * dark); su.uLow.value = skyA; su.uTime.value = time; su.uUp.value.copy(camUp0);
-        this.stars.position.copy(cam.camera.position); this.stars.updateMatrixWorld(); this.stars.visible = su.uAlpha.value > 0.004; }
+        su.uMoonW.value.copy(moon); this.skyUniforms.uStars.value = su.uAlpha.value;
+        // (how faint a star is shown: more of them from out in space than through the air, and more where a screen's pixels are small enough to hold them apart)
+        this.starField.update(cam.camera.position, turn, SKY.soft ? 6.5 : 8.7 - 1.5 * skyA + 0.9 * Math.log2(Math.max(1, su.uPx.value)));
+        this.stars.visible = su.uAlpha.value > 0.004; }
       // lights follow the sun; hemisphere dims at night for the camera's local sun elevation
       this.sunLight.position.copy(sun).multiplyScalar(10); this.sunLight.target.position.set(0, 0, 0);
       const camUp = cam.camera.position.clone().normalize(); const sunUp = camUp.dot(sun);
@@ -499,7 +484,9 @@
         // a low sun is warm and, the eye opening to it, strong; below the horizon it is gone. Dusk lends a rose glow.
         const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
         const kW = sm(0.02, 0.42, sunUp), k = sm(-0.03, 0.05, sunUp) * (1 + 1.1 * (1 - sm(0.04, 0.5, sunUp)));
-        bu.uSunCol.value.set(k, k * (0.56 + 0.44 * kW), k * (0.30 + 0.70 * kW)); bu.uDusk.value = sm(-0.12, 0.02, sunUp) * (1 - sm(0.08, 0.4, sunUp)); bu.uDay.value = sm(-0.1, 0.16, sunUp); }
+        bu.uSunCol.value.set(k, k * (0.56 + 0.44 * kW), k * (0.30 + 0.70 * kW)); bu.uDusk.value = sm(-0.12, 0.02, sunUp) * (1 - sm(0.08, 0.4, sunUp)); bu.uDay.value = sm(-0.1, 0.16, sunUp);
+        // (and under a cloud the sun is dimmed for whatever stands there as it is for the ground: by the cloud over the place the eye is at - a town is small under a sky)
+        if (this.cloudVis && cam.alt < 0.03) { this.cloudShade = 0.6 * this.cloudVis * sm(0.12, 0.7, SKY.less(SKY.cloudAt(cam.lon, cam.lat, this.cloudShift), this.cloudNear)); bu.uSunCol.value.multiplyScalar(1 - this.cloudShade); } else this.cloudShade = 0; }
       this.sunLight.intensity = 1.5 * day; this.hemi.intensity = 0.25 + 0.8 * day;
       return day;
     }
