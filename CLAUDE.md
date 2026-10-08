@@ -519,8 +519,8 @@ Conventions that matter:
   green the sea's ice (below; the map's own green, how light the country is by nature, the shader never read).
   *What it costs* (the build Mac; `costp_*`, `__T.costsPlanet()`): nothing that can be measured. In one page, the
   picture looked at in four ways or two where the ground runs away from the eye, or no finer than level 3 as it used
-  to be: 12.8 frames a second for the Alps from 19 km every time; and the game before it and with it, each in its own
-  start on the same day: 13 and 13 there, 26 and 26 over a town to the horizon. Nor does it load more slowly: a
+  to be: 12.8 frames a second for the Alps from 19 km every time. (What the winter's rules cost is under Winter,
+  below: two or three frames in a hundred where mountains fill the picture.) Nor does it load more slowly: a
   view from 300 km needs some forty packs of the picture where it needed sixteen, and its ground is whole six
   seconds after the start, where the game before it took nine (`load_*`, `__T.watch()`).
 - **Winter** (`data/snow.png`, `tools/planet/snow.py`; `snowHere` in `terrain.js`, `Trees.lyingAt`). Where snow lies,
@@ -582,6 +582,17 @@ Conventions that matter:
   sea's, and has no ice in the Index. Both notices are in the game's menu.
   Look at Europe and North America from 2,500 km and more, Poland from 600, the Alps from 300 and 80 and low, a
   town in the snow, and the seas (`winter_*`, `thaw_europe`, `ice_*` in the tour) after touching any of it.
+  *What it costs* (the build Mac; `costi_*`, `__T.costsWinter()`: the shader as it is, as it is compiled without
+  the maps' second layer - the rules the game had until 0.21 - and as it is over a second layer that says what
+  those rules took for granted, turn and turn about in one page): the Alps from 19 km 12.6 frames a second against
+  13.0, in winter 11.9 against 12.2, the edge of the Baltic's ice 16.9 against 17.1, a town from above 26.3 and
+  26.0. It was twice that (12.5 against 13.1 in the Alps, 17.6 against 18.7 over the ice) while its sums ran for
+  every pixel: the ice's for every pixel of dry land, the country before the plough where no wood would stand,
+  the snow's ragged edge in high summer. Each is gone into now only where it can show (**a block of sums that
+  writes nothing unless some share is over nought belongs behind an `if` on that share**: a dozen `smoothstep`s
+  cost what a lookup does). What is left is the second layer's lookup. One measurement of four seconds is within
+  an eighth of the next of the very same thing on that Mac: hold two things against each other only turn and turn
+  about in one page, three times each.
 - **The water's edge** (`data/w`, `tools/water/build.py`; `uWater` in `terrain.js`). A field of distances: how
   many metres it is from every place to the nearest shore (land positive), 305 m to a texel at level 7 and the
   same at half and a quarter the fineness (levels 6 and 5), in packs of 2052 texels with a rim of two. Its nought
