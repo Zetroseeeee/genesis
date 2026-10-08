@@ -177,6 +177,7 @@ function createSim(world, seed) {
   for (let c = MAXC - 1; c >= 0; c--) freeIds.push(c);
   const popOf = new Float32Array(MAXC), cellsOf = new Int32Array(MAXC), strengthOf = new Float32Array(MAXC), mightOf = new Float32Array(MAXC);      // (strengthOf: how good a realm's arms are; mightOf: its arms and its numbers: see strength)
   const acad = new Int32Array(MAXC), temples = new Int32Array(MAXC), ports = new Int32Array(MAXC), markets = new Int32Array(MAXC), wonders = new Int32Array(MAXC), mines = new Int32Array(MAXC), townsOf = new Int32Array(MAXC), bestCell = new Int32Array(MAXC), bestPop = new Float32Array(MAXC);
+  const lostSeat = new Int32Array(MAXC).fill(-1), seatAt = new Int32Array(MAXC), seatPop = new Float32Array(MAXC);      // (reseat: a capital taken this year)
   const contact = new Uint16Array(MAXC * MAXC);
   // what the market needs to know of each realm: the people living on each raw good's land (mines counted over), whether
   // it holds such land at all (known to it or not), its townspeople, and up to four of its harbours
@@ -427,7 +428,7 @@ function createSim(world, seed) {
       const p = civs[prev];
       logEvent(p, `${cellName.get(i) || 'The capital'} falls to ${fullName(c)}`, true);
       logEvent(c, `${c.ruler.title} ${c.ruler.name} takes ${cellName.get(i) || 'the enemy capital'}`, true);
-      p.stability -= 0.35; p.capital = -1;
+      p.stability -= 0.35; p.capital = -1; lostSeat[prev] = i;
     }
     if (from >= 0) { const m = Math.min(pop[from] * 0.15, 3); pop[from] -= m; pop[i] += m; }
   }
@@ -481,6 +482,24 @@ function createSim(world, seed) {
     logEvent(c, pn ? `The ${pn} of ${cellName.get(seedCell) || 'the provinces'} break away from ${fullName(c)} and found ${fullName(nc)}${why ? ', ' + why : ''}` : `${fullName(nc)} breaks away from ${fullName(c)}${why ? ' ' + why : ''}`, cells.length > 25 || c.player);
     pushOwn(nc, { year, text: `${fullName(nc)} declares independence from ${fullName(c)}`, type: 'state', loc: nc.capital, civ: nc.id });
     return nc;
+  }
+
+  // a realm whose seat was taken this year (in the border fights, by a host, by a breakaway, at a peace) moves its court at
+  // the year's end to the most populous region left to it. It used to wait for next year's count: the screens read the
+  // year's end, and between two turns a realm could stand without a capital. With nothing left it keeps its last seat's
+  // place until it is gone (next year's count).
+  function reseat() {
+    let need = 0;
+    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; seatAt[c] = -2; if (cv && (cv.capital < 0 || owner[cv.capital] !== c)) { seatAt[c] = -1; seatPop[c] = -1; need++; } }
+    if (need) {
+      for (let k = 0; k < LI.length; k++) { const i = LI[k], o = owner[i]; if (o >= 0 && seatAt[o] !== -2 && pop[i] > seatPop[o]) { seatPop[o] = pop[i]; seatAt[o] = i; } }
+      for (let c = 0; c < MAXC; c++) {
+        if (seatAt[c] === -2) continue; const cv = civs[c];
+        if (seatAt[c] >= 0) { cv.capital = seatAt[c]; logEvent(cv, `${cellName.get(cv.capital) || 'A new city'} becomes the capital of ${fullName(cv)}`, false); }
+        else if (cv.capital < 0 && lostSeat[c] >= 0) cv.capital = lostSeat[c];
+      }
+    }
+    lostSeat.fill(-1);
   }
 
   // ---------- history (for the chronicle graphs) ----------
@@ -702,6 +721,7 @@ function createSim(world, seed) {
     }
     // random disasters
     if (rnd() < 0.012) plague(pick(LI), 8 + rint(14), true);
+    reseat();
     finishWorks();
     livingWorld();
     countIndustry(); market.step(); if (tickCount % 3 === 0) hungerWatch();
