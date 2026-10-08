@@ -656,6 +656,44 @@ server.listen(0, async () => {
     await page.keyboard.press('x'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, key: document.getElementById('govkey').hidden })); check(r.mode === 'realm' && r.key, 'and off again');
     await ev(() => { __G.select(__G.sim.playerCiv().capital); });
   });
+  await scenario('faiths: a prophet, founding a faith with its tenets, taking up another, missionaries, the lens of faiths', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (TREE.isOpen()) TREE.close(); if (GOV.isOpen()) GOV.close(); if (ENVOYS.isOpen()) ENVOYS.close(); });
+    // a prophet arises in the player's realm: the attention list calls him, and the Faith page founds his faith with the tenets chosen
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.faith; if (F.state[c.id]) F.gone(c.id); c.religion = null; F.prophet(c.id, c.capital, 'prophet'); S.faithNews();
+      const att = __G.attention ? __G.attention() : []; return { pending: F.pending[c.id], cap: c.capital, att: att.map((a) => a.t1 + ': ' + a.t2) }; });
+    check(r.pending === r.cap, 'a prophet arises in the player\'s capital and waits for him'); check(r.att.some((t) => /prophet/i.test(t)), 'the attention list calls him: ' + (r.att.find((t) => /prophet/i.test(t)) || r.att.join(' | ')).slice(0, 90));
+    await ev(() => GOV.openFaith('new')); await frames(2);
+    r = await ev(() => ({ open: GOV.isOpen(), tab: document.querySelector('#gv-tabs button.on').dataset.gtab, tenets: document.querySelectorAll('#gv-fthinfo .gv-tenet').length, dis: document.querySelector('#gv-fthinfo [data-gact="f-found"]').disabled, name: document.getElementById('gv-fname').value }));
+    check(r.open && r.tab === 'faith' && r.tenets === 8 && r.dis && r.name.length > 3, `the Faith page offers eight tenets and a name (${r.name}); founding waits for two tenets`);
+    await page.click('#gv-fthinfo .gv-tenet[data-tenet="mission"]'); await page.click('#gv-fthinfo .gv-tenet[data-tenet="alms"]'); await frames(1);
+    await page.fill('#gv-fname', 'the Way of the Test'); await frames(1);
+    r = await ev(() => ({ on: [...document.querySelectorAll('#gv-fthinfo .gv-tenet.on')].map((b) => b.dataset.tenet).join(), dis: document.querySelector('#gv-fthinfo [data-gact="f-found"]').disabled })); check(r.on === 'mission,alms' && !r.dis, 'two tenets chosen: ' + r.on);
+    await page.click('#gv-fthinfo [data-gact="f-found"]'); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.faith, f = F.state[c.id]; return { f, name: F.nameOf(f), tenets: f ? F.list[f].tenets.join() : '', relig: c.religion, head: (document.querySelector('#gv-fthinfo h3') || {}).textContent || '', mine: document.querySelector('#gv-faiths .gv-frow.sel') ? document.querySelector('#gv-faiths .gv-frow.sel').textContent : '' }; });
+    check(r.f > 0 && r.name === 'the Way of the Test' && r.tenets === 'mission,alms' && r.relig === r.name && /Way of the Test/i.test(r.head), `founded: ${r.name}, with ${r.tenets}; its page is shown`);
+    // another faith around: its page, and taking it up for authority
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.faith; const nb = S.diplo.reach(c.id).map((b) => S.civs[b]).filter((b) => b && b !== c);
+      const o = nb[0] || S.civs.find((b) => b && b !== c); const g = F.found(o.id, o.capital, { world: true, tenets: ['peace', 'monks'] }); S.faithNews(); S.rule.ruleOf(c).auth = 150; GOV.openFaith(g); return { g, name: F.nameOf(g), who: S.fullName(o) }; }); await frames(2);
+    let q = await ev(() => ({ head: (document.querySelector('#gv-fthinfo h3') || {}).textContent || '', can: !!document.querySelector('#gv-fthinfo [data-gact="f-adopt"]:not([disabled])'), text: document.getElementById('gv-fthinfo').textContent }));
+    check(/teaching|ism|church|creed/i.test(q.head) && q.can && /Missionaries|Monks|Peace/.test(q.text), `another faith's page, with its tenets and a way to take it up: ${q.head}`);
+    await page.click('#gv-fthinfo [data-gact="f-adopt"]'); await frames(2);
+    q = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { f: S.faith.state[c.id], auth: S.rule.ruleOf(c).auth, mis: document.querySelectorAll('#gv-fthinfo [data-gact="f-mission"]').length }; });
+    check(q.f === r.g && q.auth < 150, `taken up for authority (${Math.round(150 - q.auth)}): ${r.name}`);
+    if (q.mis) { await ev(() => { __G.sim.playerCiv().wealth = 9999; GOV.render(); }); await frames(1); await page.click('#gv-fthinfo [data-gact="f-mission"]:not([disabled])'); await frames(2);
+      const m = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { to: S.faith.missionTo[c.id], txt: document.getElementById('gv-fthinfo').textContent }; }); check(m.to >= 0 && /missionaries are in/i.test(m.txt), 'and sends missionaries: ' + (m.txt.match(/missionaries are in [^.]*/i) || [''])[0]); }
+    await ev(() => GOV.close());
+    // the panels: the region keeps a faith (a holy city is marked), the realm its faith and its people's
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(); __G.select(c.capital); return { cell: document.getElementById('sel-cell').textContent, kv: document.getElementById('sc-kv').textContent }; });
+    check(/Faith/.test(r.cell) && /holy city/.test(r.cell), 'the capital\'s panel: its faith, and that it is a holy city'); check(/Faith/.test(r.kv), 'the realm\'s panel: ' + (r.kv.match(/Faith(.{0,70})/) || ['', ''])[1]);
+    // the lens: J paints the faiths, with a key, their names across their lands and the holy cities (the realm's land of its faith, as the state would carry it in time)
+    await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.faith; for (const i of S.LI) if (S.cellDist(i, c.capital) < 7 && S.pop[i] > 0.02 && !F.holyAt.has(i)) { F.fth[i] = F.state[c.id]; } const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.55, 0, 0); }); await wait(300); await frames(3);
+    await page.keyboard.press('j'); await frames(6); for (let k = 0; k < 30 && !(await ev(() => document.querySelectorAll('.lbl.faith.show, .lbl.holy.show').length)); k++) await frames(1);
+    r = await ev(() => { const k = document.getElementById('govkey'), W = __G.world; return { on: document.getElementById('v-fth').classList.contains('on'), mode: W.palMode, key: !k.hidden, text: k.textContent, labels: document.querySelectorAll('.lbl.faith, .lbl.holy').length }; });
+    check(r.on && r.mode === 'faith' && r.key && /The world's faiths: \d+ in \d+ families/.test(r.text), `J turns on the lens of faiths, with its key (${r.text.slice(0, 70)})`);
+    check(r.labels > 0, `and the faiths' names and holy cities on the map (${r.labels})`);
+    await page.keyboard.press('j'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, key: document.getElementById('govkey').hidden })); check(r.mode === 'realm' && r.key, 'and off again');
+    await ev(() => { __G.select(__G.sim.playerCiv().capital); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);

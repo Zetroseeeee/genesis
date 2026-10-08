@@ -43,6 +43,7 @@ window.DIPLO = (function () {
     reconquest: { name: 'Reconquest', goal: 'land', text: 'They hold land that was yours within living memory.' },
     claim: { name: 'A claim', goal: 'land', text: 'Your scribes have found, or made, a right to their borderland.' },
     holy: { name: 'Holy war', goal: 'land', text: 'They keep another faith, and yours is the law of your realm.' },
+    holycity: { name: 'The holy city', goal: 'land', text: 'They hold the holy city of your faith, and keep another.' },
     covet: { name: 'A war for goods', goal: 'tribute', text: 'They hold what your people cannot do without, and you have none.' },
     kin: { name: 'Unification', goal: 'land', text: 'They are your own people under another flag.' },
     refused: { name: 'Tribute refused', goal: 'vassal', text: 'You asked them to bend the knee, and they would not.' },
@@ -153,10 +154,18 @@ window.DIPLO = (function () {
 
     // ----- opinion: how a regards b, from -100 to 100; with `out` the reasons are listed too: [what, by how much] -----
     // (The reasons are worded for the one who is thought of, who is the one that reads them - "what they think of you": "you" is b, "they" a.)
+    const faithOf = (cv) => (host.faith ? host.faith(cv) : cv.religion ? cv.religion : 0);
+    // (what one faith is worth between two realms: since faiths spread region by region (faith.js) a few faiths for all
+    // peoples hold much of the world, and neighbours share one far oftener than when every realm took up a faith of its own)
+    const SAME_FAITH = host.faith ? 4 : 6;
     function opinion(a, b, out) {
       if (!a || !b || a === b) return 0; const da = D(a), db = D(b), y = year(); let o = 0; const put = (t, v) => { if (!v) return; o += v; if (out) out.push([t, v]); };
       const m = memOf(a, b.id); if (Math.abs(m) >= 0.5) put(m > 0 ? 'Old favours' : 'Old wrongs', Math.round(m));
-      if (a.religion && b.religion) { if (a.religion === b.religion) put('The same faith', 6); else { const fl = host.faithLaw(a), base = fl === 'orthodoxy' ? -16 : fl === 'established' ? -10 : fl === 'tolerance' || fl === 'secular' || fl === 'godless' ? 0 : -6; put('Another faith', Math.round(base * (host.trait(a) === 'pious' ? 1.5 : 1))); } }
+      // (one faith; another church of it, nearly as bad; another faith, as a's laws of faith and its faith's tenets make it; the holy city of a's faith in b's hands: faith.js)
+      { const fa = faithOf(a), fb = faithOf(b);
+        if (fa && fb) { if (fa === fb) put('The same faith', SAME_FAITH); else { const fl = host.faithLaw(a), base = fl === 'orthodoxy' ? -16 : fl === 'established' ? -10 : fl === 'tolerance' || fl === 'secular' || fl === 'godless' ? 0 : -6; const kin = !!host.faithKin && host.faithKin(a, b);
+          put(kin ? 'Another church of the same faith' : 'Another faith', Math.round(base * (host.trait(a) === 'pious' ? 1.5 : 1) * (kin ? 0.8 : 1) + (host.faithT ? host.faithT(a, 'hate') : 0))); } }
+        if (fa && host.holyHeld && host.holyHeld(a) === b.id) put('You hold the holy city of their faith', -Math.round(10 * Math.max(1, host.faithT(a, 'holy')))); }
       const ka = host.kind(a), kb = host.kind(b); if (ka === kb && ka !== 'kin') put('Ruled alike', 4); else if (a.era >= 6 || b.era >= 6) put('Ruled by another creed', -creedGap(ka, kb));
       const near = touches(a, b.id); { const fa = host.folk ? host.folk(a) : 0; if (fa && fa === host.folk(b)) put('One people', 3); }      // (two realms of one people: people.js)
       { const ta = host.tongue(a); if (ta && ta === host.tongue(b)) put('Kindred speech', 5); else if (near && (a.era >= 6 || b.era >= 6)) put('Another nation on their border', -8); }      // (once peoples think of themselves as nations)
@@ -212,7 +221,7 @@ window.DIPLO = (function () {
           const tb = threatTo(b), ta = ta0 !== undefined ? ta0 : threatTo(a); if (tb && (tb === ta || host.atWar(a, tb.id))) put('You fear the same enemy', 26); else if (tb && r > 0.8) put('They need friends', 10);
           let w = 0; for (const _ in a.wars) w++; if (w) put('You are at war', kind === 'alliance' ? -8 : -20); if (r < 0.4) put('You would be a burden', -12); else if (r > 1.5) put('Your strength', 8);
           if (lordOf(b) || lordOf(a)) put('A vassal follows its lord', -100);
-        } else if (kind === 'marriage') { put('A match takes thought', -5); if (!host.blood(a) || !host.blood(b)) put('Both realms must be ruled by blood', -200); if (a.religion && b.religion) put(a.religion === b.religion ? 'The same faith' : 'Another faith', a.religion === b.religion ? 8 : -12); }
+        } else if (kind === 'marriage') { put('A match takes thought', -5); if (!host.blood(a) || !host.blood(b)) put('Both realms must be ruled by blood', -200); { const fa = faithOf(a), fb = faithOf(b); if (fa && fb) put(fa === fb ? 'The same faith' : 'Another faith', fa === fb ? 8 : -12); } }
       }
       return { ok: s >= 0, score: Math.round(s), why: why.sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])) };
     }
@@ -318,7 +327,8 @@ window.DIPLO = (function () {
     function causes(a, b) {
       const out = [], da = D(a), y = year(); const add = (key) => out.push(Object.assign({ key, just: true }, CAUSES[key]));
       if (da.claim[b.id * 4 + 3] > y) add('rebel'); if (da.claim[b.id * 4 + 1] > y) add('reconquest'); if (da.claim[b.id * 4] > y) add('claim'); if (da.claim[b.id * 4 + 2] > y) add('refused');
-      const fl = host.faithLaw(a); if (a.religion && b.religion && b.religion !== a.religion && (fl === 'established' || fl === 'orthodoxy')) add('holy');
+      { const fa = faithOf(a), fb = faithOf(b), fl = host.faithLaw(a); if (fa && fb && fa !== fb && (fl === 'established' || fl === 'orthodoxy' || (host.sword && host.sword(a)))) add('holy');      // (a faith that holds with the sword needs no law to make it just)
+        if (fa && host.holyHeld && host.holyHeld(a) === b.id && touches(a, b.id)) add('holycity'); }
       if (touches(a, b.id) && host.covets(a, b)) add('covet'); if (host.knows(a.id, 'nationalism')) { const fa = host.folk ? host.folk(a) : host.tongue(a); if (fa && fa === (host.folk ? host.folk(b) : host.tongue(b))) add('kin'); }      // (one people under two flags)
       if ((a.era >= 6 || b.era >= 6) && creedGap(host.kind(a), host.kind(b)) >= 14) add('creed');
       out.push(Object.assign({ key: 'none', just: a.era < 2 }, CAUSES.none)); return out;
@@ -341,7 +351,7 @@ window.DIPLO = (function () {
       if (W.stab) host.shake(a, W.stab); if (W.rep) da.rep = Math.max(0, da.rep - W.rep);
       da.goal[b.id] = C.key; delete da.side[b.id]; delete D(b).side[a.id]; delete D(b).goal[a.id]; remember(b, a.id, W.broke ? -40 : -22); count(stats.wars, C.key);
       const g = C.key === 'covet' ? host.covets(a, b) : '';
-      host.declareWar(a, b, C.key === 'none' ? (a.player ? 'by decree' : pick(['over a border dispute', 'for glory', 'to seize its fields', 'after an insult to its ruler', 'to punish raids', '', ''])) : C.key === 'covet' ? `for its ${g.toLowerCase()}` : C.key === 'holy' ? 'for the faith' : C.key === 'claim' ? 'to make good its claim' : C.key === 'reconquest' ? 'to win back what it lost' : C.key === 'kin' ? 'to unite its people' : C.key === 'refused' ? 'for tribute refused' : C.key === 'creed' ? 'against a creed it cannot abide' : C.key === 'rebel' ? 'to bring a rebel vassal to heel' : '');
+      host.declareWar(a, b, C.key === 'none' ? (a.player ? 'by decree' : pick(['over a border dispute', 'for glory', 'to seize its fields', 'after an insult to its ruler', 'to punish raids', '', ''])) : C.key === 'covet' ? `for its ${g.toLowerCase()}` : C.key === 'holy' ? 'for the faith' : C.key === 'holycity' ? 'for the holy city of its faith' : C.key === 'claim' ? 'to make good its claim' : C.key === 'reconquest' ? 'to win back what it lost' : C.key === 'kin' ? 'to unite its people' : C.key === 'refused' ? 'for tribute refused' : C.key === 'creed' ? 'against a creed it cannot abide' : C.key === 'rebel' ? 'to bring a rebel vassal to heel' : '');
       if (W.broke) host.event(a, `${cap(nameOf(a))} breaks its ${PACT[W.broke].name.toLowerCase()} with ${nameOf(b)}`, true, b);
       // friends: those sworn to b's defence; a's allies and vassals
       for (const x of friends(b, false)) if (x !== a && !host.atWar(x, a.id) && !bound(x, a) && D(x).lord !== a.id) call(x, b, a);

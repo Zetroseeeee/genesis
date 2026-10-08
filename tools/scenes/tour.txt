@@ -342,3 +342,7 @@ army_fleet   | tools/scenes/town.js tools/scenes/army.js | {lon:-0.37,lat:39.47,
 peoples_old  | tools/scenes/peoples.js | {years:8000,lon:40,lat:35,alt:7500} | | 120
 peoples_late | tools/scenes/peoples.js | {years:11500,lon:40,lat:35,alt:7500} | | 170
 peoples_near | tools/scenes/peoples.js | {years:9000,lon:30,lat:45,alt:1800,tilt:0.35,clouds:false} | | 130
+# --- faiths: the lens of faiths over the Old World in 500 BC and in AD 1500, with their holy cities; a region from closer ---
+faiths_old   | tools/scenes/peoples.js | {years:9500,lon:40,lat:35,alt:7500,lens:'fth'} | | 140
+faiths_late  | tools/scenes/peoples.js | {years:11500,lon:40,lat:35,alt:7500,lens:'fth'} | | 170
+faiths_near  | tools/scenes/peoples.js | {years:11000,lon:35,lat:38,alt:2200,tilt:0.3,lens:'fth'} | | 160

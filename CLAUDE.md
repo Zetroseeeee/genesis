@@ -105,6 +105,11 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   many families, the largest, how many have drifted apart and how many regions were taken in, what share of other
   peoples realms rule; `--write` puts each age's mean into `src/people.js` (its NORM marks), which a realm's unrest is
   measured against. Run it twice over two seeds after touching how peoples are taken in, drift apart or rise.
+- `node tools/faith/probe.js [seed,seed] [last year] [--write]` — the world's faiths through the ages: how many, of how
+  many families, how many for all peoples, the largest with their holy cities and tenets, how many realms keep the old
+  ways, what was founded, taken up, forsaken and broken away, how many regions the state, the preachers and the
+  merchants carried over, what share of other faiths realms hold; `--write` puts each age's mean into `src/faith.js`
+  (its NORM marks). Run it twice over two seeds after touching how faiths spread, split or are taken up.
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -190,6 +195,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/diplo.js` | `DIPLO` | What two realms can swear, why they go to war and what a winner may ask; one world's diplomacy: what every realm thinks of every other and why, pacts, vassals, claims, wars with friends on both sides, offers to the player |
 | `src/army.js` | `ARMY` | Hosts and fleets: the autopilot's host on every front, the player's levy that marches where he sends it (by road over land, by fleet over the sea), battles, assaults and sieges; pure data |
 | `src/people.js` | `PEOPLE` | The peoples of the world: who lives in every region, each people's tongue and family, how peoples are taken into those who rule them and drift apart, what ruling others costs a realm; pure data |
+| `src/faith.js` | `FAITH` | The faiths of the world: what every region keeps, the holy cities, faiths founded, carried by the state, preached and taken up, churches that break away, what other faiths cost a realm; the player's faith (founding with tenets, taking up another, missionaries); pure data |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
@@ -454,6 +460,45 @@ Conventions that matter:
   who lives there, the realm's its peoples. Saved run by run (`save().peoples`); a world saved before peoples is given
   one people a realm (`settle`). After touching how peoples are taken in, drift or rise, run `tools/people/probe.js` over
   12345 and 777 (twice with `--write`), and the war-and-peace probe: the world must keep about as many realms.
+- **Faiths** (`faith.js`; `sim.faith`). Every region people live in keeps a faith (`fth`, a Uint16 a region; 0 the old
+  ways: each people's own gods and dead, unpainted under the lens), and every realm has one (`state`; `cv.religion` is
+  its name, kept in step for rule, diplomacy's older words and the pages). A faith is founded when a prophet arises (the
+  sim's old roll: a realm that knows priesthood and has none; the comet, where there are priests to read it; the god
+  power): at the realm's capital, its holy city (`home`; `holyAt`), named in the tongue of the people there, with two
+  tenets (`TENETS`: missionaries, the sword, peace among peoples, pilgrimage, monks and books, the ancestors, kings
+  anointed, alms), chosen by the ruler's character; **in the player's realm the prophet waits** (`pending`) and the player
+  founds the faith on the Faith page of the laws screen, choosing its name and tenets. A faith founded where the world
+  faiths are known (`scripture`) is for all peoples (`world`), an earlier one is its people's. How it spreads: the state
+  carries its faith into its regions (`CONV`, faster beside regions that hold it, in towns and by temples, by the laws:
+  an enforced orthodoxy fast, many gods in one peace slowly, faith a private matter hardly; a godless state takes faith
+  away); those who preach carry it to a neighbouring region (`PREACH`: a faith for all peoples over any border, a
+  people's faith among its own people; held back by the realm's own faith as its laws of faith and speech hold it:
+  `resist`); merchants carry a faith for all peoples to their partners' harbours (`MISSION`, along the market's links); a
+  holy city keeps its faith whoever holds it. A ruler of the old ways takes up the faith most of his people hold, or a
+  neighbour's (`ADOPT`); one who keeps his people's faith turns now and then to one for all peoples; one of a faith
+  turns only when his own is a quarter of his realm (the player's realm never by itself); a vassal comes to its lord's
+  faith for all peoples. Every twenty-five years a faith held far from its holy city (`SPLIT` regions, the more readily
+  once books are printed) may split: the far realm's church breaks away with its people, and its neighbours may follow
+  (named for where it lies, or once books are printed for what it means: Reformed, Free ...); out of a people's faith,
+  where the world faiths are known, now and then comes a teaching for all peoples (rarer the more there are: a world has
+  a handful). A tenth of the land is gone over each year (`LAP`) and what a realm's laws and age make of it is worked
+  out every five years (`prep`): about a third of a millisecond a year. **Other faiths are measured against the age**: a
+  realm's stability loses `RESTLESS` times its share of other faiths (weighed: the old ways under a faith a quarter,
+  another church of the same faith most, another faith all; by its laws and its faith's tenets) beyond what realms of
+  its age usually hold (`NORM`, `tools/faith/probe.js --write`). Diplomacy (by faith, not by name): one faith, another
+  church of it, another faith (and what the faith's tenets make of others: `hate`); a realm whose holy city another
+  faith holds thinks the less of the holder ('You hold the holy city of their faith', the more with pilgrimage) and has
+  a cause for war if they touch ('holycity'); a faith of the sword makes a holy war just whatever the laws. The player
+  (`sim.faithCosts`, `sim.faithAct`): found a faith (free where a prophet waits, else authority), take up another
+  (authority, by how few of his people keep it; his old priests' goodwill where most keep the old), send missionaries
+  to a realm within reach (coin; two turns of them), break with his faith for a church of his own (much authority; far
+  from the holy city, or once books are printed). The lens of faiths (J; `world.palMode = 'faith'`) paints every
+  region by the faith its people keep, writes the faiths' names across their lands and marks the great ones' holy
+  cities; the region's panel says what it keeps and whether it is a holy city, the realm's its faith and its people's.
+  Saved run by run (`save().faiths`); a world saved before faiths had regions is given one faith by each name, its holy
+  city the first realm's capital, and every realm's land of its realm's faith (`settle`). The module throws its own
+  dice. After touching it run `tools/faith/probe.js` over 12345 and 777 (twice with `--write`) and the war-and-peace
+  probe.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

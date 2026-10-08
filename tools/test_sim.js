@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -812,6 +812,94 @@ log('13. peoples');
   check(alive.length > 80 && fams.size < alive.length, `a world of peoples (${alive.length}) in fewer families (${fams.size})`);
   check(!bad, `every realm's share of other peoples and its unrest are within bounds (${bad} not)`);
   check(ms / 100 < 1, `peoples are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
+}
+}
+if (want(14)) {
+// ---------- 14. faiths: founded, carried by the state, preached, taken up; what it costs; holy cities, churches, the player; saved ----------
+log('14. faiths');
+{
+  const sim = createSim(wd, 53); const W2 = sim.W, F = sim.faith; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && ok(i + d - 2 * W2) && ok(i + d + 2 * W2)));
+  const bronze = sim.ERAS[1][1] + 0.01, classic = sim.ERAS[3][1] + 0.01;
+  const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
+  for (const x of [A, B]) { x.tech = bronze; x.era = sim.eraOf(bronze); teach(sim, x, x === A ? 1 : 0); x.aggression = 0; x.dip.think = 1e12; }      // (B has no priests of its own: no prophet will arise there)
+  // a prophet arises in a realm without a faith: a faith of its people, founded at its capital, the faith of the realm
+  check(!F.state[A.id] && !A.religion, 'a new realm keeps the old ways');
+  const f = F.prophet(A.id, A.capital, 'prophet'); const X = F.list[f];
+  check(f > 0 && F.state[A.id] === f && A.religion === X.name && X.home === A.capital && F.fth[A.capital] === f && X.tenets.length === 2 && !X.world, `a prophet founds a faith of its people at the capital: ${X && X.name} (${X && X.tenets.join(', ')})`);
+  check(F.holyAt.get(A.capital) === f, 'and its holy city is the capital');
+  // the state carries it through the realm; settlers of the realm's own people bring it to empty land
+  for (let d = 1; d <= 4; d++) for (const e of [-2 * W2, -W2, 0, W2, 2 * W2]) { const i = i0 + d + e; if (sim.owner[i] < 0) sim.claim(i, A, i0); sim.pop[i] = 2; }
+  for (let d = 6; d <= 12; d++) for (const e of [-2 * W2, -W2, 0, W2, 2 * W2]) { const i = i0 + d + e; if (sim.owner[i] < 0) sim.claim(i, B, i0 + 8); sim.pop[i] = 2; }
+  sim.recount();
+  const aCells = [], bCells = []; for (let d = 1; d <= 12; d++) for (const e of [-2 * W2, -W2, 0, W2, 2 * W2]) { const i = i0 + d + e; if (sim.owner[i] === A.id) aCells.push(i); else if (sim.owner[i] === B.id) bCells.push(i); }
+  for (const i of aCells) if (i !== A.capital) F.fth[i] = 0;
+  const c0 = F.stats.converted; let y = 0; for (; y < 600 && aCells.filter(i => F.fth[i] === f).length < aCells.length * 0.6; y++) sim.tick();
+  check(F.stats.converted > c0 && aCells.filter(i => F.fth[i] === f).length >= aCells.length * 0.6, `the state carries its faith through the realm (${aCells.filter(i => F.fth[i] === f).length} of ${aCells.length} regions in ${y} years)`);
+  // a ruler of the old ways takes up the faith of his neighbour
+  for (y = 0; y < 800 && F.state[B.id] !== f; y++) sim.tick();
+  check(F.state[B.id] === f && B.religion === X.name, `a neighbour of the old ways takes it up (${y} years)`);
+  // a faith for all peoples is preached over the border, into a realm of another faith
+  const C = sim.spawnTribe(sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.cellDist(i, i0) > 30), {}); C.tech = classic; C.era = sim.eraOf(classic); teach(sim, C, 3); C.aggression = 0; C.dip.think = 1e12;
+  const g = F.found(C.id, C.capital, { world: true, tenets: ['mission', 'alms'] }); const G = F.list[g];
+  check(g > 0 && G.world && G.tenets.join() === 'mission,alms', `a realm that knows the world faiths founds one for all peoples: ${G.name}`);
+  for (const i of bCells.slice(0, 6)) F.fth[i] = g;      // (its preachers have come)
+  const p0 = F.stats.preached; for (y = 0; y < 300 && F.stats.preached === p0; y++) sim.tick();
+  check(F.stats.preached > p0, `those who preach it carry it from region to region (${F.stats.preached - p0} in ${y} years)`);
+  // other faiths cost a realm some steadiness, measured against its age; the laws weigh on it
+  for (const i of bCells) { if (i !== B.capital) F.fth[i] = g; }
+  for (y = 0; y < 6; y++) sim.tick();
+  const sp = sim.stabilityParts(B); check(F.otherShare[B.id] > 0.3 && sp.faiths < 0, `a realm of many other faiths is the less steady for it (${Math.round(F.otherShare[B.id] * 100)}% others: ${(sp.faiths * 100).toFixed(1)} stability)`);
+  const R = sim.rule.ruleOf(B), was = R.laws.faith; R.laws.faith = 'tolerance'; const calm = F.lawF(B.id, 'minor'), slow = F.lawF(B.id, 'conv'); R.laws.faith = 'orthodoxy'; const hot = F.lawF(B.id, 'minor'), fast = F.lawF(B.id, 'conv'), hold = F.lawF(B.id, 'resist'); R.laws.faith = was;
+  check(calm < 1 && slow < 1 && hot > 1 && fast > 1.5 && hold < 0.5, `laws: many gods in one peace quiet other faiths (${calm}) and carry the realm's slowly (${slow}); an enforced orthodoxy angers them (${hot}), carries it fast (${fast}) and holds it against preachers (${hold})`);
+  check(weightOk(F), 'other faiths weigh as they should: the old ways a quarter, another church most, another faith all');
+  function weightOk(F) { return F.weight(f, f) === 0 && F.weight(0, f) === 0.25 && F.weight(g, f) === 1; }
+  // a holy city keeps its faith, and its fall is told
+  { const hc = X.home; if (sim.owner[hc] !== A.id) sim.claim(hc, A, hc); sim.claim(hc, C, hc + 1); sim.faithNews();
+    const told = C.events.slice(-4).concat(A.events.slice(-4)).map(e => e.text).join(' / '); check(/holy city of/.test(told), 'the fall of a holy city to a realm of another faith is told: ' + told.slice(0, 160));
+    for (y = 0; y < 120; y++) { if (sim.owner[hc] !== C.id) sim.claim(hc, C, hc + 1); sim.tick(); } check(F.fth[hc] === f, 'and the holy city keeps its faith under its new masters'); }
+  // diplomacy: a realm whose holy city another faith holds thinks less of it, and may go to war for it
+  { const out = []; sim.diplo.opinion(A, C, out); check(out.some(r => /holy city/.test(r[0])), 'a realm thinks less of whoever holds the holy city of its faith: ' + out.map(r => r[0] + ' ' + r[1]).join(', ')); }
+  // a church breaks away far from its holy city (the more readily once books are printed), and takes its people with it
+  { const s2 = createSim(wd, 59), F2 = s2.faith; const j0 = s2.LI.find(i => ok(i) && s2.owner[i] < 0 && s2.fert[i] > 0.4);
+    const H = s2.spawnTribe(j0, {}); const far = s2.LI.find(i => ok(i) && s2.owner[i] < 0 && s2.cellDist(i, j0) > 90 && [1, 2, 3, 4, 5, 6].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+    const Z = s2.spawnTribe(far, {}); const ren = s2.ERAS[5][1] + 0.01; for (const x of [H, Z]) { x.tech = ren; x.era = s2.eraOf(ren); teach(s2, x, 5); x.aggression = 0; x.dip.think = 1e12; }
+    const h = F2.found(H.id, H.capital, { world: true, tenets: ['mission', 'peace'] }); F2.adopt(Z.id, h, 'chosen'); F2.list[h].born = s2.year - 500;
+    for (let d = 1; d <= 6; d++) for (const e of [-W2, 0, W2]) { const i = far + d + e; if (s2.owner[i] < 0) s2.claim(i, Z, far); s2.pop[i] = 3; F2.fth[i] = h; }
+    for (let k = 0; k < 40; k++) { const i = s2.LI.find(q => ok(q) && s2.owner[q] < 0 && F2.fth[q] === 0 && s2.cellDist(q, j0) < 25 && s2.cellDist(q, j0) > 2 + k * 0.1); if (i === undefined) break; F2.fth[i] = h; s2.pop[i] = 1; }
+    s2.recount(); let yy = 0; for (; yy < 400 && !F2.stats.split; yy++) s2.tick();
+    const sect = F2.list.find(q => q && q.parent === h); check(F2.stats.split > 0 && !!sect && F2.state[Z.id] === sect.id && F2.fth[far + 1] === sect.id, `far from its holy city a church breaks away: ${sect ? sect.name : '?'} (${yy} years), and the realm's people go with it`); }
+  // the player: a prophet waits for him; he founds the faith with the tenets he chooses; takes up another; sends missionaries; a church of his own
+  { const s4 = createSim(wd, 61), F4 = s4.faith; const k0 = s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8].every(d => ok(i + d) && s4.owner[i + d] < 0));
+    s4.setPlayer(k0, 'Testland'); const P = s4.playerCiv(); P.tech = bronze; P.era = s4.eraOf(bronze); teach(s4, P, 1);
+    const N2 = s4.spawnTribe(k0 + 6, {}); N2.tech = classic; N2.era = s4.eraOf(classic); teach(s4, N2, 3); N2.aggression = 0; N2.dip.think = 1e12; const n = F4.found(N2.id, N2.capital, { world: true });
+    F4.prophet(P.id, P.capital, 'prophet'); check(F4.pending[P.id] === P.capital && !F4.state[P.id], 'in the player\'s realm a prophet waits for the court');
+    check(s4.faithCosts().found === 0 && s4.faithCosts().canFound, 'and founding his faith costs nothing');
+    const why = s4.faithAct('found', ['monks', 'pilgrim'], 'the Faith of Tests'); const pf = F4.state[P.id];
+    check(!why && pf > 0 && F4.list[pf].name === 'the Faith of Tests' && F4.list[pf].tenets.join() === 'monks,pilgrim' && F4.pending[P.id] < 0, `the player founds it with the tenets he chose (${why || F4.list[pf].name})`);
+    for (let k = 0; k < 400; k++) s4.tick(); check(F4.state[P.id] === pf, 'and his realm keeps it until he changes it');
+    const R4 = s4.rule.ruleOf(P); R4.auth = 150; const cost = s4.faithCosts().adopt(n); const w2 = s4.faithAct('adopt', n);
+    check(!w2 && F4.state[P.id] === n && R4.auth === 150 - cost, `he takes up another faith for ${cost} authority (${w2 || F4.nameOf(n)})`);
+    P.wealth = 5000; const t0 = s4.civs.find(c => c && c !== P && F4.state[c.id] !== n); if (t0) { const w3 = s4.faithAct('mission', t0.id); check(!w3 && F4.missionTo[P.id] === t0.id, `and sends missionaries (${w3 || s4.fullName(t0)})`); }
+    const save4 = JSON.parse(JSON.stringify(s4.save())); const s5 = createSim(wd, 1); s5.load(save4); const F5 = s5.faith; let same = true; for (let i = 0; i < N; i++) if (F5.fth[i] !== F4.fth[i]) { same = false; break; }
+    check(same && F5.list.length === F4.list.length && F5.state[P.id] === n && F5.list[pf].tenets.join() === 'monks,pilgrim' && s5.playerCiv().religion === F4.list[n].name && F5.missionTo[P.id] === F4.missionTo[P.id], `saved and loaded: ${F4.list.length - 1} faiths, the map of them, the realms' and the missionaries`); }
+  // a world saved before faiths had regions: every faith by its name, every realm's land of its faith
+  { const saved = JSON.parse(JSON.stringify(sim.save())); delete saved.faiths; const s3 = createSim(wd, 1); s3.load(saved); const R3 = s3.faith; let all = true, n = 0;
+    for (const k of s3.LI) { const o = s3.owner[k]; if (o >= 0 && s3.civs[o] && s3.civs[o].religion) { n++; if (R3.fth[k] !== R3.state[o] || R3.list[R3.state[o]].name !== s3.civs[o].religion) { all = false; break; } } }
+    check(all && n > 0 && R3.state[A.id] === R3.state[B.id], 'a world saved before faiths had regions: every realm\'s land of its faith, one faith by one name'); }
+  invariants(sim, 'the world of faiths in ' + sim.fmtYear(sim.year));
+}
+// the faiths of a whole world: once priests are known, many faiths of fewer families; quick enough
+{
+  const sim = createSim(wd, 12345); const F = sim.faith; for (let y = 0; y < 3000; y++) sim.tick();
+  const bronze = sim.ERAS[1][1] + 0.02; for (const cv of sim.civs) if (cv) { cv.tech = Math.max(cv.tech, bronze); cv.era = sim.eraOf(cv.tech); teach(sim, cv, 1); }
+  for (let y = 0; y < 600; y++) sim.tick();
+  let ms = 0; for (let y = 0; y < 100; y++) { sim.tick(); ms += F.stats.ms; }
+  const alive = F.list.filter(f => f && f.n > 0), fams = new Set(alive.map(f => f.fam)); let bad = 0, kept = 0, held = 0; for (const cv of sim.civs) { if (!cv) continue; held++; if (F.state[cv.id]) kept++; if (!(F.otherShare[cv.id] >= 0 && F.otherShare[cv.id] <= 1 && F.restless[cv.id] <= 0.02 && F.restless[cv.id] > -0.5)) bad++; }
+  log(`   ${sim.fmtYear(sim.year)}: ${alive.length} faiths in ${fams.size} families, kept by ${kept} of ${held} realms; ${F.stats.founded} founded, ${F.stats.adopted} taken up, ${F.stats.split} churches broke away; a year of faiths takes ${(ms / 100).toFixed(3)} ms`);
+  check(alive.length > 10 && kept > held * 0.3, `a world of faiths once priests are known (${alive.length} faiths, kept by ${kept} of ${held} realms)`);
+  check(!bad, `every realm's share of other faiths and its unrest are within bounds (${bad} not)`);
+  check(ms / 100 < 1.5, `faiths are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

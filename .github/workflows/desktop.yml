@@ -189,7 +189,7 @@ jobs:
           gh release upload latest "out/$DMG" --clobber
           for f in $(gh release view latest --json assets --jq '.assets[].name'); do case "$f" in "$DMG") ;; *) gh release delete-asset latest "$f" --yes ;; esac; done
           node tools/update/publish.js promote --manifest out/manifest.json --repo "$GITHUB_REPOSITORY"
-          node tools/update/publish.js check --repo "$GITHUB_REPOSITORY" | tee out/published.log
+          node tools/update/publish.js check --repo "$GITHUB_REPOSITORY" --tries 6 | tee out/published.log
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Keep the logs
