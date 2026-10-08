@@ -252,7 +252,7 @@
     static get COLD() { return Trees._cold || (Trees._cold = (() => { const a = new Float32Array(256); for (const k of [20, 21, 24, 25, 28, 29, 30, 31]) a[k] = 1; for (const k of [18, 19, 22, 23, 26, 27]) a[k] = 0.72; a[11] = 0.5; a[6] = a[8] = 0.45; a[10] = 0.25; a[9] = 0.12; a[16] = a[17] = 0.1; a[13] = 0.06; return a; })()); }
     // the climate class of a point (0 while the map has not arrived)
     climateAt(lon, lat) { const c = this.climate; if (!c) return 0; const x = ((Math.floor((lon + 180) / 360 * c.width) % c.width) + c.width) % c.width, y = Math.min(c.height - 1, Math.max(0, Math.floor((90 - lat) / 180 * c.height))); return c.data[(y * c.width + x) * 4]; }
-    async load(vegUrl, noiseUrl, climateUrl) {
+    async load(vegUrl, noiseUrl, climateUrl, snowUrl) {
       const img = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => { const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(im, 0, 0); res(ctx.getImageData(0, 0, im.width, im.height)); }; im.onerror = () => rej(new Error('failed ' + url)); im.src = url; });
       const [v, n] = await Promise.all([img(vegUrl), img(noiseUrl)]);
       this.veg = v; this.noise = n; this.ready = true;
@@ -261,6 +261,18 @@
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 4; c++) { let sum = 0; for (let yy = 0; yy < k; yy++) for (let xx = 0; xx < k; xx++) sum += n.data[((y * k + yy) * n.width + x * k + xx) * 4 + c]; d[(y * w + x) * 4 + c] = sum / (k * k); }
         this.noiseLo = { width: w, height: h, data: d }; }
       if (climateUrl) img(climateUrl).then((c) => { this.climate = c; for (const L of this.last) L.t = -1e9; }).catch((e) => console.warn('climate', e));
+      if (snowUrl) img(snowUrl).then((c) => { this.snow = c; }).catch((e) => console.warn('snow', e));
+    }
+    // How much of the ground snow covers at a place just now (0..1), the twin of the ground shader's rule (without the grain of
+    // its edge): for how much of its cold season snow lies there - what the map has for the level of the sea (data/snow.png:
+    // tools/planet/snow.py) and half the season more for every thousand metres the place lies high - and so for how long about
+    // the depth of winter. cold: the cold of the year in that hemisphere (0..1, a month behind the sun); h: how high the place
+    // lies, in metres. Roofs and boughs go white by it with the ground.
+    lyingAt(lon, lat, coldYear, h) {
+      if (!this.snow) { const cold = Trees.COLD[this.climateAt(lon, lat)] || 0, thr = 1.02 - 0.55 * cold; return smooth(thr, thr + 0.1, coldYear) * smooth(0.08, 0.5, cold); }
+      const sn = this.snow, s = Math.min(1.25, Math.max(0, this.samp(sn, (lon + 180) / 360 * sn.width, (90 - lat) / 180 * sn.height, 0) * 4 - 3 + (h || 0) * 0.0005));
+      const off = Math.acos(Math.min(1, Math.max(-1, 2 * coldYear - 1))) / Math.PI;
+      return Math.min(1, Math.max(0, (s * 0.58 - off) / 0.2 + 0.5)) * smooth(0.02, 0.4, s);
     }
     // bilinear sample of an ImageData channel at fractional pixel coords (wrapping x)
     samp(id, fx, fy, ch) {
@@ -512,8 +524,8 @@
               if (leafless) col.setRGB(v * 0.86, v * 0.77, v * 0.63);              // bare twigs are bark-brown and dark (the photographs, cut from a blue screen, come out pale and a little pink)
               if (under) col.setRGB(col.r * 0.74, col.g * 0.86, col.b * 0.62);        // scrub is dark and green whatever tree lent it its crown (an olive's is silver: as bushes they were boulders)
               // where snow lies it lies on the trees too: boughs and twigs go pale with it
-              if (this.bareness && fw.kc) { const cold = Trees.COLD[fw.kc]; if (cold > 0.08) { const thr = 1.02 - 0.55 * cold; const frost = smooth(thr, thr + 0.1, lat > 0 ? this.bareness.z : this.bareness.w) * smooth(0.08, 0.5, cold) * (0.6 + 0.4 * hash2(gx, gy, 91));
-                if (frost > 0.02) col.setRGB(col.r * (1 + 0.32 * frost), col.g * (1 + 0.34 * frost), col.b * (1 + 0.46 * frost)); } }
+              if (this.bareness && fw.kc) { const frost = this.lyingAt(lon, lat, lat > 0 ? this.bareness.z : this.bareness.w, h) * (0.6 + 0.4 * hash2(gx, gy, 91));
+                if (frost > 0.02) col.setRGB(col.r * (1 + 0.32 * frost), col.g * (1 + 0.34 * frost), col.b * (1 + 0.46 * frost)); }
               // how deep in a wood it stands: by how much of the country round it is wood (a tree by a town, drawn at the town's
               // scale, is a tree on a green: it keeps its light)
               const wood = (kEff > kTier * 1.05 ? 0 : smooth(0.3, 0.72, fw.f)) * (leafless ? 0.4 : 1), dice = 0.55 * stB + 0.45 * hash2(gx, gy, 43);      // (a bare wood lets the light through)

@@ -28,7 +28,15 @@ jobs:
           node-version: 22
       - run: npm ci
       - name: Fetch art and models
-        run: npm run fetch
+        run: |
+          # (What a fetch could not bring it does without, and says so in a line nobody reads: a run on a day GitHub's own
+          #  downloads failed took its pictures of a game without the water's edge - no lakes in the Alps, the Finnish lakes one
+          #  blur - and they were believed. A set of pictures of half a game is worse than none: tried again, then stopped.)
+          npm run fetch
+          node tools/water/fetch.mjs check && node tools/planet/fetch.mjs check && test -s data/tex/ground.json || { sleep 60; npm run fetch; }
+          node tools/water/fetch.mjs check
+          node tools/planet/fetch.mjs check
+          test -s data/tex/ground.json
       - name: Package
         run: npm run pack:mac
         env:

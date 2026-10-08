@@ -78,10 +78,10 @@
     uFertView: { value: 0 }, uPolitical: { value: 1 }, uLens: { value: 0 }, uLabelsOn: { value: 1 },
     uClouds: { value: null }, uCloudShift: { value: 0 }, uCloudVis: { value: 0 },
     uDecal: { value: null }, uDecalRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uDecalOn: { value: 0 }, uQuality: { value: 1 }, uDecal2: { value: null }, uWaterN: { value: null },
-    uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) }, uIceCold: { value: new THREE.Vector2(1, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
     // the ground's materials (textures.js: TEX.ground), laid at a ladder of sizes in a frame of cells a metre and a half across at the equator
-    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 20 }, uGndFar: { value: new Float32Array(24) }, uGndFarD: { value: new Float32Array(48) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(75).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.4, GND_PX) }, uGndT: { value: new THREE.Vector4(1, 1, 0.25, 3) }, uWaterK: { value: new THREE.Vector4(1, 1, 1, 1) }, uSkyR: { value: new Float32Array(45).fill(0.3) }, uSeaK: { value: new THREE.Vector4(1, 1, 1, 0) }, uGndShow: { value: -1 }, uGndV: { value: 1 }, uGndDbg: { value: 0 }, uGndFine: { value: new THREE.Vector3(0.75, 0.6, 2.25) }, uGndCls: { value: new Float32Array(24) },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndT: how far a material's brightness follows the photograph of the Earth (0..1), and its hue (a factor), how wide the span in which one step of the ladder gives way to the next (0.1: a patchwork of the two; 0.25 and more: they lie over each other), how ragged its edge; uGndShow: one layer everywhere (to look at it), or -1; uGndV: how much the ground varies from stretch to stretch (lusher, drier); uGndDbg: parts left out, to measure them (terrain.js); uGndFine: how many steps of the ladder lower the fine kinds of ground stand: at the closest, how fast that grows with height, at the most (uGndCls: which they are, from textures.js)
+    uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 20 }, uGndFar: { value: new Float32Array(24) }, uGndFarD: { value: new Float32Array(48) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(75).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.4, GND_PX) }, uGndT: { value: new THREE.Vector4(1, 1, 0.25, 3) }, uWaterK: { value: new THREE.Vector4(1, 1, 1, 1) }, uSkyR: { value: new Float32Array(45).fill(0.3) }, uSeaK: { value: new THREE.Vector4(1, 1, 1, 0) }, uGndShow: { value: -1 }, uGndV: { value: 1 }, uWild: { value: 1 }, uGndDbg: { value: 0 }, uGndFine: { value: new THREE.Vector3(0.75, 0.6, 2.25) }, uGndCls: { value: new Float32Array(24) },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndT: how far a material's brightness follows the photograph of the Earth (0..1), and its hue (a factor), how wide the span in which one step of the ladder gives way to the next (0.1: a patchwork of the two; 0.25 and more: they lie over each other), how ragged its edge; uGndShow: one layer everywhere (to look at it), or -1; uGndV: how much the ground varies from stretch to stretch (lusher, drier); uGndDbg: parts left out, to measure them (terrain.js); uGndFine: how many steps of the ladder lower the fine kinds of ground stand: at the closest, how fast that grows with height, at the most (uGndCls: which they are, from textures.js)
     uGlow: { value: 0 },      // 1 while the picture goes through post.js, which can hold light brighter than white and lets it bleed
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
@@ -89,6 +89,39 @@
 
   // ---------- loading ----------
   function setLoad(pct, step) { $('loadbar').style.transform = `scaleX(${pct / 100})`; if (step) $('loadstep').textContent = step; }
+  // The bytes of a picture exactly as its file has them (w x h: made that size if it is another). Through the card, not a 2D
+  // canvas: a canvas keeps colour multiplied by its alpha and gives nothing back where alpha is nought, and info.png's alpha is
+  // how dry the country is - the deserts would lose their winters.
+  async function pixelsOf(url, w, h) {
+    const r = await fetch(url); if (!r.ok) throw new Error('http ' + r.status + ' ' + url);
+    let bmp = await createImageBitmap(await r.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    if (bmp.width !== w || bmp.height !== h) { const b2 = await createImageBitmap(bmp, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high', premultiplyAlpha: 'none', colorSpaceConversion: 'none' }); if (bmp.close) bmp.close(); bmp = b2; }
+    const gl = renderer.getContext(), tex = gl.createTexture(), fb = gl.createFramebuffer(), out = new Uint8Array(w * h * 4);
+    try {
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bmp);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('the card will not read a picture back');
+      gl.pixelStorei(gl.PACK_ALIGNMENT, 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, out);
+    } finally { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.bindTexture(gl.TEXTURE_2D, null); gl.deleteFramebuffer(fb); gl.deleteTexture(tex); if (bmp.close) bmp.close(); renderer.resetState(); }
+    return out;
+  }
+  // The planet's own maps as one texture of two layers (a fragment shader has sixteen textures on an Apple GPU, and the ground's
+  // has them all): info.png (the sea's shelf, the ice, how hard the winters are, how dry the country is: tools/climate/build.py)
+  // and under it veg.jpg, what grows there by nature (how green, how light, how warm-coloured: the map the trees are planted
+  // by), at info's size, with snow.png in its alpha and its green (where snow lies in winter and where the sea freezes, as
+  // the Earth has it; the map's own green, how light the country is by nature, is not used by the shader). Where that cannot
+  // be made, info.png alone, as it was.
+  async function planetMaps() {
+    const W = 2048, H = 1024;
+    try {
+      if (!renderer.capabilities.isWebGL2 || !THREE.DataTexture2DArray) throw new Error('no texture arrays');
+      const [a, b, c] = [await pixelsOf('data/info.png', W, H), await pixelsOf('data/veg.jpg', W, H), await pixelsOf('data/snow.png', W, H)], data = new Uint8Array(W * H * 8); data.set(a, 0); data.set(b, W * H * 4);
+      for (let i = 0, o = W * H * 4 + 3; i < W * H; i++, o += 4) { data[o] = c[i * 4]; data[o - 2] = c[i * 4 + 1]; }      // (the second layer's alpha: for how much of its winter snow lies there; its green, which the map of what grows has no use for here: for how much of it the sea is ice - tools/planet/snow.py)
+      const t = new THREE.DataTexture2DArray(data, W, H, 2); t.format = THREE.RGBAFormat; t.type = THREE.UnsignedByteType; t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true;
+      return t;
+    } catch (e) { console.warn('the planet\'s maps as one texture: ' + e.message + '; info.png alone'); const t = await loadTex('data/info.png', { flipY: false }); t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; return t; }
+  }
   function loadTex(url, opts = {}) {
     return new Promise((res) => { new THREE.TextureLoader().load(url, (t) => { t.wrapS = t.wrapT = opts.mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.anisotropy = opts.aniso || ANISO_SMALL; if (opts.flipY === false) t.flipY = false; res(t); }, undefined, () => { console.warn('texture missing', url); res(null); }); });
   }
@@ -116,9 +149,10 @@
       const index = await (await fetch('data/index.json')).json();
       // (the water's edge: fetched with the art, not kept in the repository; without it the coasts are the picture's own)
       let water = null; try { const r = await fetch('data/w/index.json'); if (r.ok) water = await r.json(); } catch (e) { water = null; }
+      // (the picture of the Earth: fetched likewise, tools/planet/fetch.mjs; its own list says what packs it has)
+      let img = null; try { const r = await fetch('data/i/index.json'); if (r.ok) img = await r.json(); } catch (e) { img = null; }
       setLoad(14, 'surface data');
-      const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([loadTex('data/info.png', { flipY: false }), loadTex('data/noise.png', { aniso: ANISO_NOISE }), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
-      info.wrapS = THREE.RepeatWrapping; info.wrapT = THREE.ClampToEdgeWrapping; info.minFilter = THREE.LinearFilter; info.generateMipmaps = false;
+      const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([planetMaps(), loadTex('data/noise.png', { aniso: ANISO_NOISE }), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
       globals.uInfo.value = info; globals.uNoise.value = noise; globals.uClouds.value = noise; globals.uWaterN.value = waterN || noise; globals.uDetA.value = detA || noise; globals.uDetB.value = detB || noise; globals.uDetC.value = detC || noise; globals.uDetD.value = detD || noise;
       // one array texture for the four detail photographs (WebGL2): the terrain shader then fits the 16 textures an Apple GPU allows
       detImages = [detA, detB, detC, detD].map((t) => (t || noise).image); buildDetArray(null);
@@ -128,10 +162,10 @@
       for (let i = 0; i < N; i++) { worldData.elev[i] = wd.data[i * 4]; worldData.fert[i] = wd.data[i * 4 + 1] / 255; worldData.flags[i] = wd.data[i * 4 + 2]; worldData.land[i] = wd.data[i * 4 + 2] & 1; }
       setLoad(50, 'peoples');
       world = new WORLD.World({ scene, terrain: { exag: 2.0, heightAt: () => 0 } });
-      terrain = new TERRAIN.Terrain({ scene, index, water, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID, plainWater: softGL && !window.GENESIS_POST, slow: softGL });
+      terrain = new TERRAIN.Terrain({ scene, index, water, img, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID, plainWater: softGL && !window.GENESIS_POST, slow: softGL });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
-      trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL) trees.slice = 1e9; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png').catch((e) => console.warn('veg', e));
+      trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL) trees.slice = 1e9; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png', 'data/snow.png').catch((e) => console.warn('veg', e));
       life = new LIFE.Life({ scene, terrain }); if (softGL) life.budget = 0.5; movers = new MOVERS.Movers({ scene, terrain, world }); fx = new EVENTS.Effects({ scene, terrain, world });
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
@@ -1174,6 +1208,8 @@
       // and the cold of the year runs a month behind the sun: the depth of winter is late January, not the solstice
       const coldN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.08) * Math.PI * 2);
       globals.uBare.value.set(leafOff(seasonPhase), leafOff((seasonPhase + 0.5) % 1), coldN, 1 - coldN);
+      // (and the sea is slower still: its ice is at its widest when winter ends, early in March and in September, eleven weeks behind the sun)
+      { const iceN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.21) * Math.PI * 2); globals.uIceCold.value.set(iceN, 1 - iceN); }
       if (trees) { trees.season = globals.uSeason.value; trees.bareness = globals.uBare.value; } }
     const real = Math.min(1.5, (now - lastReal) / 1000); lastReal = now;      // (the step above is capped for the simulation's sake; these go by the clock, so a slow machine is not left with a half-moved picture)
     { const want = mode === 'intro' ? 1 : 0; if (Math.abs(want - homeK) > 0.0005) { homeK += (want - homeK) * (1 - Math.exp(-real * 3)); if (Math.abs(want - homeK) < 0.004) homeK = want; frameHome(); camera.updateProjectionMatrix(); } }
@@ -1209,9 +1245,7 @@
     globals.uCloudShift.value = world.cloudShift; globals.uCloudVis.value = world.cloudVis;
     world.updateBuildings(mapcam, false);
     // whether snow lies here now (by the climate of the place and the time of year): roofs go white with the ground
-    if (trees && trees.ready && mapcam.alt < 0.03) { const cold = TREES.Trees.COLD[trees.climateAt(mapcam.lon, mapcam.lat)], season = mapcam.lat >= 0 ? globals.uBare.value.z : globals.uBare.value.w; const thr = 1.02 - 0.55 * cold;
-        const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-        world.bUniforms.uSnow.value = sm(thr, thr + 0.1, season) * sm(0.08, 0.5, cold); }
+    if (trees && trees.ready && mapcam.alt < 0.03) world.bUniforms.uSnow.value = trees.lyingAt(mapcam.lon, mapcam.lat, mapcam.lat >= 0 ? globals.uBare.value.z : globals.uBare.value.w, mapcam.agl === undefined ? 0 : (mapcam.alt - mapcam.agl) * GEO.R_M / terrain.exag);
     // the colour of the ground hereabouts, for the light it throws back onto walls in shade (looked up now and then)
     if (trees && trees.ready && ((frameNo = (frameNo + 1) % 20) === 0) && mapcam.alt < 0.03) {
       const fw = trees.forestAt(mapcam.lon, mapcam.lat, Math.max(1, terrain.heightAt(mapcam.lon, mapcam.lat))); const g = world.bUniforms.uGround.value;

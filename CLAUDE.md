@@ -111,8 +111,26 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   must go on fighting about as often as it did, and keep about as many realms.
 - `node tools/brand/icon.mjs [sheet.jpg]` — the app icon (`build/icon.png`) and the mark (`src/mark.png`), rendered
   from the game's own picture of the Earth.
-- `node tools/imagery/seams.mjs check` — whether the packs of the picture of the Earth (`data/i`) end in the colours
-  their neighbours begin with (they must: see "A pack is a texture of its own"); `fix` makes them.
+- `MODE=imagery tools/planet/pack.sh [bbox=lon0,lat0,lon1,lat1 | blocks=4/0,4/1]` — makes the picture of the Earth on
+  GitHub (the Planet workflow runs `tools/planet/imagery.py`: NASA's and Amazon's hosts are out of reach from here) and
+  brings back its log and its pictures to look at (`shots/peek/planet_imagery.jpg`: places side by side, as the source
+  has them and as the game gets them; `planet_world.jpg`). Eight minutes for the whole Earth; with a box or blocks a
+  trial of some of the 32 blocks in three (kept as `planet-part.tar`, nobody's pack). `REF=<branch>` runs a branch's
+  builder. `node tools/planet/fetch.mjs` (in `npm run fetch`) brings the pack into `data/i/`: `index.json` and 46
+  bundles of 8 x 8 packs, fetched, never committed. A pack is kept under the name of what it was made from (twelve
+  digits of the SHA-256 of `tools/planet/imagery.py` and `tools/planet/mask.png` together): **after any change to the
+  builder - a comment too - the pack must be made before `main` is pushed** (the game's build stops without it:
+  `PLANET_STRICT`; elsewhere the pack made last is taken, with a warning). `MODE=probe tools/planet/pack.sh [urls |
+  months | sheet | tiff]` looks at the sources.
+- `REF=<branch> MODE=snow PICS="planet_snow.jpg snow.png" tools/planet/pack.sh` — makes the map of the Earth's own
+  winters (`tools/planet/snow.py`, two minutes): `shots/peek/snow.png` (red: snow on the land; green: ice on the
+  sea), which is copied to `data/snow.png` by hand and committed (it is small), and `planet_snow.jpg` to look at
+  (the summer with the map's snow and ice on it, over the Blue Marble's own January). Its log prints the share of
+  the land that has snow by latitude, the value at some thirty places (Moscow 0.7, Winnipeg 0.55, Berlin 0, Tibet
+  0) and the months of ice at thirty more (Hudson Bay 7, the Norwegian Sea 0): look at them after touching its rule.
+- `node tools/glerr.js "<script>" [wait ms]` — which call to the card fails: a page of the built game in which
+  every call that can raise a GL error is asked at once whether it did (WebGL keeps its errors until somebody
+  asks; the end-to-end suite asks once, late, and can only say "GL error 1281").
 - `tools/water/pack.sh` — makes the water's edge on GitHub (the Water workflow runs `tools/water/build.py`: its sources
   are on AWS, out of reach from here) and brings it here: `data/w/` (`index.json` and 1,484 packs, kept in 157
   bundles of sixteen: `<level>_b<x>_<y>.bin`, a table and then the packs' own files; `fetch.mjs` makes them, always
@@ -130,9 +148,6 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   with a warning). Look at `shots/peek/water_sheet.jpg` and the end of `shots/peek/water_build.log`. In a workflow
   never write `ls | head` under `pipefail`: with more files than `head` takes, `ls` fails on the closed pipe (the
   first whole build was thrown away by its own listing, after 33 minutes).
-- `python3 tools/imagery/under.py` — carries the land's colour on under the water in the picture of the Earth
-  (`data/i`) and the land's green in `data/veg.jpg`: the true shore runs a texel or two inside and outside the
-  picture's own. Run it after anything that remakes `data/i`, then `seams.mjs check`.
 - `node tools/terrain/voids.mjs scan` — holes in the elevation packs (`data/e`): ground at zero where the simulation's
   grid has land well above the sea. It must report none. `fix` fills them (real heights from the Terrain Tiles on AWS;
   Antarctica from the half-degree grid, made to meet the ice beside it); that host is out of reach from here, so the
@@ -149,7 +164,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/rule.js` | `RULE` | Forms of government (24), laws (100 in twelve fields), the seven estates, authority; one world's rule: what every realm has chosen, who holds power in it, reforms, demands, risings |
 | `src/diplo.js` | `DIPLO` | What two realms can swear, why they go to war and what a winner may ask; one world's diplomacy: what every realm thinks of every other and why, pacts, vassals, claims, wars with friends on both sides, offers to the player |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
-| `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
+| `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
 | `src/buildings.js` | `BKIT` | Procedural building kit (unit archetypes) and its material shader |
 | `src/models.js` | `MODELS` | Real 3D model library: manifest, loading, LODs, instancing (replaces kit archetypes when a model exists) |
@@ -176,10 +191,20 @@ Conventions that matter:
   as tall again (`exag: 2.0`). Ground put into a pack must be raised the same (`TALL` in `tools/terrain/voids.mjs`),
   or it meets the old ground in a step.
 - **A pack is a texture of its own** and is not smoothed across its edge: whatever is in two packs' facing texels
-  shows as a line if it differs. Edges of packs are every 45° in the picture of the Earth (`data/i`), 22.5° and finer
-  in the elevation. The picture's facing texels are therefore kept equal in the data (and the packs written without
-  loss, so that they stay equal): `node tools/imagery/seams.mjs check` must say every edge meets; after anything that
-  rewrites `data/i`, run `seams.mjs fix`. The elevation's edges are not matched (a step of a texel's worth of height).
+  shows as a line if it differs. The picture of the Earth (`data/i`) and the water's edge (`data/w`) therefore carry
+  a rim of two texels of their neighbours all round (`apron` in their lists; `bindPack` and `bindWater` leave it out
+  of a tile's rectangle): a lookup at a pack's edge is as good as one inside it, and nothing has to be matched by
+  hand. The elevation's packs have no rim and their edges are not matched (a step of a texel's worth of height).
+  **A pack that is let go must not be drawn from again** (`evictPacks`: its texture is disposed and its picture
+  closed). A tile shows the finest pack that is here, down to the coarsest; the three coarsest levels of the
+  picture and of the heights are never let go (nothing asks for them by name while finer ones are here, so they
+  went first), and a tile that finds no pack at all is given the blank one. Left with the texture it had last, a
+  tile had the card upload a closed picture at every frame: `GL error 1281` and `1282`, and a black tile. With
+  forty-three packs of the picture that hardly ever came up; with seventeen hundred it did in the first minute.
+  **A pack that did not come is asked for again** (`p.failed`, `retryAt` in `loadPack` and `getPack`: after 4 s, 8,
+  12 ... five times). Sixteen or sixty-four packs hang on one bundle of megabytes: a fetch that failed once left them
+  in `error` for as long as the game ran - a country without its lakes, or blurred. `__T.watch()` writes into the
+  picture what every tile is drawn with and what is still on its way (`load_*` in the tour).
 - **Representational scale.** Towns are planned at true scale and drawn `scaleOf(Rt) = 20/(1+Rt/1200)` times larger
   (a village ~19×, a metropolis ~3×) so they read from region height. Shader patterns divide by that factor.
 - **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
@@ -437,8 +462,8 @@ Conventions that matter:
   told how large a pixel is (`textureGrad`: a tenth slower), branches round the two places of a ladder, fewer ways
   of filtering. `__T.costsGround()` goes through the parts (`uGndDbg`).
 - **A card does not weigh four texels finely.** Between two texels a GPU gives 256 steps and no more (the software
-  renderer here weighs finely and shows none of this). The picture of the Earth is 1024 pixels to 45 degrees
-  (`data/i`: five kilometres to a texel; the `4096` in the shader's `texPerPx0` is four times the truth), so from
+  renderer here weighs finely and shows none of this). The picture's map of land and water is 1024 texels to 45
+  degrees (five kilometres to a texel, at every level of `data/i`: see "The picture of the Earth"), so from
   close to a texel is thousands of pixels wide and what is looked up between two of them is a flight of stairs,
   dead level on every tread: nine metres by nineteen in Finland. Never take `fwidth` of such a lookup for its
   slope, and put no threshold on one: a lake is told from a shore by how level the water's mask lies, and every
@@ -449,6 +474,125 @@ Conventions that matter:
   mixtures (64, 96, 128 ...), and 128 is also what a lake is, so off many coasts there was a blue band and a bar
   of sand. Since 0.21 the water's edge is the field's (below); the mask draws the coasts only from far out (tiles
   under level 5) and while a pack is on its way.
+- **The picture of the Earth** (`data/i`, `tools/planet/imagery.py`; `uImg` in `terrain.js`). NASA's Blue Marble
+  Next Generation (2004, 500 m; public domain, credited in the menu) at 611 m to a texel (level 6: 65,536 texels
+  round), every level below it half the one above, each hemisphere in its summer: July north of the equator, January
+  south of it, the one going over into the other between twelve degrees either side. (The game had July 2004 alone,
+  at five kilometres: the picture's origin had never been written down; `probe.py months` found it.) Packs are two
+  tiles of 512 texels a side with a rim of two (1028 x 1028), WebP: the colour squeezed (quality 92; 96 at the four
+  levels the old picture had), the mask without loss, the colour under clear texels kept (`exact`). 1,740 packs in 46
+  bundles of 8 x 8 (`<level>_b<x>_<y>.bin`, as the water's edge has them: `terrain.bundleBlob` reads both), 166 MB;
+  `index.json` says which packs there are (`P`; `S`: nothing but sea, drawn without a picture).
+  *What the builder does to the photograph.* Its sea is one dark blue and its lakes are black, and the game draws
+  all water itself: a texel that is not plainly dry land - by ESA WorldCover read at 160 m (nine tenths land, and
+  no water in the texels beside it: a shore's texel has the water's dark in it; an islet too small for that keeps
+  what it has), south of sixty by the old mask - takes the colour of the land beside it, pulled together to ever
+  coarser pictures and pushed back down (smooth: no stripes), and far out at sea the colour land of that climate has
+  on the whole. Water the photograph has where WorldCover has land is told by its colour (the Aral Sea of 2004 was
+  green with algae over what is desert now; reefs; glacier milk). What is built over takes the colour of the country
+  round it and then the grain of open country some way off (painted plain, a town was a smear among the fields):
+  the towns of 2004 are gone from a world that begins in 10,000 BC. Fields stay in the picture: see below.
+  A block is 45 degrees (a bundle of the finest level) with a margin of 128 texels, and every block begins on a
+  multiple of the coarsest cell it pulls itself together to: two blocks work the ground they share out alike, and
+  no seam runs along a block's edge.
+  *The mask.* The alpha is the map of land and water the picture always had (`tools/planet/mask.png`: 255 land, 191
+  the band of a great river, 128 a lake, 0 the sea), as it was at the four coarsest levels and weighed between its
+  texels above them - which is what a card did with it before. The game draws its coasts with it from far out and
+  while a pack of the water's edge is on its way. **`uImgK`**: the shader's measure of how near the eye is was "how
+  many of the picture's texels to a pixel" (`texPerPx0`, `detailFade`, `closeFade`, the mask's `plateau`), fitted to
+  texels of five kilometres. It is kept in those texels whatever level is bound (4096 to a pack at levels 0 to 3,
+  halved with every level above): change it and everything that fades with the distance moves.
+  *Before the plough* (`uWild`, at "the country before the plough" in the shader). The photograph is of our own day:
+  where woods would stand, half of what it shows is field and pasture, tan with stubble in July, and from the
+  photograph alone that is dry ground. Where nobody farms (`sim.b`: the simulation knows who does), ground lighter
+  than a wood is given back the colour of the woods and glades that stood there, keeping a share of its own light
+  and dark (a remapping of each texel, not a smoothing: the grain of the country stays); where the game's people
+  have cleared the land, the photograph's own fields show - a realm's farmland is seen from orbit, and grows with
+  it. "Where woods would stand" is the map the trees are planted by (`data/veg.jpg`: green by nature and not
+  warm-coloured, which a steppe, a prairie and a savanna are), not the climate's class: by the class the wheat of
+  Kansas and of Picardy are one, and the plains were a green wall with a ruled edge. Not in the taiga or beyond.
+  Doing the same in the builder, as a filling-in from the woods near by, was tried first and was a blur.
+  **The planet's own maps are one texture of two layers** (`uInfo`, a `sampler2DArray`: `planetMaps` in `main.js`):
+  `info.png` and under it `veg.jpg` at the same size - the ground's shader has all sixteen textures, and a layer
+  costs none. `info.png` is read back through the card (`pixelsOf`): a 2D canvas keeps colour multiplied by alpha,
+  and its alpha is how dry the country is. The second layer's alpha is the snow of the Earth's own winters and its
+  green the sea's ice (below; the map's own green, how light the country is by nature, the shader never read).
+  *What it costs* (the build Mac; `costp_*`, `__T.costsPlanet()`): nothing that can be measured. In one page, the
+  picture looked at in four ways or two where the ground runs away from the eye, or no finer than level 3 as it used
+  to be: 12.8 frames a second for the Alps from 19 km every time. (What the winter's rules cost is under Winter,
+  below: two or three frames in a hundred where mountains fill the picture.) Nor does it load more slowly: a
+  view from 300 km needs some forty packs of the picture where it needed sixteen, and its ground is whole six
+  seconds after the start, where the game before it took nine (`load_*`, `__T.watch()`).
+- **Winter** (`data/snow.png`, `tools/planet/snow.py`; `snowHere` in `terrain.js`, `Trees.lyingAt`). Where snow lies,
+  and for how much of the year, is the Earth's own: the Blue Marble has every month, and the builder reads from it
+  the share of a cold season's seven months (October to April in the north, April to October in the south) in which
+  a place was white or grey and had not been in summer - all of them at Yakutsk, 0.9 at Novosibirsk, 0.7 at Moscow
+  and Quebec, 0.6 at St Petersburg and Winnipeg, 0.4 at Stockholm, 0.25 at Kyiv, 0.13 at Warsaw, none at Berlin or in
+  Tibet (which is dry: by the climate's class it was an ice cap half the year, and a cold desert from the Tarim to
+  the Namib lay white). A wood's winter is measured as a wood's (under snow it is grey, not white), and a wood takes
+  the snow of the open ground about it (by their own look the larch of Yakutia and the woods of Minnesota had no
+  winter); water takes that of its nearest land.
+  *Heights.* The map is of cells twenty kilometres across, and what it has for the Alps is the Alps on the whole.
+  Snow lies half the season longer for every thousand metres (`PER_KM`; 0.0005 a metre in the shader and in
+  `lyingAt`), so the map keeps how long it would lie **at the level of the sea** - the cell's share less what the
+  cell's own height on the whole accounts for (the game's heights, smoothed as the snow is), `(share + 3) / 4` in
+  red - and every place adds its own height back: `snowHere = clamp(map x 4 - 3 + height x 0.0005, 0, 1.25)`. A
+  valley of the Alps is green for most of its winter under white mountains; the high ranges of a dry plateau have
+  snow while the plateau has none. Far from any snow, country counts as lying higher than it does: by 2,000 m from
+  three hundred kilometres off (the Hoggar has no winter, nor Yemen, nor Ethiopia), by nothing beside the snow - by
+  the distance, which is smooth (taken off at once, there was a cliff in the map along the snow's edge). With the
+  heights out of it the map is climate, smooth over a hundred kilometres: it is the middle value within a hundred,
+  which lets go of one year's holes and islands (a hole in the snow of Mazovia with the edges of a tile). And a
+  place's own height is that of the heights' texels (`hE` .. `hN`), not of the mesh's corners: from far out a quad
+  is tens of kilometres, and the snow's edge was a smooth line that moved as the mesh grew finer under the eye. The same number brings the snow line of
+  the mountains down in winter (`winterSnow`).
+  *The season.* Snow of so much of the cold season lies for just so long about the depth of winter: `snowOff =
+  acos(2 x cold - 1) / pi` is how far the year is from that (`uBare.z/.w`: 0 late in January, 1 half a year on),
+  the cold season is 0.58 of the year, and snow lies while `snowHere x 0.58 > snowOff`, coming and going over three
+  weeks; where there is little of it in any winter it is thin in all of them (`smoothstep(0.02, 0.4, .)`).
+  **It does not end at a line.** It thins out, and where it thins it lies on open ground before the woods: the
+  photograph's own light and dark, field by field (`lum0`), say which is which, and from close to the hollows of the
+  ground's own material do (`gHU`). That grain is what tells snow from cloud; a patch has an edge where the grain is
+  large in the picture (`edgeW`), or thinning snow is a white mist. Things that were tried and looked wrong: January
+  alone (a yes or no: the snow of Europe was a white sheet with a ruled edge through Poland); noise the size of a
+  country added to the map, or the map looked up a little way off by it (white puffs on green, and the snow of the
+  Alps lying beside the Alps); the place's own noise from far out (it repeats every forty kilometres and less: the
+  thinning snow of Poland was a wallpaper of dark dots from six hundred up - `noiseL` fades each size out long
+  before its repeat is small in the picture, here and for the wind's patches on the sea and the blots of a lake's
+  ice); the height counted as a factor on the map's share (the plains had too little or the valleys too much).
+  A wood under snow is dark from above (`wForest` hides half of it at most, a third under bare boughs, by how dark
+  the photograph has it), and snow lights its own shade (the ambient light is up to twice as much and bluer on it:
+  shaded as other ground, a winter's mountains were white and navy) while the sun's own light counts for a little
+  less on it (under a high sun every slope of a snowfield was past white, a sheet of paper with no hills in it).
+  Roofs and boughs ask `trees.lyingAt(lon, lat, cold, height)`, the same sum without the grain.
+  **Ice on the sea** is the sea's own too (`natv.g`, the map's green; `uIceCold`, `iceOff`): the share of the
+  year's twelve months in which the sea there is ice, from the Sea Ice Index of the US National Snow and Ice Data
+  Center (the mean of its first ten years; the Blue Marble's sea is one dark blue the year round) - twelve at the
+  pole, nine in Baffin Bay, seven in Hudson Bay, four in the Gulf of Bothnia, none off Norway. By the latitude alone,
+  in winter there was ice off Scotland. Ice of so many months lies for just that many about the end of winter (the
+  sea runs eleven weeks behind the sun). The builder takes the middle year of the ten, and only cells clear of the
+  land: a radiometer's cell of 25 km on a shore sees the land with the sea and takes it for some ice (the Danish
+  straits, all shore, froze every March); a strait or a fjord freezes as the sea outside it does. Lakes and rivers freeze by the snow of their shores, three quarters as long as it lies and on the
+  sea's slower clock (`frozen`, `lakeSeason`: by the snow lying at the moment Ladoga was open water in March),
+  where the climate's winters are hard (`info.b` from 0.6) or snow lies four months and more (a tarn of the Alps);
+  in high dry country by the climate alone (`coldShare`: the lakes of Tibet freeze under a sky that brings no
+  snow); from their shores first, the middle of a great lake weeks later; and as the sea beside them does wherever
+  the Index has any ice (from far out a strait is a lake to the picture's map). So: Great Bear seven months, Winnipeg
+  and Ladoga five, Baikal four and a half, Erie two, Geneva never. The Caspian is the
+  sea's, and has no ice in the Index. Both notices are in the game's menu.
+  Look at Europe and North America from 2,500 km and more, Poland from 600, the Alps from 300 and 80 and low, a
+  town in the snow, and the seas (`winter_*`, `thaw_europe`, `ice_*` in the tour) after touching any of it.
+  *What it costs* (the build Mac; `costi_*`, `__T.costsWinter()`: the shader as it is, as it is compiled without
+  the maps' second layer - the rules the game had until 0.21 - and as it is over a second layer that says what
+  those rules took for granted, turn and turn about in one page): the Alps from 19 km 12.6 frames a second against
+  13.0, in winter 11.9 against 12.2, the edge of the Baltic's ice 16.9 against 17.1, a town from above 26.3 and
+  26.0. It was twice that (12.5 against 13.1 in the Alps, 17.6 against 18.7 over the ice) while its sums ran for
+  every pixel: the ice's for every pixel of dry land, the country before the plough where no wood would stand,
+  the snow's ragged edge in high summer. Each is gone into now only where it can show (**a block of sums that
+  writes nothing unless some share is over nought belongs behind an `if` on that share**: a dozen `smoothstep`s
+  cost what a lookup does). What is left is the second layer's lookup. One measurement of four seconds is within
+  an eighth of the next of the very same thing on that Mac: hold two things against each other only turn and turn
+  about in one page, three times each.
 - **The water's edge** (`data/w`, `tools/water/build.py`; `uWater` in `terrain.js`). A field of distances: how
   many metres it is from every place to the nearest shore (land positive), 305 m to a texel at level 7 and the
   same at half and a quarter the fineness (levels 6 and 5), in packs of 2052 texels with a rim of two. Its nought
@@ -475,7 +619,11 @@ Conventions that matter:
   *In the mesh.* The sea lies at nought and a lake at its level, and the ground comes up from the water's own
   level, beginning a little inland (`uShoreQ`: a quad and a half of the tile's mesh as it is, never under 60 m): a
   triangle with one corner in the water and one on a hill carried the water up the hill. Without the levels a lake
-  under a mountain climbed it; with them the game cuts the lake's bed into its own (coarse) heights. The byte the
+  under a mountain climbed it; with them the game cuts the lake's bed into its own (coarse) heights. Not where
+  a tile's lakes are smaller than its quads (`waterWide`, `uWaterP.z`): from far off a quad is kilometres, and a tarn
+  a few hundred metres across was a pit miles wide with its walls in shadow - dark blots all over the snows of the
+  Himalaya. There the ground is left as the heights have it; a great lake (the field at its limit in the middle of
+  it) lies level as before. The byte the
   card cannot weigh (two things in one) is fetched from the nearest texel. `shoreAt` (metres; then `wKind`,
   `wOpen`, `wLevel`), `isWater`, `heightAt` and `gpuVertexH` are the CPU's twins: trees, harbours, piers, ships,
   town sites and walls ask them, and ask again whenever more packs have come (`stats.packsW`).
@@ -589,7 +737,7 @@ Conventions that matter:
 - **Climate.** `data/climate.png` is the Köppen-Geiger class of every eighth of a degree, and `data/info.png`
   carries two fields made from it: alpha = how dry the country is (the ground shader blends sand, stony plain,
   scrub, steppe and savanna by it; the photograph only says where the ground is bare), blue = how hard the winters
-  are (snow lies on the ground and on roofs by it, in season). Trees take their zone and their density from the
+  are (still water freezes by it; where snow lies is no longer the climate's to say: see "Winter"). Trees take their zone and their density from the
   class (`zoneOf`, `Trees.THIN`). Rebuild both with `tools/climate/build.py` (the source and its licence are in the
   file's header). The year: `uSeason` (sun), `uBare` (leaves down N/S, the cold of the year N/S, a month behind the sun).
 - **Rivers** are drawn wider than life (`drawnWidth()` in `decal.js`: brooks four times, great rivers twice), like
@@ -612,6 +760,12 @@ Conventions that matter:
 - **Shadows.** The sun's depth map holds what stands still (models, kit, near trees) and is redrawn only when the
   camera, the sun or the placements change (`castersVersion` follows a signature of everything placed). Things
   that move get their own cheap shadow (walkers: a streak on the ground in `movers.js`).
+  The ground's own marks (`decal.js`, the second picture of the decal: the shadows things throw on the ground from
+  far, burnt ground, flood water) are drawn only below 190 km, and **cleared above it** (`shadowed`): that picture
+  is laid out over the decal's place, which grows with the eye's height and goes where the eye goes, and what was
+  drawn low down over a town lay stretched over the country as dark blocks a hundred kilometres long, from 190 km
+  up to 290, wherever the eye went next. (Found by a picture of Tibet taken in a page that had looked at a town
+  first: when a picture shows something the place cannot have, ask where the page had been.)
 
 ## The home screen
 

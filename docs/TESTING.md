@@ -67,6 +67,24 @@ then `wKind` 0 sea .. 1 fresh, `wOpen` how open the water lies, `wLevel` a lake'
 nothing mirrored), `uWaterK.value` (x how ragged the shore, y how wide a beach), `uSkyR.value` (the fifteen colours the water
 mirrors). `__T.costsWater()` writes frame rates with its parts left out one by one. A shader that does not compile leaves the
 ground undrawn and says nothing loud: ask `__G.renderer.info.programs` for those whose `diagnostics.runnable` is false.
+The planet: `__G.globals.uWild.value = 0` shows the photograph as it is (today's fields and all; 1 is the country before the
+plough), `__G.world.cloudsOn = false` takes the clouds away (from 300 km up they hide what is asked about), `__forest(lon, lat,
+height in metres, 0, 0, season)` with a height of 60,000 to 14,000,000 looks straight down on a country, a continent, the
+planet (season 0.08 is the depth of the northern winter, 0.58 of the southern; 0.24 the thaw). `__G.terrain.imgMax` is the
+finest level of the picture (6), `stats.packsI` how many of its packs are here; `node tools/planet/fetch.mjs check` says
+whether what lies in `data/i` is whole. A page just started takes minutes to fetch and read its packs on a software renderer:
+ask nothing of it until an `/eval` answers at once, or the answers queue up behind one another and the pictures are of half
+a planet.
+`node tools/glerr.js "<script>" [wait ms]` says which call to the card fails (the suite's "GL error 1281" names none): every
+call that can raise one is asked at once, and the first twelve are printed with their arguments, the picture last handed to the
+card and where the call came from. `__T.costsPlanet()` writes frame rates with the picture looked at in fewer ways and no finer
+than it used to be (`costp_*` in the tour); `__T.costsWinter()` with the shader as it is, compiled without the maps' second layer
+(the rules for snow and ice the game had until 0.21) and over a second layer of the old rules' numbers, turn and turn about (`costi_*`;
+`window.__costOld = 1` stops at the old rules, to see what they draw). `__T.watch()` writes into the picture, once a second, the frame rate, the packs by kind and
+state and what every tile in view is drawn with (the picture, the heights and the water's edge by level): a view is whole
+when nothing is loading and the levels stand still (`load_*` in the tour; on the build Mac the ground of a view from 300 km
+is whole in six to nine seconds, the trees of a town in forty-five). The frame rate the smoke run reports is of the three seconds before its picture: where packs are still
+arriving then it is far too low (11 for a view that holds 20) - believe the `cost*` scenes, which wait.
 The packs of the water's edge lie in bundles (`data/w/<level>_b<x>_<y>.bin`; `node tools/water/fetch.mjs check` says whether
 they are whole; `WATER_DIR=<folder>` tries the fetching and bundling on a copy). `__G.terrain.wBundles` are those in hand; a
 drawn tile's `wPack` is `{ pack, level, rect }`, or `{ flat: 'L' | 'S' }` where its piece of the pack is nothing but land

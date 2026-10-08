@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'probe | imagery | clouds | sky'
+        description: 'probe | imagery | snow | clouds | sky'
         required: false
         default: 'probe'
       args:
@@ -30,14 +30,14 @@ jobs:
         with:
           node-version: 20
       - name: What it needs
-        run: python3 -m pip install --quiet --disable-pip-version-check --break-system-packages numpy scipy pillow || python3 -m pip install --quiet --disable-pip-version-check numpy scipy pillow
+        run: python3 -m pip install --quiet --disable-pip-version-check --break-system-packages numpy scipy pillow rasterio || python3 -m pip install --quiet --disable-pip-version-check numpy scipy pillow rasterio
       - name: Make
         env:
           MODE: ${{ github.event.inputs.mode }}
           ARGS: ${{ github.event.inputs.args }}
         run: |
           set -euo pipefail
-          case "$MODE" in probe|imagery|clouds|sky) ;; *) echo "bad mode"; exit 1;; esac
+          case "$MODE" in probe|imagery|snow|clouds|sky) ;; *) echo "bad mode"; exit 1;; esac
           case "$ARGS" in *[!A-Za-z0-9.,/=_:\ -]*) echo "bad args"; exit 1;; esac
           mkdir -p out work
           df -h . | tail -1; nproc; free -g | sed -n 2p

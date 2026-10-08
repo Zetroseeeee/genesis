@@ -52,12 +52,15 @@ jobs:
         env:
           GROUND_STRICT: '1'      # (the ground's materials must be the pack of the list in this commit, or the build stops)
           WATER_STRICT: '1'       # (and the water's edge the pack of this commit's builder and rivers: tools/water/pack.sh makes it, in about an hour)
+          PLANET_STRICT: '1'      # (and the picture of the Earth the pack of this commit's builder: MODE=imagery tools/planet/pack.sh makes it, in a quarter of an hour)
         run: |
           npm run fetch
           # (built without the ground's materials the game would draw the ground the old way, and nobody would be told)
           node -e "const fs = require('fs'), j = JSON.parse(fs.readFileSync('data/tex/ground.json', 'utf8')); for (const f of [j.albedo, j.normal]) if (!(fs.statSync('data/tex/' + f).size > 1e6)) throw new Error('ground: ' + f + ' is missing'); console.log('ground: ' + j.layers.length + ' materials, made ' + j.made);"
           # (and without the water's edge it would draw its coasts from the picture of the Earth, five kilometres to a texel)
           node tools/water/fetch.mjs check
+          # (and without the picture of the Earth it would have no Earth at all)
+          node tools/planet/fetch.mjs check
       - name: Package
         run: npm run pack:mac
         env:
