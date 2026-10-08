@@ -409,11 +409,15 @@ Conventions that matter:
   its slope taken from pixel to pixel was nought, nought and a step, bars of light and shade at sunset. **Light and
   shade come from two lookups toward the sun and away from it**, never from a derivative of the grain. From far the
   picture's cloud is gathered where the heaps would stand and thinned between them: laid on as it is, between its
-  texels, it was a blur. **Over a country that is being ruled** (from some 4,000 km down to the shell) the weather is
+  texels, it was a blur. Seen from under them, low in the sky one cloud stands before the next, and the gaps close toward
+  the horizon (`fill`: as the shell lies to the eye; drawn as a shell they stood apart down to the horizon, and the low
+  sky, which is most of what a tilted camera sees of it, was empty). **Over a country that is being ruled** (from some 4,000 km down to the shell) the weather is
   less than the picture has it, its thin cloud gone and its thick cloud white (`less`; `SKY.less` and `uCloudNear` give
   the shadows on the ground and on houses the same), and what is left is seen through where it is looked straight down
   on (`uThin`): all of it at two fifths the strength was a grey murk on the map. By night the clouds are grey in the
-  dark and silver under a moon (`uMoonL`: a half moon gives a tenth of a full one's light). The shell has no inside:
+  dark and silver under a moon (`uMoonL`: a half moon gives a tenth of a full one's light), as an eye opened to the
+  night sees them (`uEyeN`, from `AIR.opened`): from out where the day is in the picture too, the night side is black.
+  The Milky Way's map is taken less its faint floor (the light between the stars, a brown murk over the whole night). The shell has no inside:
   going up through it the clouds fade out over the last kilometres and come in below. The ground under them is in
   their shadow (the picture's small copy, `uClouds`, in the ground's shader), and so is a house (`cloudShade`).
   Look at `sky_*` on the Mac after touching any of it (`sky_under_dusk` and `sky_under_fair` from under the clouds,

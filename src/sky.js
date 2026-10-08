@@ -206,6 +206,11 @@
       vec3 n = normalize(vDirW), q = vec3(n.x * uShiftCS.x - n.z * uShiftCS.y, n.y, n.z * uShiftCS.x + n.x * uShiftCS.y);
       vec3 dx = dFdx(q), dy = dFdy(q); float foot = max(length(dx), length(dy));      // (how much of the shell a pixel takes, to the unit of the globe)
       float c = less(cover(q, dx, dy));
+      // (how the picture's cloud changes across the pixel, and the place with it: asked before any pixel is thrown away, while its neighbours still answer)
+      vec3 Px = dFdx(vPosV), Py = dFdy(vPosV); float tx = dFdx(c), ty = dFdy(c);
+      // Where the picture has a clear sky there is nothing to draw, and nothing more is asked: over a country that is being ruled
+      // that is most of it (looked straight down on from 900 km the clouds cost a fifth of the frame while every pixel went on).
+      if (c < 0.002) discard;
       // The picture's finest texel is two and a half kilometres. What it cannot hold is in the block of grain, at four sizes:
       // heaps of cloud some five kilometres across, the lumps of heaps four times that, and what eats at a heap's edge at
       // half a kilometre and a hundred metres; each drifts a little against the weather it belongs to.
@@ -263,14 +268,13 @@
       // knows for nothing: the block is of bytes, a heap seen from under it changes by less than a byte's step from pixel
       // to pixel, and its slope was nought, nought, nought and a step - bars of light and shade when the sun was low and the
       // slope counted; and from far, where a heap is a pixel, the slope from pixel to pixel was dice.)
-      if (g1 > 0.0) {
+      // (not where the heaps are a pixel or two across: there the slope is less than the light can show, and two lookups a pixel are not nothing)
+      if (g1 > 0.2) {
         float lodS = max(log2(max(tpp, 1e-3)), 1.0); vec3 off = sQ * 0.0195;
         vec2 mq = 0.72 * mix(vec2(0.5), vec2(textureLod(uGrain, p1 + off, lodS).r, textureLod(uGrain, p1 - off, lodS).r), g1) + 0.28 * n0, xq = (mq - thr) / 0.11;
         vec2 tq = mix(clamp(c + (mq - 0.5) * gather, 0.0, 1.0), max((1.0 - exp(-max(xq, 0.0) * 0.4)) * smoothstep(-0.55, 0.55, xq), vec2(veil * 0.4)), dK);
-        slope = (tq.x - tq.y) * 8150.0;      // (to the unit of the globe: the two are 1.23e-4 of it apart)
+        slope = (tq.x - tq.y) * 8150.0 * smoothstep(0.2, 0.45, g1);      // (to the unit of the globe: the two are 1.23e-4 of it apart)
       }
-      // (how the picture's cloud changes across the pixel, and the place with it: asked before any pixel is thrown away, while its neighbours still answer)
-      vec3 Px = dFdx(vPosV), Py = dFdy(vPosV); float tx = dFdx(c), ty = dFdy(c);
       vec3 nV = normalize(vPosV - uAirC), vd = normalize(vPosV); float sunUp = dot(nV, uAirS), cosV = abs(dot(vd, nV));
       // (seen from above, a country under cloud is no country to rule: looked straight down through from where the game is
       //  played, the clouds are thin - uThin - and along the horizon and from far out they are as they are)
