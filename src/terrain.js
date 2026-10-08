@@ -1244,9 +1244,11 @@
         shadow = mix(1.0, shadow, shadowMix);
       }
       shadow = min(shadow, 1.0 - 0.62 * max(castS, sunHidden(vViewPos)));       // block shadows far off, true ones from the sun's depth map near the camera
-      // cloud shadows (same texture the cloud shell uses, same drift)
-      float cloudA = texture2D(uClouds, vec2(fract((vLon - uCloudShift) / (2.0 * PI)), vLat / PI + 0.5)).g;
-      float cloudShadow = 1.0 - 0.55 * smoothstep(0.3, 0.8, cloudA) * uCloudVis;
+      // The clouds' shadows: of the cloud that stands between this ground and the sun, which is not the one overhead - the shell
+      // is 25 km up (sky.js), and the lower the sun the further toward it that cloud is. The same picture, the same drift.
+      vec2 cSun = vec2(dot(uSun, eastL) / max(cl, 0.05), dot(uSun, northL)) * min(0.004 / max(sunUp, 0.06), 0.05);
+      float cloudA = texture2D(uClouds, vec2((vLon - uCloudShift + cSun.x) / (2.0 * PI) + 0.5, clamp((vLat + cSun.y) / PI + 0.5, 0.0, 1.0))).g;
+      float cloudShadow = 1.0 - 0.6 * smoothstep(0.12, 0.7, cloudA) * uCloudVis;
       float sunVis = shadow * cloudShadow; diff *= sunVis;
       // the light of the hour (models.js, buildings.js and the trees take the same from the world's uniforms): a low sun
       // is warm and, the eye opening to it, strong; night is blue and enough to see by; dusk lends a rose glow

@@ -130,6 +130,12 @@ window.__T.aniso = function (n, ...texs) {
   R.state.reset(); return k;
 };
 
+// The eye turned to a place in the sky (the game's camera looks at the ground; mapcam.lift raises it): a direction in the globe's
+// frame, the Moon, or a star by its right ascension (hours) and declination (degrees) as the catalogues have it for 2000.
+// window.__moonAge holds the Moon at an age (0 new, pi full) as __sunLock holds the sun.
+window.__T.face = function (d) { const M = __G.mapcam, f = GEO.enu(M.lon, M.lat), el = Math.asin(Math.max(-1, Math.min(1, d.dot(f.up)))), az = Math.atan2(d.dot(f.east), d.dot(f.north)); M.autoTilt = false; M.tilt = M.tTilt = 1.45; M.heading = M.tHeading = az; M.lift = M.tLift = Math.max(0, Math.min(1.25, el + (Math.PI / 2 - 1.45))); return { height: +(el * 180 / Math.PI).toFixed(1), bearing: +(az * 180 / Math.PI).toFixed(1) }; };
+window.__T.faceMoon = function () { return __T.face(__G.world._moon); };
+window.__T.faceStar = function (raH, dec) { const a = raH * 15 * Math.PI / 180, de = dec * Math.PI / 180; return __T.face(new THREE.Vector3(Math.cos(de) * Math.cos(a), Math.sin(de), -Math.cos(de) * Math.sin(a)).applyMatrix4(__G.world.skyTurn)); };
 // The ground's shaders, taken anew from src/terrain.js into a page that is running (tools/live.js: /load?file=terrain.js, then
 // __T.reshade()): every tile is given the new ones, and tiles made from now on get them too. Seconds, where a new page takes minutes.
 window.__T.reshade = function (more) { const T = __G.terrain; Object.setPrototypeOf(T, TERRAIN.Terrain.prototype); if (more) for (const k in more) if (!T.globals[k]) T.globals[k] = { value: more[k] };      // (more: uniforms the new shader has and the page's game does not yet know, { name: value })

@@ -162,6 +162,7 @@
       for (let i = 0; i < N; i++) { worldData.elev[i] = wd.data[i * 4]; worldData.fert[i] = wd.data[i * 4 + 1] / 255; worldData.flags[i] = wd.data[i * 4 + 2]; worldData.land[i] = wd.data[i * 4 + 2] & 1; }
       setLoad(50, 'peoples');
       world = new WORLD.World({ scene, terrain: { exag: 2.0, heightAt: () => 0 } });
+      SKY.load({ soft: softGL && !window.GENESIS_SKY });      // the stars, the Milky Way, the Moon, the clouds (sky.js): each put to use as it comes; a software renderer takes the lighter half unless asked
       terrain = new TERRAIN.Terrain({ scene, index, water, img, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID, plainWater: softGL && !window.GENESIS_POST, slow: softGL });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
@@ -248,7 +249,7 @@
     if (pc && pc.capital >= 0) { const [cl, ca] = cellCenter(pc.capital); lon = GEO.wrapLon(cl + 30); lat = clamp(ca - 22, -50, 40); }
     mapcam.spin = HOME.spin;
     if (fly) mapcam.flyTo(lon, lat, HOME.dist, { duration: 2.4, tilt: 0, heading: 0, onDone: () => { if (mode === 'intro') mapcam.idleSpin = true; } });
-    else { mapcam.fly = null; mapcam.tLon = mapcam.lon = lon; mapcam.tLat = mapcam.lat = lat; mapcam.tDist = mapcam.dist = HOME.dist; mapcam.tTilt = mapcam.tilt = 0; mapcam.tHeading = mapcam.heading = 0; mapcam.idleSpin = true; }
+    else { mapcam.fly = null; mapcam.tLon = mapcam.lon = lon; mapcam.tLat = mapcam.lat = lat; mapcam.tDist = mapcam.dist = HOME.dist; mapcam.tTilt = mapcam.tilt = 0; mapcam.tLift = mapcam.lift = 0; mapcam.tHeading = mapcam.heading = 0; mapcam.idleSpin = true; }
   }
   function setSoil(on) { view.soil = on; globals.uFertView.value = on ? 0.6 : 0; $('v-soil').classList.toggle('on', on); }
   function showFoundCard(hit, i, cx, cy) {
@@ -976,7 +977,7 @@
     $('v-clouds').addEventListener('click', () => { view.clouds = !view.clouds; world.cloudsOn = view.clouds; $('v-clouds').classList.toggle('on', view.clouds); });
     $('v-labels').addEventListener('click', () => { view.labels = !view.labels; $('v-labels').classList.toggle('on', view.labels); });
     $('v-trade').addEventListener('click', () => { view.trade = !view.trade; $('v-trade').classList.toggle('on', view.trade); if (view.trade && sim && sim.playerCiv() && !sim.market.partners(sim.playerCiv().id).some(p => p.v > 0)) toast('No merchants reach you yet: touch another realm, or build a harbour'); });
-    $('northbtn').addEventListener('click', () => { mapcam.tHeading = 0; }); $('topbtn').addEventListener('click', () => { mapcam.tTilt = 0; mapcam.autoTilt = false; });
+    $('northbtn').addEventListener('click', () => { mapcam.tHeading = 0; }); $('topbtn').addEventListener('click', () => { mapcam.tTilt = 0; mapcam.tLift = 0; mapcam.autoTilt = false; });
     $('homebtn').addEventListener('click', goHome); $('orbitbtn').addEventListener('click', () => { mapcam.flyTo(mapcam.lon, mapcam.lat, 2.6, { tilt: 0, heading: 0, duration: 2 }); mapcam.autoTilt = settings.autoTilt; });
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -991,7 +992,7 @@
       else if (e.key === 'Escape') { if (mapcam.fly) mapcam.fly = null; else if (placing) cancelPlacing(); else if (tool) setTool(null); else if (!$('found').hidden) { $('found').hidden = true; pendingFound = null; } else if ($('chron').open) $('chron').close(); else if ($('menu').open) $('menu').close(); else if (!$('lensmenu').hidden) $('lensmenu').hidden = true; else if (document.body.classList.contains('dockopen')) $('l-build').click(); else if (selected >= 0) deselect(); else if (mode === 'play') openMenu(); }
       else if (e.key === '`') { const d = $('debug'); d.style.display = d.style.display === 'block' ? 'none' : 'block'; }
       else if (e.key === 'p' || e.key === 'P') $('v-pol').click(); else if (e.key === 'l' || e.key === 'L') $('v-labels').click(); else if (e.key === 't' || e.key === 'T') $('v-trade').click(); else if (e.key === 'o' || e.key === 'O') $('v-gov').click(); else if (e.key === 'x' || e.key === 'X') $('v-rel').click();
-      else if (e.key === 'n' || e.key === 'N') mapcam.tHeading = 0; else if (e.key === 'u' || e.key === 'U') { mapcam.tTilt = 0; mapcam.autoTilt = false; }
+      else if (e.key === 'n' || e.key === 'N') mapcam.tHeading = 0; else if (e.key === 'u' || e.key === 'U') { mapcam.tTilt = 0; mapcam.tLift = 0; mapcam.autoTilt = false; }
       else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
     });
     $('btn-chronicle').addEventListener('click', writeChronicle); $('btn-chronicle-stop').addEventListener('click', () => { if (chronCtl) chronCtl.abort(); });
@@ -1154,7 +1155,7 @@
         sunFor(s.cam.lon);
         // from the home screen the camera flies down to where the world was left; otherwise it is simply there
         if (fromHome && !quiet) mapcam.flyTo(s.cam.lon, s.cam.lat, s.cam.dist, { duration: 2.8, tilt: s.cam.tilt, heading: s.cam.heading });
-        else { mapcam.tLon = mapcam.lon = s.cam.lon; mapcam.tLat = mapcam.lat = s.cam.lat; mapcam.tDist = mapcam.dist = s.cam.dist; mapcam.tTilt = mapcam.tilt = s.cam.tilt; mapcam.tHeading = mapcam.heading = s.cam.heading; }
+        else { mapcam.tLon = mapcam.lon = s.cam.lon; mapcam.tLat = mapcam.lat = s.cam.lat; mapcam.tDist = mapcam.dist = s.cam.dist; mapcam.tTilt = mapcam.tilt = s.cam.tilt; mapcam.tLift = mapcam.lift = 0; mapcam.tHeading = mapcam.heading = s.cam.heading; }
       }
       feedIdx = sim.worldEvents.length; seen.wars.clear(); seen.ack.clear(); seen.era = -1; seen.turns = 1; turnRun.active = false; turnRun.townSet = null; turnRun.capital = -1; paused = true; snapshotTurn(); refreshAll(true); world.updateBuildings(mapcam, true);
       if (!quiet) toast(`Welcome back. It is ${sim.fmtYear(sim.year)}.`); return true;
@@ -1237,6 +1238,7 @@
     globals.uGndK.value.w = GND_PX * Math.sqrt(renderer.getPixelRatio());      // (the ground's materials: a repeat is so many device pixels across; on a screen of twice the pixels a little more of them, so that what the materials show is neither half the size nor half as sharp there)
     const devH = stage.clientHeight * renderer.getPixelRatio();      // point sprites are sized in device pixels
     world.starUniforms.uPx.value = renderer.getPixelRatio();
+    world.seasonPhase = seasonPhase; world.viewH = devH;
     const day = world.updateSky(mapcam, globals.uSun.value, now / 1000);
     if (life && mode === 'play') life.update(mapcam, sim, now, world.bUniforms.uDay.value, devH, camera.fov);      // (after the sky: smoke and fires take this frame's light, not the last one's)
     if (movers && mode === 'play') movers.update(mapcam, sim, decal, now, dt, world.bUniforms.uDay.value, devH, camera.fov);
