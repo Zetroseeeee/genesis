@@ -9,7 +9,7 @@
     {"id": "scrub", "from": "polyhaven", "asset": "aerial_ground_rock", "size": 20},
     {"id": "sand", "from": "polyhaven", "asset": "aerial_beach_01", "size": 30},
     {"id": "hamada", "from": "polyhaven", "asset": "gravelly_sand", "size": 2.5, "fine": true},
-    {"id": "rock", "from": "polyhaven", "asset": "marble_cliff_05", "size": 20},
+    {"id": "rock", "from": "polyhaven", "asset": "rock_08", "size": 1.5, "sat": 0.45, "warm": -0.03},
     {"id": "snow", "from": "ambientcg", "asset": "Snow008A"},
     {"id": "forestfloor", "from": "polyhaven", "asset": "coast_land_rocks_01", "size": 20, "far": "canopy", "farFrom": 2200, "farTo": 4200, "farSize": 768},
     {"id": "tundra", "from": "polyhaven", "asset": "aerial_rocks_01", "size": 80},
@@ -21,12 +21,12 @@
     {"id": "dirt", "from": "polyhaven", "asset": "dry_ground_rocks", "size": 4},
     {"id": "cracked", "from": "polyhaven", "asset": "mud_cracked_dry_03", "size": 1.5, "fine": true},
     {"id": "pasture", "from": "polyhaven", "asset": "rocky_terrain_02", "size": 90},
-    {"id": "crag", "from": "polyhaven", "asset": "aerial_rocks_02", "size": 50},
+    {"id": "crag", "from": "polyhaven", "asset": "rock_wall_02", "size": 2, "sat": 0.75},
     {"id": "heath", "from": "polyhaven", "asset": "coast_sand_rocks_02", "size": 15},
     {"id": "beach", "from": "polyhaven", "asset": "coast_sand_01", "size": 15},
     {"id": "sandstone", "from": "polyhaven", "asset": "marble_cliff_03", "size": 5.75}
   ],
   "try": [
-    {"from": "polyhaven", "asset": "sandy_gravel_02"}, {"from": "polyhaven", "asset": "dirt_aerial_02"}, {"from": "polyhaven", "asset": "dirt_aerial_03"}, {"from": "ambientcg", "asset": "Ground037"}
+    {"from": "polyhaven", "asset": "rocky_terrain"}, {"from": "polyhaven", "asset": "rock_face"}, {"from": "polyhaven", "asset": "aerial_rocks_02"}, {"from": "polyhaven", "asset": "cliff_side"}, {"from": "polyhaven", "asset": "marble_cliff_05"}, {"from": "polyhaven", "asset": "aerial_rocks_04"}
   ]
 }

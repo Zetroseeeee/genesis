@@ -1,7 +1,7 @@
 {
   "name": "genesis",
   "productName": "Holocene",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "private": true,
   "description": "Holocene \u2014 a god-game on the real Earth, from 10,000 BC",
   "main": "desktop/main.js",
