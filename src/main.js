@@ -76,7 +76,7 @@
     uDetA: { value: null }, uDetB: { value: null }, uDetC: { value: null }, uDetD: { value: null }, uDet: { value: null },
     uSimRes: { value: new THREE.Vector2(W, H) }, uSel: { value: new THREE.Vector2(-9, -9) }, uHover: { value: new THREE.Vector2(-9, -9) },
     uFertView: { value: 0 }, uPolitical: { value: 1 }, uLens: { value: 0 }, uLabelsOn: { value: 1 },
-    uClouds: { value: null }, uCloudShift: { value: 0 }, uCloudVis: { value: 0 },
+    uClouds: { value: null }, uCloudShift: { value: 0 }, uCloudVis: { value: 0 }, uCloudNear: { value: 0 },
     uDecal: { value: null }, uDecalRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uDecalOn: { value: 0 }, uQuality: { value: 1 }, uDecal2: { value: null }, uWaterN: { value: null },
     uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) }, uIceCold: { value: new THREE.Vector2(1, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
@@ -1244,7 +1244,7 @@
     if (movers && mode === 'play') movers.update(mapcam, sim, decal, now, dt, world.bUniforms.uDay.value, devH, camera.fov);
     if (fx && mode === 'play') { fx.update(mapcam, sim, now, dt, world.bUniforms.uDay.value, devH, camera.fov); if (fx.shake > 0.001) { const a = fx.shake * fx.shake * mapcam.dist * 0.02; camera.position.x += (Math.random() - 0.5) * a; camera.position.y += (Math.random() - 0.5) * a; camera.position.z += (Math.random() - 0.5) * a; camera.updateMatrixWorld(); } }
     if (world.cloudTex && globals.uClouds.value !== world.cloudTex) globals.uClouds.value = world.cloudTex;
-    globals.uCloudShift.value = world.cloudShift; globals.uCloudVis.value = world.cloudVis;
+    globals.uCloudShift.value = world.cloudShift; globals.uCloudVis.value = world.cloudVis; globals.uCloudNear.value = world.cloudNear;
     world.updateBuildings(mapcam, false);
     // whether snow lies here now (by the climate of the place and the time of year): roofs go white with the ground
     if (trees && trees.ready && mapcam.alt < 0.03) world.bUniforms.uSnow.value = trees.lyingAt(mapcam.lon, mapcam.lat, mapcam.lat >= 0 ? globals.uBare.value.z : globals.uBare.value.w, mapcam.agl === undefined ? 0 : (mapcam.alt - mapcam.agl) * GEO.R_M / terrain.exag);

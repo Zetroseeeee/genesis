@@ -159,7 +159,7 @@
     #endif
     #endif
     uniform vec2 uSimRes, uSel, uHover; uniform float uFertView, uPolitical, uLens, uLabelsOn;
-    uniform sampler2D uClouds; uniform float uCloudShift, uCloudVis; uniform vec2 uPhaseB, uPhaseRot;
+    uniform sampler2D uClouds; uniform float uCloudShift, uCloudVis, uCloudNear; uniform vec2 uPhaseB, uPhaseRot;
     uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality, uGlow;      // uGlow: 1 where the picture can hold light brighter than white (post.js lets it bleed), else 0
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     const float PI = 3.14159265;
@@ -1248,6 +1248,7 @@
       // is 25 km up (sky.js), and the lower the sun the further toward it that cloud is. The same picture, the same drift.
       vec2 cSun = vec2(dot(uSun, eastL) / max(cl, 0.05), dot(uSun, northL)) * min(0.004 / max(sunUp, 0.06), 0.05);
       float cloudA = texture2D(uClouds, vec2((vLon - uCloudShift + cSun.x) / (2.0 * PI) + 0.5, clamp((vLat + cSun.y) / PI + 0.5, 0.0, 1.0))).g;
+      cloudA = mix(cloudA, smoothstep(0.3, 1.0, cloudA), uCloudNear);      // (the weather over a country that is being ruled is less than the picture has it: sky.js)
       float cloudShadow = 1.0 - 0.6 * smoothstep(0.12, 0.7, cloudA) * uCloudVis;
       float sunVis = shadow * cloudShadow; diff *= sunVis;
       // the light of the hour (models.js, buildings.js and the trees take the same from the world's uniforms): a low sun

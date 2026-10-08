@@ -381,7 +381,7 @@
       this.skyTurn = new THREE.Matrix4(); this.seasonPhase = 0.45; this.viewH = 1000; this._moon = new THREE.Vector3(0, 1, 0);
       // The clouds (sky.js): the Earth's own, on a shell a little above the highest ground, white in the sun, the colours of the
       // sun's light along the edge of night and dark after it, behind the same air as everything else; seen from under, too.
-      this.cloudLayer = window.AIR ? new SKY.Clouds(scene, AIR) : null; this.cloudTex = null; this.cloudShift = 0; this.cloudVis = 0; this.cloudsOn = true;
+      this.cloudLayer = window.AIR ? new SKY.Clouds(scene, AIR) : null; this.cloudTex = null; this.cloudShift = 0; this.cloudVis = 0; this.cloudNear = 0; this.cloudsOn = true;
       SKY.onPiece = (n) => { if (n === 'stars') { try { this.starField.set(SKY.starData, SKY.index.stars); } catch (e) { console.warn('the stars: ' + e.message); } SKY.starData = null; } };
       if (SKY.starData) SKY.onPiece('stars');
       // The sky: every line of sight that ends on nothing, out through the air (air.js): blue by day, the colours of dusk, the
@@ -457,7 +457,7 @@
       // (the world's own: its first nights turn about a point near Vega). The Moon goes round the Earth's path once a
       // game-month, and its age is its phase.
       const turn = SKY.turn(sun, this.seasonPhase, window.__skyYear !== undefined ? window.__skyYear : this.sim ? this.sim.year : -10000, this.skyTurn), moon = SKY.moonAt(sun, turn.ecl, window.__moonAge !== undefined ? window.__moonAge : 2.6 + time * 0.0025, this._moon);
-      if (this.cloudLayer) { this.cloudLayer.on = this.cloudsOn; this.cloudLayer.update(cam.alt, time, sun); this.cloudShift = this.cloudLayer.shift; this.cloudVis = this.cloudLayer.vis; if (SKY.cloudSmall) this.cloudTex = SKY.cloudSmall; }
+      if (this.cloudLayer) { this.cloudLayer.on = this.cloudsOn; this.cloudLayer.update(cam.alt, time, sun); this.cloudShift = this.cloudLayer.shift; this.cloudVis = this.cloudLayer.vis; this.cloudNear = this.cloudLayer.near; if (SKY.cloudSmall) this.cloudTex = SKY.cloudSmall; }
       const skyA = Math.min(1, Math.max(0, (0.06 - cam.alt) / 0.04));
       this.skyUniforms.uAlpha.value = skyA; this.skyUniforms.uSun.value.copy(sun);
       { const U = this.skyUniforms; U.uTime.value = time; U.uLat.value = cam.lat; U.uComet.value = this.cometOn ? 1 : 0; U.uSkyM.value.setFromMatrix4(turn); U.uMoonW.value.copy(moon); U.uEclW.value.copy(turn.ecl);
@@ -484,7 +484,7 @@
         const kW = sm(0.02, 0.42, sunUp), k = sm(-0.03, 0.05, sunUp) * (1 + 1.1 * (1 - sm(0.04, 0.5, sunUp)));
         bu.uSunCol.value.set(k, k * (0.56 + 0.44 * kW), k * (0.30 + 0.70 * kW)); bu.uDusk.value = sm(-0.12, 0.02, sunUp) * (1 - sm(0.08, 0.4, sunUp)); bu.uDay.value = sm(-0.1, 0.16, sunUp);
         // (and under a cloud the sun is dimmed for whatever stands there as it is for the ground: by the cloud over the place the eye is at - a town is small under a sky)
-        if (this.cloudVis && cam.alt < 0.03) { this.cloudShade = 0.6 * sm(0.12, 0.7, SKY.cloudAt(cam.lon, cam.lat, this.cloudShift)); bu.uSunCol.value.multiplyScalar(1 - this.cloudShade); } else this.cloudShade = 0; }
+        if (this.cloudVis && cam.alt < 0.03) { this.cloudShade = 0.6 * this.cloudVis * sm(0.12, 0.7, SKY.less(SKY.cloudAt(cam.lon, cam.lat, this.cloudShift), this.cloudNear)); bu.uSunCol.value.multiplyScalar(1 - this.cloudShade); } else this.cloudShade = 0; }
       this.sunLight.intensity = 1.5 * day; this.hemi.intensity = 0.25 + 0.8 * day;
       return day;
     }
