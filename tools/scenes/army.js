@@ -37,14 +37,13 @@
     const h = S.army.of(c.id)[0]; if (!h) return 'no host: ' + S.cannot('levy', cap);
     let fleet = null; if (o.fleet) { const why = S.cannot('fleet', cap); if (!why) S.act('fleet', cap); fleet = S.army.fleetsOf(c.id)[0] || null; if (!fleet) return 'no fleet: ' + why; }
     if (o.goal !== false) S.army.order(h.id, foe.capital);
-    if (o.until === 'siege') { for (let y = 0; y < 12 && S.army.byId(h.id) && S.army.byId(h.id).state !== 'siege'; y++) G.run(1); }
+    if (o.until === 'siege') { for (let y = 0; y < 12 && S.army.byId(h.id) && S.army.byId(h.id).state !== 'siege'; y++) G.run(1); G.run(1); }      // (and a year of it: the engines are brought up)
     else if (o.years) G.run(o.years);
     if (o.halt && S.army.byId(h.id)) S.army.halt(h.id);
     const put = () => {
       const A = S.army, M = G.mapcam; M.fly = null; M.autoTilt = false;
       if (o.look === 'fleet' && fleet) {
-        const T = G.troops, f = A.fleetById(fleet.id) || fleet; let lon, lat; [lon, lat] = A.cellLL(f.cell);
-        if (f.port >= 0 && S.level[f.port]) { const [tl, ta] = TOWN.siteOf(S, f.port, S.civs[S.owner[f.port]], G.terrain, null); lon = (lon + tl * 2) / 3; lat = (lat + ta * 2) / 3; }
+        const T = G.troops, f = A.fleetById(fleet.id) || fleet; let [lon, lat] = (T && T.fleetAt.get(f.id)) || A.cellLL(f.cell);      // (where troops.js draws it)
         M.lon = M.tLon = lon; M.lat = M.tLat = lat; M.tilt = M.tTilt = o.tilt; M.dist = M.tDist = o.alt / 6371000 / Math.cos(o.tilt); M.heading = M.tHeading = o.heading || 0;
         return { fleet: f.name, ships: f.ships, state: f.state, drawn: T ? T.counts : null };
       }

@@ -11,6 +11,7 @@
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
   const cellLL = (i) => { const y = (i / W) | 0, x = i - y * W; return [(x + 0.5) / W * 360 - 180, 90 - (y + 0.5) / H * 180]; };
   const hexOf = (rgb) => ((Math.round(rgb[0] * 255) << 16) | (Math.round(rgb[1] * 255) << 8) | Math.round(rgb[2] * 255)) >>> 0;
+  const dyed = (rgb) => { const l = 0.3 * rgb[0] + 0.55 * rgb[1] + 0.15 * rgb[2]; return rgb.map((v) => (l + (v - l) * 0.7) * 0.82); };      // (a realm's colour as cloth takes it)
   const css = (rgb) => `rgb(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)})`;
 
   // ---------- a soldier: the walker of movers.js with his kit ----------
@@ -56,6 +57,7 @@
       float a = id > 1.5 && id < 2.5 ? swing * 0.55 : id > 2.5 && id < 3.5 ? -swing * 0.55 : id > 4.5 && id < 5.5 || (id > 6.5 && id < 7.5) ? swing * 0.15 : 0.0;      // (the arms that carry do not swing)
       if (a != 0.0) { float c = cos(a), s = sin(a); vec2 q = vec2(p.x, p.y - aPart.y); p.x = q.x * c - q.y * s; p.y = aPart.y + q.x * s + q.y * c; n.xy = vec2(n.x * c - n.y * s, n.x * s + n.y * c); }
       p.y += abs(swing) * 0.025;
+      if (walk < 0.5) { float sway = sin(uTime * 1.1 + aGear.w * 6.2832) * 0.025; p.x += sway * max(p.y - 0.2, 0.0); }      // (men standing in the ranks shift their weight)
       vMat = aPart.z; vY = position.y; vCol = instanceColor; vGear = aGear.x; vHelm = aGear.y;
       vec4 mv = modelViewMatrix * instanceMatrix * vec4(p, 1.0); vView = mv.xyz;
       vN = normalize(normalMatrix * (mat3(instanceMatrix) * n));
@@ -110,7 +112,9 @@
     precision highp float; uniform vec3 uSunCol; uniform float uDay; varying vec2 vUv; varying vec3 vCol, vView;
     ${AIR_F}
     void main() {
-      vec3 col = vUv.x < 0.0 ? vec3(0.35, 0.26, 0.17) : mix(vCol, vCol * 0.45, step(0.42, abs(vUv.y - 0.5)) * step(0.0, vUv.x));      // (the cloth in the realm's colour, a darker edge top and bottom)
+      vec3 cloth = mix(vec3(dot(vCol, vec3(0.3, 0.55, 0.15))), vCol, 0.8) * 0.86;      // (dyed, not the map's paint)
+      float edge = step(0.4, abs(vUv.y - 0.5)), dev = 1.0 - smoothstep(0.15, 0.18, length((vUv - vec2(0.4, 0.5)) * vec2(1.55, 1.0)));      // (a darker hem top and bottom; a pale device, a disc, near the pole)
+      vec3 col = vUv.x < 0.0 ? vec3(0.35, 0.26, 0.17) : mix(mix(cloth, cloth * 0.5, edge), vec3(0.9, 0.86, 0.74), dev * (1.0 - edge));
       vec3 lit = col * (0.35 + 0.75 * uSunCol * mix(0.5, 1.0, uDay));
       gl_FragColor = vec4(airOver(lit, vAirT, vAirL), 1.0);
     }`;
@@ -139,7 +143,7 @@
       { const g = new THREE.BufferGeometry(); this.roadPos = new Float32Array(3 * 600); g.setAttribute('position', new THREE.BufferAttribute(this.roadPos, 3).setUsage(THREE.DynamicDrawUsage)); g.setDrawRange(0, 0);
         this.road = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffe6a0, size: 7, sizeAttenuation: false, transparent: true, opacity: 0.9, depthTest: false })); this.road.frustumCulled = false; this.road.renderOrder = 9; scene.add(this.road); }
       this.vis = new Map();      // host id -> where it is drawn { lon, lat, head, walk }
-      this.camps = { key: '' }; this.selected = -1; this.onPick = null; this._m = new THREE.Matrix4(); this._vc = new Map(); this._k = new Map();
+      this.camps = { key: '' }; this.selected = -1; this.onPick = null; this._m = new THREE.Matrix4(); this._vc = new Map(); this._k = new Map(); this.fleetAt = new Map();      // (fleet id -> where it is drawn: lon, lat, heading)
       this.stats = { men: 0, hosts: 0, banners: 0 };
       // the banners on the screen
       this.host = document.getElementById('hosts'); this.banners = new Map();
@@ -194,12 +198,13 @@
           const ex = fwd * ch - side * sh, ny = fwd * sh + side * ch;      // (east, north) metres
           const lon = v.lon + ex * mLon, lat = v.lat + ny * mLat; const hg = T.meshHeightAt(lon, lat, this._vc);
           if (hg < 0.5 && T.isWater(lon, lat)) continue;
-          this.setFigure(mm, n, lon, lat, hg, ch, sh, kH);
-          mc[n * 3] = col[0]; mc[n * 3 + 1] = col[1]; mc[n * 3 + 2] = col[2];
+          const hk = hash(a.id * 977 + k, 3), sk = 0.93 + 0.14 * hk, ck = 0.88 + 0.24 * hash(a.id * 977 + k, 4);      // (no two men of a size, nor two tunics of one dye)
+          this.setFigure(mm, n, lon, lat, hg, ch, sh, kH * sk);
+          mc[n * 3] = col[0] * ck; mc[n * 3 + 1] = col[1] * ck; mc[n * 3 + 2] = col[2] * ck;
           mg[n * 4] = gear; mg[n * 4 + 1] = helm; mg[n * 4 + 2] = march ? 1 : 0; mg[n * 4 + 3] = hash(a.id, k); n++;
         }
         // the standard: at the head of the column, or before the middle of the line
-        if (nf < MAXF) { const lon = v.lon + (ch * gap * 2.5) * mLon, lat = v.lat + (sh * gap * 2.5) * mLat; const hg = T.meshHeightAt(lon, lat, this._vc); this.setFigure(this.flags, nf, lon, lat, hg, Math.cos(v.head + 1.2), Math.sin(v.head + 1.2), kH * (a.c === sim.player ? 1.5 : 1.2)); fc[nf * 3] = col[0]; fc[nf * 3 + 1] = col[1]; fc[nf * 3 + 2] = col[2]; fs[nf] = hash(a.id, 3); nf++; }
+        if (nf < MAXF) { const lon = v.lon + (ch * gap * 2.5) * mLon, lat = v.lat + (sh * gap * 2.5) * mLat; const hg = T.meshHeightAt(lon, lat, this._vc); this.setFigure(this.flags, nf, lon, lat, hg, Math.cos(v.head + 1.2), Math.sin(v.head + 1.2), kH * (a.c === sim.player ? 1.1 : 0.95)); fc[nf * 3] = col[0]; fc[nf * 3 + 1] = col[1]; fc[nf * 3 + 2] = col[2]; fs[nf] = hash(a.id, 3); nf++; }
       }
       mm.count = n; GEO.touch(mm.instanceMatrix, n); GEO.touch(mm.instanceColor, n); GEO.touch(this.gear, n); if (this.shade) this.shade.count = n;
       this.flags.count = nf; GEO.touch(this.flags.instanceMatrix, nf); GEO.touch(this.flags.instanceColor, nf); GEO.touch(this.fseed, nf);
@@ -247,8 +252,8 @@
         const nT = clamp(Math.round(Math.sqrt(a.men) / 3), 6, 60), ch = Math.cos(v.head), sh = Math.sin(v.head);
         // (the camp lies behind the host's ranks: as deep as they are, a lane, and its own breadth)
         const kH = v.k || K, back = 6 * 1.7 * kH + 40 + (60 + nT * 12) * kH / K, cx = v.lon - ch * back * mLon, cy = v.lat - sh * back * mLat;
-        for (let k = 0; k < nT; k++) { const ang = hash(a.id, k + 30) * Math.PI * 2, rr = Math.sqrt(hash(a.id, k + 60)) * (60 + nT * 12) * kH / K; const lo = cx + Math.cos(ang) * rr * mLon, la = cy + Math.sin(ang) * rr * mLat; if (T.isWater(lo, la)) continue; place('tent', lo, la, 3 * kH, 2.2 * kH, 3.4 * kH, ang, 0xd8ccb0, a.era, 0, kH); }
-        place('bigtent', cx, cy, 8 * kH, 5 * kH, 8 * kH, v.head, hexOf(c.rgb), a.era, 0, kH);      // (the captain's pavilion, in the realm's colour)
+        for (let k = 0; k < nT; k++) { const ang = hash(a.id, k + 30) * Math.PI * 2, rr = Math.sqrt(hash(a.id, k + 60)) * (60 + nT * 12) * kH / K; const lo = cx + Math.cos(ang) * rr * mLon, la = cy + Math.sin(ang) * rr * mLat; if (T.isWater(lo, la)) continue; place('tent', lo, la, 3 * kH, 2.2 * kH, 3.4 * kH, ang, [0xd9cfb4, 0xc9b99a, 0xb9a88a][k % 3], a.era, 0, kH); }
+        place('bigtent', cx, cy, 7 * kH, 4.4 * kH, 7 * kH, v.head, hexOf(dyed(c.rgb)), a.era, 0, kH);      // (the captain's pavilion, in the realm's colour)
       }
       // the fleets near the eye: ships in a wedge, the realm's colour on them
       // (drawn SHIP_K times life size, as the ships of movers.js are; in harbour off its town, at sea where it sails, its
@@ -262,6 +267,7 @@
           for (let r = R * 0.8; r < R * 0.8 + 25000; r += 400) { const lo = tl + ux * r / (R_M * cl * D2R), la = ta + uy * r / (R_M * D2R); if (T.isWater(lo, la)) { lon = tl + ux * (r + 900) / (R_M * cl * D2R); lat = ta + uy * (r + 900) / (R_M * D2R); break; } }
           head = Math.atan2(uy, ux);
         } else if (f.path && f.path.length) { const [nl, na] = cellLL(f.path[0]); head = Math.atan2(na - lat, (nl - lon) * Math.max(0.15, Math.cos(lat * D2R))); }
+        this.fleetAt.set(f.id, [lon, lat, head]);
         if (GEO.distKm(cam.lon, cam.lat, lon, lat) > Math.min(400, 60 + cam.dist * 6371 * 3)) continue;
         const kind = f.era >= 3 ? 'ship' : 'boat', w = (f.era >= 6 ? 90 : f.era >= 3 ? 34 : 12) * SK, h = (f.era >= 6 ? 18 : f.era >= 3 ? 9 : 3) * SK, d = (f.era >= 6 ? 16 : f.era >= 3 ? 8 : 4) * SK;
         const cl = Math.max(0.15, Math.cos(lat * D2R)), mLon = 1 / (R_M * cl * D2R), mLat = 1 / (R_M * D2R), nS = clamp(f.ships, 3, 24), sp = w * 1.6;
@@ -292,7 +298,7 @@
         const v = this.vis.get(a.id); if (!v) continue;
         if (!mine && GEO.distKm(cam.lon, cam.lat, v.lon, v.lat) > Math.min(2500, 300 + cam.dist * 6371 * 2)) continue;
         // (it stands over the top of the standard while the soldiers are drawn, else over the ground where the host is)
-        const top = cam.dist < SEE ? 6.2 * (v.k || K) * (mine ? 1.5 : 1.2) / this.exag : 0;
+        const top = cam.dist < SEE ? 6.2 * (v.k || K) * (mine ? 1.1 : 0.95) / this.exag : 0;
         const p = project(v.lon, v.lat, Math.max(0, this.terrain.meshHeightAt(v.lon, v.lat, this._vc)) + top); if (!p) continue;
         let el = this.banners.get(a.id);
         if (!el) { el = document.createElement('div'); el.className = 'hostb'; el.addEventListener('click', (e) => { e.stopPropagation(); if (this.onPick) this.onPick(a.id); }); this.host.appendChild(el); this.banners.set(a.id, el); }
@@ -311,7 +317,7 @@
     }
   }
   // what a host is doing, as a small mark on its banner: marching, laying siege, encamped, at sea
-  const ST_ICON = { march: 'M5 6l6 6-6 6M12 6l6 6-6 6', siege: 'M5 21V9l3-2 3 2V5l3-2 3 2v4l2-2v14z', camp: 'M2 20h20M4 20L12 5l8 15M12 20l-3-6M12 20l3-6', sea: 'M3 14c3 3 6 3 9 0s6-3 9 0M3 19c3 3 6 3 9 0s6-3 9 0' };
+  const ST_ICON = { march: 'M5 6l6 6-6 6M12 6l6 6-6 6', siege: 'M5 21V9l3-2 3 2V5l3-2 3 2v4l2-2v14z', camp: 'M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5 0 2 1 3 2 3.5 0-3-.5-5.5.5-8.5zM5 21h14', sea: 'M3 14c3 3 6 3 9 0s6-3 9 0M3 19c3 3 6 3 9 0s6-3 9 0' };
   const fmtK = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + 'm' : n >= 1e4 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(Math.round(n));
   window.TROOPS = { Troops, K, SEE };
 })();
