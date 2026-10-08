@@ -414,14 +414,24 @@ Conventions that matter:
   sky, which is most of what a tilted camera sees of it, was empty). **Over a country that is being ruled** (from some 4,000 km down to the shell) the weather is
   less than the picture has it, its thin cloud gone and its thick cloud white (`less`; `SKY.less` and `uCloudNear` give
   the shadows on the ground and on houses the same), and what is left is seen through where it is looked straight down
-  on (`uThin`): all of it at two fifths the strength was a grey murk on the map. By night the clouds are grey in the
+  on (`uThin`): all of it at two fifths the strength was a grey murk on the map. **From over them, beyond some 200 km
+  (`uFar1`), there are no heaps and no lookups for their light**: the eye had every pixel of a screen of cloud to go
+  through, and from 900 km they cost a fifth of the frame for a grain the map is better without. There the picture's
+  cloud is given an edge (`edge`), looked up by a cubic B-spline (`cubic2`: thresholded between its texels on a real
+  card it was a lattice of rounded squares) and broken into cells by the smaller of the two gathering sizes while that
+  is a few pixels across (gone by 900 km). Clear sky is thrown away before anything else is asked. By night the clouds are grey in the
   dark and silver under a moon (`uMoonL`: a half moon gives a tenth of a full one's light), as an eye opened to the
   night sees them (`uEyeN`, from `AIR.opened`): from out where the day is in the picture too, the night side is black.
   The Milky Way's map is taken less its faint floor (the light between the stars, a brown murk over the whole night). The shell has no inside:
   going up through it the clouds fade out over the last kilometres and come in below. The ground under them is in
   their shadow (the picture's small copy, `uClouds`, in the ground's shader), and so is a house (`cloudShade`).
   Look at `sky_*` on the Mac after touching any of it (`sky_under_dusk` and `sky_under_fair` from under the clouds,
-  `sky_tops` and `sky_oblique` over them, `sky_region` over a country, `sky_edge` the edge of night).
+  `sky_tops` and `sky_oblique` over them, `sky_low` and `sky_region` over a country, `sky_edge` the edge of night).
+  *What it costs* (the build Mac, 1680 by 1050; `costc_*`, `__T.costsSky()`: as it is, without the clouds, without
+  their heaps, without the stars, turn and turn about): looking straight down from 300 km 23.2 frames a second against
+  24.9 without the clouds, from 900 km 34.4 against 38.0, over the cloud tops from 70 km 21.4 against 21.8, a town to
+  the horizon 23.0 and 22.9 (nothing that can be measured), straight up from under them 60 and 60 (the screen's own
+  limit). The stars cost nothing that can be measured anywhere.
 - **The picture's last steps** (`post.js`; on a real GPU at full quality, `POST=1` in the harnesses). The scene is
   drawn into a target that holds light brighter than white (half floats, four samples) and its depth, then: shade
   (ambient occlusion from the depth alone, two reaches, a share of the distance wide so it reads at every height;
