@@ -212,11 +212,22 @@ Conventions that matter:
   slope a step can tell is the same at every level, and there are no contour lines under a low sun. They are the
   Terrain Tiles' (SRTM and the rest, read at zoom 10 and averaged over each texel's piece of the Earth), and each level
   is the mean of the one above, so the levels agree. Levels 0 to 5 everywhere there is land, 6 and 7 where they add
-  most to the level below within a budget (`budget6`, `budget7`); a pack's mark in the list says P, S (sea) or L (land
-  drawn from the level below: `terrain.eMark`). The card gets them as a texture of two channels, low then high
+  most to the level below within a budget (`budget6`, `budget7`: the mean slope of the difference, so the high
+  mountains first), and wherever the old packs had them, outside the budgets (the old build kept them where the game's
+  first peoples live; by relief alone the Levant fell to level 5 and its wadis went). A kept 7 keeps its 6: the eye
+  drawing back goes to 6, not 5. A pack's mark in the list says P, S (sea) or L (land drawn from the level below:
+  `terrain.eMark`). Every pack carries a rim of two texels of its neighbours (`apron`), and where a kept pack meets one
+  that is drawn from a coarser level it is made that level along the edge, coming into its own over sixty texels
+  (`feather`): on a mountain the step between two levels is hundreds of metres, and at Pangong it stood across the
+  valley as a wall. Greenland's ice the tiles have in places and its rock in others: on the ice the higher of the
+  tiles and the old packs is taken. A few tiles are spikes kilometres high in a plain (Alaska had one of 26 km):
+  where the tiles stand 2 km above the old packs within two kilometres, in country the old packs have under 2,500 m,
+  or above 9,150 m, the old packs are taken. The card gets them as a texture of two channels, low then high
   (`uElevK` weighs red and green: (255, 65280); the old packs (255, 0)), and the CPU the very same bytes as a
   Uint16Array. **No mipmaps on an elevation texture**: a mipmap of the high byte rounded to whole steps is 256 low
-  steps off. They stand 2.8 % taller than the Earth, as the old packs did (every lake in the game does: it came with the
+  steps off. Land below the sea stands at nought, as it did in the old packs (the Dead Sea, the Caspian's shores: the
+  water's levels come from those, and a lake at -430 m in ground at nought would be a pit). They stand 2.8 % taller
+  than the Earth, as the old packs did (every lake in the game does: it came with the
   first build), and the ground is drawn twice as tall again (`exag: 2.0`): Everest stands at 18 km. Two places the tiles
   do not give the ground one stands on, and the old packs are taken: Antarctica (at zoom 10 the tiles have the rock
   under the ice; Greenland's ice they have), and north of 85 degrees. The old packs (`data/e`: eight bits, min + byte ×
@@ -227,7 +238,8 @@ Conventions that matter:
   shows as a line if it differs. The picture of the Earth (`data/i`) and the water's edge (`data/w`) therefore carry
   a rim of two texels of their neighbours all round (`apron` in their lists; `bindPack` and `bindWater` leave it out
   of a tile's rectangle): a lookup at a pack's edge is as good as one inside it, and nothing has to be matched by
-  hand. The elevation's packs have no rim and their edges are not matched (a step of a texel's worth of height).
+  hand. The heights (`data/h`) have the same rim; the old elevation packs (`data/e`) have none and their edges are not
+  matched (a step of a texel's worth of height).
   **A pack that is let go must not be drawn from again** (`evictPacks`: its texture is disposed and its picture
   closed). A tile shows the finest pack that is here, down to the coarsest; the three coarsest levels of the
   picture and of the heights are never let go (nothing asks for them by name while finer ones are here, so they
@@ -510,7 +522,9 @@ Conventions that matter:
   rows of itself, whatever is done to hide it (an aerial scan put on the fine ladder was a field of dots from a
   mile up).
   **Which material** comes from what the shader always weighed (wood, grass, dry ground, rock), the climate and the
-  slope. The two that count most are laid one in the other's hollows, by their heights. A material takes the
+  slope (what is bright and has no colour of its own in the photograph is snow, ice or salt, never grass: the sum
+  that weighs green read a twelfth of white as green, and the glaciers of the Andes were meadows until 0.24). The
+  two that count most are laid one in the other's hollows, by their heights. A material takes the
   brightness the photograph of the Earth has there, up to a cap of its kind (grass under a bright haze is still
   grass), and a share of its hue: but only what is as coloured as the material on the whole is tinted (a grey
   stone in the grass stays grey; tinted with the grass it went blue, and brown earth mauve), and nothing past grey
