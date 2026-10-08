@@ -257,6 +257,13 @@ Conventions that matter:
   12 ... five times). Sixteen or sixty-four packs hang on one bundle of megabytes: a fetch that failed once left them
   in `error` for as long as the game ran - a country without its lakes, or blurred. `__T.watch()` writes into the
   picture what every tile is drawn with and what is still on its way (`load_*` in the tour).
+  **Packs are read off the page** (`PackReader`, `PACK_WORKER` in `terrain.js`, since 0.26): the heights and the water's
+  edge are decoded and read back in workers (two to four, by the cores), and the page only uploads the bytes that come
+  back as a texture; the picture's own pixels go to the card as an ImageBitmap, and its alpha (the map of land and water
+  the CPU asks) is read in a worker beside them. Read on the page, strip by strip, a pack of four million texels held
+  every frame up for a twentieth of a second, and a view of the Himalaya waited thirteen seconds for its ground. The
+  workers are made from a Blob (no file of their own: nothing for the app's scheme to refuse); a worker that cannot
+  (no `OffscreenCanvas`) says so, and the page reads as it did.
 - **Representational scale.** Towns are planned at true scale and drawn `scaleOf(Rt) = 20/(1+Rt/1200)` times larger
   (a village ~19×, a metropolis ~3×) so they read from region height. Shader patterns divide by that factor.
 - **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
@@ -846,6 +853,12 @@ Conventions that matter:
   small a picture is an average of its texels, so far trees were pale and haloed), and where the frame has several
   samples a pixel the cut-out's edge is drawn by coverage (`alphaToCoverage`, `uCover`), not pixel by pixel. Trees
   stand up to the water (the water mask climbs over a kilometre: only its lower half is shore).
+  **A low sun** (since 0.26): the photograph's own soft light is a day sky's, and under a low sun a tree is lit on the
+  side turned to it only (`baseK`: a lone birch at dusk glowed whole, brighter than anything in the picture); and in a
+  wood a low sun comes only a little way down each tree (`reach`, 2.5 times the sine of its height: trees twenty metres
+  tall forty apart are lit for 2 tan(e) of their height). A wood at sunset was a carpet of glowing crowns on dark
+  ground. The ground's grass and the crowns of the canopy stand up out of it and are lit as walls are (`stand` in the
+  ground's shader): lit as flat ground, a meadow at sunset was black beside the golden walls of a town.
   **How they are placed.** A tier is tens of thousands of plots, each asking the country what grows there: a tenth
   of a second and more. It is done a slice a frame (`trees.slice`, milliseconds; a software renderer does it at
   once) into a store the picture does not see, and shown when it is whole; and only when the eye has moved or what
