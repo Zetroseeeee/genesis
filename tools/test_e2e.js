@@ -68,6 +68,9 @@ server.listen(0, async () => {
     check(s.left, 'inspector opened on the new village'); check(s.t1 === 'Knowledge', 'the turn button asks what the people will learn first: ' + s.t1);
     const cap = await ev(() => { const c = __G.sim.playerCiv(); return { lvl: __G.sim.level[c.capital], owner: __G.sim.owner[c.capital] === c.id, cells: __G.sim.cellsOf[c.id] }; }); check(cap.lvl >= 1 && cap.owner, 'capital is a village the player owns');
     check((await ev(() => __G.sim.st.civCount)) >= 10, 'other tribes seeded');
+    // (the HUD's figures are numbers: the strength tile read 'NaN' from 0.17 to 0.25, sim.strength asked with one argument of three)
+    const hud = await ev(() => Array.from(document.querySelectorAll('[id^="eco-"]')).map((e) => e.textContent).join(' | '));
+    check(!/NaN|undefined/.test(hud), 'the HUD has no NaN: ' + hud);
   });
   await scenario('intro: click on sea / on an owned cell is refused', async (check) => {
     await fresh(); await ev(() => document.getElementById('btn-choose').click()); await ev(() => { __G.mapcam.flyTo(-30, 30, 0.3, { duration: 0.1, tilt: 0 }); }); await wait(1200); await frames(4);
