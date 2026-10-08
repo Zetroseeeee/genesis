@@ -307,7 +307,7 @@ hts_everest_old | tools/scenes/forest.js | null | __G.world.cloudsOn = false; __
 hts_k2          | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(76.35, 35.70, 30000, 1.2, 0.5, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
 hts_k2_old      | tools/scenes/forest.js | null | __G.world.cloudsOn = false; __T.oldHeights(true); const f = () => __forest(76.35, 35.70, 30000, 1.2, 0.5, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
 hts_himalaya    | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(86.9, 27.2, 150000, 1.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
-hts_aconcagua   | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(-70.2, -32.9, 30000, 1.2, 0.6, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
+hts_aconcagua   | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(-70.2, -32.9, 30000, 1.2, 0.6, 0.0); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
 hts_andes       | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(-72.5, -13.6, 60000, 1.15, 0.2, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
 hts_alps        | tools/scenes/forest.js | null | __G.world.cloudsOn = false; const f = () => __forest(7.75, 45.80, 20000, 1.25, 0.2, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60
 hts_alps_old    | tools/scenes/forest.js | null | __G.world.cloudsOn = false; __T.oldHeights(true); const f = () => __forest(7.75, 45.80, 20000, 1.25, 0.2, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 60

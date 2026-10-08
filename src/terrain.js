@@ -545,6 +545,9 @@
         } }
       float lum = dot(base, vec3(0.299, 0.587, 0.114));
       float green = clamp((base.g - max(base.r, base.b) * 0.92) * 6.0 + 0.25, 0.0, 1.0);
+      // (What is bright and has no colour of its own is not green, however the sum above reads it: a twelfth of a white is
+      //  a lot of green to that sum, and a glacier under Aconcagua was a meadow, pale yellow at six thousand metres.)
+      green *= mix(1.0, smoothstep(0.0, 0.05, base.g - max(base.r, base.b)), smoothstep(0.5, 0.72, lum));
       float warm = clamp((base.r - base.b) * 4.0, 0.0, 1.0);
       float white = smoothstep(0.66, 0.9, lum) * (1.0 - warm) * (1.0 - green);
       // seasons: the hemisphere's winter pulls the snow line down (to the coast in the far north), autumn colours the deciduous belt
