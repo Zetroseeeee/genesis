@@ -1501,7 +1501,7 @@
           float fw = max(fwidth(w), 1e-4);                         // never a zero-width smoothstep (undefined in GLSL)
           float inside = smoothstep(0.5 - fw * 0.8, 0.5 + fw * 0.8, w);
           float border = 1.0 - smoothstep(0.0, min(fw * 2.2, 0.1), abs(w - 0.5));
-          vec3 pc = texture2D(uPal, vec2((id + 0.5) / 512.0, 0.5)).rgb;
+          vec3 pc = texture2D(uPal, vec2((id + 0.5) / 4096.0, 0.5)).rgb;
           float isPlayer = step(0.5, o.b) * step(o.b, 0.75);   // b: 0.6 player, 1.0 other, 0.3 at war
           float atWar = step(0.2, o.b) * step(o.b, 0.45);
           float band = 1.0 - smoothstep(0.5, 0.98, w);            // inner glow along the frontier

@@ -962,6 +962,7 @@
           <button class="btn" id="v-trade" title="Where your merchants go, and how much crosses (T)">Trade</button>
           <button class="btn" id="v-gov" title="How each realm is governed (O)">Government</button>
           <button class="btn" id="v-rel" title="How each realm stands with you (X)">Relations</button>
+          <button class="btn" id="v-ppl" title="Who lives where, and in what tongue (I)">Peoples</button>
         </div>
       </div>
     </div>
@@ -1059,7 +1060,7 @@
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-autotilt" checked> Tilt the camera automatically when zooming in</label>
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-textures" checked> Painted materials on buildings and ground (needs WebGL2)</label>
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-continuous"> Continuous time (WorldBox style) instead of turns</label>
-    <div class="hint">Controls · Enter or space: advance / stop · B: city · R: realm · M: market · K: knowledge · V: laws · F: diplomacy · Y: your host · G: powers · C: chronicle · T, O, X: trade, government and relations on the map · drag: move · scroll: zoom to cursor · right-drag or shift-drag: tilt and turn · WASD/arrows: move · Q E: turn · Page Up/Down: tilt · N: north up · U: top-down · H: home · Esc: cancel/close · F9: hide HUD</div>
+    <div class="hint">Controls · Enter or space: advance / stop · B: city · R: realm · M: market · K: knowledge · V: laws · F: diplomacy · Y: your host · G: powers · C: chronicle · T, O, X, I: trade, government, relations and peoples on the map · drag: move · scroll: zoom to cursor · right-drag or shift-drag: tilt and turn · WASD/arrows: move · Q E: turn · Page Up/Down: tilt · N: north up · U: top-down · H: home · Esc: cancel/close · F9: hide HUD</div>
     <details class="hint sources" id="m-sources"><summary>Where the world comes from</summary>
       <p><b>The picture of the Earth.</b> NASA's Blue Marble Next Generation (R. Stöckli, E. Vermote, N. Saleous, R. Simmon and D. Herring, NASA Earth Observatory, 2005): the land as the MODIS instrument saw it through 2004, at 500 m. Each hemisphere is shown in its summer; the towns of our own day are painted over with the country round them.</p>
       <p><b>Winter.</b> Where snow lies and for how long is read from the twelve months of the same Blue Marble. Where the sea freezes and for how long is from the Sea Ice Index, Version 4 (F. Fetterer, K. Knowles, W. N. Meier, M. Savoie and A. K. Windnagel; National Snow and Ice Data Center, Boulder, Colorado; doi:10.7265/a98x-0f50): the usual year of its first ten, 1979 to 1988.</p>
@@ -1122,6 +1123,7 @@
 <script src="rule.js"></script>
 <script src="diplo.js"></script>
 <script src="army.js"></script>
+<script src="people.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>

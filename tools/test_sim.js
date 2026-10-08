@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -745,6 +745,72 @@ log('12. armies');
   log(`   ${sim.fmtYear(sim.year)}: ${AR.list.length} hosts in the field for ${wars / 2} wars, ${AR.stats.battles} battles; a year of hosts takes ${AR.stats.ms.toFixed(2)} ms`);
   check(AR.list.length > 0 && AR.list.every(a => a.ai && sim.civs[a.c] && sim.isAtWar(sim.civs[a.c], a.foe)), 'the autopilot keeps hosts only on fronts of its wars');
   check(AR.stats.ms < 4, `hosts are quick enough (${AR.stats.ms.toFixed(2)} ms a year)`);
+}
+}
+if (want(13)) {
+// ---------- 13. peoples: who lives where; kin and strangers; taken in, drifting apart, rising; saved ----------
+log('13. peoples');
+{
+  const sim = createSim(wd, 41); const W2 = sim.W, PP = sim.people; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  // a tribe on empty land is a new people, named as it is; another settling near it is of its kin; one far off a new family
+  const A = sim.spawnTribe(i0, {}); const pA = PP.ruling[A.id];
+  check(pA > 0 && PP.ppl[i0] === pA && PP.list[pA].name === A.name && PP.list[pA].fam === pA, `a tribe on empty land is a new people: the ${PP.list[pA] && PP.list[pA].name}`);
+  const B = sim.spawnTribe(i0 + 6, {}); const pB = PP.ruling[B.id];
+  check(pB > 0 && pB !== pA && PP.list[pB].parent === pA && PP.list[pB].fam === pA, `a tribe settling near is of its kin: the ${PP.list[pB].name}, daughters of the ${PP.list[pA].name}`);
+  check(B.style === PP.list[pB].t.st, 'and its realm is named in its tongue');
+  const far = sim.LI.find(i => ok(i) && sim.cellDist(i, i0) > 40 && sim.owner[i] < 0 && PP.ppl[i] === 0);
+  const C = sim.spawnTribe(far, {}); const pC = PP.ruling[C.id];
+  check(pC > 0 && PP.list[pC].fam === pC && PP.list[pC].parent === 0, 'one far away is the first of a new family');
+  // settlers bring their people; a conquered region keeps its own
+  sim.claim(i0 + 1, A, i0); check(PP.ppl[i0 + 1] === pA, 'empty land a realm settles is its people\'s');
+  for (let d = 5; d <= 8; d++) for (const e of [-W2, 0, W2]) { if (sim.owner[i0 + d + e] < 0) sim.claim(i0 + d + e, B, i0 + 6); sim.pop[i0 + d + e] = 2; }
+  for (let d = 1; d <= 4; d++) for (const e of [-W2, 0, W2]) { if (sim.owner[i0 + d + e] !== A.id) sim.claim(i0 + d + e, A, i0); sim.pop[i0 + d + e] = 2; }
+  sim.recount(); const took = i0 + 5; sim.claim(took, A, i0 + 4); sim.recount();
+  check(sim.owner[took] === A.id && PP.ppl[took] === pB, 'a conquered region keeps its own people');
+  // the strangers a realm rules cost it some steadiness, measured against its age
+  for (const x of [A, B, C]) { x.aggression = 0; x.dip.think = 1e12; }
+  for (let y = 0; y < 6; y++) sim.tick();
+  const fsA = PP.foreignShare[A.id], sp = sim.stabilityParts(A);
+  check(fsA > 0 && fsA < 1 && sp.peoples < 0, `a realm ruling others is the less steady for it (${Math.round(fsA * 100)}% others: ${(sp.peoples * 100).toFixed(1)} stability)`);
+  check(PP.peoplesOf(A.id, 4).length >= 2 && PP.peoplesOf(A.id, 4)[0][0] === pA, 'its peoples, the largest first: ' + PP.peoplesOf(A.id, 4).map(([p, s]) => PP.nameOf(p) + ' ' + Math.round(s * 100) + '%').join(', '));
+  // laws: one state, one law and schooling take others in faster; self-rule leaves them be and quiets them
+  const R = sim.rule.ruleOf(A); const was = { admin: R.laws.admin, learning: R.laws.learning };
+  R.laws.admin = 'central'; R.laws.learning = 'schooling'; const fast = PP.lawF(A.id, 'assim'); R.laws.admin = 'selfrule'; const slow = PP.lawF(A.id, 'assim'), calm = PP.lawF(A.id, 'minor'); R.laws.admin = was.admin; R.laws.learning = was.learning;
+  check(fast > 2 && slow < 1 && calm < 1, `laws: one state and schools take others in ${fast.toFixed(1)} times as fast; self-rule ${slow.toFixed(1)}, and quiets them (${calm.toFixed(2)})`);
+  // over the centuries a region among the rulers' own is taken into their people
+  A.tech = sim.ERAS[6][1] + 0.01; A.era = 6; R.laws.admin = 'central'; R.laws.learning = 'schooling';      // (an industrial state with schools: in the Stone Age it would take a thousand years)
+  const before = PP.stats.assimilated; for (let y = 0; y < 900 && PP.ppl[took] !== pA; y++) { if (sim.owner[took] !== A.id) sim.claim(took, A, i0 + 4); sim.tick(); }
+  check(PP.ppl[took] === pA && PP.stats.assimilated > before, `in time a region among the rulers' own is taken into their people (${PP.stats.assimilated - before} regions taken in)`);
+  // a province of another people breaks away with its people, named in its tongue
+  { const s2 = createSim(wd, 43), P2 = s2.people; const j0 = s2.LI.find(i => s2.fert[i] > 0.5 && [-1, 1, 2, 3, 4, 5, 6, 7, 8, 9].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && s2.owner[i + d] < 0));
+    const X = s2.spawnTribe(j0, {}); const pX = P2.ruling[X.id]; const far2 = s2.LI.find(i => ok(i) && s2.cellDist(i, j0) > 40 && s2.owner[i] < 0); const Y = s2.spawnTribe(far2, {}); const pY = P2.ruling[Y.id];
+    for (let d = 1; d <= 9; d++) for (const e of [-W2, 0, W2]) { s2.owner[j0 + d + e] = X.id; s2.pop[j0 + d + e] = 2; P2.ppl[j0 + d + e] = d >= 6 ? pY : pX; }
+    s2.recount(); const nc = s2.splitCiv(X, j0 + 8, 9, 'as the realm fractures');
+    const cells = []; for (let d = 1; d <= 9; d++) for (const e of [-W2, 0, W2]) if (nc && s2.owner[j0 + d + e] === nc.id) cells.push(j0 + d + e);
+    check(!!nc && P2.ruling[nc.id] === pY && cells.length >= 6 && cells.every(i => P2.ppl[i] === pY) && nc.style === P2.list[pY].t.st, `a province of another people breaks away with its people (${cells.length} regions, all theirs: ${nc && s2.fullName(nc)})`);
+    const ev = X.events.slice(-3).map(e => e.text).join(' / '); check(new RegExp('The ' + P2.list[pY].name + ' of .* break away').test(ev), 'and the chronicle says who rose: ' + ev.slice(0, 140)); }
+  // a people spread far beyond its home drifts apart into a daughter people of its own tongue
+  { const s3 = createSim(wd, 47), P3 = s3.people; const k0 = s3.LI.find(i => s3.fert[i] > 0.3 && s3.owner[i] < 0); const Z = s3.spawnTribe(k0, {}); const pZ = P3.ruling[Z.id];
+    const row = []; for (let d = 1; d < 120 && row.length < 60; d++) { const i = k0 + d; if (ok(i) && s3.owner[i] < 0) row.push(i); } for (const i of row) { P3.ppl[i] = pZ; s3.pop[i] = 1; }
+    P3.list[pZ].born = s3.year - 400; let y = 0; for (; y < 100 && !P3.stats.drifted; y++) s3.tick();
+    const d = P3.list.find(p => p && p.parent === pZ && p.fam === pZ); check(P3.stats.drifted > 0 && !!d && d.t.st === P3.list[pZ].t.st, `a people spread far drifts apart: the ${d ? d.name : '?'} of the ${P3.list[pZ].name} (${y} years)`); }
+  // saved and loaded: the map of peoples, their tongues and who rules whom
+  { const saved = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(saved); const Q = s2.people; let same = true; for (let i = 0; i < N; i++) if (Q.ppl[i] !== PP.ppl[i]) { same = false; break; }
+    check(same && Q.list.length === PP.list.length && Q.ruling[A.id] === PP.ruling[A.id] && Q.list[pA].name === PP.list[pA].name && JSON.stringify(Q.list[pB].t) === JSON.stringify(PP.list[pB].t), `saved and loaded: ${PP.list.length - 1} peoples and the map of them`);
+    delete saved.peoples; const s3 = createSim(wd, 1); s3.load(saved); const R3 = s3.people; let all = true; for (const k of s3.LI) { const o = s3.owner[k]; if (o >= 0 && s3.civs[o] && R3.ppl[k] !== R3.ruling[o]) { all = false; break; } }
+    check(all && R3.list.length > 1, 'a world saved before there were peoples: every realm\'s land its own people\'s'); }
+  invariants(sim, 'the world of peoples in ' + sim.fmtYear(sim.year));
+}
+// the peoples of a whole world: many, of fewer families, quick enough
+{
+  const sim = createSim(wd, 12345); const PP = sim.people; for (let y = 0; y < 3000; y++) sim.tick();
+  let ms = 0; for (let y = 0; y < 100; y++) { sim.tick(); ms += PP.stats.ms; }
+  const alive = PP.list.filter(p => p && p.n > 0), fams = new Set(alive.map(p => p.fam)); let bad = 0; for (const cv of sim.civs) if (cv && !(PP.foreignShare[cv.id] >= 0 && PP.foreignShare[cv.id] <= 1 && PP.restless[cv.id] <= 0.02 && PP.restless[cv.id] > -0.5)) bad++;
+  log(`   ${sim.fmtYear(sim.year)}: ${alive.length} peoples in ${fams.size} families, ${PP.stats.drifted} drifted apart, ${PP.stats.assimilated} regions taken in; a year of peoples takes ${(ms / 100).toFixed(3)} ms`);
+  check(alive.length > 80 && fams.size < alive.length, `a world of peoples (${alive.length}) in fewer families (${fams.size})`);
+  check(!bad, `every realm's share of other peoples and its unrest are within bounds (${bad} not)`);
+  check(ms / 100 < 1, `peoples are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

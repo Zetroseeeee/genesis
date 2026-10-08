@@ -8,10 +8,10 @@
     constructor(opts) {
       this.scene = opts.scene; this.terrain = opts.terrain; this.sim = null; this.exag = opts.terrain.exag;
       // sim textures
-      this.ownerData = new Uint8Array(W * H * 4); this.simData = new Uint8Array(W * H * 4); this.palData = new Uint8Array(512 * 4);
+      this.ownerData = new Uint8Array(W * H * 4); this.simData = new Uint8Array(W * H * 4); this.palData = new Uint8Array(4096 * 4);      // (realms, or under the lens of peoples the peoples: people.js)
       this.ownerTex = new THREE.DataTexture(this.ownerData, W, H, THREE.RGBAFormat); this.ownerTex.magFilter = this.ownerTex.minFilter = THREE.NearestFilter; this.ownerTex.wrapS = THREE.RepeatWrapping;
       this.simTex = new THREE.DataTexture(this.simData, W, H, THREE.RGBAFormat); this.simTex.magFilter = this.simTex.minFilter = THREE.LinearFilter; this.simTex.wrapS = THREE.RepeatWrapping;
-      this.palTex = new THREE.DataTexture(this.palData, 512, 1, THREE.RGBAFormat); this.palTex.magFilter = this.palTex.minFilter = THREE.NearestFilter;
+      this.palTex = new THREE.DataTexture(this.palData, 4096, 1, THREE.RGBAFormat); this.palTex.magFilter = this.palTex.minFilter = THREE.NearestFilter;
       this.centroids = new Map(); // civ id -> {x,y,z,n}
       // buildings
       this.arche = BKIT.makeKit();
@@ -60,13 +60,17 @@
       const civs = sim.civs, owner = sim.owner, pop = sim.pop, player = sim.player; const pc = sim.playerCiv();
       const od = this.ownerData, sd = this.simData; const cents = this.centroids; cents.clear();
       const cosLat = new Float32Array(H), sinLat = new Float32Array(H); for (let y = 0; y < H; y++) { const la = (90 - (y + 0.5) / H * 180) * GEO.D2R; cosLat[y] = Math.cos(la); sinLat[y] = Math.sin(la); }
+      // (under the lens of peoples every region is painted by the people that lives there, and the lines are drawn between
+      // peoples, not realms: people.js)
+      const PP = this.palMode === 'people' && sim.people ? sim.people : null;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const i = y * W + x, j = i * 4; const o = owner[i]; const c = o >= 0 ? civs[o] : null;
+        if (PP) { const p = PP.ppl[i] & 4095; if (p && sim.land[i]) { od[j] = p & 255; od[j + 1] = p >> 8; od[j + 2] = 255; od[j + 3] = 255; } else { od[j] = od[j + 1] = od[j + 2] = od[j + 3] = 0; } }
         if (c) {
-          od[j] = o & 255; od[j + 1] = o >> 8; od[j + 2] = o === player ? 153 : (pc && sim.isAtWar(pc, o) ? 77 : 255); od[j + 3] = 255;
+          if (!PP) { od[j] = o & 255; od[j + 1] = o >> 8; od[j + 2] = o === player ? 153 : (pc && sim.isAtWar(pc, o) ? 77 : 255); od[j + 3] = 255; }
           let ct = cents.get(o); if (!ct) { ct = { x: 0, y: 0, z: 0, n: 0 }; cents.set(o, ct); }
           const lo = ((x + 0.5) / W * 360 - 180) * GEO.D2R; ct.x += cosLat[y] * Math.cos(lo); ct.y += sinLat[y]; ct.z += -cosLat[y] * Math.sin(lo); ct.n++;
-        } else { od[j] = 0; od[j + 1] = 0; od[j + 2] = 0; od[j + 3] = 0; }
+        } else if (!PP) { od[j] = 0; od[j + 1] = 0; od[j + 2] = 0; od[j + 3] = 0; }
         const p = pop[i]; let light = 0;
         if (p > 0.2) { const t = c ? c.tech : 0; light = Math.min(1, Math.log10(p + 1) * (0.12 + t * 0.55)); if (t < 0.12) light *= 0.35; }
         // (green: how far along a people is, for the look of its ground - paving comes with the Classical age, but not where the old ways last)
@@ -77,7 +81,8 @@
       const byForm = this.palMode === 'form' && sim.rule && window.RULE; const me = this.palMode === 'rel' && sim.diplo && window.DIPLO ? sim.playerCiv() : null; let stand = null;
       if (me) { if (!this.relRgb) { this.relRgb = {}; for (const k in DIPLO.STAND) { const h = DIPLO.STAND[k][1]; this.relRgb[k] = [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]; } }
         const within = new Uint8Array(sim.MAXC); for (const b of sim.diplo.reach(me.id)) within[b] = 1; within[me.id] = 1; stand = (c) => this.relRgb[within[c.id] ? sim.diplo.standing(me, c) : 'far']; }
-      for (const c of civs) if (c) { const rgb = byForm ? RULE.FORM[sim.rule.ruleOf(c).gov].rgb : stand ? stand(c) : c.rgb; this.palData[c.id * 4] = rgb[0] * 255; this.palData[c.id * 4 + 1] = rgb[1] * 255; this.palData[c.id * 4 + 2] = rgb[2] * 255; this.palData[c.id * 4 + 3] = 255; }
+      if (PP) { for (let p = 1; p < Math.min(4096, PP.list.length); p++) { const rgb = PP.rgbOf(p); this.palData[p * 4] = rgb[0] * 255; this.palData[p * 4 + 1] = rgb[1] * 255; this.palData[p * 4 + 2] = rgb[2] * 255; this.palData[p * 4 + 3] = 255; } }
+      else for (const c of civs) if (c) { const rgb = byForm ? RULE.FORM[sim.rule.ruleOf(c).gov].rgb : stand ? stand(c) : c.rgb; this.palData[c.id * 4] = rgb[0] * 255; this.palData[c.id * 4 + 1] = rgb[1] * 255; this.palData[c.id * 4 + 2] = rgb[2] * 255; this.palData[c.id * 4 + 3] = 255; }
       this.ownerTex.needsUpdate = true; this.simTex.needsUpdate = true; this.palTex.needsUpdate = true;
       this.texVersion = (this.texVersion || 0) + 1;
     }
