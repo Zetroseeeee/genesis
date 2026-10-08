@@ -457,7 +457,9 @@
       // (the world's own: its first nights turn about a point near Vega). The Moon goes round the Earth's path once a
       // game-month, and its age is its phase.
       const turn = SKY.turn(sun, this.seasonPhase, window.__skyYear !== undefined ? window.__skyYear : this.sim ? this.sim.year : -10000, this.skyTurn), moon = SKY.moonAt(sun, turn.ecl, window.__moonAge !== undefined ? window.__moonAge : 2.6 + time * 0.0025, this._moon);
-      if (this.cloudLayer) { this.cloudLayer.on = this.cloudsOn; this.cloudLayer.update(cam.alt, time, sun); this.cloudShift = this.cloudLayer.shift; this.cloudVis = this.cloudLayer.vis; this.cloudNear = this.cloudLayer.near; if (SKY.cloudSmall) this.cloudTex = SKY.cloudSmall; }
+      // (how much moonlight there is where the eye is: the Moon's lit share, which is not its light - a half moon gives a tenth of a full one's - and none from under the horizon)
+      const moonUp = moon.dot(this._pv.copy(cam.camera.position).normalize()), moonLit = 0.5 - 0.5 * moon.dot(sun); this.moonLight = Math.pow(moonLit, 2.2) * Math.min(1, Math.max(0, (moonUp + 0.05) / 0.25));
+      if (this.cloudLayer) { this.cloudLayer.on = this.cloudsOn; this.cloudLayer.update(cam.alt, time, sun, this.moonLight); this.cloudShift = this.cloudLayer.shift; this.cloudVis = this.cloudLayer.vis; this.cloudNear = this.cloudLayer.near; if (SKY.cloudSmall) this.cloudTex = SKY.cloudSmall; }
       const skyA = Math.min(1, Math.max(0, (0.06 - cam.alt) / 0.04));
       this.skyUniforms.uAlpha.value = skyA; this.skyUniforms.uSun.value.copy(sun);
       { const U = this.skyUniforms; U.uTime.value = time; U.uLat.value = cam.lat; U.uComet.value = this.cometOn ? 1 : 0; U.uSkyM.value.setFromMatrix4(turn); U.uMoonW.value.copy(moon); U.uEclW.value.copy(turn.ecl);
