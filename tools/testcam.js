@@ -98,8 +98,13 @@ window.__T.costsWinter = function () {
   const T = __G.terrain, G = T.globals, arr = G.uInfo.value; if (!(arr && arr.isDataTexture2DArray)) return 'the planet\'s maps are one layer here';
   const im = arr.image, flat = new THREE.DataTexture(im.data.subarray(0, im.width * im.height * 4), im.width, im.height, THREE.RGBAFormat);
   flat.wrapS = THREE.RepeatWrapping; flat.wrapT = THREE.ClampToEdgeWrapping; flat.minFilter = flat.magFilter = THREE.LinearFilter; flat.generateMipmaps = false; flat.needsUpdate = true;
+  // (and the shader as it is with a second layer that says what the old rules took for granted - no woods by nature, snow all
+  //  winter, no ice of the sea's own: the same sums over other numbers, which tells what the sums cost from what they draw)
+  const d2 = new Uint8Array(im.width * im.height * 8); d2.set(im.data.subarray(0, im.width * im.height * 4), 0); for (let o = im.width * im.height * 4; o < d2.length; o += 4) { d2[o] = 0; d2[o + 1] = 128; d2[o + 2] = 255; d2[o + 3] = 255; }
+  const blank = new THREE.DataTexture2DArray(d2, im.width, im.height, 2); blank.format = arr.format; blank.type = arr.type; blank.wrapS = arr.wrapS; blank.wrapT = arr.wrapT; blank.minFilter = blank.magFilter = THREE.LinearFilter; blank.generateMipmaps = false; blank.needsUpdate = true;
   const use = (tex) => () => { G.uInfo.value = tex; for (const t of T.tiles.values()) { const m = t.mesh.material; m.defines = T.defines(); m.needsUpdate = true; } };
-  __T.cost([['as it is', () => {}], ['the old rules', use(flat)], ['as it is again', use(arr)], ['the old rules again', use(flat)], ['as it is, a third time', use(arr)], ['the old rules, a third', use(flat)], ['as it is, a fourth', use(arr)]], 4, 5000);
+  const list = window.__costOld ? [['as it is', () => {}], ['the old rules', use(flat)]] : [['as it is', () => {}], ['the old rules', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is again', use(arr)], ['the old rules again', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a third time', use(arr)], ['the old rules, a third', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a fourth', use(arr)]];
+  __T.cost(list, 4, 5000);      // (window.__costOld: stop at the old rules, to see what they draw)
 };
 // What the ground has to show and what it is still waiting for, written into the picture once a second: __T.watch(). The frame
 // rate of the last second, the packs by kind and state, and what every tile in the picture is drawn with: the picture, the heights
