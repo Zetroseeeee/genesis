@@ -454,8 +454,8 @@
     }
     updateSky(cam, sun, time) {
       // how the sky stands: its hour from where the sun is over the Earth and among the stars (the time of year), and the year
-      // (the world's own: its first nights turn about a point near Vega). The Moon goes round the Earth's path once a
-      // game-month, and its age is its phase.
+      // (the world's own: its first nights turn about a point near Vega). The Moon goes round the Earth's path, through all its
+      // phases in some forty minutes of play, and its age is its phase.
       const turn = SKY.turn(sun, this.seasonPhase, window.__skyYear !== undefined ? window.__skyYear : this.sim ? this.sim.year : -10000, this.skyTurn), moon = SKY.moonAt(sun, turn.ecl, window.__moonAge !== undefined ? window.__moonAge : 2.6 + time * 0.0025, this._moon);
       // (how much moonlight there is where the eye is: the Moon's lit share, which is not its light - a half moon gives a tenth of a full one's - and none from under the horizon)
       const moonUp = moon.dot(this._pv.copy(cam.camera.position).normalize()), moonLit = 0.5 - 0.5 * moon.dot(sun); this.moonLight = Math.pow(moonLit, 2.2) * Math.min(1, Math.max(0, (moonUp + 0.05) / 0.25));

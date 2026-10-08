@@ -45,7 +45,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   software renderer takes 4). One command with one `/shot` in it: a picture takes a minute, a tool call two at
   most. The ground's shader needs no new page: `/load?file=terrain.js`, then `/eval "__T.reshade()"` gives every
   tile the new one (`__T.reshade({ uNew: 1 })` when it has a uniform the page's game does not know yet), and
-  `/eval "__T.reground()"` reads the ground's materials again after a new pack.
+  `/eval "__T.reground()"` reads the ground's materials again after a new pack. The sky likewise: `/load?file=sky.js`,
+  then `/eval "__T.resky()"` (`__T.resky({ uNew: value })` for a uniform the page does not know yet); `SKY=1` gives a
+  software renderer the whole sky (it takes the lighter half: no heaps of cloud, the stars to 6.5).
 - `tools/ground/pack.sh` — packs the ground's materials on GitHub (the Ground workflow: `assets/ground/materials.json`
   into the `ground` release) and brings the pack here: `data/tex/ground.json` and two atlases, which are fetched
   (`npm run fetch`), never committed. `REF=<branch>` packs a branch's list; a run that fails fetches nothing. A pack
@@ -128,6 +130,17 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   (the summer with the map's snow and ice on it, over the Blue Marble's own January). Its log prints the share of
   the land that has snow by latitude, the value at some thirty places (Moscow 0.7, Winnipeg 0.55, Berlin 0, Tibet
   0) and the months of ice at thirty more (Hudson Bay 7, the Norwegian Sea 0): look at them after touching its rule.
+- `REF=<branch> MODE=sky tools/planet/pack.sh` — makes the sky's pack on GitHub (`tools/planet/sky.py`, five and a half
+  minutes; its sources, NASA's and the catalogues' hosts, are out of reach from here): the stars of the Bright Star
+  Catalogue, Hipparcos and Tycho-2 to the tenth magnitude (355,646, brightest first: `stars.bin`), the Milky Way and the
+  Moon of NASA's Scientific Visualization Studio, the Earth's clouds of the Blue Marble (the last days of July 2001,
+  16,384 texels round in two halves, and a small copy) and the block of noise that is their grain (`noise3.bin`), with
+  pictures to look at (`shots/peek/planet_sky.jpg`, `planet_moon.jpg`, `planet_clouds*.jpg`, `planet_noise.jpg`).
+  `node tools/planet/fetch.mjs` (in `npm run fetch`) brings it into `data/sky/`: fetched, never committed. It is kept
+  under the name of `tools/planet/sky.py` (twelve digits of its SHA-256): **after any change to it - a comment too -
+  the pack must be made before `main` is pushed** (the game's build stops without it, as without the picture's).
+  `python3 tools/planet/grain.py` measures how much of the sky the clouds' grain covers at a threshold (`thr` in the
+  clouds' shader): run it after touching the block or the sum the shader makes of it.
 - `node tools/glerr.js "<script>" [wait ms]` — which call to the card fails: a page of the built game in which
   every call that can raise a GL error is asked at once whether it did (WebGL keeps its errors until somebody
   asks; the end-to-end suite asks once, late, and can only say "GL error 1281").
@@ -170,6 +183,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/models.js` | `MODELS` | Real 3D model library: manifest, loading, LODs, instancing (replaces kit archetypes when a model exists) |
 | `src/shadows.js` | `SHADOWS` | Sun depth map of everything standing near the camera; terrain and models read it (true shadows) |
 | `src/air.js` | `AIR` | The air: one sum along the line of sight for the sky, the haze before far hills, the planet's rim and the edge of night; as GLSL for every shader and as JavaScript |
+| `src/sky.js` | `SKY` | What is above the air: the stars where they stood in the world's year, the Milky Way, the Moon at its age, the Earth's own clouds on a shell above the highest ground (heaps of cloud near the eye); the sky's pack |
 | `src/post.js` | `POST` | What a frame goes through between the scene and the screen: shade between things (from the depth), the glow of what is brighter than white, the developed picture |
 | `src/world.js` | `WORLD` | Turns town plans into instances near the camera; sky, clouds, atmosphere |
 | `src/textures.js` | `TEX` | Generated material atlases as texture arrays; the ground's scanned materials (`TEX.ground`); UI art |
@@ -368,6 +382,42 @@ Conventions that matter:
   at all. `AIR.update` runs once a frame after the camera is final. Change the air in `tools/air/sky.js` first. The
   stars are points on a sphere that goes with the camera, at every height: from the ground they come out as the sky
   darkens, thin out toward the horizon and twinkle.
+- **The sky** (`sky.js`; its pack `data/sky`, made by `tools/planet/sky.py`). *The stars* are the catalogues' own,
+  355,646 to the tenth magnitude, on a sphere turned by the hour, the time of year and the year itself (`SKY.turn`: the
+  Earth's axis goes round the pole of its path once in 25,772 years, so the sky of 10,000 BC turns about a point near
+  Vega and that of AD 2000 about Polaris). A star's light is its magnitude, its colour its B-V; how many are drawn goes
+  with how dark the sky is (`uDeep`). The Milky Way is NASA's map of it and the Moon the Moon's own picture (LRO's),
+  both in the sky's own shader (`SKY.GLSL`); the Moon goes round the Earth's path, through all its phases in some forty
+  minutes of play, and is lit as its angle from the sun has it, with earthshine on its dark side (`SKY.moonAt`). The camera can be lifted to the sky once
+  its tilt is at the end (`mapcam.lift`: PageUp, or a drag past the end; back with the top button or U). For tests:
+  `window.__skyYear` (2000: the catalogues' sky), `__moonAge` (0 new, pi full), `__moonLight`, `__cloudTime` (the
+  weather held where it is); `__T.faceStar(ra hours, dec)` and `__T.faceMoon()` turn the eye to them.
+  *The clouds* are the Earth's own (the Blue Marble's), drifting round the world once in a day and a bit of play
+  (`SKY.drift`), on a shell 25 km up, above the highest ground as it is drawn (`SHELL`). From far out they are the
+  picture as it is. Near it and from under it the picture cannot hold them (2.4 km to a texel), and they are made of a
+  block of noise (128 cubed, two bytes a place): heaps five kilometres across, the lumps of heaps four times that, what
+  eats at a heap's rim at 500 m and 100 m; as many heaps as leave just so much of the sky covered as the picture has
+  (`thr`, measured by `tools/planet/grain.py`), a veil of the picture's thin cloud over them, and none where it has a
+  clear sky. What it cost to learn: a size of the grain whose places are several to a pixel the long way of the pixel
+  (low in the sky a pixel is a strip of the shell many times as long as it is wide) is read from a coarse copy of the
+  block, a lattice with nothing of the grain left in it, and the clouds toward the horizon were rows of bricks: each
+  size goes to its mean before that. The grain is of cells, and cells seen from the side are dashes: an edge eaten at
+  by them was a course of bricks, so low in the sky a cloud keeps a soft edge. Eaten at everywhere, a heap was a
+  cluster of dots: the grain eats at a heap's rim, never its heart. Where a place of the block is larger than a pixel
+  it is looked up by a cubic B-spline (`grain3`, eight lookups): weighed straight, a heap's edge was a row of facets.
+  The block is of bytes, and seen from under it a heap changes by less than a byte's step from one pixel to the next:
+  its slope taken from pixel to pixel was nought, nought and a step, bars of light and shade at sunset. **Light and
+  shade come from two lookups toward the sun and away from it**, never from a derivative of the grain. From far the
+  picture's cloud is gathered where the heaps would stand and thinned between them: laid on as it is, between its
+  texels, it was a blur. **Over a country that is being ruled** (from some 4,000 km down to the shell) the weather is
+  less than the picture has it, its thin cloud gone and its thick cloud white (`less`; `SKY.less` and `uCloudNear` give
+  the shadows on the ground and on houses the same), and what is left is seen through where it is looked straight down
+  on (`uThin`): all of it at two fifths the strength was a grey murk on the map. By night the clouds are grey in the
+  dark and silver under a moon (`uMoonL`: a half moon gives a tenth of a full one's light). The shell has no inside:
+  going up through it the clouds fade out over the last kilometres and come in below. The ground under them is in
+  their shadow (the picture's small copy, `uClouds`, in the ground's shader), and so is a house (`cloudShade`).
+  Look at `sky_*` on the Mac after touching any of it (`sky_under_dusk` and `sky_under_fair` from under the clouds,
+  `sky_tops` and `sky_oblique` over them, `sky_region` over a country, `sky_edge` the edge of night).
 - **The picture's last steps** (`post.js`; on a real GPU at full quality, `POST=1` in the harnesses). The scene is
   drawn into a target that holds light brighter than white (half floats, four samples) and its depth, then: shade
   (ambient occlusion from the depth alone, two reaches, a share of the distance wide so it reads at every height;

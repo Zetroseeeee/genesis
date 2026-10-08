@@ -389,8 +389,9 @@ if 'sky' in what:
         g8 = a8 if a8.ndim == 2 else a8[..., 0]; small = np.array(Image.fromarray(g).resize((1024, 1024), Image.BOX)).astype(np.float32)
         halves = {'the left half of the whole': np.array(Image.fromarray(g8[:, :4096]).resize((1024, 1024), Image.BOX)).astype(np.float32), 'the right half': np.array(Image.fromarray(g8[:, 4096:]).resize((1024, 1024), Image.BOX)).astype(np.float32)}
         for lab, h in halves.items(): print('  east against %s: r = %.4f' % (lab, np.corrcoef(small.ravel(), h.ravel())[0, 1]))
-        # pieces at the finest, beside the 8192 picture's and the game's own (data/clouds.jpg) made as large
-        gm = np.array(Image.open(os.path.join(ROOT, 'data', 'clouds.jpg')).convert('L')); tiles = []
+        # pieces at the finest, beside the 8192 picture's and the game's old one (data/clouds.jpg, 4096 round, until 0.23; the 8192 made as small where it is gone) made as large
+        old = os.path.join(ROOT, 'data', 'clouds.jpg'); tiles = []
+        gm = np.array(Image.open(old).convert('L')) if os.path.exists(old) else np.array(Image.fromarray(g8).resize((4096, 2048), Image.BOX))
         for lon, lat in ((75, 20), (140, 35), (100, -45), (30, 5)):
             x, y = int(lon / 180 * 21600), int((90 - lat) / 180 * 21600); n = 700; fine = g[y:y + n, x:x + n]
             x8, y8 = int((lon + 180) / 360 * 8192), int((90 - lat) / 180 * 4096); n8 = int(n * 8192 / 43200 + 0.5); mid = np.array(Image.fromarray(g8[y8:y8 + n8, x8:x8 + n8]).resize((n, n), Image.BICUBIC))
@@ -399,5 +400,5 @@ if 'sky' in what:
             tiles += [fine, mid, low, half]
         sh = Image.new('L', (704 * 4, 704 * 4), 60)
         for i, t in enumerate(tiles): sh.paste(Image.fromarray(t), ((i % 4) * 704, (i // 4) * 704))
-        sh.save(os.path.join(OUT, 'planet_clouds.jpg'), quality=88); print('planet_clouds.jpg: India, Japan, the southern ocean, the Congo: at 930 m, the 8192 picture, the game\'s own, twice the piece at half the fineness')
+        sh.save(os.path.join(OUT, 'planet_clouds.jpg'), quality=88); print('planet_clouds.jpg: India, Japan, the southern ocean, the Congo: at 930 m, the 8192 picture, the game\'s old one, twice the piece at half the fineness')
     except Exception as e: print('  the clouds: %s' % str(e)[:300])
