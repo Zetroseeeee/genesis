@@ -495,6 +495,26 @@ Conventions that matter:
   stands on the ground asks `gpuHeightAt`, which uses the mesh a tile has at the moment (`t.grid`), and
   `meshVersion` follows the meshes as it follows the tiles. A software renderer keeps its two fixed grids.
   `terrain.stats.quads` counts what is drawn; `terrain.quadPx = 0` is the old way (to compare).
+- **The ground is drawn on a smooth surface** (`elevCR` in `terrain.js`, since 0.25): the vertex shader takes the
+  heights by Catmull-Rom (sixteen texels, the height and how it changes east and south from one lookup's texels),
+  which goes through every texel and is smooth across them. Weighed between four texels, as a card weighs them, the
+  ground was a sheet of facets with a crease along every texel's edge: from a few kilometres a mountain was a cut
+  stone. The corners carry their normal (`vNrmV`), and close to, where a texel of the heights is three pixels and more
+  across, the fragment shader takes it in place of its own (four lookups at 1.6 texels, which see the creases);
+  further off its own sees more than the corners. `heightAt` and `gpuVertexH` take the same sum (`elevCRAt`), the
+  small relief's slope still the four texels' (`hAtV`). `terrain.uElevCR.value = 0` is the old way, to compare
+  (`near_alps_old`, `__T.costsNear()`). It costs nothing that can be measured (`costn_alps`). A software renderer
+  shows the facets whatever is done here unless it has `GRID=1`: its mesh is a quarter as fine.
+- **The gullies of a mountainside** (`gullyIn`, `GULLY`, `uGulK`, `uGulPh` in `terrain.js`). Frost and water cut every
+  steep slope into gullies straight down it with ribs between; from a few kilometres off they are what a mountain's
+  face is made of, and the heights (306 m to a texel) know nothing of them. The noise is stretched down the slope:
+  four frames of it a quarter of a right angle apart, the two either side of the slope's own way weighed by how near
+  it they lie (one frame turned to every pixel's own way swirls and tears; a frame per pixel with the card's own
+  level of the noise sparkles where two frames meet: the level is worked out from the frame). The way down is the
+  ground's as it lies over a kilometre (2.5 texels either side): by the pixel's normal it changed at every crease, and
+  the gullies with it. Each frame's phase at a tile's centre is worked out on the CPU in double precision
+  (`gullyPhases`), as the ladder's is, so that tiles meet. The bed of a gully leans the normal, lies darker, and holds
+  snow longest (couloirs down a face, its ribs bare). None where neither `uGulK.z` nor `.w` is above nought.
 - **The ground's shader is the frame.** It is what a view costs: by pixels, not by corners (on the build Mac a
   view to the horizon takes 37 ms, of which the ground 20 and more: `cost_far`). Two things were found to count far more
   than they show, and both are per texture and per tile, not per shader line: slivers (above), and how many ways a
@@ -547,7 +567,10 @@ Conventions that matter:
   turned from the sun. What should stay where it is while the eye draws back (lusher and drier stretches of a
   meadow, stony patches, scree) hangs on the noise of the place, never on the ladder: only the grain may change
   under the eye. And a scan must be what it is called: the first "meadow" was moss with twigs in it, and from a
-  barn's height the twigs were logs. `shots/peek/ground_native.jpg` shows a piece of every material texel for
+  barn's height the twigs were logs; and the first bare rock was a cliff of marble, whose veins, laid out a kilometre
+  long, made the face of every mountain a slab of polished stone (since 0.25 `rock_08`; the crags of green country,
+  pink and mossy from the air, are lichened `rock_wall_02`). Rock is the one thing a close scan of does for every
+  size: it looks the same at a metre as at a mile. `shots/peek/ground_native.jpg` shows a piece of every material texel for
   pixel: look there, not at the small sheet. A repeat is `GND_PX` (600) device pixels across times the root of the
   screen's pixel ratio: on a screen of twice the pixels the materials are neither half the size nor half as sharp.
   A wood's floor gives way to its canopy between 2.2 and 4.2 km from the eye (`far` in the list: one size, by

@@ -802,7 +802,7 @@
         // snow on high cold ground and ice: it fills the hollows first, and what stands up in the ground shows through it longest
         if (snowW > 0.01) {
           // (near: by the hollows of the ground under it; far: by broken stretches, the size the eye can make out)
-          float gNear = gndNear(6.0); gSnow = gnd(6.0); float sc = snowed ? 1.0 : smoothstep(0.35, 0.65, snowW + ((0.5 - hU) * 0.5 + (gSnow.a - 0.5) * 0.08 * gNear + (nMid.b + nMic.b - 0.87) * 0.22 * (1.0 - gNear)) * (1.0 - snowW));
+          float gNear = gndNear(6.0); gSnow = gnd(6.0); float sc = snowed ? 1.0 : smoothstep(0.35, 0.65, snowW + ((0.5 - hU) * 0.5 + (gSnow.a - 0.5) * 0.08 * gNear + (nMid.b + nMic.b - 0.87) * 0.22 * (1.0 - gNear) + (gully - 0.25 * gullyW) * 0.9) * (1.0 - snowW));      // (and the gullies hold it longest: couloirs of snow down a mountain's face, its ribs bare)
           gSnowN = gndN(6.0); gSnowOn = 1.0;
           land = mix(land, mix(vec3(0.92, 0.94, 0.97), min(gSnow.rgb * vec3(0.9, 0.925, 0.96), vec3(1.02)), gOn), sc); gRel = mix(gRel, gSnowN, sc);
         }
