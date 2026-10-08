@@ -532,11 +532,15 @@
         //  prairie and a savanna are. A climate's class cannot say it: the wheat of Kansas and the wheat of Picardy grow under
         //  the same letters, and the plains were a green wall from Texas to the Dakotas with a ruled edge where the class
         //  changes. Not in the taiga or beyond it, where what is light in the photograph is bog, burn and tundra, and was so then.)
-        float woods = smoothstep(0.55, 0.9, natv.r) * (1.0 - smoothstep(0.3, 0.6, natv.b)) * (1.0 - smoothstep(0.78, 0.92, info.b)) * (1.0 - smoothstep(treeLine - 500.0, treeLine - 100.0, vH));
-        float field = smoothstep(0.13, 0.24, l0) * (1.0 - smoothstep(0.5, 0.7, l0)) * (1.0 - smoothstep(0.25, 0.5, slope));
-        float ln = mix(0.15, l0, 0.45);          // (a glade is lighter than the wood round it, as the field was: by less)
-        vec3 nat = mix(vec3(0.78, 1.20, 0.40), vec3(0.96, 1.12, 0.44), smoothstep(0.16, 0.30, ln)) * ln;
-        base = mix(base, nat, woods * field * (1.0 - ploughed) * uWild); }
+        // (gone into only where the map has woods at all: the sums are a twentieth of a lookup each, and there are a dozen of them)
+        float woods = smoothstep(0.55, 0.9, natv.r) * uWild;
+        if (woods > 0.0) {
+          woods *= (1.0 - smoothstep(0.3, 0.6, natv.b)) * (1.0 - smoothstep(0.78, 0.92, info.b)) * (1.0 - smoothstep(treeLine - 500.0, treeLine - 100.0, vH));
+          float field = smoothstep(0.13, 0.24, l0) * (1.0 - smoothstep(0.5, 0.7, l0)) * (1.0 - smoothstep(0.25, 0.5, slope));
+          float ln = mix(0.15, l0, 0.45);          // (a glade is lighter than the wood round it, as the field was: by less)
+          vec3 nat = mix(vec3(0.78, 1.20, 0.40), vec3(0.96, 1.12, 0.44), smoothstep(0.16, 0.30, ln)) * ln;
+          base = mix(base, nat, woods * field * (1.0 - ploughed));
+        } }
       float lum = dot(base, vec3(0.299, 0.587, 0.114));
       float green = clamp((base.g - max(base.r, base.b) * 0.92) * 6.0 + 0.25, 0.0, 1.0);
       float warm = clamp((base.r - base.b) * 4.0, 0.0, 1.0);
@@ -942,9 +946,15 @@
         //  before a repeat of it is small in the picture (the largest repeats every forty kilometres: from six hundred up,
         //  the thinning snow of Poland was a wallpaper of dark dots). Nor is there any noise the size of a country in it:
         //  thinning out by that, the snow of a plain seen from far out was white puffs on green, like cloud.)
-        float rag = (nMac.g - 0.512) * 0.5 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23)) + (nMid.g - 0.512) * 0.3 * (1.0 - smoothstep(0.0, 1.5, noiseL + 10.23)) + (nMic.g - 0.512) * 0.2 * (1.0 - smoothstep(0.0, 1.5, noiseL + 13.13)) + (nFin.g - 0.512) * 0.12 * (1.0 - smoothstep(0.0, 1.5, noiseL + 15.29));
-        float sn = snowHere + rag * smoothstep(0.02, 0.2, snowHere), snowOff = acos(clamp(2.0 * coldNow - 1.0, -1.0, 1.0)) * 0.31831;
-        float lying = clamp((sn * 0.58 - snowOff) / 0.2 + 0.5, 0.0, 1.0) * smoothstep(0.02, 0.4, sn); snowLying = lying;
+        float snowOff = acos(clamp(2.0 * coldNow - 1.0, -1.0, 1.0)) * 0.31831, lying = 0.0;
+        // (gone into only where snow of the map's share could lie at this time of the year at all, however the noise falls: it
+        //  adds 0.56 at the very most, and in summer that leaves the highest ground and little else)
+        if (snowHere > 0.02 && (snowHere + 0.56) * 0.58 - snowOff > -0.1) {
+          float rag = (nMac.g - 0.512) * 0.5 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23)) + (nMid.g - 0.512) * 0.3 * (1.0 - smoothstep(0.0, 1.5, noiseL + 10.23)) + (nMic.g - 0.512) * 0.2 * (1.0 - smoothstep(0.0, 1.5, noiseL + 13.13)) + (nFin.g - 0.512) * 0.12 * (1.0 - smoothstep(0.0, 1.5, noiseL + 15.29));
+          float sn = snowHere + rag * smoothstep(0.02, 0.2, snowHere);
+          lying = clamp((sn * 0.58 - snowOff) / 0.2 + 0.5, 0.0, 1.0) * smoothstep(0.02, 0.4, sn);
+        }
+        snowLying = lying;
         #else
         // (Snow lies on low ground only well away from the tropics. By the climate's map a cold desert is the Namib too, and a tundra
         //  the Puna of the Andes: each lay under a white sheet all its winter. Climates of mild winters keep snow from some forty
@@ -1130,56 +1140,62 @@
       //  length of Lake Geneva, and with a river's pale banks about it that was a stripe of shallows down the middle of the lake)
       inland = mix(inland, riverCol, wOn > 0.5 ? vecRiver * (1.0 - lakeW) : vecRiver);
       inland = mix(inland, vec3(0.36, 0.33, 0.22), floodW * 0.85);
-      // where the snow lies long, still water freezes: lakes and rivers under white ice (blown clear in places), and in
-      // the hardest winters the sea stands fast along the shore
+      // Ice, on lakes and on the sea: gone into only where the pixel has any water or surf in it. (Its sums ran for every pixel
+      // of dry land too, a dozen of them and an arc cosine: with one more lookup they were what the Earth's own winter cost,
+      // four frames in a hundred on the build Mac - costi_* in the tour, __T.costsWinter().)
+      float iced = 0.0;
+      if (seaW + inlandW + foam > 0.0) {
+        // where the snow lies long, still water freezes: lakes and rivers under white ice (blown clear in places), and in
+        // the hardest winters the sea stands fast along the shore
       #ifdef INFO2
-      // (by the snow of its shores, counted for a third as much again - a lake freezes where snow would lie on open ground, and the
-      //  map has too little of it among woods - and on the sea's slower clock: a lake freezes weeks after the first snow and
-      //  is open weeks after the last. By the snow lying at the moment, Ladoga was open water in March. Not where a month of
-      //  snow is all the winter there is: from far out the Danish straits are a lake to the picture's map.)
-      float iceOff = acos(clamp(2.0 * mix(uIceCold.y, uIceCold.x, hemi) - 1.0, -1.0, 1.0)) * 0.31831;      // (how far the year is from the end of winter: 0 early in March, 1 half a year on)
-      // (And where the sea beside it freezes, as that sea does, whichever is the longer: from far out a strait is a lake to the
-      //  picture's map. Not one in place of the other: forty kilometres in from a freezing sea, where its ice gives out on the
-      //  map, the lakes of Karelia had open rings in them.)
-      float iceIn = natv.g * 1.1 - 0.06 - iceOff;
-      // (High dry country has its hard winters without the snow: the lakes of Tibet freeze under a sky that brings none. And a
-      //  lake freezes from its shores: out in a great one the ice comes weeks later and goes weeks sooner.)
-      float coldShare = smoothstep(0.85, 1.0, info.b) * smoothstep(0.27, 0.36, latN0) * 0.55;
-      float lakeSeason = max(snowHere, coldShare) * 0.75 - 0.08 - (wOn > 0.5 ? 0.07 * smoothstep(300.0, 3000.0, off) : 0.0);
-      float frozen = max(smoothstep(0.0, 0.06, lakeSeason - iceOff) * max(smoothstep(0.3, 0.6, info.b), smoothstep(0.5, 0.8, snowHere)), smoothstep(0.01, 0.05, iceIn));      // (hard winters from 0.6 by the climate's class - Winnipeg's are 0.72 - or wherever snow lies for four months and more: a tarn of the Alps, a lake of the Qilian)
+        // (by the snow of its shores, counted for a third as much again - a lake freezes where snow would lie on open ground, and the
+        //  map has too little of it among woods - and on the sea's slower clock: a lake freezes weeks after the first snow and
+        //  is open weeks after the last. By the snow lying at the moment, Ladoga was open water in March. Not where a month of
+        //  snow is all the winter there is: from far out the Danish straits are a lake to the picture's map.)
+        float iceOff = acos(clamp(2.0 * mix(uIceCold.y, uIceCold.x, hemi) - 1.0, -1.0, 1.0)) * 0.31831;      // (how far the year is from the end of winter: 0 early in March, 1 half a year on)
+        // (And where the sea beside it freezes, as that sea does, whichever is the longer: from far out a strait is a lake to the
+        //  picture's map. Not one in place of the other: forty kilometres in from a freezing sea, where its ice gives out on the
+        //  map, the lakes of Karelia had open rings in them.)
+        float iceIn = natv.g * 1.1 - 0.06 - iceOff;
+        // (High dry country has its hard winters without the snow: the lakes of Tibet freeze under a sky that brings none. And a
+        //  lake freezes from its shores: out in a great one the ice comes weeks later and goes weeks sooner.)
+        float coldShare = smoothstep(0.85, 1.0, info.b) * smoothstep(0.27, 0.36, latN0) * 0.55;
+        float lakeSeason = max(snowHere, coldShare) * 0.75 - 0.08 - (wOn > 0.5 ? 0.07 * smoothstep(300.0, 3000.0, off) : 0.0);
+        float frozen = max(smoothstep(0.0, 0.06, lakeSeason - iceOff) * max(smoothstep(0.3, 0.6, info.b), smoothstep(0.5, 0.8, snowHere)), smoothstep(0.01, 0.05, iceIn));      // (hard winters from 0.6 by the climate's class - Winnipeg's are 0.72 - or wherever snow lies for four months and more: a tarn of the Alps, a lake of the Qilian)
       #else
-      float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
+        float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
       #endif
-      // (blown clear in places, of a size the eye can make out: each size of the noise gives way to its mean before its repeat is
-      //  small in the picture - from forty kilometres up Ladoga's ice was a wallpaper of blots)
-      vec3 lakeIce = mix(vec3(0.70, 0.78, 0.84), vec3(0.90, 0.93, 0.96), smoothstep(0.3, 0.7, mix(nMac.b, 0.434, smoothstep(0.0, 1.5, noiseL + 7.23)) * 0.6 + mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) * 0.25 + nMic.a * 0.15)) * (0.86 + 0.2 * dl);
-      inland = mix(inland, lakeIce, frozen * 0.94);
-      nWater = normalize(mix(nWater, vec3(0.0, 0.0, 1.0), frozen * 0.85));       // ice does not ripple
-      // ice on the sea
+        // (blown clear in places, of a size the eye can make out: each size of the noise gives way to its mean before its repeat is
+        //  small in the picture - from forty kilometres up Ladoga's ice was a wallpaper of blots)
+        vec3 lakeIce = mix(vec3(0.70, 0.78, 0.84), vec3(0.90, 0.93, 0.96), smoothstep(0.3, 0.7, mix(nMac.b, 0.434, smoothstep(0.0, 1.5, noiseL + 7.23)) * 0.6 + mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) * 0.25 + nMic.a * 0.15)) * (0.86 + 0.2 * dl);
+        inland = mix(inland, lakeIce, frozen * 0.94);
+        nWater = normalize(mix(nWater, vec3(0.0, 0.0, 1.0), frozen * 0.85));       // ice does not ripple
+        // ice on the sea
       #ifdef INFO2
-      // (Where, and for how much of the year: the sea's own - natv.g is the share of the year's twelve months in which the sea
-      //  there is ice (tools/planet/snow.py, from the Sea Ice Index). By the latitude alone, in winter there was ice off
-      //  Scotland, where the sea never freezes, as in Hudson Bay, where it does for seven months. The sea is slow: its ice is
-      //  widest eleven weeks behind the sun (uIceCold), and ice of so many months lies for just so many about that time:
-      //  iceOff is how far the year is from it, 0 at the end of winter and 1 half a year on. What is ice all the year
-      //  stays.)
-      float seaIce = smoothstep(0.01, 0.05, iceIn) * seaW;
-      float floe = smoothstep(0.35, 0.65, mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) + 0.3 * nMic.a) * smoothstep(0.02, 0.22, iceIn);
+        // (Where, and for how much of the year: the sea's own - natv.g is the share of the year's twelve months in which the sea
+        //  there is ice (tools/planet/snow.py, from the Sea Ice Index). By the latitude alone, in winter there was ice off
+        //  Scotland, where the sea never freezes, as in Hudson Bay, where it does for seven months. The sea is slow: its ice is
+        //  widest eleven weeks behind the sun (uIceCold), and ice of so many months lies for just so many about that time:
+        //  iceOff is how far the year is from it, 0 at the end of winter and 1 half a year on. What is ice all the year
+        //  stays.)
+        float seaIce = smoothstep(0.01, 0.05, iceIn) * seaW;
+        float floe = smoothstep(0.35, 0.65, mix(nMid.b, 0.434, smoothstep(0.0, 1.5, noiseL + 10.23)) + 0.3 * nMic.a) * smoothstep(0.02, 0.22, iceIn);
       #else
-      float iceEdge = 0.86 - 0.22 * winter;                               // the pack ice spreads toward the equator in the hemisphere's winter
-      float seaIce = smoothstep(iceEdge - 0.08, iceEdge + 0.04, latN0 + (nMac.r - 0.5) * 0.08 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23))) * seaW;
-      float floe = smoothstep(0.35, 0.65, nMid.b + 0.3 * nMic.a) * smoothstep(0.0, 0.08, latN0 - iceEdge + 0.1);
+        float iceEdge = 0.86 - 0.22 * winter;                               // the pack ice spreads toward the equator in the hemisphere's winter
+        float seaIce = smoothstep(iceEdge - 0.08, iceEdge + 0.04, latN0 + (nMac.r - 0.5) * 0.08 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23))) * seaW;
+        float floe = smoothstep(0.35, 0.65, nMid.b + 0.3 * nMic.a) * smoothstep(0.0, 0.08, latN0 - iceEdge + 0.1);
       #endif
-      vec3 iceCol = mix(vec3(0.74, 0.82, 0.9), vec3(0.9, 0.93, 0.96), floe);
-      water = mix(water, iceCol, seaIce * mix(0.55, 1.0, floe));
+        vec3 iceCol = mix(vec3(0.74, 0.82, 0.9), vec3(0.9, 0.93, 0.96), floe);
+        water = mix(water, iceCol, seaIce * mix(0.55, 1.0, floe));
       #ifdef INFO2
-      float seaFast = 0.0;      // (the sea's ice is the sea's own now: none along a shore because the land beside it is white)
+        float seaFast = 0.0;      // (the sea's ice is the sea's own now: none along a shore because the land beside it is white)
       #else
-      float seaFast = frozen * (wOn > 0.5 ? 1.0 - smoothstep(300.0, 1500.0, off) : smoothstep(0.86, 0.97, shelf));
-      water = mix(water, lakeIce, seaFast * 0.94);
+        float seaFast = frozen * (wOn > 0.5 ? 1.0 - smoothstep(300.0, 1500.0, off) : smoothstep(0.86, 0.97, shelf));
+        water = mix(water, lakeIce, seaFast * 0.94);
       #endif
-      float iced = max(max(seaIce * mix(0.55, 1.0, floe), seaFast) * seaShare, frozen * (1.0 - seaShare));      // how much of the water here is ice (it mirrors nothing)
-      foam *= 1.0 - iced;
+        iced = max(max(seaIce * mix(0.55, 1.0, floe), seaFast) * seaShare, frozen * (1.0 - seaShare));      // how much of the water here is ice (it mirrors nothing)
+        foam *= 1.0 - iced;
+      }
       land = mix(land, land * vec3(0.66, 0.68, 0.72), wetSand * beach);          // the sand the last wave wetted
       // ---------- compose surface ----------
       float inlandMix = max(max(inlandW * mix(0.9, 0.7, closeFade), lakeW * (wOn > 0.5 ? 1.0 : 0.95)), vecRiver * 0.97);   // a river is water from bank to bank, and a lake from shore to shore, not a tint on the ground
