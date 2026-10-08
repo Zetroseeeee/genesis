@@ -633,6 +633,27 @@ server.listen(0, async () => {
     check(r.hosts === 0 && r.card && r.again === null, `Home: the levy is over and may be raised again (${r.toast})`); check(/Needs|harbour/.test(r.fleet), 'a fleet needs shipwrights and a harbour: ' + r.fleet);
     await ev(() => { __G.select(__G.sim.playerCiv().capital); });
   });
+  await scenario('peoples: who lives where, the lens of peoples with its key and names, a realm\'s peoples', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (TREE.isOpen()) TREE.close(); if (GOV.isOpen()) GOV.close(); if (ENVOYS.isOpen()) ENVOYS.close(); });
+    // the player's land is his people's; a neighbour's region taken is of another people, and the realm's panel says so
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), P = S.people, W = S.W; const mine = (i) => S.owner[i] === c.id;
+      let other = -1; for (const i of S.LI) { const o = S.owner[i]; if (o >= 0 && o !== c.id && P.ppl[i] && P.ppl[i] !== P.ruling[c.id] && [i - 1, i + 1, i - W, i + W].some(mine) && S.civs[o].capital !== i) { other = i; break; } }
+      if (other < 0) { for (const i of S.LI) { if (S.owner[i] < 0 && S.land[i] && !(S.flags[i] & 8) && [i - 1, i + 1, i - W, i + W].some(mine)) { const t = S.spawnTribe(i, {}); if (t && P.ruling[t.id] !== P.ruling[c.id]) { other = i; break; } } } }
+      const was = other >= 0 ? P.ppl[other] : 0; if (other >= 0) { S.claim(other, c, -1); S.pop[other] = Math.max(S.pop[other], 3); } S.recount(); for (let y = 0; y < 5; y++) S.tick();
+      __G.select(c.capital); const kv = document.getElementById('sc-kv').textContent, cell = document.getElementById('sel-cell').textContent;
+      return { mine: P.ruling[c.id], name: P.nameOf(P.ruling[c.id]), other, was, kept: other >= 0 && P.ppl[other] === was, kv, cell, share: P.foreignShare[c.id] }; });
+    check(r.mine > 0 && new RegExp('Who\\s*the ' + r.name).test(r.cell), `the capital's people: the ${r.name}`); check(r.kept, 'a region taken keeps its own people');
+    check(/Peoples/.test(r.kv) && r.kv.includes(r.name), 'the realm lists its peoples: ' + (r.kv.match(/Peoples(.{0,80})/) || ['', ''])[1]);
+    // the lens: I paints the peoples, with a key of the largest and their names across their lands
+    await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.55, 0, 0); }); await wait(300); await frames(3);
+    await page.keyboard.press('i'); await frames(6); for (let k = 0; k < 30 && !(await ev(() => document.querySelectorAll('.lbl.folk.show').length)); k++) await frames(1);      // (a label shows once two rounds have found room for it)
+    r = await ev(() => { const k = document.getElementById('govkey'), W = __G.world; return { on: document.getElementById('v-ppl').classList.contains('on'), mode: W.palMode, lens: __G.globals.uLens.value, key: !k.hidden, text: k.textContent, rows: k.querySelectorAll('i').length, folk: document.querySelectorAll('.lbl.folk').length, pal: W.palData[__G.sim.people.ruling[__G.sim.player] * 4 + 3] }; });
+    check(r.on && r.mode === 'people' && r.lens === 1 && r.key && /The world's peoples: \d+ in \d+ families/.test(r.text) && r.rows >= 3 && r.pal === 255, `I turns on the lens of peoples, with its key (${r.text.slice(0, 60)})`);
+    check(r.folk > 0, `and the peoples' names across their lands (${r.folk})`);
+    await page.keyboard.press('x'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, ppl: document.getElementById('v-ppl').classList.contains('on'), folk: document.querySelectorAll('.lbl.folk').length })); check(r.mode === 'rel' && !r.ppl, 'one lens at a time: X swaps it for relations');
+    await page.keyboard.press('x'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, key: document.getElementById('govkey').hidden })); check(r.mode === 'realm' && r.key, 'and off again');
+    await ev(() => { __G.select(__G.sim.playerCiv().capital); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);

@@ -832,7 +832,15 @@
     if (!view.labels || !sim || mode === 'intro') { if (labelEls.size) { for (const el of labelEls.values()) el.remove(); labelEls.clear(); labelState.clear(); } return; }
     if (++labelTick % 3 !== 0) return;
     const altKm = mapcam.alt * 6371; const cands = []; const player = sim.player;
-    if (altKm > 250 && altKm < 9000) {
+    if (altKm > 250 && altKm < 9000 && view.ppl && world.pcentroids && sim.people) {
+      // (under the lens of peoples, the peoples' names across their lands, in their colours: people.js)
+      const PP = sim.people, list = []; for (const [id, ct] of world.pcentroids) { if (ct.n >= 3 && PP.list[id]) list.push([id, ct]); } list.sort((a, b) => b[1].n - a[1].n);
+      list.forEach(([id, ct], rank) => {
+        if (rank >= (altKm > 4000 ? 14 : altKm > 1500 ? 30 : 80)) return;      // (the largest peoples from far out, more of them closer)
+        const len = Math.hypot(ct.x, ct.y, ct.z) || 1; const [lon, lat] = GEO.fromVec(new THREE.Vector3(ct.x / len, ct.y / len, ct.z / len)); const rgb = PP.rgbOf(id);
+        cands.push({ id: 'p' + id, cls: 'realm folk', text: PP.list[id].name, lon, lat, h: 0, size: clamp(12 + Math.log2(ct.n + 1) * 1.5, 13, 22) * settings.uiScale, pri: 1000 + ct.n, color: `rgb(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)})` });
+      });
+    } else if (altKm > 250 && altKm < 9000) {
       const list = []; for (const [id, ct] of world.centroids) { const c = sim.civs[id]; if (!c || ct.n < 4) continue; list.push([id, ct]); }
       list.sort((a, b) => b[1].n - a[1].n);
       list.forEach(([id, ct], rank) => {
@@ -1042,7 +1050,7 @@
     $('btn-chronicle').addEventListener('click', writeChronicle); $('btn-chronicle-stop').addEventListener('click', () => { if (chronCtl) chronCtl.abort(); });
     let compassIdle = 0; const wake = () => { $('compass').classList.remove('idle'); clearTimeout(compassIdle); compassIdle = setTimeout(() => $('compass').classList.add('idle'), 3000); }; renderer.domElement.addEventListener('pointermove', wake); renderer.domElement.addEventListener('wheel', wake, { passive: true }); wake();
     // labels are pointer-transparent except for double-click fly-to
-    labelLayer.addEventListener('dblclick', (e) => { const el = e.target.closest('.lbl'); if (!el) return; const id = el.dataset.id; if (id[0] === 'c') { const i = +id.slice(1); const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, viewDist(i)); select(i); } else { const c = sim.civs[+id.slice(1)]; if (c && c.capital >= 0) { const [lon, lat] = placeOf(c.capital); mapcam.flyTo(lon, lat, 0.15); select(c.capital); } } });
+    labelLayer.addEventListener('dblclick', (e) => { const el = e.target.closest('.lbl'); if (!el) return; const id = el.dataset.id; if (id[0] === 'p') return; if (id[0] === 'c') { const i = +id.slice(1); const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, viewDist(i)); select(i); } else { const c = sim.civs[+id.slice(1)]; if (c && c.capital >= 0) { const [lon, lat] = placeOf(c.capital); mapcam.flyTo(lon, lat, 0.15); select(c.capital); } } });
   }
   function goHome() { const c = sim.playerCiv(); if (!c || c.capital < 0) { toast('No capital yet'); return; } const [lon, lat] = placeOf(c.capital); mapcam.flyTo(lon, lat, viewDist(c.capital), { duration: 2 }); select(c.capital); }
   function openMenu() { $('m-title').textContent = mode === 'intro' ? 'Settings' : 'Menu'; $('m-info').textContent = `Tiles ${terrain.stats.tiles} · imagery packs ${terrain.stats.packsI} · elevation packs ${terrain.stats.packsE} · buildings ${world.buildingCount}`; $('menu').showModal(); }

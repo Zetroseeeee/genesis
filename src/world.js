@@ -62,10 +62,12 @@
       const cosLat = new Float32Array(H), sinLat = new Float32Array(H); for (let y = 0; y < H; y++) { const la = (90 - (y + 0.5) / H * 180) * GEO.D2R; cosLat[y] = Math.cos(la); sinLat[y] = Math.sin(la); }
       // (under the lens of peoples every region is painted by the people that lives there, and the lines are drawn between
       // peoples, not realms: people.js)
-      const PP = this.palMode === 'people' && sim.people ? sim.people : null;
+      const PP = this.palMode === 'people' && sim.people ? sim.people : null; const pcents = this.pcentroids = PP ? new Map() : null;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const i = y * W + x, j = i * 4; const o = owner[i]; const c = o >= 0 ? civs[o] : null;
-        if (PP) { const p = PP.ppl[i] & 4095; if (p && sim.land[i]) { od[j] = p & 255; od[j + 1] = p >> 8; od[j + 2] = 255; od[j + 3] = 255; } else { od[j] = od[j + 1] = od[j + 2] = od[j + 3] = 0; } }
+        if (PP) { const p = PP.ppl[i] & 4095; if (p && sim.land[i]) { od[j] = p & 255; od[j + 1] = p >> 8; od[j + 2] = 255; od[j + 3] = 255;
+            let ct = pcents.get(p); if (!ct) { ct = { x: 0, y: 0, z: 0, n: 0 }; pcents.set(p, ct); } const lo = ((x + 0.5) / W * 360 - 180) * GEO.D2R; ct.x += cosLat[y] * Math.cos(lo); ct.y += sinLat[y]; ct.z += -cosLat[y] * Math.sin(lo); ct.n++; }
+          else { od[j] = od[j + 1] = od[j + 2] = od[j + 3] = 0; } }
         if (c) {
           if (!PP) { od[j] = o & 255; od[j + 1] = o >> 8; od[j + 2] = o === player ? 153 : (pc && sim.isAtWar(pc, o) ? 77 : 255); od[j + 3] = 255; }
           let ct = cents.get(o); if (!ct) { ct = { x: 0, y: 0, z: 0, n: 0 }; cents.set(o, ct); }

@@ -338,3 +338,7 @@ army_foe     | tools/scenes/town.js tools/scenes/army.js | {lon:10,lat:52,tech:0
 army_modern  | tools/scenes/town.js tools/scenes/army.js | {lon:10,lat:52,tech:0.82,pop:40,walls:0,special:14,alt:620,tilt:1.25,out:1.0} | setTimeout(() => __army({off:[8,0], years:0, goal:false, alt:300, tilt:1.12, heading:2.4}), 9000); | 50
 army_high    | tools/scenes/town.js tools/scenes/army.js | {lon:10,lat:52,tech:0.2,pop:8,walls:1,special:14,alt:620,tilt:1.25,out:1.0} | setTimeout(() => __army({off:[8,0], years:2, alt:90000, tilt:0.3, heading:0}), 9000); | 40
 army_fleet   | tools/scenes/town.js tools/scenes/army.js | {lon:-0.37,lat:39.47,tech:0.3,pop:6,walls:2,special:9,alt:620,tilt:1.25,out:1.0} | setTimeout(() => __army({off:[-4,0], years:0, goal:false, fleet:true, alt:2500, tilt:1.05, look:'fleet'}), 9000); | 45
+# --- peoples: the lens of peoples over the Old World in 2000 BC and in AD 1500; a region from closer, with its names ---
+peoples_old  | tools/scenes/peoples.js | {years:8000,lon:40,lat:35,alt:7500} | | 120
+peoples_late | tools/scenes/peoples.js | {years:11500,lon:40,lat:35,alt:7500} | | 170
+peoples_near | tools/scenes/peoples.js | {years:9000,lon:30,lat:45,alt:1800,tilt:0.35,clouds:false} | | 130

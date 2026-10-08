@@ -101,6 +101,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   `save().food`): an update must not starve anyone's people.
   Fit the pace first, then what the ages expect of rule (`tools/rule/norm.js`), then the people, then the market's
   yields (`calibrate.js`): each stands on the one before.
+- `node tools/people/probe.js [seed,seed] [last year] [--write]` — the world's peoples through the ages: how many, of how
+  many families, the largest, how many have drifted apart and how many regions were taken in, what share of other
+  peoples realms rule; `--write` puts each age's mean into `src/people.js` (its NORM marks), which a realm's unrest is
+  measured against. Run it twice over two seeds after touching how peoples are taken in, drift apart or rise.
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -185,6 +189,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/rule.js` | `RULE` | Forms of government (24), laws (100 in twelve fields), the seven estates, authority; one world's rule: what every realm has chosen, who holds power in it, reforms, demands, risings |
 | `src/diplo.js` | `DIPLO` | What two realms can swear, why they go to war and what a winner may ask; one world's diplomacy: what every realm thinks of every other and why, pacts, vassals, claims, wars with friends on both sides, offers to the player |
 | `src/army.js` | `ARMY` | Hosts and fleets: the autopilot's host on every front, the player's levy that marches where he sends it (by road over land, by fleet over the sea), battles, assaults and sieges; pure data |
+| `src/people.js` | `PEOPLE` | The peoples of the world: who lives in every region, each people's tongue and family, how peoples are taken into those who rule them and drift apart, what ruling others costs a realm; pure data |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
@@ -426,6 +431,25 @@ Conventions that matter:
   them while it rests, the walkers' shadow streak; a siege is also a battle with `host` set (events.js draws the
   engines and the dust, not lines and camps of its own, where hosts stand); a fleet's ships off its harbour town. A
   banner on the screen for every host in view (the player's at every height).
+- **Peoples** (`people.js`; `sim.people`). Every region people live in belongs to a people (`ppl`, a Uint16 a region; 0
+  where nobody known lives), and every realm is ruled by one (`ruling`). A tribe on empty land is a people of its own,
+  named as the realm is: a daughter of the nearest people within twelve regions (its tongue a little changed: the
+  family likeness), or the first of a new family. A people spreads with the land its realms settle (`claimed`: empty
+  land takes the settlers' people); a conquered region keeps its own. Over the centuries a region is taken into the
+  people that rules it (`ASSIM` by age, faster in towns and beside the rulers' own regions, by the laws: one state one
+  law and schooling quicken it, self-rule leaves people be: `LAW`); a people spread farther from its home than its age
+  holds together (`DRIFT`) drifts into a daughter people, unless one realm of its own rules it; rulers who are a tenth
+  of their own realm take up their subjects' tongue. A tongue is one of sim.js's name styles narrowed to the sounds one
+  people uses (`tongue`): places and new realms are named in the tongue of who lives there. **Ruling others is
+  measured against the age**: a realm's stability loses `RESTLESS` (more from the Industrial age) times its share of
+  other peoples beyond what realms of its age usually rule (`NORM`, measured by `tools/people/probe.js --write` over two
+  seeds), so the world's steadiness stays where it was; and a realm that fractures breaks along its peoples (`farSeed`:
+  the seed is of another people sooner, and `splitCiv`'s fill keeps to the seed's people). The module throws its own
+  dice. The lens of peoples (I; `world.palMode = 'people'`, the palette 4096 wide) paints every region by its people,
+  draws the lines between peoples, writes their names across their lands and keys the largest; the region's panel says
+  who lives there, the realm's its peoples. Saved run by run (`save().peoples`); a world saved before peoples is given
+  one people a realm (`settle`). After touching how peoples are taken in, drift or rise, run `tools/people/probe.js` over
+  12345 and 777 (twice with `--write`), and the war-and-peace probe: the world must keep about as many realms.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by
