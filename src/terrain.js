@@ -40,6 +40,51 @@
       v += r * wy[j]; }
     return v;
   }
+  // ---------- reading packs off the page ----------
+  // A pack of the heights or of the water's edge is four million texels, and what the CPU asks of it (heightAt, shoreAt) needs
+  // its bytes: drawn into a canvas and read back on the page, strip by strip with the frame let through between, it held each
+  // frame up for a twentieth of a second, and a view of the Himalaya waited thirteen seconds for its ground. In workers,
+  // several at once, the page only uploads what comes back. (kind h: the heights, low byte then high; w: the water's three
+  // bytes; a: the picture's alpha, its map of land and water.) A worker that cannot (no OffscreenCanvas) says so, and the page
+  // reads as it did.
+  function PACK_WORKER() {
+    self.onmessage = async (e) => {
+      const { id, blob, kind, level, open } = e.data;
+      try {
+        if (typeof OffscreenCanvas === 'undefined') throw new Error('no OffscreenCanvas');
+        const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+        const w = bmp.width, h = bmp.height, cv = new OffscreenCanvas(w, h), ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(bmp, 0, 0); if (bmp.close) bmp.close();
+        const d = ctx.getImageData(0, 0, w, h).data, n = w * h; let out, top = 0;
+        if (kind === 'h') { out = new Uint8Array(n * 2); for (let i = 0, o = 0; i < n; i++, o += 2) { const hi = d[i * 4]; out[o] = d[i * 4 + 1]; out[o + 1] = hi; if (hi > top) top = hi; } }
+        else if (kind === 'w') { out = new Uint8Array(n * 3);
+          if (level) for (let i = 0, o = 0; i < n; i++, o += 3) { out[o] = d[i * 4]; out[o + 1] = d[i * 4 + 1]; out[o + 2] = d[i * 4 + 2]; }
+          else for (let i = 0, o = 0; i < n; i++, o += 3) { out[o] = d[i * 4]; out[o + 1] = (Math.round(d[i * 4 + 1] / 17) << 4) | (open ? Math.round(d[i * 4 + 2] / 17) : 15); } }
+        else { out = new Uint8Array(n); for (let i = 0; i < n; i++) out[i] = d[i * 4 + 3]; }
+        self.postMessage({ id, w, h, top, data: out.buffer }, [out.buffer]);
+      } catch (err) { self.postMessage({ id, error: String((err && err.message) || err) }); }
+    };
+  }
+  class PackReader {
+    constructor(n) {
+      this.ws = []; this.jobs = new Map(); this.id = 0; this.k = 0; this.off = false;
+      try {
+        const url = URL.createObjectURL(new Blob(['(' + PACK_WORKER.toString() + ')()'], { type: 'text/javascript' }));
+        for (let i = 0; i < n; i++) {
+          const w = new Worker(url);
+          w.onmessage = (e) => { const j = this.jobs.get(e.data.id); if (!j) return; this.jobs.delete(e.data.id); if (e.data.error) { if (/OffscreenCanvas/.test(e.data.error)) this.off = true; j.reject(new Error(e.data.error)); } else j.resolve(e.data); };
+          w.onerror = () => { this.off = true; for (const j of this.jobs.values()) j.reject(new Error('worker')); this.jobs.clear(); };
+          this.ws.push(w);
+        }
+      } catch (e) { this.ws = []; }
+    }
+    get on() { return this.ws.length > 0 && !this.off; }
+    // what a worker made of a pack's picture: { w, h, top, data } (an ArrayBuffer), or a rejection
+    read(blob, kind, extra) {
+      const id = ++this.id, w = this.ws[this.k++ % this.ws.length];
+      return new Promise((resolve, reject) => { this.jobs.set(id, { resolve, reject }); w.postMessage(Object.assign({ id, blob, kind }, extra || {})); });
+    }
+  }
   // ---------- shared tile geometry (u, v, skirt) ----------
   function buildTileGeometry(GRID) {
     const n = GRID + 1; const pos = []; const idx = [];
@@ -1517,6 +1562,7 @@
       // tour.txt has alps_q4 and ridge_q4 to hold against alps and ridge, and __T.costsMesh measures.)
       this.quadPx = 8;
       this.tiles = new Map(); this.packs = new Map(); this.loading = 0; this.maxLoading = 6;
+      this.reader = new PackReader(Math.max(2, Math.min(4, (navigator.hardwareConcurrency || 4) - 2)));      // (the packs read off the page: PackReader)
       this.exag = opts.exag || 2.0;
       this.frame = 0; this.visible = [];
       this.sseThreshold = 360; this.maxTiles = 380; this.maxLevel = 9;
@@ -1594,11 +1640,25 @@
         else if (p.kind === 'w' && this.water.bundle) blob = await this.bundleBlob(p, 'w', this.water.bundle, this.water.ext);
         else if (p.kind === 'i' && this.img.bundle) blob = await this.bundleBlob(p, 'i', this.img.bundle, this.img.ext);
         else { const r = await fetch(url); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); }
-        const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-        p.w = bmp.width; p.h = bmp.height;
-        let tex = new THREE.Texture(bmp);
-        tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false;
-        if (p.kind === 'e' && this.heights) {
+        // (the heights and the water's edge are read in a worker, and what the card gets is made of the bytes that come back; the
+        //  picture's own pixels go to the card as they are, and its alpha is read in a worker beside them)
+        const kindW = p.kind === 'e' && this.heights ? 'h' : p.kind === 'w' ? 'w' : null;
+        let got = null;
+        if (kindW && this.reader.on) { try { got = await this.reader.read(blob, kindW, kindW === 'w' ? { level: !!this.water.level, open: !!this.water.open } : null); } catch (e) { got = null; } }
+        const alphaP = p.kind === 'i' && p.L >= Math.min(3, this.imgMax) && this.reader.on ? this.reader.read(blob, 'a').catch(() => null) : null;
+        const bmp = got ? null : await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+        p.w = got ? got.w : bmp.width; p.h = got ? got.h : bmp.height;
+        let tex = got ? null : new THREE.Texture(bmp);
+        if (tex) { tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; }
+        if (got && kindW === 'h') {
+          const two = new Uint8Array(got.data);
+          p.data = new Uint16Array(got.data); p.min = 0; p.scale = this.heights.levels[p.L].step || this.heights.step; p.k = HEIGHTS_K; p.top = (got.top + 1) * 256 * p.scale;
+          tex = new THREE.DataTexture(two, p.w, p.h, THREE.RGFormat, THREE.UnsignedByteType); tex.internalFormat = 'RG8'; tex.unpackAlignment = 2;
+          tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+        } else if (got && kindW === 'w') {
+          p.scale = this.water.levels[p.L].scale; p.dist = new Uint8Array(got.data);
+          tex = new THREE.DataTexture(p.dist, p.w, p.h, THREE.RGBFormat, THREE.UnsignedByteType); tex.flipY = false; tex.unpackAlignment = 1; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+        } else if (p.kind === 'e' && this.heights) {
           // The heights: how high the ground stands in steps (a metre at level 7, doubling with every level below), the high byte in red and the low in green. They go to
           // the card as a texture of two channels, low then high (uElevK weighs them), and the very same bytes read two at a time
           // are what is asked here (a Uint16Array over them: low byte first). Read out of the picture a strip at a time, as the
@@ -1648,7 +1708,9 @@
           // CPU copy of the water mask (alpha), so buildings and ships agree with the drawn coast while the water's edge is on its way.
           // From the level the picture always had: above it the mask is the same mask weighed finer, and whichever is here answers.
           // (A strip at a time, as the water's packs are read.)
-          if (p.L >= Math.min(3, this.imgMax)) {
+          const ga = alphaP ? await alphaP : null;
+          if (ga) p.alpha = new Uint8Array(ga.data);
+          else if (p.L >= Math.min(3, this.imgMax)) {
             const ROWS = 512, cv = document.createElement('canvas'); cv.width = p.w; cv.height = Math.min(ROWS, p.h); const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.globalCompositeOperation = 'copy';
             const out = new Uint8Array(p.w * p.h);
             for (let y0 = 0; y0 < p.h; y0 += ROWS) {
