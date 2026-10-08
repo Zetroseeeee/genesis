@@ -170,7 +170,7 @@
       // was, a lone birch at dusk glowed whole, brighter than anything in the picture). And in a wood a low sun reaches only
       // the tops: a tree twenty metres tall throws its shadow three hundred metres at four degrees, over the next eight, and
       // a wood at sunset was a carpet of glowing crowns on dark ground. (reach: how far down a tree the sun comes, from the top)
-      float baseK = mix(0.3, 1.0, smoothstep(0.03, 0.3, sinE)), reach = clamp(sinE * 6.0, 0.0, 1.0);
+      float baseK = mix(0.3, 1.0, smoothstep(0.03, 0.3, sinE)), reach = clamp(sinE * 2.5, 0.0, 1.0);      // (trees twenty metres tall forty apart: the sun comes down a fraction 2 tan(e) of each)
       float litW = mix(1.0, smoothstep(0.88 - reach, 1.08 - reach, mix(vUv.y, 1.0, 0.5 * vTop)), deep);
       float diff = mix(0.45, 0.16, wood) * baseK + mix(0.55, 0.92, wood) * sunSide * litW + 0.25 * sinE * mix(1.0, low, wood);     // the photograph is already softly lit: the sun adds a bright side
       diff *= (1.0 - 0.6 * vHid * mix(1.0, 1.0 - 0.8 * low, deep)) * shade;      // (in a wood the neighbours' shadow is on a tree's foot, which is dark by 'shade' already: its top is in the sun)
