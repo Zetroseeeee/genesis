@@ -40,6 +40,51 @@
       v += r * wy[j]; }
     return v;
   }
+  // ---------- reading packs off the page ----------
+  // A pack of the heights or of the water's edge is four million texels, and what the CPU asks of it (heightAt, shoreAt) needs
+  // its bytes: drawn into a canvas and read back on the page, strip by strip with the frame let through between, it held each
+  // frame up for a twentieth of a second, and a view of the Himalaya waited thirteen seconds for its ground. In workers,
+  // several at once, the page only uploads what comes back. (kind h: the heights, low byte then high; w: the water's three
+  // bytes; a: the picture's alpha, its map of land and water.) A worker that cannot (no OffscreenCanvas) says so, and the page
+  // reads as it did.
+  function PACK_WORKER() {
+    self.onmessage = async (e) => {
+      const { id, blob, kind, level, open } = e.data;
+      try {
+        if (typeof OffscreenCanvas === 'undefined') throw new Error('no OffscreenCanvas');
+        const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+        const w = bmp.width, h = bmp.height, cv = new OffscreenCanvas(w, h), ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(bmp, 0, 0); if (bmp.close) bmp.close();
+        const d = ctx.getImageData(0, 0, w, h).data, n = w * h; let out, top = 0;
+        if (kind === 'h') { out = new Uint8Array(n * 2); for (let i = 0, o = 0; i < n; i++, o += 2) { const hi = d[i * 4]; out[o] = d[i * 4 + 1]; out[o + 1] = hi; if (hi > top) top = hi; } }
+        else if (kind === 'w') { out = new Uint8Array(n * 3);
+          if (level) for (let i = 0, o = 0; i < n; i++, o += 3) { out[o] = d[i * 4]; out[o + 1] = d[i * 4 + 1]; out[o + 2] = d[i * 4 + 2]; }
+          else for (let i = 0, o = 0; i < n; i++, o += 3) { out[o] = d[i * 4]; out[o + 1] = (Math.round(d[i * 4 + 1] / 17) << 4) | (open ? Math.round(d[i * 4 + 2] / 17) : 15); } }
+        else { out = new Uint8Array(n); for (let i = 0; i < n; i++) out[i] = d[i * 4 + 3]; }
+        self.postMessage({ id, w, h, top, data: out.buffer }, [out.buffer]);
+      } catch (err) { self.postMessage({ id, error: String((err && err.message) || err) }); }
+    };
+  }
+  class PackReader {
+    constructor(n) {
+      this.ws = []; this.jobs = new Map(); this.id = 0; this.k = 0; this.off = false;
+      try {
+        const url = URL.createObjectURL(new Blob(['(' + PACK_WORKER.toString() + ')()'], { type: 'text/javascript' }));
+        for (let i = 0; i < n; i++) {
+          const w = new Worker(url);
+          w.onmessage = (e) => { const j = this.jobs.get(e.data.id); if (!j) return; this.jobs.delete(e.data.id); if (e.data.error) { if (/OffscreenCanvas/.test(e.data.error)) this.off = true; j.reject(new Error(e.data.error)); } else j.resolve(e.data); };
+          w.onerror = () => { this.off = true; for (const j of this.jobs.values()) j.reject(new Error('worker')); this.jobs.clear(); };
+          this.ws.push(w);
+        }
+      } catch (e) { this.ws = []; }
+    }
+    get on() { return this.ws.length > 0 && !this.off; }
+    // what a worker made of a pack's picture: { w, h, top, data } (an ArrayBuffer), or a rejection
+    read(blob, kind, extra) {
+      const id = ++this.id, w = this.ws[this.k++ % this.ws.length];
+      return new Promise((resolve, reject) => { this.jobs.set(id, { resolve, reject }); w.postMessage(Object.assign({ id, blob, kind }, extra || {})); });
+    }
+  }
   // ---------- shared tile geometry (u, v, skirt) ----------
   function buildTileGeometry(GRID) {
     const n = GRID + 1; const pos = []; const idx = [];
@@ -640,6 +685,17 @@
           vec3 nat = mix(vec3(0.78, 1.20, 0.40), vec3(0.96, 1.12, 0.44), smoothstep(0.16, 0.30, ln)) * ln;
           base = mix(base, nat, woods * field * (1.0 - ploughed));
         } }
+      // ---------- the country before the canals ----------
+      // In a desert what the photograph has green is fields watered from canals and wells: the plain of Mesopotamia between its
+      // rivers, the Nile's valley, the Punjab, the oases. Where nobody farms they are given back the dry grass and bare earth of
+      // the steppe round them, darker than the sand (a river's plain is); where the game's people have dug the canals the
+      // photograph's own fields show. (Taken for woods, the plain between the Tigris and the Euphrates was a forest's canopy
+      // from the air in 10,000 BC. The trees along a river there are the trees' own: trees.js, gallery.)
+      { float dryC = smoothstep(0.62, 0.85, clim) * (1.0 - ploughed);
+        if (dryC > 0.0) {
+          float gr = clamp((base.g - max(base.r, base.b)) * 7.0, 0.0, 1.0), l0 = dot(base, vec3(0.299, 0.587, 0.114));
+          base = mix(base, vec3(1.12, 1.0, 0.70) * mix(0.44, 0.54, smoothstep(0.08, 0.3, l0)), dryC * gr);      // (straw and earth: lighter than a wood, darker than the sand)
+        } }
       float lum = dot(base, vec3(0.299, 0.587, 0.114));
       float green = clamp((base.g - max(base.r, base.b) * 0.92) * 6.0 + 0.25, 0.0, 1.0);
       // (What is bright and has no colour of its own is not green, however the sum above reads it: a twelfth of a white is
@@ -681,6 +737,10 @@
       float wild = (1.0 - smoothstep(0.22, 0.48, warm)) * (1.0 - clamp(cult * 1.4, 0.0, 1.0)) * (1.0 - smoothstep(0.35, 0.6, clim));
       float wForest = green * (1.0 - smoothstep(0.32 + 0.2 * wild, 0.6 + 0.3 * wild, lum)) * (1.0 - aboveTree) * (1.0 - steep * 0.7);
       float wGrass  = green * smoothstep(0.28 + 0.2 * wild, 0.55 + 0.3 * wild, lum) * (1.0 - steep * 0.6) + green * aboveTree * 0.6 * (1.0 - steep);
+      // (No closed wood where the climate is too dry for one: what the photograph has green in a desert is fields watered from
+      //  canals, reeds and grass. The plain of Mesopotamia between its rivers, all fields today, was a forest's canopy from the
+      //  air in 10,000 BC. The trees that line a river there are the trees' own: trees.js, gallery.)
+      { float dryF = wForest * smoothstep(0.62, 0.85, clim); wForest -= dryF; wGrass += dryF; }
       float wDesert = warm * (1.0 - green) * (1.0 - steep) * (1.0 - smoothstep(1800.0, 3000.0, vH));
       float wRock   = max(steep, smoothstep(treeLine + 400.0, treeLine + 1400.0, vH) * (1.0 - green * 0.5)) + (1.0 - green) * (1.0 - warm) * 0.5;
       // dithered transitions: land cover breaks up instead of fading
@@ -723,7 +783,8 @@
         // The two that count most here; how far the regional colour of the photograph may tint each (a rock stays the colour of rock),
         // and how bright each may be at most (where the photograph is bright with snow or haze, grass under it is still grass).
         // (Each kind of ground is gone into only where there is any of it: the arithmetic of this choosing was a fifth of the frame.)
-        float L1 = gL, w1 = wGrass * (1.0 - redK) * (1.0 - stony), L2 = fL, w2 = wForest; vec2 h1 = vec2(gL > 0.5 ? 0.5 : 0.75, 0.42), h2 = fL > 7.5 ? vec2(0.7, 0.45) : vec2(0.8, 0.32);      // (dry grass is straw whatever the earth under it: the red of a red country is its soil's; the fell is open ground, lighter than the floor of a wood)
+        // (the straw of a desert's steppe in July is pale, as pale as the photograph has it: a cap of a wet meadow's made it dark as burnt ground beside the sand)
+      float L1 = gL, w1 = wGrass * (1.0 - redK) * (1.0 - stony), L2 = fL, w2 = wForest; vec2 h1 = vec2(gL > 0.5 ? 0.5 : 0.75, gL > 0.5 ? mix(0.42, 0.56, smoothstep(0.6, 0.85, clim)) : 0.42), h2 = fL > 7.5 ? vec2(0.7, 0.45) : vec2(0.8, 0.32);      // (dry grass is straw whatever the earth under it: the red of a red country is its soil's; the fell is open ground, lighter than the floor of a wood)
         forestOpen = fL > 7.5 ? 0.3 : 1.0;
         if (w2 > w1) { float t; t = L1; L1 = L2; L2 = t; t = w1; w1 = w2; w2 = t; vec2 th = h1; h1 = h2; h2 = th; }
         #define CAND(L, w, h) { float wc = w; if (wc > w1) { L2 = L1; w2 = w1; h2 = h1; L1 = L; w1 = wc; h1 = h; } else if (wc > w2) { L2 = L; w2 = wc; h2 = h; } }
@@ -1326,6 +1387,10 @@
       float sunUp = dot(upV, sunV);
       float day = smoothstep(-0.15, 0.25, sunUp);
       float diff = mix(max(dot(nV, sunV), 0.0), max(sunUp, 0.0), wetAll * (1.0 - foam));      // (what comes up out of water is lit by how high the sun stands, not by the lie of a wave)
+      // (Grass and the crowns of a wood stand up out of the ground: under a low sun their blades and leaves are lit as walls are,
+      //  not as the flat ground under them. Lit as flat ground, a meadow at sunset was black beside the golden walls of a town.)
+      { float stand = (wGrass + 0.5 * wForest) * (1.0 - max(max(snow, ice), snowCov)) * (1.0 - wetAll) * landW;
+        if (stand > 0.01) diff = max(diff, stand * 0.3 * smoothstep(-0.01, 0.06, sunUp) * (0.6 + 0.4 * max(dot(nV, sunV) * 4.0, 0.0))); }
       // ---------- terrain self-shadowing: march the heightmap toward the sun ----------
       float shadow = 1.0;
       float shadowMix = smoothstep(0.15, 0.08, uCamAlt) * step(0.5, uQuality);
@@ -1497,6 +1562,7 @@
       // tour.txt has alps_q4 and ridge_q4 to hold against alps and ridge, and __T.costsMesh measures.)
       this.quadPx = 8;
       this.tiles = new Map(); this.packs = new Map(); this.loading = 0; this.maxLoading = 6;
+      this.reader = new PackReader(Math.max(2, Math.min(4, (navigator.hardwareConcurrency || 4) - 2)));      // (the packs read off the page: PackReader)
       this.exag = opts.exag || 2.0;
       this.frame = 0; this.visible = [];
       this.sseThreshold = 360; this.maxTiles = 380; this.maxLevel = 9;
@@ -1574,11 +1640,25 @@
         else if (p.kind === 'w' && this.water.bundle) blob = await this.bundleBlob(p, 'w', this.water.bundle, this.water.ext);
         else if (p.kind === 'i' && this.img.bundle) blob = await this.bundleBlob(p, 'i', this.img.bundle, this.img.ext);
         else { const r = await fetch(url); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); }
-        const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-        p.w = bmp.width; p.h = bmp.height;
-        let tex = new THREE.Texture(bmp);
-        tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false;
-        if (p.kind === 'e' && this.heights) {
+        // (the heights and the water's edge are read in a worker, and what the card gets is made of the bytes that come back; the
+        //  picture's own pixels go to the card as they are, and its alpha is read in a worker beside them)
+        const kindW = p.kind === 'e' && this.heights ? 'h' : p.kind === 'w' ? 'w' : null;
+        let got = null;
+        if (kindW && this.reader.on) { try { got = await this.reader.read(blob, kindW, kindW === 'w' ? { level: !!this.water.level, open: !!this.water.open } : null); } catch (e) { got = null; } }
+        const alphaP = p.kind === 'i' && p.L >= Math.min(3, this.imgMax) && this.reader.on ? this.reader.read(blob, 'a').catch(() => null) : null;
+        const bmp = got ? null : await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+        p.w = got ? got.w : bmp.width; p.h = got ? got.h : bmp.height;
+        let tex = got ? null : new THREE.Texture(bmp);
+        if (tex) { tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; }
+        if (got && kindW === 'h') {
+          const two = new Uint8Array(got.data);
+          p.data = new Uint16Array(got.data); p.min = 0; p.scale = this.heights.levels[p.L].step || this.heights.step; p.k = HEIGHTS_K; p.top = (got.top + 1) * 256 * p.scale;
+          tex = new THREE.DataTexture(two, p.w, p.h, THREE.RGFormat, THREE.UnsignedByteType); tex.internalFormat = 'RG8'; tex.unpackAlignment = 2;
+          tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+        } else if (got && kindW === 'w') {
+          p.scale = this.water.levels[p.L].scale; p.dist = new Uint8Array(got.data);
+          tex = new THREE.DataTexture(p.dist, p.w, p.h, THREE.RGBFormat, THREE.UnsignedByteType); tex.flipY = false; tex.unpackAlignment = 1; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+        } else if (p.kind === 'e' && this.heights) {
           // The heights: how high the ground stands in steps (a metre at level 7, doubling with every level below), the high byte in red and the low in green. They go to
           // the card as a texture of two channels, low then high (uElevK weighs them), and the very same bytes read two at a time
           // are what is asked here (a Uint16Array over them: low byte first). Read out of the picture a strip at a time, as the
@@ -1628,7 +1708,9 @@
           // CPU copy of the water mask (alpha), so buildings and ships agree with the drawn coast while the water's edge is on its way.
           // From the level the picture always had: above it the mask is the same mask weighed finer, and whichever is here answers.
           // (A strip at a time, as the water's packs are read.)
-          if (p.L >= Math.min(3, this.imgMax)) {
+          const ga = alphaP ? await alphaP : null;
+          if (ga) p.alpha = new Uint8Array(ga.data);
+          else if (p.L >= Math.min(3, this.imgMax)) {
             const ROWS = 512, cv = document.createElement('canvas'); cv.width = p.w; cv.height = Math.min(ROWS, p.h); const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.globalCompositeOperation = 'copy';
             const out = new Uint8Array(p.w * p.h);
             for (let y0 = 0; y0 < p.h; y0 += ROWS) {
