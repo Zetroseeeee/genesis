@@ -649,7 +649,7 @@
       { float dryC = smoothstep(0.62, 0.85, clim) * (1.0 - ploughed);
         if (dryC > 0.0) {
           float gr = clamp((base.g - max(base.r, base.b)) * 7.0, 0.0, 1.0), l0 = dot(base, vec3(0.299, 0.587, 0.114));
-          base = mix(base, vec3(1.16, 1.0, 0.74) * mix(0.29, 0.40, smoothstep(0.08, 0.3, l0)), dryC * gr);
+          base = mix(base, vec3(1.12, 1.0, 0.70) * mix(0.44, 0.54, smoothstep(0.08, 0.3, l0)), dryC * gr);      // (straw and earth: lighter than a wood, darker than the sand)
         } }
       float lum = dot(base, vec3(0.299, 0.587, 0.114));
       float green = clamp((base.g - max(base.r, base.b) * 0.92) * 6.0 + 0.25, 0.0, 1.0);
@@ -738,7 +738,8 @@
         // The two that count most here; how far the regional colour of the photograph may tint each (a rock stays the colour of rock),
         // and how bright each may be at most (where the photograph is bright with snow or haze, grass under it is still grass).
         // (Each kind of ground is gone into only where there is any of it: the arithmetic of this choosing was a fifth of the frame.)
-        float L1 = gL, w1 = wGrass * (1.0 - redK) * (1.0 - stony), L2 = fL, w2 = wForest; vec2 h1 = vec2(gL > 0.5 ? 0.5 : 0.75, 0.42), h2 = fL > 7.5 ? vec2(0.7, 0.45) : vec2(0.8, 0.32);      // (dry grass is straw whatever the earth under it: the red of a red country is its soil's; the fell is open ground, lighter than the floor of a wood)
+        // (the straw of a desert's steppe in July is pale, as pale as the photograph has it: a cap of a wet meadow's made it dark as burnt ground beside the sand)
+      float L1 = gL, w1 = wGrass * (1.0 - redK) * (1.0 - stony), L2 = fL, w2 = wForest; vec2 h1 = vec2(gL > 0.5 ? 0.5 : 0.75, gL > 0.5 ? mix(0.42, 0.56, smoothstep(0.6, 0.85, clim)) : 0.42), h2 = fL > 7.5 ? vec2(0.7, 0.45) : vec2(0.8, 0.32);      // (dry grass is straw whatever the earth under it: the red of a red country is its soil's; the fell is open ground, lighter than the floor of a wood)
         forestOpen = fL > 7.5 ? 0.3 : 1.0;
         if (w2 > w1) { float t; t = L1; L1 = L2; L2 = t; t = w1; w1 = w2; w2 = t; vec2 th = h1; h1 = h2; h2 = th; }
         #define CAND(L, w, h) { float wc = w; if (wc > w1) { L2 = L1; w2 = w1; h2 = h1; L1 = L; w1 = wc; h1 = h; } else if (wc > w2) { L2 = L; w2 = wc; h2 = h; } }
