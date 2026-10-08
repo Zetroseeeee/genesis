@@ -406,7 +406,8 @@ Conventions that matter:
   that is for the eye: land changes hands as it always did. **The hosts have their own dice** (`rs` in `army.js`, saved
   with them): drawing from the world's, their battles made one world a century slow and half as many people in 2000 AD,
   as any world one throw apart may be (four worlds measured 3.4 to 6.8 billion either way): a world fitted to its seeds
-  must not move by a hair for what is only seen.
+  must not move by a hair for what is only seen. A world without a player is the very world it was before the hosts
+  (`tools/diplo/probe.js` prints what it printed, line for line): keep it so.
   The player's levy (`levy`: `army.raise`) is a host he leads, half again the share of the age: it marches where he
   sends it (`order`: A* over the regions it may enter, `mayPass` - its own, its enemies', nobody's, an ally's, its lord's
   or its vassals' - mountains slower), `SPEED` regions a year; it storms an enemy region as it comes to it (`STORM` a

@@ -271,7 +271,8 @@
         if (GEO.distKm(cam.lon, cam.lat, lon, lat) > Math.min(400, 60 + cam.dist * 6371 * 3)) continue;
         const kind = f.era >= 3 ? 'ship' : 'boat', w = (f.era >= 6 ? 90 : f.era >= 3 ? 34 : 12) * SK, h = (f.era >= 6 ? 18 : f.era >= 3 ? 9 : 3) * SK, d = (f.era >= 6 ? 16 : f.era >= 3 ? 8 : 4) * SK;
         const cl = Math.max(0.15, Math.cos(lat * D2R)), mLon = 1 / (R_M * cl * D2R), mLat = 1 / (R_M * D2R), nS = clamp(f.ships, 3, 24), sp = w * 1.6;
-        for (let k = 0; k < nS; k++) { const row = Math.floor((k + 1) / 2), side = k % 2 ? 1 : -1; const fw = -row * sp, sd = side * row * sp * 0.7; const ex = fw * Math.cos(head) - sd * Math.sin(head), ny = fw * Math.sin(head) + sd * Math.cos(head); const lo = lon + ex * mLon, la = lat + ny * mLat; if (!this.terrain.isWater(lo, la)) continue; place(kind, lo, la, w, h, d, head, hexOf(c.rgb), f.era, h * 0.3, SK); }
+        const dc = dyed(c.rgb), base = f.era >= 6 ? [0.29, 0.31, 0.34] : [0.42, 0.3, 0.19], hull = hexOf(base.map((v, q) => v * 0.72 + dc[q] * 0.28));      // (timber or steel, washed with the realm's colour)
+        for (let k = 0; k < nS; k++) { const row = Math.floor((k + 1) / 2), side = k % 2 ? 1 : -1; const fw = -row * sp, sd = side * row * sp * 0.7; const ex = fw * Math.cos(head) - sd * Math.sin(head), ny = fw * Math.sin(head) + sd * Math.cos(head); const lo = lon + ex * mLon, la = lat + ny * mLat; if (!this.terrain.isWater(lo, la)) continue; place(kind, lo, la, w, h, d, head, hull, f.era, h * 0.3, SK); }
       }
       for (const k in this.inst) { const I = this.inst[k]; const c = this.counts[k] || 0; I.mesh.count = c; GEO.touch(I.mesh.instanceMatrix, c); GEO.touch(I.mesh.instanceColor, c); GEO.touch(I.info, c); }
     }

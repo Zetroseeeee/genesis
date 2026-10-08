@@ -417,7 +417,7 @@ function createSim(world, seed) {
       const p = civs[prev];
       logEvent(p, `${cellName.get(i) || 'The capital'} falls to ${fullName(c)}`, true);
       logEvent(c, `${c.ruler.title} ${c.ruler.name} takes ${cellName.get(i) || 'the enemy capital'}`, true);
-      p.stability = Math.max(0, p.stability - 0.35); p.capital = -1;
+      p.stability -= 0.35; p.capital = -1;
     }
     if (from >= 0) { const m = Math.min(pop[from] * 0.15, 3); pop[from] -= m; pop[i] += m; }
   }

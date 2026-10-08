@@ -241,7 +241,7 @@
       const c = civs[a.c], pa = power(a) * k, pd = garrison(n, false) + 1e-6, r = pa / (pa + pd);
       const p = Math.min(0.95, Math.max(0.05, 0.15 + 0.8 * Math.pow(r, 1.5)));
       a.men = Math.max(0, Math.round(a.men * (1 - (0.01 + 0.07 * (1 - r)))));
-      if (rnd() < p) { h.conquer(n, c, a.cell, false); stats.taken++; a.morale = Math.min(1.2, a.morale + 0.02); return true; }
+      if (rnd() < p) { const e = civs[owner[n]]; h.conquer(n, c, a.cell, false); if (e && e.stability < 0) e.stability = 0; stats.taken++; a.morale = Math.min(1.2, a.morale + 0.02); return true; }      // (a capital that falls costs its realm stability; the year's own reckoning, which keeps it above nought, is past)
       a.morale = Math.max(0.2, a.morale - 0.05); return false;
     }
     function siegeStep(a) {
@@ -253,7 +253,7 @@
       h.battles.push({ i: n, from: a.cell, year: year(), a: c.id, b: o, siege: true, host: true, taken: false });      // (events.js draws the engines before the walls; the enemy's host on that front comes to relieve the town)
       if (a.siege >= 1) {
         const name = h.cellName.get(n) || 'the town', foe = civs[o];
-        h.conquer(n, c, a.cell, true); stats.taken++;
+        h.conquer(n, c, a.cell, true); if (foe && foe.stability < 0) foe.stability = 0; stats.taken++;
         h.logEvent(c, `${a.name} takes ${name} after a siege`, true, 'war', n); say(c, `${a.name} takes ${name} after a siege`, n, 'taken'); if (foe) { h.logEvent(foe, `${name} falls to ${a.name}`, false, 'war', n); say(foe, `${name} falls to ${a.name}`, n, 'lost'); }
         a.from = a.cell; a.cell = n; if (a.path[0] === n) a.path.shift(); a.siege = 0; a.siegeAt = -1; a.state = a.path.length ? 'march' : 'camp'; a.moved = year(); a.morale = Math.min(1.2, a.morale + 0.1);
       }
