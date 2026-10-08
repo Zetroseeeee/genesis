@@ -125,10 +125,14 @@
       const ax = to % W, ay = (to / W) | 0, hx = from % W, hy = (from / W) | 0; let dx = ax - hx; if (dx > W / 2) dx -= W; if (dx < -W / 2) dx += W; const dy = ay - hy;
       return Math.abs(dx) > Math.abs(dy) * 1.2 ? (dx > 0 ? 'Eastern' : 'Western') : (dy > 0 ? 'Southern' : 'Northern');
     }
-    const prefixed = (F, a) => (F.name.startsWith('the ') ? 'the ' + a + ' ' + F.name.slice(4) : a + ' ' + F.name);
+    // (one word before the faith's own name, never a pile of them: a church of the Southern church is the Western church, not
+    // the Western Southern one)
+    const QUAL = ['Eastern', 'Western', 'Northern', 'Southern', 'True', 'Old', 'Pure'].concat(LATER);
+    const bare = (nm) => { let the = nm.startsWith('the '), t = the ? nm.slice(4) : nm; for (let k = 0; k < 4; k++) { const w = t.split(' ')[0]; if (QUAL.indexOf(w) < 0 || t.indexOf(' ') < 0) break; t = t.slice(w.length + 1); } return { the, t }; };
+    const prefixed = (F, a) => { const b = bare(F.name); return (b.the ? 'the ' : '') + a + ' ' + b.t; };
     function sectName(F, cv) {
       const opts = (eraOf(cv) >= 5 && h.knows(cv.id, 'printing') ? LATER.slice() : []).concat([dirOf(F.home, cv.capital), 'True', 'Old', 'Pure']);
-      for (const a of opts) { if (F.name.indexOf(a + ' ') >= 0) continue; const nm = prefixed(F, a); if (!taken(nm)) return { name: nm, base: F.base }; }
+      for (const a of opts) { const nm = prefixed(F, a); if (nm !== F.name && !taken(nm)) return { name: nm, base: F.base }; }
       return freshName(cv.capital, cv, F.world);
     }
     const shortOf = (f) => { const F = list[f]; return F ? (F.name.startsWith('the ') ? F.name.slice(4) : F.name) : ''; };
@@ -157,11 +161,13 @@
     const GOLD = 0.6180339887;
     function make(o) {
       if (list.length >= MAXF) return 0;
-      const id = list.length, P = o.parent ? list[o.parent] : null;
-      // (a family keeps a hue of its own, its churches near it; faiths for all peoples bright, a people's faith quieter)
-      const hue = P ? (P.hue + (rnd() - 0.5) * 0.08 + 1) % 1 : (id * GOLD + 0.41) % 1;
+      const id = list.length, P = o.parent && !o.newFam ? list[o.parent] : null;
+      // (a family keeps a hue of its own, its churches beside it, each a step to one side and lighter or darker, so that they can be told
+      // apart on the map; a teaching for all peoples out of a people's faith is a family of its own; faiths for all peoples bright, a
+      // people's faith quieter)
+      const side = rnd() < 0.5 ? -1 : 1, hue = P ? (P.hue + side * (0.05 + rnd() * 0.06) + 1) % 1 : (id * GOLD + 0.41) % 1;
       const F = { id, name: o.name, base: o.base || '', world: !!o.world, parent: o.parent || 0, fam: P ? P.fam : id, born: year(), home: o.home, founder: o.founder ?? -1, people: o.people ?? (h.people ? h.people.ppl[o.home] : 0),
-        tenets: o.tenets || [], hue, sat: P ? Math.min(0.85, Math.max(0.4, P.sat + (rnd() - 0.5) * 0.16)) : (o.world ? 0.68 : 0.5) + rnd() * 0.12, lit: P ? Math.min(0.64, Math.max(0.4, P.lit + (rnd() - 0.5) * 0.14)) : 0.47 + rnd() * 0.1,
+        tenets: o.tenets || [], hue, sat: P ? Math.min(0.85, Math.max(0.4, P.sat + (rnd() - 0.5) * 0.24)) : (o.world ? 0.68 : 0.5) + rnd() * 0.12, lit: P ? Math.min(0.66, Math.max(0.38, P.lit + (rnd() < 0.5 ? -1 : 1) * (0.05 + rnd() * 0.07))) : 0.47 + rnd() * 0.1,
         n: 0, pop: 0, peak: 0, realms: 0, gone: 0 };
       factors(F); list.push(F); holyAt.set(o.home, id); holyCell[o.home] = 1; return id;
     }
@@ -333,7 +339,7 @@
     function split(f, c, yr, world) {
       const F = list[f], cv = civs[c]; const nm = world ? freshName(cv.capital, cv, true) : sectName(F, cv);
       const tenets = world ? chooseTenets(cv, true) : (rnd() < 0.5 ? F.tenets.slice() : [F.tenets[0], chooseTenets(cv, F.world).find((k) => k !== F.tenets[0])]);
-      const id = make({ name: nm.name, base: nm.base, world: world || F.world, parent: f, home: cv.capital, founder: c, tenets }); if (!id) return 0;
+      const id = make({ name: nm.name, base: nm.base, world: world || F.world, parent: f, newFam: world, home: cv.capital, founder: c, tenets }); if (!id) return 0;
       // (a church that breaks away takes its flock with it; a new teaching has the court, and the state carries it from there)
       if (!world) for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c && fth[i] === f && !holyAt.has(i)) fth[i] = id; }
       fth[cv.capital] = id; setState(c, id);

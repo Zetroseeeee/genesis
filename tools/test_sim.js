@@ -557,7 +557,7 @@ log('11. diplomacy');
   // the tables hang together
   check(DP.PACTS.length === 5 && DP.PACTS.every(P => KN.ID[P.need] !== undefined && P.turns >= 2 && P.text.length > 30) && KN.ID[DP.VASSAL.need] !== undefined, 'five pacts and vassalage, each standing on a real discovery');
   check(Object.keys(DP.OPENS).length >= 5 && Object.keys(DP.OPENS).every(k => KN.ID[k] !== undefined && DP.OPENS[k].length > 20), 'what else discoveries open between realms (a claim, vassals, embassies, the wireless, unification) is said of real discoveries');
-  check(Object.keys(DP.CAUSES).length === 10 && Object.values(DP.CAUSES).every(C => C.name && C.text.length > 15 && ['land', 'tribute', 'vassal', 'regime', 'none'].includes(C.goal)), 'ten causes of war, each with something to win');
+  check(Object.keys(DP.CAUSES).length === 11 && Object.values(DP.CAUSES).every(C => C.name && C.text.length > 15 && ['land', 'tribute', 'vassal', 'regime', 'none'].includes(C.goal)), 'eleven causes of war (the holy city among them), each with something to win');
   check(Object.values(DP.STAND).every(([n, h]) => n && /^#[0-9A-F]{6}$/i.test(h)) && Object.keys(DP.TERMS).every(t => DP.TERM_TEXT[t] && DP.RANK[t] !== undefined), 'standings have a colour, terms a rank and a line');
   check(DP.moodOf(80) === 'devoted' && DP.moodOf(0) === 'indifferent' && DP.moodOf(-20) === 'wary' && DP.moodOf(-90) === 'bitter', 'opinions have words');
   check(DP.UNJUST_STAB[0] === 0 && DP.UNJUST_STAB[1] === 0 && DP.UNJUST_REP[8] > DP.UNJUST_REP[3] && DP.UNJUST_REP[3] > 0, 'the early ages keep no account of unprovoked wars; the later ones do');
@@ -589,7 +589,7 @@ log('11. diplomacy');
     for (let n = 0; n < 12; n++) dp.gift(c, B, 30); check(dp.memOf(B, c.id) <= 45.01 && dp.memOf(B, c.id) > 30, `but not without end (${dp.memOf(B, c.id).toFixed(1)})`); }
 
   // the Iron Age: everything but embassies; kings on every throne
-  setAge(iron); for (const x of all) { teach(sim, x, 2); sim.rule.setForm(x.id, x, R.FORM.kingdom, 'quiet'); x.religion = 'the Old Faith'; x.ruler.trait = 'steward'; } still(); sim.recount();
+  setAge(iron); for (const x of all) { teach(sim, x, 2); sim.rule.setForm(x.id, x, R.FORM.kingdom, 'quiet'); x.ruler.trait = 'steward'; } { const of = sim.faith.found(all[0].id, all[0].capital, { name: 'the Old Faith', tenets: ['kings', 'pilgrim'] }); for (const x of all) if (x !== all[0]) sim.faith.adopt(x.id, of, 'chosen'); sim.faith.news.length = 0; } still(); sim.recount();
   check(all.every(x => sim.rule.succession(x) === 'blood') && dp.cannot(c, A, 'nap') === null && dp.cannot(c, A, 'alliance') === null && dp.cannot(c, A, 'marriage') === null, 'with writing, envoys and kings, everything can be proposed');
   // a sworn peace: agreed, in force on both sides for four turns, and it binds
   { dp.remember(A, c.id, 30); const j = dp.judge(A, c, 'nap'); check(j.ok && j.why.length > 0, `they would agree (${j.score}: ${j.why.map(w => w[0]).join(', ')})`);

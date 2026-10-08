@@ -24,7 +24,9 @@
   const [foe, cold, friend, small, trader, asker, spouse] = made; const size = new Map(); [[foe, [52, 3.5]], [cold, [30, 3]], [friend, [24, 3]], [small, [6, 1.6]], [trader, [18, 3]], [asker, [14, 2.6]], [spouse, [34, 3.2]]].forEach(([t, v]) => { if (t) size.set(t, v); });
   const got = new Map(made.map((t) => [t, 1])); for (let round = 0; round < 14; round++) for (const t of made) { const [n, pop] = size.get(t); const need = n - got.get(t); if (need > 0) got.set(t, got.get(t) + grow(t, Math.min(Math.ceil(n / 10), need), pop)); }
   const king = (x) => { if (x.ruler && S.rule.naming) x.ruler.title = S.rule.naming(x, 'kingdom').titles[0]; };
-  const iron = S.ERAS[2][1] + 0.015; for (const x of [c, ...made]) { x.tech = iron; x.era = S.eraOf(iron); if (window.__T) __T.teach(x, 2, true); S.rule.setForm(x.id, x, RULE.FORM.kingdom, 'quiet'); king(x); x.religion = x === cold ? 'the Way of Ashur' : 'the Old Faith'; if (x !== c) { x.aggression = 0; x.dip.think = 1e12; } }
+  const iron = S.ERAS[2][1] + 0.015; for (const x of [c, ...made]) { x.tech = iron; x.era = S.eraOf(iron); if (window.__T) __T.teach(x, 2, true); S.rule.setForm(x.id, x, RULE.FORM.kingdom, 'quiet'); king(x); if (x !== c) { x.aggression = 0; x.dip.think = 1e12; } }
+  // (two faiths: the old faith of the land, kept by all but the cold neighbour, who keeps the Way of Ashur: faith.js)
+  { const F = S.faith, old = F.found(c.id, c.capital, { name: 'the Old Faith', tenets: ['kings', 'pilgrim'] }); for (const x of made) if (x !== cold) F.adopt(x.id, old, 'chosen'); if (cold) F.found(cold.id, cold.capital, { name: 'the Way of Ashur', tenets: ['sword', 'ancestors'] }); for (const i of S.LI) { const o = S.owner[i]; if (o >= 0 && S.civs[o] && F.state[o] && !F.holyAt.has(i)) F.fth[i] = F.state[o]; } F.news.length = 0; }
   c.wealth = 6000; S.recount(); S.touchAll(); G.run(6); S.touchAll();
   for (const x of [c, ...made]) king(x); if (friend) friend.ruler.trait = 'steward'; if (foe) foe.ruler.trait = 'conqueror';
   // the table
