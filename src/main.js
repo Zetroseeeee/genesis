@@ -151,6 +151,8 @@
       let water = null; try { const r = await fetch('data/w/index.json'); if (r.ok) water = await r.json(); } catch (e) { water = null; }
       // (the picture of the Earth: fetched likewise, tools/planet/fetch.mjs; its own list says what packs it has)
       let img = null; try { const r = await fetch('data/i/index.json'); if (r.ok) img = await r.json(); } catch (e) { img = null; }
+      // (and the heights, likewise: tools/planet/heights.py; without them the old packs of data/e serve)
+      let heights = null; try { const r = await fetch('data/h/index.json'); if (r.ok) heights = await r.json(); } catch (e) { heights = null; }
       setLoad(14, 'surface data');
       const [info, noise, detA, detB, detC, detD, waterN] = await Promise.all([planetMaps(), loadTex('data/noise.png', { aniso: ANISO_NOISE }), loadTex('data/det_forest.jpg', { mirror: true }), loadTex('data/det_dunes.jpg', { mirror: true }), loadTex('data/det_rock.jpg', { mirror: true }), loadTex('data/det_grass.jpg', { mirror: true }), loadTex('data/waternormals.jpg')]);
       globals.uInfo.value = info; globals.uNoise.value = noise; globals.uClouds.value = noise; globals.uWaterN.value = waterN || noise; globals.uDetA.value = detA || noise; globals.uDetB.value = detB || noise; globals.uDetC.value = detC || noise; globals.uDetD.value = detD || noise;
@@ -163,7 +165,7 @@
       setLoad(50, 'peoples');
       world = new WORLD.World({ scene, terrain: { exag: 2.0, heightAt: () => 0 } });
       SKY.load({ soft: softGL && !window.GENESIS_SKY });      // the stars, the Milky Way, the Moon, the clouds (sky.js): each put to use as it comes; a software renderer takes the lighter half unless asked
-      terrain = new TERRAIN.Terrain({ scene, index, water, img, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID, plainWater: softGL && !window.GENESIS_POST, slow: softGL });
+      terrain = new TERRAIN.Terrain({ scene, index, water, img, heights, base: 'data/', globals, exag: 2.0, anisotropy: ANISO, soft: softGL && !window.GENESIS_GRID, plainWater: softGL && !window.GENESIS_POST, slow: softGL });
       world.terrain = terrain;
       decal = new DECAL.Decal({ renderer, globals }); decal.terrain = terrain; decal.load('data/rivers.png').catch((e) => console.warn('rivers', e)); world.decal = decal;
       trees = new TREES.Trees({ scene, terrain, renderer }); trees.decal = decal; if (window.GENESIS_TREES || softGL) trees.budget = window.GENESIS_TREES || 0.25; if (softGL) trees.slice = 1e9; if (softGL && !window.GENESIS_TREES) { trees.coverCap = 0.6; trees.coverMin = 0; }      /* (a software renderer shades every pixel of every card: each ring of trees may cover no more than half the picture in all) */ trees.load('data/veg.jpg', 'data/noise.png', 'data/climate.png', 'data/snow.png').catch((e) => console.warn('veg', e));

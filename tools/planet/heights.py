@@ -45,6 +45,7 @@ TILE, PER, TOP, TALL, STEP = 512, 4, 7, 1.0282, 0.5
 Z, ZHI = int(words.get('z', 10)), int(words.get('zhigh', 10))      # (the tiles' zoom for level 7, and beyond 55 degrees, where Mercator's rows are twice as fine and more)
 CAP = 85.05112878
 KEEP = words.get('keep', 'relief')
+SOUTH = words.get('south', 'old')      # (Antarctica from the old packs, or - to look at - from the tiles)
 T0 = time.time()
 LOG = []
 def say(*a):
@@ -183,14 +184,14 @@ def build7(px, py):
     """the ground of one level-7 pack, in half metres (uint16), and how much relief it has"""
     lon0, lon1, lat0, lat1, dl = box(TOP, px, py)
     t0 = time.time(); n0 = STATS['tiles']
-    if lat0 <= -60:                       # Antarctica: the old packs' ice (twelve hundred metres to a texel: it is only for the levels below, and never kept at this one)
+    if lat0 <= -60 and SOUTH == 'old':      # Antarctica: the old packs' ice (twelve hundred metres to a texel: it is only for the levels below, and never kept at this one)
         h = old_heights(TOP, px, py); src = 'old'
     else:
         h = from_tiles(TOP, px, py, ZHI if min(abs(lat0), abs(lat1)) > 55 else Z) * TALL; src = 'tiles'
         bad = np.isnan(h)
         if bad.any():                     # north of the tiles' end, or a tile that would not come: the old packs there
             o = old_heights(TOP, px, py); h[bad] = o[bad]; src += ' + old %.0f %%' % (100 * bad.mean())
-        if lat1 < -60: h[np.arange(h.shape[0]) * dl > lat0 + 60] = old_heights(TOP, px, py)[np.arange(h.shape[0]) * dl > lat0 + 60]
+        if lat1 < -60 and SOUTH == 'old': h[np.arange(h.shape[0]) * dl > lat0 + 60] = old_heights(TOP, px, py)[np.arange(h.shape[0]) * dl > lat0 + 60]
     v = np.clip(np.round(h / STEP), 0, 65535).astype(np.uint16)
     land = v > 0
     if land.any():
@@ -207,6 +208,15 @@ def png_of(v):
 def webp_of(v):
     rgb = np.zeros(v.shape + (3,), np.uint8); rgb[..., 0] = v >> 8; rgb[..., 1] = v & 255
     b = io.BytesIO(); Image.fromarray(rgb).save(b, 'WEBP', lossless=True, quality=100, method=6); return b.getvalue()
+
+def gain(v, mask=None):
+    """what a pack adds to the level below it: the mean slope of the difference between it and its own mean over 2 x 2 drawn
+    up again (bilinear, as the card would draw the coarser level) - nought on a plain, tenths in mountains"""
+    a = v.astype(np.float32) * STEP; h2, w2 = a.shape[0] // 2, a.shape[1] // 2
+    c = a.reshape(h2, 2, w2, 2).mean(axis=(1, 3)); from scipy import ndimage
+    up = ndimage.zoom(c, 2, order=1, mode='nearest', grid_mode=True)[:a.shape[0], :a.shape[1]]
+    gy, gx = np.gradient(a - up); m = v > 0 if mask is None else mask
+    return float(np.mean(np.hypot(gx, gy)[m]) / 306.0) if m.any() else 0.0
 
 def shade(v, k=1.0):
     """a hillshade of half metres at 306 m to a texel scaled by k, lit from the north-west, for the sheet"""
@@ -226,11 +236,13 @@ def trial(packs):
         sizes = {}
         for step in (0.5, 1.0, 2.0):
             w = (v.astype(np.int64) * STEP / step).round().astype(np.uint16)
-            t1 = time.time(); sizes['png9 %.1f m' % step] = '%.2f MB %.1f s' % (len(png_of(w)) / 1e6, time.time() - t1)
-            if step == 0.5:
-                rgb = np.zeros(w.shape + (3,), np.uint8); rgb[..., 0] = w >> 8; rgb[..., 1] = w & 255; b = io.BytesIO(); t1 = time.time(); Image.fromarray(rgb).save(b, 'PNG', compress_level=6)
-                sizes['png6 0.5 m'] = '%.2f MB %.1f s' % (len(b.getvalue()) / 1e6, time.time() - t1)
-                t1 = time.time(); sizes['webp 0.5 m'] = '%.2f MB %.1f s' % (len(webp_of(w)) / 1e6, time.time() - t1)
+            rgb = np.zeros(w.shape + (3,), np.uint8); rgb[..., 0] = w >> 8; rgb[..., 1] = w & 255; b = io.BytesIO(); t1 = time.time(); Image.fromarray(rgb).save(b, 'PNG', compress_level=6)
+            sizes['png6 %.1f m' % step] = '%.2f MB %.1f s' % (len(b.getvalue()) / 1e6, time.time() - t1)
+            t1 = time.time(); sizes['webp %.1f m' % step] = '%.2f MB %.1f s' % (len(webp_of(w)) / 1e6, time.time() - t1)
+            if step == 1.0:
+                b = io.BytesIO(); t1 = time.time(); Image.fromarray(rgb).save(b, 'WEBP', lossless=True, quality=100, method=4); sizes['webp4 1.0 m'] = '%.2f MB %.1f s' % (len(b.getvalue()) / 1e6, time.time() - t1)
+        # what this level adds to the one below: the slope of the difference between the two (the one below drawn up as the card would)
+        sizes['adds'] = '%.4f' % gain(v)
         if lat0 > 55 or lat1 < -55:      # (and the tiles one zoom coarser, which beyond 55 degrees still have rows finer than ours)
             v9 = np.clip(np.round(from_tiles(TOP, px, py, 9) * TALL / STEP), 0, 65535).astype(np.uint16); dz = np.abs(v9.astype(np.float32) - v.astype(np.float32)) * STEP
             sizes['zoom 9 against 10'] = 'mean %.1f m, 99%% %.0f m' % (dz.mean(), np.percentile(dz, 99))
@@ -252,7 +264,7 @@ def trial(packs):
     say('tiles fetched: %d (%.0f MB), failed: %d' % (STATS['tiles'], STATS['bytes'] / 1e6, STATS['failed']))
     # the ice: what the tiles have where the old packs have the ice one stands on
     for name, lon, lat, true in (('Summit, Greenland', -38.46, 72.58, 3216), ('Dome C', 123.35, -75.1, 3233), ('Vostok', 106.84, -78.46, 3488), ('the Ross Ice Shelf', -175.0, -81.0, 50), ('Everest', 86.925, 27.988, 8849), ('Aconcagua', -70.011, -32.653, 6961), ('Mont Blanc', 6.865, 45.833, 4808), ('the Dead Sea', 35.5, 31.5, -430)):
-        z = 8; S = 256 << z; x, y = mx(lon, S), my(lat, S); t = tile(z, int(x // 256), int(y // 256))
+        z = 10; S = 256 << z; x, y = mx(lon, S), my(lat, S); t = tile(z, int(x // 256), int(y // 256))
         val = t[int(y % 256), int(x % 256)] if t is not None else float('nan')
         say('  %s: the tiles %.0f m, the Earth %d m' % (name, val, true))
 
