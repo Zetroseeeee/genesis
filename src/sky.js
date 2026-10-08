@@ -228,8 +228,13 @@
       // From far, where a heap is a pixel or less: the picture's cloud, gathered where the heaps stand and thinned between
       // them (not at all where the picture has all cloud or none). Laid on as it is, between its texels, it was a blur.
       float gather = 5.6 * c * (1.0 - c), cl = clamp(c + (ms - 0.5) * gather, 0.0, 1.0);
-      float a = pow(cl, 0.85), thick = cl, slope = 0.0, dK = (1.0 - smoothstep(uGrainK.x, uGrainK.y, foot)) * uGrainOn;
-      float f = min(c * uCover.x, uCover.y);      // (how much of the sky the heaps take: what the picture has; from under them never all of it)
+      // Clouds stand some way up, and seen from under them low in the sky one stands before the next: there the line of sight
+      // crosses the layer over many times its height and finds the gaps between them closed. (Drawn as a shell, they stood
+      // apart down to the horizon, and the low sky was empty.) As the shell lies to the eye: once from straight under it, three
+      // times along it at some ten degrees up.
+      float lean = foot / max(min(length(dx), length(dy)), 1e-9), fill = 1.0 + uBelow * 0.35 * clamp(lean - 1.0, 0.0, 12.0);
+      float a = 1.0 - pow(1.0 - pow(cl, 0.85), fill), thick = cl, slope = 0.0, dK = (1.0 - smoothstep(uGrainK.x, uGrainK.y, foot)) * uGrainOn;
+      float f = 1.0 - pow(1.0 - min(c * uCover.x, uCover.y), fill);      // (how much of the sky the heaps take: what the picture has; from under them never all of it, but for the closing up toward the horizon)
       float fd = 0.5 - f, thr = 0.5 + 0.72 * fd + 2.8 * fd * fd * fd * fd * fd;      // (the sum's own measure, so that f of the sky is over it: tools/planet/grain.py)
       float veil = 0.3 * smoothstep(0.25, 1.0, c);
       vec3 sW = uSunW - n * dot(n, uSunW); float sl = length(sW); sW /= max(sl, 1e-4);      // (the way to the sun along the shell, in the globe's own frame)
@@ -239,7 +244,7 @@
         // at; and what the picture has of thin high cloud stays as a veil over them. The grain eats at an edge only where the
         // shell is seen from under or over it, not along it: it is of cells, which seen from the side are dashes, and an edge
         // eaten at by dashes is a course of bricks. Low in the sky a cloud keeps a soft edge.
-        float lean = foot / max(min(length(dx), length(dy)), 1e-9), flat_ = 1.0 - smoothstep(1.5, 2.6, lean);
+        float flat_ = 1.0 - smoothstep(1.5, 2.6, lean);
         float e2 = (1.0 - smoothstep(1.5, 4.0, tpp * 5.03)) * flat_, e3 = (1.0 - smoothstep(1.5, 4.0, tpp * 21.9)) * flat_, n2 = 0.5, n3 = 0.5;
         if (e2 > 0.0) n2 = mix(0.5, textureGrad(uGrain, p.zxy * 5.03 + w * 3.0, dx.zxy * 1600.0, dy.zxy * 1600.0).g, e2);
         if (e3 > 0.0) n3 = mix(0.5, textureGrad(uGrain, p.yzx * 21.9, dx.yzx * 6964.0, dy.yzx * 6964.0).g, e3);
