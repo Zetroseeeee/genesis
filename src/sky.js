@@ -227,7 +227,9 @@
       // The heaps and their lumps are looked up by the curve until a place is well under a pixel, then by the card's own
       // coarser copies. Not sooner: weighed straight, every place of the block has a slope of its own, and the light, which
       // goes by the slope, made a cloud low in the sky of flat bars, each lit or not.
-      float g1 = (1.0 - smoothstep(2.0, 6.0, tpp)) * uGrainOn, g0 = (1.0 - smoothstep(3.0, 8.0, tpp * 0.23)) * uGrainOn, n1 = 0.5, n0 = 0.5;
+      // (from over them the smaller size goes sooner: looked straight down on from 900 km, where it is a speckle of a pixel or two,
+      //  its one lookup cost an eighth of the frame)
+      float g1 = (1.0 - (uBelow > 0.5 ? smoothstep(2.0, 6.0, tpp) : smoothstep(1.2, 3.2, tpp))) * uGrainOn, g0 = (1.0 - smoothstep(3.0, 8.0, tpp * 0.23)) * uGrainOn, n1 = 0.5, n0 = 0.5;
       float k1 = 1.0 - smoothstep(2.5, 5.0, tpp), k0 = 1.0 - smoothstep(2.5, 5.0, tpp * 0.23);
       if (g1 > 0.0) { float v = 0.0; if (k1 < 1.0) v = textureGrad(uGrain, p1, dx * 318.0, dy * 318.0).r; if (k1 > 0.0) v = mix(v, grain3(p1), k1); n1 = mix(0.5, v, g1); }
       // (the lumps, which count for less and are larger, by a cheaper curve: one lookup with its place moved toward the middle of
