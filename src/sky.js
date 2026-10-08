@@ -72,9 +72,14 @@
     if (!out.ecl) out.ecl = new THREE.Vector3(); out.ecl.copy(_ax).applyMatrix4(out);      // (the path's pole turns with the Earth's hour only: the other turn is about it)
     return out;
   };
-  // where the Moon stands: round the Earth's path from the sun by its age (0 new, pi full), a little off the path as it goes
+  // Where the Moon stands: round from the sun by its age (0 new, pi full) - along the Earth's path, and a little off it as it
+  // goes (five degrees: its own path is tilted so much). The turn is about the pole of the Earth's path as nearly as may be
+  // while still square to the sun: where the game has the sun off its path (the home screen holds it in the picture) the
+  // Moon's age is still its angle from the sun, and its phase is what its age says.
+  const _a = new THREE.Vector3();
   SKY.moonAt = function (sun, ecl, age, out) {
-    out.copy(sun).applyAxisAngle(ecl, age).addScaledVector(ecl, 0.089 * Math.sin(age * 1.085 + 1.3)).normalize(); return out;      // (five degrees: its path is tilted so much to the Earth's)
+    _a.copy(ecl).addScaledVector(sun, -ecl.dot(sun)); if (_a.lengthSq() < 1e-6) _a.set(0, 1, 0).addScaledVector(sun, -sun.y); _a.normalize();
+    out.copy(sun).applyAxisAngle(_a, age).addScaledVector(_a, 0.089 * Math.sin(age * 1.085 + 1.3)).normalize(); return out;
   };
 
   // ---------- the stars ----------
@@ -84,22 +89,22 @@
     void main() {
       vec3 wd = normalize(mat3(modelMatrix) * position);
       vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); p.z = p.w * 0.9999995; gl_Position = p;
-      // (the eye and the screen both take light by its root or near it: a star five magnitudes fainter is a hundredth of the
-      //  light and is drawn a sixth as bright - else the sky is seven stars and nothing)
-      float c = exp(-0.4145 * aMag.x), deep = 1.0 - smoothstep(uDeep - 1.3, uDeep, aMag.x);
-      gl_PointSize = (1.3 + 2.9 * sqrt(c)) * uPx;
+      // (the eye takes light by something like its fourth root: a star five magnitudes fainter is a hundredth of the light, and
+      //  is drawn a little under a third as bright and somewhat smaller - drawn as its light is, the sky is seven stars and nothing)
+      float c = exp(-0.4145 * aMag.x), lum = 2.2 * exp(-0.25 * aMag.x), deep = 1.0 - smoothstep(uDeep - 1.3, uDeep, aMag.x);
+      gl_PointSize = (1.6 + 3.4 * sqrt(c)) * uPx;      // (never under a pixel and a half: a point smaller than the pixels it falls between is a star that comes and goes as the sky turns)
       // from the ground (uLow): none in the thick air along the horizon, and they twinkle, the low ones most
       float el = dot(wd, uUp), tw = 0.5 + 0.5 * sin(uTime * (2.1 + 3.0 * fract(aMag.y * 37.0)) + position.x * 311.0 + position.z * 173.0);
       float seen = mix(1.0, smoothstep(0.015, 0.22, el) * (1.0 - (0.16 + 0.34 * (1.0 - smoothstep(0.1, 0.7, el))) * tw), uLow);
       float bv = aMag.y; vec3 t = mix(vec3(0.60, 0.71, 1.0), vec3(0.96, 0.97, 1.0), smoothstep(-0.3, 0.35, bv)); t = mix(t, vec3(1.0, 0.85, 0.66), smoothstep(0.35, 1.05, bv)); t = mix(t, vec3(1.0, 0.62, 0.38), smoothstep(1.05, 1.9, bv));
       // (not through the Moon)
       float hid = step(uMoonK.x, dot(wd, uMoonW)) * uMoonK.y;
-      vCol = t * (c * uGain * deep * seen * (1.0 - hid)); }`;      // (the few brightest are brighter than white: post.js gives them a little glow)
-  SKY.STAR_F = `uniform float uAlpha; varying vec3 vCol; void main() { vec2 q = gl_PointCoord - 0.5; float a = exp(-dot(q, q) * 13.0) - 0.039; gl_FragColor = vec4(vCol * max(a, 0.0) * uAlpha, 1.0); }`;
+      vCol = t * (lum * uGain * deep * seen * (1.0 - hid)); }`;      // (the few brightest are brighter than white: post.js gives them a little glow)
+  SKY.STAR_F = `uniform float uAlpha; varying vec3 vCol; void main() { vec2 q = gl_PointCoord - 0.5; float a = exp(-dot(q, q) * 9.0) - 0.105; gl_FragColor = vec4(vCol * max(a, 0.0) * uAlpha, 1.0); }`;
   class Stars {
     constructor(scene) {
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3)); g.setAttribute('aMag', new THREE.BufferAttribute(new Float32Array(2), 2)); g.setDrawRange(0, 0);
-      this.uniforms = { uAlpha: { value: 1 }, uPx: { value: 1 }, uLow: { value: 0 }, uTime: { value: 0 }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uDeep: { value: 7 }, uGain: { value: 1.7 }, uMoonW: { value: new THREE.Vector3(0, 1, 0) }, uMoonK: { value: new THREE.Vector2(Math.cos(SKY.moonSize), 1) } };
+      this.uniforms = { uAlpha: { value: 1 }, uPx: { value: 1 }, uLow: { value: 0 }, uTime: { value: 0 }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uDeep: { value: 7 }, uGain: { value: 1 }, uMoonW: { value: new THREE.Vector3(0, 1, 0) }, uMoonK: { value: new THREE.Vector2(Math.cos(SKY.moonSize), 1) } };
       this.points = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: this.uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, vertexShader: SKY.STAR_V, fragmentShader: SKY.STAR_F }));
       this.points.frustumCulled = false; this.points.renderOrder = -4; this.points.matrixAutoUpdate = false; scene.add(this.points); this.n = 0; this.count = [];
     }

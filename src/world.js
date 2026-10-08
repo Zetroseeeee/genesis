@@ -429,7 +429,7 @@
             // life, as a painter would have it. By day a pale ghost, by night brighter than white (post.js gives it its glow), from
             // out in space as bright as lit rock is. And the light of the faint stars, the Milky Way, where the Moon is not.
             vec4 mo = moonDisc(dir, sun); float md = dot(dir, uMoonW), nightG = 1.0 - smoothstep(-0.17, -0.05, sunEl);
-            vec3 beyond = mo.rgb * mo.a * mix(1.25, mix(0.2, 2.3, nightG), uAlpha) + milky(dir) * (0.55 * uStars) * (1.0 - mo.a);
+            vec3 beyond = mo.rgb * mo.a * mix(1.25, mix(0.2, 2.3, nightG), uAlpha) + milky(dir) * (uStars * mix(0.3, 0.22, uAlpha)) * (1.0 - mo.a);
             add += vec3(0.8, 0.85, 0.95) * pow(max(md, 0.0), 600.0) * 0.25 * night * (0.5 - 0.5 * dot(sun, uMoonW));
             // aurora: curtains to the pole on clear nights at high latitude
             float auroraLat = smoothstep(52.0, 66.0, abs(uLat));
@@ -456,7 +456,7 @@
       // how the sky stands: its hour from where the sun is over the Earth and among the stars (the time of year), and the year
       // (the world's own: its first nights turn about a point near Vega). The Moon goes round the Earth's path once a
       // game-month, and its age is its phase.
-      const turn = SKY.turn(sun, this.seasonPhase, this.sim ? this.sim.year : -10000, this.skyTurn), moon = SKY.moonAt(sun, turn.ecl, window.__moonAge !== undefined ? window.__moonAge : 2.6 + time * 0.0025, this._moon);
+      const turn = SKY.turn(sun, this.seasonPhase, window.__skyYear !== undefined ? window.__skyYear : this.sim ? this.sim.year : -10000, this.skyTurn), moon = SKY.moonAt(sun, turn.ecl, window.__moonAge !== undefined ? window.__moonAge : 2.6 + time * 0.0025, this._moon);
       if (this.cloudLayer) { this.cloudLayer.on = this.cloudsOn; this.cloudLayer.update(cam.alt, time, sun); this.cloudShift = this.cloudLayer.shift; this.cloudVis = this.cloudLayer.vis; if (SKY.cloudSmall) this.cloudTex = SKY.cloudSmall; }
       const skyA = Math.min(1, Math.max(0, (0.06 - cam.alt) / 0.04));
       this.skyUniforms.uAlpha.value = skyA; this.skyUniforms.uSun.value.copy(sun);
