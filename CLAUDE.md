@@ -233,7 +233,14 @@ Conventions that matter:
   under the ice; Greenland's ice they have), and north of 85 degrees. The old packs (`data/e`: eight bits, min + byte ×
   scale, levels 6 and 7 only where `data/index.json` lists them) stay in the repository for the water's builder and
   as what the game draws where `data/h` is not here; the app does not carry them. They had the high Himalaya, the
-  Karakoram, the Andes and the Alps above the snows smooth, as the radar left them: Everest stood at 5,880 m.
+  Karakoram, the Andes and the Alps above the snows smooth, as the radar left them: Everest stood at 5,880 m. The app
+  does not carry the old packs; the Scenes workflow copies them into its app, so that the tour can hold the new
+  against them (`__T.oldHeights`, `hts_*_old`, `costh_*`: without them the old packs were blank ground). *What it
+  costs* (the build Mac, turn and turn about in one page): nothing that can be measured - the Alps from 19 km 12.1
+  frames a second against 11.8 with the old packs, the Himalaya from 30 km 12.7 against 12.2. A view of the Himalaya
+  from 250 km has its finest ground 13 s after the start where it had it after 7 (`load_himalaya`): a pack of the
+  heights is four million texels of lossless WebP, and the decoding and reading back is the loader's work on the
+  main thread.
 - **A pack is a texture of its own** and is not smoothed across its edge: whatever is in two packs' facing texels
   shows as a line if it differs. The picture of the Earth (`data/i`) and the water's edge (`data/w`) therefore carry
   a rim of two texels of their neighbours all round (`apron` in their lists; `bindPack` and `bindWater` leave it out
