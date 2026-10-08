@@ -177,9 +177,9 @@
     // the picture of the clouds where a line from the Earth's middle points (q: unit, the weather's turn taken out), with how
     // fast that changes across the pixel: told outright, because the picture's own edge (the date line) and the two halves of the
     // fine one would each be a line of wrong texels if the card were left to work it out
-    float cover(vec3 q, vec3 dx, vec3 dy) {
+    float cover(vec3 q, vec3 dx, vec3 dy, out vec2 uv) {
       float k = 1.0 / max(q.x * q.x + q.z * q.z, 1e-4), kl = 0.31830989 / sqrt(max(1.0 - q.y * q.y, 1e-4));
-      vec2 uv = vec2(atan(-q.z, q.x) * 0.15915494 + 0.5, asin(clamp(q.y, -1.0, 1.0)) * 0.31830989 + 0.5);
+      uv = vec2(atan(-q.z, q.x) * 0.15915494 + 0.5, asin(clamp(q.y, -1.0, 1.0)) * 0.31830989 + 0.5);
       vec2 gx = vec2((q.z * dx.x - q.x * dx.z) * k * 0.15915494, dx.y * kl), gy = vec2((q.z * dy.x - q.x * dy.z) * k * 0.15915494, dy.y * kl);
       if (uFine > 0.5) {
         vec2 u2 = vec2(clamp(fract(uv.x * 2.0), 0.00007, 0.99993), uv.y); gx.x *= 2.0; gy.x *= 2.0;
@@ -197,7 +197,11 @@
            + g1.z * (g0.y * (g0.x * textureLod(uGrain, vec3(h0.x, h0.y, h1.z), 0.0).r + g1.x * textureLod(uGrain, vec3(h1.x, h0.y, h1.z), 0.0).r)
                    + g1.y * (g0.x * textureLod(uGrain, vec3(h0.x, h1.y, h1.z), 0.0).r + g1.x * textureLod(uGrain, vec3(h1.x, h1.y, h1.z), 0.0).r)); }
     vec3 soft3(vec3 p) { vec3 t = p * 128.0 + 0.5, i = floor(t), f = t - i; return (i + f * f * (3.0 - 2.0 * f) - 0.5) * 0.0078125; }
-    float coverS(vec3 q) { return textureLod(uCloudS, vec2(atan(-q.z, q.x) * 0.15915494 + 0.5, asin(clamp(q.y, -1.0, 1.0)) * 0.31830989 + 0.5), 1.0).r; }
+    // (the small picture a step d along the shell from q, whose place in the picture is uv: moved there by how the picture's places change with q, not found anew)
+    float coverS(vec3 q, vec2 uv, vec3 d) {
+      float k = 1.0 / max(q.x * q.x + q.z * q.z, 1e-4), kl = 0.31830989 / sqrt(max(1.0 - q.y * q.y, 1e-4));
+      vec2 ua = uv + vec2((q.z * d.x - q.x * d.z) * k * 0.15915494, d.y * kl);
+      return textureLod(uCloudS, vec2(fract(ua.x), clamp(ua.y, 0.0, 1.0)), 1.0).r; }
     // Over a country that is being ruled the weather is less than the picture has it: its thin cloud is gone and its thick
     // cloud stands, white, with the country to be seen between (SKY.less is the same sum for the shadows on the ground). All
     // of it at two fifths the strength was a grey murk over the map.
@@ -205,7 +209,7 @@
     void main() {
       vec3 n = normalize(vDirW), q = vec3(n.x * uShiftCS.x - n.z * uShiftCS.y, n.y, n.z * uShiftCS.x + n.x * uShiftCS.y);
       vec3 dx = dFdx(q), dy = dFdy(q); float foot = max(length(dx), length(dy));      // (how much of the shell a pixel takes, to the unit of the globe)
-      float c = less(cover(q, dx, dy));
+      vec2 uv; float c = less(cover(q, dx, dy, uv));
       // (how the picture's cloud changes across the pixel, and the place with it: asked before any pixel is thrown away, while its neighbours still answer)
       vec3 Px = dFdx(vPosV), Py = dFdy(vPosV); float tx = dFdx(c), ty = dFdy(c);
       // Where the picture has a clear sky there is nothing to draw, and nothing more is asked: over a country that is being ruled
@@ -303,7 +307,7 @@
         // From above: lit on the side the sun is on, and in the shade of the weather beyond it toward the sun where more
         // cloud stands there than here.
         float lit = clamp(0.62 - rise * 0.9, 0.0, 1.0);
-        float ahead = less(coverS(normalize(q + sQ * (0.0016 * sl / max(sunUp + 0.1, 0.1)))));
+        float ahead = less(coverS(q, uv, sQ * (0.0016 * sl / max(sunUp + 0.1, 0.1))));
         lit *= 1.0 - 0.45 * clamp((ahead - c) * 2.5, 0.0, 1.0) * uDown;
         col = sunT * (0.52 + 0.56 * lit) * mix(0.9, 1.0, thick) + vec3(0.30, 0.38, 0.55) * 0.22 * (1.0 - lit) * day + night * (0.7 + 0.3 * lit);
       }
@@ -339,7 +343,7 @@
       // How near the eye is to a country it is over (0 from under the clouds and from far out, 1 from where the game is
       // played): there the weather is less than the picture has it (`less` in the shader), what is left of it is seen
       // through when looked straight down on, and its shadows on the ground are as much fainter.
-      const near = this.near = sm(0.55 * h, 1.15 * h, alt) * (1 - sm(0.08, 0.6, alt));
+      const near = this.near = sm(0.55 * h, 1.15 * h, alt) * (1 - sm(0.15, 0.6, alt));
       U.uBelow.value = below ? 1 : 0; U.uOpacity.value = fade; U.uNear.value = near; U.uCover.value.set(below ? 0.9 : 1.05, below ? 0.78 : 1); U.uThin.value = below ? 1 : 1 - 0.38 * near; U.uDown.value = below ? 0 : 1;
       // (heaps of cloud are drawn where one is some pixels across: from under them out to where a pixel is a kilometre of the shell, from over them a third as far)
       U.uGrainK.value.set(below ? 0.5e-4 : 2e-5, below ? 1.6e-4 : 6e-5);
