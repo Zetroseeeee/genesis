@@ -44,7 +44,7 @@ words = dict(a.split('=', 1) for a in sys.argv[1:] if '=' in a and not a.startsw
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.join(HERE, '..', '..')
 H = hashlib.sha256(open(os.path.abspath(__file__), 'rb').read()).hexdigest()[:12]
 URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/%d/%d/%d.png'
-TILE, PER, TOP, TALL, STEP = 512, 4, 7, 1.0282, 0.5
+TILE, PER, TOP, TALL, STEP, A = 512, 4, 7, 1.0282, 0.5, 2      # (A: the rim of texels of its neighbours a pack carries all round)
 Z, ZHI = int(words.get('z', 10)), int(words.get('zhigh', 10))      # (the tiles' zoom for level 7, and beyond 55 degrees, where Mercator's rows are twice as fine and more)
 CAP = 85.05112878
 KEEP = words.get('keep', 'relief')
@@ -68,6 +68,13 @@ def box(L, px, py):
     td = 360.0 / (2 << L); nx, ny, W, Hh = grid(L)
     return -180 + px * PER * td, -180 + px * PER * td + W / TILE * td, 90 - py * PER * td, 90 - py * PER * td - Hh / TILE * td, td / TILE
 
+def frame(L, px, py):
+    """the pack with its rim: the longitude of its first texel's west edge, the latitude of its first row's north edge,
+    degrees to a texel, texels across, down (A more each side than the pack itself: a lookup at a pack's edge is then as
+    good as one inside it, and two packs meet without a step - the picture of the Earth and the water's edge do the same)"""
+    lon0, lon1, lat0, lat1, dl = box(L, px, py); nx, ny, W, Hh = grid(L)
+    return lon0 - A * dl, lat0 + A * dl, dl, W + 2 * A, Hh + 2 * A
+
 
 # ------------------------------------------------------------------------------------------------- the old packs
 IDX = json.load(open(os.path.join(ROOT, 'data/index.json')))['elev']
@@ -86,9 +93,9 @@ def old_pack(L, px, py):
     return r
 
 def old_heights(L, px, py):
-    """the old packs' ground (already 2.82 % tall) at the texels of this pack: from the finest old pack that holds it"""
-    lon0, lon1, lat0, lat1, dl = box(L, px, py); nx, ny, W, Hh = grid(L)
-    lons = lon0 + (np.arange(W) + 0.5) * dl; lats = lat0 - (np.arange(Hh) + 0.5) * dl
+    """the old packs' ground (already 2.82 % tall) at the texels of this pack and its rim: from the finest old pack that holds it"""
+    lon0, lat0, dl, W, Hh = frame(L, px, py)
+    lons = lon0 + (np.arange(W) + 0.5) * dl; lats = np.clip(lat0 - (np.arange(Hh) + 0.5) * dl, -90, 90)
     for l in range(min(L, 7), -1, -1):
         sh = L - l; qx, qy = px >> sh, py >> sh       # (packs of every level are 4 x 4 tiles: a pack of level l holds 2^(L-l) of ours each way)
         if l == 7 and (qx, qy) not in L7: continue
@@ -137,8 +144,8 @@ def box_mean(M, a, b, axis):
     return np.moveaxis((I(b) - I(a)) / w, 0, axis)
 
 def from_tiles(L, px, py, z=Z):
-    """the pack's ground from the Terrain Tiles at zoom z: true metres, at least nought; NaN where there are none"""
-    lon0, lon1, lat0, lat1, dl = box(L, px, py); nx, ny, W, Hh = grid(L); S = 256 << z; n = 1 << z
+    """the pack's ground and its rim from the Terrain Tiles at zoom z: true metres, at least nought; NaN where there are none"""
+    lon0, lat0, dl, W, Hh = frame(L, px, py); lon1, lat1 = lon0 + W * dl, lat0 - Hh * dl; S = 256 << z; n = 1 << z
     out = np.full((Hh, W), np.nan, np.float32)
     top, bot = min(lat0, CAP), max(lat1, -CAP)
     if top <= bot: return out
@@ -204,7 +211,7 @@ def land_packs():
 # ------------------------------------------------------------------------------------------------- one level-7 pack
 def build7(px, py):
     """the ground of one level-7 pack, in half metres (uint16), and how much relief it has"""
-    lon0, lon1, lat0, lat1, dl = box(TOP, px, py)
+    lon0, lon1, lat0, lat1, dl = box(TOP, px, py); flon, flat, _, fw, fh = frame(TOP, px, py)
     t0 = time.time(); n0 = STATS['tiles']
     if lat0 <= -60 and SOUTH == 'old':      # Antarctica: the old packs' ice (twelve hundred metres to a texel: it is only for the levels below, and never kept at this one)
         h = old_heights(TOP, px, py); src = 'old'
@@ -218,7 +225,7 @@ def build7(px, py):
         # with holes of rock in what ice they have further south). On the ice (the planet's own map of it), wherever the old
         # packs stand higher, they are taken: the ice one stands on, and the tiles' rock where it stands out of the ice.
         if lon1 > GREEN[0] and lon0 < GREEN[1] and lat0 > GREEN[2] and lat1 < GREEN[3]:
-            w = ice_at(lon0, lat0, dl, h.shape); up = w * np.maximum(o - h, 0)
+            w = ice_at(flon, flat, dl, h.shape); up = w * np.maximum(o - h, 0)
             if up.max() > 50: src += ' + the ice %.0f %%' % (100 * (up > 50).mean())
             h += up
         # Spikes: a few tiles have ground kilometres high in a plain (Alaska had one of 26 km; Yemen, New Zealand): where the
@@ -229,9 +236,9 @@ def build7(px, py):
         om = ndimage.maximum_filter(o, 11); gl = ((h - om > 2000) & (om < 2500)) | (h > 9150)
         if gl.any():
             gl = ndimage.binary_dilation(gl, iterations=4) & (h > o + 200); h[gl] = o[gl]; src += ' + %d spiked texels' % gl.sum()
-        if lat1 < -60 and SOUTH == 'old': h[np.arange(h.shape[0]) * dl > lat0 + 60] = old_heights(TOP, px, py)[np.arange(h.shape[0]) * dl > lat0 + 60]
+        if lat1 < -60 and SOUTH == 'old': south = flat - (np.arange(h.shape[0]) + 0.5) * dl < -60; h[south] = o[south]
     v = np.clip(np.round(h / STEP), 0, 65535).astype(np.uint16)
-    land = v > 0
+    h = h[A:-A, A:-A]; land = v[A:-A, A:-A] > 0      # (what it says of itself: its own texels, not its rim)
     if land.any():
         q = np.percentile(h[land], [1, 99]); gy, gx = np.gradient(h); slope = float(np.mean(np.hypot(gx, gy)[land])) / (dl * 111320)
     else: q, slope = (0, 0), 0.0
@@ -250,7 +257,7 @@ def webp_of(v):
 def gain(v, mask=None):
     """what a pack adds to the level below it: the mean slope of the difference between it and its own mean over 2 x 2 drawn
     up again (bilinear, as the card would draw the coarser level) - nought on a plain, tenths in mountains"""
-    a = v.astype(np.float32) * STEP; h2, w2 = a.shape[0] // 2, a.shape[1] // 2
+    v = v[A:-A, A:-A]; a = v.astype(np.float32) * STEP; h2, w2 = a.shape[0] // 2, a.shape[1] // 2
     c = a.reshape(h2, 2, w2, 2).mean(axis=(1, 3)); from scipy import ndimage
     up = ndimage.zoom(c, 2, order=1, mode='nearest', grid_mode=True)[:a.shape[0], :a.shape[1]]
     gy, gx = np.gradient(a - up); m = v > 0 if mask is None else mask
@@ -308,9 +315,36 @@ def trial(packs):
 
 
 # ------------------------------------------------------------------------------------------------- the whole Earth
+def pad(L, inner):
+    """the packs of a level with their rims, from the packs beside them (the longitudes go round; past a pole the edge row
+    stands again; beside nothing but sea, nought): {(px, py): file of the pack itself} -> {(px, py): file with its rim}"""
+    nx, ny, W, Hh = grid(L); out = {}; cache = OrderedDict()
+    def get(k):
+        if k not in inner: return None
+        if k not in cache:
+            cache[k] = load_png(inner[k])
+            while len(cache) > 12: cache.popitem(last=False)
+        cache.move_to_end(k); return cache[k]
+    for (px, py) in sorted(inner, key=lambda k: (k[1], k[0])):
+        c = get((px, py)); big = np.zeros((Hh + 2 * A, W + 2 * A), np.uint16); big[A:-A, A:-A] = c
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if dx == 0 and dy == 0: continue
+                cols = slice(W - A, W) if dx < 0 else slice(0, A) if dx > 0 else slice(0, W)
+                if 0 <= py + dy < ny:
+                    n = get(((px + dx) % nx, py + dy)); rows = slice(Hh - A, Hh) if dy < 0 else slice(0, A) if dy > 0 else slice(0, Hh)
+                else:      # (past the pole: the edge row of the pack below it, again)
+                    n = get(((px + dx) % nx, py)); rows = slice(0, 1) if dy < 0 else slice(Hh - 1, Hh)
+                if n is None: continue
+                ys = slice(0, A) if dy < 0 else slice(A + Hh, 2 * A + Hh) if dy > 0 else slice(A, A + Hh)
+                xs = slice(0, A) if dx < 0 else slice(A + W, 2 * A + W) if dx > 0 else slice(A, A + W)
+                big[ys, xs] = n[rows, cols]
+        f = os.path.join(os.path.dirname(inner[(px, py)]), os.path.basename(inner[(px, py)])[2:]); save_png(f, big, 1); out[(px, py)] = f
+    return out
+
 def pyramid(have7):
-    """levels 6 .. 0, each the mean of the four texels under it; returns {level: {(px, py): uint16 array}} on disk"""
-    have = {TOP: have7}
+    """levels 6 .. 0, each the mean of the four texels under it, then given its rim; {level: {(px, py): file}} (with rims)"""
+    have = {TOP: have7}; inner = {TOP: None}
     for L in range(TOP - 1, -1, -1):
         nx, ny, W, Hh = grid(L); cnx, cny, cW, cH = grid(L + 1); cur = {}
         for py in range(ny):
@@ -320,15 +354,35 @@ def pyramid(have7):
                 if not kids: continue
                 big = np.zeros((Hh * 2, W * 2), np.float32)
                 for cx, cy in kids:
-                    a = load_png(have[L + 1][(cx, cy)]).astype(np.float32); ox, oy = (cx - 2 * px) * cW, (cy - 2 * py) * cH
+                    a = load_png(have[L + 1][(cx, cy)])[A:-A, A:-A].astype(np.float32); ox, oy = (cx - 2 * px) * cW, (cy - 2 * py) * cH
                     big[oy:oy + a.shape[0], ox:ox + a.shape[1]] = a
                 v = np.round(big.reshape(Hh, 2, W, 2).mean(axis=(1, 3))).astype(np.uint16)
                 if L == 5 and py == grid(5)[1] - 1:      # (the packs of level 5 wholly south of 67.5 degrees: the old packs' own, as they were, not a blur of them)
-                    o = old_heights(5, px, py); v = np.clip(np.round(o / STEP), 0, 65535).astype(np.uint16)
+                    o = old_heights(5, px, py)[A:-A, A:-A]; v = np.clip(np.round(o / STEP), 0, 65535).astype(np.uint16)
                 if not v.any(): continue
-                f = os.path.join(WORK, 'h', '%d_%d_%d.png' % (L, px, py)); save_png(f, v, 1); cur[(px, py)] = f
-        have[L] = cur; say('level %d: %d packs with land' % (L, len(cur)))
+                f = os.path.join(WORK, 'h', 'i_%d_%d_%d.png' % (L, px, py)); save_png(f, v, 1); cur[(px, py)] = f
+        have[L] = pad(L, cur); say('level %d: %d packs with land' % (L, len(cur)))
     return have
+
+def feather(L, k, f, have, kept, target):
+    """A pack of a finer level that is kept beside one that is drawn from a coarser level (target: which) is made the coarser
+    level along that edge and comes to its own over sixty texels: where the two meet the ground is the same, and there is no
+    wall (on a mountain, a step between the two levels is hundreds of metres)."""
+    px, py = k; v = load_png(f).astype(np.float32); Hp, Wp = v.shape; nx, ny, W, Hh = grid(L)
+    w = np.zeros_like(v); F = 60.0; xi = np.arange(Wp) - A + 0.5; yi = np.arange(Hp) - A + 0.5
+    edge = lambda d: 1 - np.clip((d - 0.5) / F, 0, 1) ** 2 * (3 - 2 * np.clip((d - 0.5) / F, 0, 1))
+    for (dx, dy), lev in target.items():
+        if lev is None: continue
+        if dx < 0: w = np.maximum(w, edge(xi)[None, :])
+        if dx > 0: w = np.maximum(w, edge(W - xi)[None, :])
+        if dy < 0: w = np.maximum(w, edge(yi)[:, None])
+        if dy > 0: w = np.maximum(w, edge(Hh - yi)[:, None])
+    lev = min(l for l in target.values() if l is not None); kk = L - lev; q = 1 << kk
+    c = load_png(have[lev][(px >> kk, py >> kk)]).astype(np.float32)
+    fx = ((px % q) * W + xi) / q + A - 0.5; fy = ((py % q) * Hh + yi) / q + A - 0.5      # (the GPU's own weighing of the coarser texels, at ours)
+    x0 = np.clip(np.floor(fx).astype(int), 0, c.shape[1] - 2); y0 = np.clip(np.floor(fy).astype(int), 0, c.shape[0] - 2); ax = (fx - x0)[None, :]; ay = (fy - y0)[:, None]
+    up = (c[y0][:, x0] * (1 - ax) + c[y0][:, x0 + 1] * ax) * (1 - ay) + (c[y0 + 1][:, x0] * (1 - ax) + c[y0 + 1][:, x0 + 1] * ax) * ay
+    save_png(f, np.round(v * (1 - w) + up * w).astype(np.uint16), 1)
 
 def whole(keep):
     land = sorted(land_packs()); say('%d packs of level 7 have land in them' % len(land))
@@ -337,7 +391,7 @@ def whole(keep):
         px, py = k; f = os.path.join(WORK, 'h', '7_%d_%d.png' % (px, py))
         if os.path.exists(f) and os.path.exists(f + '.json'): return k, f, json.load(open(f + '.json'))
         v, st = build7(px, py)
-        if not v.any(): return k, None, st
+        if not v[A:-A, A:-A].any(): return k, None, st
         st['adds'] = gain(v); save_png(f, v, 6); json.dump(st, open(f + '.json', 'w'))
         return k, f, st
     with cf.ThreadPoolExecutor(int(words.get('packs', 4))) as ex:      # (some packs at a time: while one waits for its tiles another is averaged or written)
@@ -347,37 +401,51 @@ def whole(keep):
             if done[0] % 25 == 0 or st.get('top', 0) > 7000: say('7/%d/%d: %s (%d of %d; %d tiles so far, %.1f GB)' % (k[0], k[1], st, done[0], len(land), STATS['tiles'], STATS['bytes'] / 1e9))
     say('level 7: %d packs; tiles fetched %d (%.1f GB), failed %d' % (len(have7), STATS['tiles'], STATS['bytes'] / 1e9, STATS['failed']))
     have = pyramid(have7)
-    sheet(have)      # (before the packs of level 7 are put away)
+    sheet(have)
     # Every pack in WebP (lossless) at its level's step: a metre at level 7, two at 6, four at 5 ... - the slope it can tell
     # is the same at every level. Levels 0 to 5 wherever there is land; 6 and 7 where they add most to the level below
     # (gain: the mean slope of the difference), until each has spent its share of the pack (budget6, budget7: MB) - and
     # never where the old packs were all there was (Antarctica: a finer level of those would only be a blur of them).
+    # A pack of level 7 that is kept keeps its pack of level 6 too: where the eye draws back, the ground goes to 6, not 5.
     old = {k for k, s in stats.items() if s['src'] == 'old'}
     cand = {TOP: [k for k in have7 if k not in old]}
     cand[6] = [(px, py) for (px, py) in have[6] if any((cx, cy) in have7 and (cx, cy) not in old for cy in (2 * py, 2 * py + 1) for cx in (2 * px, 2 * px + 1))]
-    adds = {TOP: {k: stats[k]['adds'] for k in cand[TOP]}, 6: {}}
-    enc = os.path.join(WORK, 'enc'); os.makedirs(enc, exist_ok=True)
-    jobs = [(L, k) for L in range(0, 6) for k in have[L]] + [(6, k) for k in cand[6]] + [(TOP, k) for k in cand[TOP]]
-    sizes = {}
-    import multiprocessing
-    with cf.ProcessPoolExecutor(os.cpu_count() or 2, mp_context=multiprocessing.get_context('spawn')) as pool:
-        futs = {pool.submit(_encode, have[L][k], L, os.path.join(enc, '%d_%d_%d.webp' % ((L,) + k)), L == 6): (L, k) for L, k in jobs}
-        for n, f in enumerate(cf.as_completed(futs)):
-            L, k = futs[f]; size, g = f.result(); sizes[(L, k)] = size
-            if L == 6: adds[6][k] = g
-            if n % 200 == 0: say('  encoded %d of %d' % (n + 1, len(jobs)))
+    adds = {TOP: {k: stats[k]['adds'] for k in cand[TOP]}, 6: {k: gain(load_png(have[6][k])) for k in cand[6]}}
+    sizes = {(L, k): os.path.getsize(have[L][k]) * 0.72 for L in (6, TOP) for k in cand[L]}      # (what a pack will weigh in WebP: some seven tenths of its PNG)
     kept = {}
-    for L, budget in ((6, float(words.get('budget6', 180))), (TOP, float(words.get('budget7', 200)))):
-        order = sorted(cand[L], key=lambda k: -adds[L][k]); spent = 0; kept[L] = set()
+    for L, budget in ((TOP, float(words.get('budget7', 200))), (6, float(words.get('budget6', 180)))):
+        order = sorted(cand[L], key=lambda k: -adds[L][k]); kept[L] = set()
+        if L == 6: kept[6] = {(px >> 1, py >> 1) for (px, py) in kept[TOP] if (px >> 1, py >> 1) in have[6]}
+        spent = sum(sizes[(L, k)] for k in kept[L]) / 1e6
         for k in order:
+            if k in kept[L]: continue
             if spent + sizes[(L, k)] / 1e6 > budget: break
             kept[L].add(k); spent += sizes[(L, k)] / 1e6
-        last = adds[L][order[len(kept[L]) - 1]] if kept[L] else 0
-        say('level %d: kept %d of %d packs (%.0f MB of %.0f), down to a gain of %.4f; the gains: %s' % (L, len(kept[L]), len(order), spent, budget, last,
+        say('level %d: kept %d of %d packs (some %.0f MB of %.0f); the gains: %s' % (L, len(kept[L]), len(order), spent, budget,
             ' '.join('%.3f' % adds[L][order[min(len(order) - 1, int(q * len(order)))]] for q in (0, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9))))
+    # where a kept pack meets one that is drawn from a coarser level, it is made that level along the edge
+    nf = 0
+    for L in (6, TOP):
+        nx, ny, W, Hh = grid(L)
+        for (px, py) in sorted(kept[L]):
+            target = {}
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                q = ((px + dx) % nx, py + dy)
+                if q[1] < 0 or q[1] >= ny or q in kept[L] or q not in have[L]: target[(dx, dy)] = None; continue
+                target[(dx, dy)] = 6 if L == TOP and (q[0] >> 1, q[1] >> 1) in kept[6] else 5
+            if any(v is not None for v in target.values()): feather(L, (px, py), have[L][(px, py)], have, kept, target); nf += 1
+    say('%d kept packs made their coarser level along an edge' % nf)
+    enc = os.path.join(WORK, 'enc'); os.makedirs(enc, exist_ok=True)
+    jobs = [(L, k) for L in range(0, 6) for k in have[L]] + [(L, k) for L in (6, TOP) for k in kept[L]]
+    import multiprocessing
+    with cf.ProcessPoolExecutor(os.cpu_count() or 2, mp_context=multiprocessing.get_context('spawn')) as pool:
+        futs = {pool.submit(_encode, have[L][k], L, os.path.join(enc, '%d_%d_%d.webp' % ((L,) + k))): (L, k) for L, k in jobs}
+        for n, f in enumerate(cf.as_completed(futs)):
+            f.result()
+            if n % 100 == 0: say('  encoded %d of %d' % (n + 1, len(jobs)))
     # the bundles
     index = dict(made=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), hash=H, source='the Terrain Tiles (Mapzen/Tilezen on AWS Open Data: SRTM, 3DEP, GMTED2010, ETOPO1 and national surveys); Antarctica from the old packs',
-                 packTiles=PER, tile=TILE, maxLevel=TOP, tall=TALL, ext='webp', levels={})
+                 packTiles=PER, tile=TILE, apron=A, maxLevel=TOP, tall=TALL, ext='webp', levels={})
     tar = tarfile.open(os.path.join(OUT, 'heights-%s.tar' % H), 'w'); total = 0
     for L in range(0, TOP + 1):
         nx, ny, W, Hh = grid(L); n = 8; marks = []
@@ -407,14 +475,12 @@ def step_of(L):
     """metres to a step at level L: a metre at the finest, doubling with every level below (but no coarser than 32 m)"""
     return float(min(32, 2 ** (TOP - L)))
 
-def _encode(src, L, out, want_gain=False):
-    """one pack from its half metres to WebP at its level's step; its size, and (for level 6) what it adds to the level below"""
+def _encode(src, L, out):
+    """one pack from its half metres to WebP at its level's step"""
     v = load_png(src); w = np.round(v.astype(np.float64) * STEP / step_of(L)).astype(np.uint16)
     rgb = np.zeros(w.shape + (3,), np.uint8); rgb[..., 0] = w >> 8; rgb[..., 1] = w & 255
     Image.fromarray(rgb).save(out + '.part', 'WEBP', lossless=True, quality=100, method=4); os.replace(out + '.part', out)
-    g = gain(v) if want_gain else 0.0
-    if L == TOP: os.remove(src)      # (the runner's disk: level 7 is most of it, and nothing more is made from it)
-    return os.path.getsize(out), g
+    return os.path.getsize(out)
 
 def save_png(f, v, level=9):
     rgb = np.zeros(v.shape + (3,), np.uint8); rgb[..., 0] = v >> 8; rgb[..., 1] = v & 255
@@ -424,14 +490,14 @@ def load_png(f):
 
 def sheet(have):
     nx, ny, W, Hh = grid(3); world = np.zeros((ny * Hh, nx * W), np.uint16)
-    for (px, py), f in have[3].items(): world[py * Hh:(py + 1) * Hh, px * W:(px + 1) * W] = load_png(f)
-    Image.fromarray(shade(world, 16)).resize((4096, 2048)).save(os.path.join(OUT, 'planet_heights_world.jpg'), quality=85)
+    for (px, py), f in have[3].items(): world[py * Hh:(py + 1) * Hh, px * W:(px + 1) * W] = load_png(f)[A:-A, A:-A]
+    Image.fromarray(shade(world, 16 / 12)).resize((4096, 2048)).save(os.path.join(OUT, 'planet_heights_world.jpg'), quality=85)      # (twelve times as steep, to be seen)
     rows = []
     for name, lon, lat in (('Everest', 86.925, 27.988), ('K2', 76.513, 35.881), ('Mont Blanc', 6.865, 45.833), ('Aconcagua', -70.011, -32.653), ('Denali', -151.007, 63.069), ('Kilimanjaro', 37.355, -3.066)):
         px, py = int((lon + 180) / (360 / (2 << TOP)) // PER), int((90 - lat) / (360 / (2 << TOP)) // PER)
         f = have[TOP].get((px, py))
         if not f: continue
-        v = load_png(f); a0, a1, b0, b1, dl = box(TOP, px, py); x, y = int((lon - a0) / dl), int((b0 - lat) / dl)
+        v = load_png(f)[A:-A, A:-A]; a0, a1, b0, b1, dl = box(TOP, px, py); x, y = int((lon - a0) / dl), int((b0 - lat) / dl)
         y0, x0 = min(max(y - 256, 0), v.shape[0] - 512), min(max(x - 256, 0), v.shape[1] - 512)
         rows.append(Image.fromarray(shade(v[y0:y0 + 512, x0:x0 + 512])))
         say('%s: the highest within 2 km %d m (the Earth times %.4f)' % (name, v[max(0, y - 6):y + 7, max(0, x - 6):x + 7].max() * STEP, TALL))

@@ -1589,7 +1589,8 @@
       else maxL = Math.min(L, this.imgMax);
       if (kind === 'i' && !this.img) return null;
       const per = kind === 'e' ? (this.heights || this.index.elev).packTiles : this.img.packTiles;
-      const ap = kind === 'i' ? this.img.apron || 0 : 0, ts = kind === 'i' ? this.img.tile || 512 : 1;      // (the picture's packs have a rim of texels all round; the heights' have none)
+      const rim = kind === 'i' ? this.img : kind === 'e' && this.heights ? this.heights : null;      // (the picture's packs and the heights' have a rim of their neighbours' texels all round; the old heights' have none)
+      const ap = rim ? rim.apron || 0 : 0, ts = rim ? rim.tile || 512 : 1;
       let ideal = null;
       for (let l = maxL; l >= 0; l--) {
         const sh = L - l; const txl = tx >> sh, tyl = ty >> sh;
@@ -1607,6 +1608,7 @@
             const sx = ptx * ts + 2 * ap, sy = pty * ts + 2 * ap, f = 4096 * Math.pow(2, Math.min(0, 3 - l));
             return { pack: p, rect: [(ap + u0 * ptx * ts) / sx, (ap + v0 * pty * ts) / sy, within * ts / sx, within * ts / sy], level: l, k: [f * sx / (ptx * ts), f * sy / (pty * ts)] };
           }
+          if (ap) { const sx = ptx * ts + 2 * ap, sy = pty * ts + 2 * ap; return { pack: p, rect: [(ap + u0 * ptx * ts) / sx, (ap + v0 * pty * ts) / sy, within * ts / sx, within * ts / sy], level: l }; }
           return { pack: p, rect: [u0, v0, within / ptx, within / pty], level: l };
         }
       }
@@ -1846,7 +1848,8 @@
       // pack covers lon range
       const lonW = 360 / tilesX * ptx, latH = 180 / tilesY * pty;
       const lon0 = -180 + px * per * 360 / tilesX, lat0 = 90 - py * per * 180 / tilesY;
-      const fx = ((lon - lon0) / lonW) * best.w - 0.5, fy = ((lat0 - lat) / latH) * best.h - 0.5;
+      const ap = this.heights ? this.heights.apron || 0 : 0;      // (the heights' packs carry a rim of their neighbours' texels)
+      const fx = ap + ((lon - lon0) / lonW) * (best.w - 2 * ap) - 0.5, fy = ap + ((lat0 - lat) / latH) * (best.h - 2 * ap) - 0.5;
       const x0 = Math.max(0, Math.min(best.w - 2, Math.floor(fx))), y0 = Math.max(0, Math.min(best.h - 2, Math.floor(fy)));
       const ax = Math.max(0, Math.min(1, fx - x0)), ay = Math.max(0, Math.min(1, fy - y0));
       const d = best.data, w = best.w;
