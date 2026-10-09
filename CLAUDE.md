@@ -1176,6 +1176,34 @@ Conventions that matter:
   up to 290, wherever the eye went next. (Found by a picture of Tibet taken in a page that had looked at a town
   first: when a picture shows something the place cannot have, ask where the page had been.)
 
+## The interface
+
+- **Plates set in the age's metal** (the styles in `index.html`). Every plate is dark enamel in a rim of metal, and the metal
+  is the player's age: `body[data-age]` (set in `updateEconomy`; none on the home screen) gives `--m`, `--m-hi`, `--m-lo` and an
+  ornament for the corners of the great plates (`--orn`, a mask: cupules, a spiral, an iron bracket, a meander, a quatrefoil, a
+  volute, rivets, deco steps, a line of glass). Flint and ochre, bronze, iron, gold on marble, gilt, brass, copper, the brass of
+  the machine age, glass. `--gold` and `--gold-2`, the accents everywhere, are the metal; text is vellum on ink in every age.
+  A rim is the border's own background (`var(--plate) padding-box, var(--rim) border-box` with a transparent border), so a plate
+  needs no pseudo-element and no position of its own. No blur over the globe (it would be redone every frame).
+- **The top bar**: the ruler's seal (`#id-seal`: the face from `portrait.js`, in a ring of the realm's colour; it opens the realm,
+  its tooltip names realm, ruler, house and heir), the realm's name, age, form and ruler; the ledger; the date with the nine ages
+  under it (`#ages`: those behind the player in metal, the one it is in filled as far as it has come, a white tick where the
+  world's front is; it opens where the realm stands in knowledge). `--top` is its height: the panels under it begin below it.
+  As the window narrows the ruler's line goes first (1,540 px), then the ledger's changes (1,320), then everything but the seal
+  (1,100).
+- **What is under way** (`#tracker`, `updateTracker` in `main.js`): a story waiting, the discovery studied, a demand, the reform,
+  the three works nearest done, hosts in the field, each war and how it stands, a golden age, debts. Each line opens its page or
+  flies to its place; it folds away (`settings.trackerFolded`) and is hidden when nothing is under way.
+- **What needs the player** (`#notes`, `renderNotes`): every item of `computeAttention` as a seal beside the turn button, the
+  nearest being what the button opens; each opens its own. The turn button is the largest seal, in the age's metal unless a war,
+  a warning or good news has it.
+- **The dock** (`#bl`): seals with their names, in three groups (the realm; its screens; the map's tools); below 1,320 px the
+  names go and the tooltips stay.
+- Names of classes inside the interface are scoped to their plate (`#tracker .trk`, `#notes .note`): the screens use short
+  names of their own (the market's `.tk`, the news' `.note`), and a bare `.note { width: 40px }` once shrank the news to dots.
+- Look at `hud`, `hud_laws`, `hud_copper` and `hud_glass` on the Mac after touching any of it (`tools/scenes/hud.js`, after
+  `dip.js`: works, a host, a reform and a discovery under way; `age` dresses the interface in another age's metal).
+
 ## The home screen
 
 The game opens on the Earth itself, large, running off the right and the bottom of the window (`HOME` in `main.js`:
