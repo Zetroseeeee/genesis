@@ -23,6 +23,8 @@
     const q = [c.capital], seen = new Set(q); let got = 0; const mine = [];
     while (q.length && got < P.land) { const i = q.shift(); for (let k = 0; k < 8; k++) { const n = nb(i, k); if (n < 0 || seen.has(n) || !S.land[n] || (S.flags[n] & 8)) continue; seen.add(n); const o = S.owner[n]; if (o >= 0 && S.civs[o] && S.civs[o].capital === n) continue; if (o !== c.id) { S.claim(n, c, i); got++; } S.pop[n] = Math.max(S.pop[n], got % 3 === 0 ? 30 : 4); mine.push(n); q.push(n); } }
     S.pop[c.capital] = Math.max(S.pop[c.capital], 40); c.stability = 0.8; S.special[c.capital] |= 2 | 4 | 8; S.recount(); S.touchAll();
+    // (the neighbours keep still: a realm cut out of theirs in a world at random could be gone again before its story is told)
+    for (const x of S.civs) if (x && !x.player) { x.aggression = 0; if (x.dip) x.dip.think = 1e12; }
     S.rule.setForm(c.id, c, RULE.FORM.feudal, 'reform'); G.run(2);
     const y = S.year, r = D.rulerOf(c.id); r.f = false; c.ruler.fem = false; c.ruler.title = S.rule.naming(c).titles[0]; r.b = y - 52; r.r = [y - 21, 0]; c.ruler.since = y - 21;
     for (const id of r.k) D.P.delete(id); r.k = []; { const was = D.of(r.s); if (was) { was.s = 0; was.k = []; } }
