@@ -840,7 +840,8 @@ server.listen(0, async () => {
     check(q.open && q.same && /festival/i.test(q.title), `the turn button opens it again, and time does not go on: ${q.title}`);
     // keys: 1 chooses the first choice, Enter closes what came of it
     await page.keyboard.press('1'); await frames(1); q = await ev(() => ({ out: !document.getElementById('tl-out').hidden })); check(q.out, 'key 1 chooses the first choice');
-    await page.keyboard.press('Enter'); await frames(1); q = await ev(() => ({ open: TALES.isOpen() })); check(!q.open, 'Enter closes the page');
+    { const y0 = await ev(() => __G.sim.year); await page.keyboard.press('Enter'); await frames(2); q = await ev((y) => ({ open: TALES.isOpen(), other: [...document.querySelectorAll('dialog[open]')].map((d) => d.id).join(','), running: __G.turnRun.active, same: __G.sim.year === y }), y0);
+      check(!q.open, 'Enter closes the page'); check(!q.other && !q.running && q.same, `the Enter that closes the page is not the turn button's (open: ${q.other || 'nothing'}, ${q.running ? 'time runs' : 'time stands'})`); }
     // stories off: nothing comes before the court
     await ev(() => { const el = document.getElementById('opt-stories'); el.checked = false; el.dispatchEvent(new Event('change')); });
     q = await ev(() => ({ on: __G.sim.storiesOn, why: __G.sim.storyTell('omen') })); check(!q.on && !!q.why, `with stories switched off, none is told (${q.why})`);
@@ -854,7 +855,7 @@ server.listen(0, async () => {
 
   // ---------- layouts ----------
   await scenario('layout: from 800x500 to 1920x1080 the HUD stays inside the viewport and the launchers clear of the minimap', async (check) => {
-    for (const vp of [{ width: 800, height: 500 }, { width: 1260, height: 700 }, { width: 1920, height: 1080 }]) {      // (1260: just wide enough for the launchers' names, where they come nearest the minimap)
+    for (const vp of [{ width: 800, height: 500 }, { width: 1260, height: 700 }, { width: 1920, height: 1080 }]) {      // (1260: the launchers without their names; 1920: with them)
       await page.setViewportSize(vp); await wait(300); await frames(3); await ev(() => { document.getElementById('l-build').click(); __G.select(__G.sim.playerCiv().capital); }); await frames(2);
       const r = await ev(() => { const ids = ['tl', 'tr', 'left', 'bl', 'bc', 'br', 'turn', 'minimapbox']; const out = []; for (const id of ids) { const el = document.getElementById(id); if (!el || getComputedStyle(el).display === 'none') continue; const b = el.getBoundingClientRect(); if (b.width === 0) continue; if (b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1) out.push(`${id} ${Math.round(b.left)},${Math.round(b.top)}-${Math.round(b.right)},${Math.round(b.bottom)}`); } const a = document.getElementById('left').getBoundingClientRect(), d = document.getElementById('bc').getBoundingClientRect(); const overlap = a.left < d.right && d.left < a.right && a.top < d.bottom && d.top < a.bottom;
         // (the bar of launchers stops short of the minimap and the turn button, and none of its names is cut off)

@@ -1072,7 +1072,7 @@
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (mode === 'intro') { homeKey(e); return; }
-      if ($('tale').open) return;      // (a story has the keyboard while it is open: 1, 2, 3 choose, Esc puts it off)
+      if ($('tale').open || e.defaultPrevented) return;      // (a story has the keyboard while it is open: 1, 2, 3 choose, Esc puts it off; the Enter that closes it is its own, not the turn button's)
       if ($('market').open) { if (e.key === 'm' || e.key === 'M') MARKET.close(); return; }      // (the market has the keyboard while it is open; Esc closes it, as it does any dialog)
       if ($('know').open) { if (e.key === 'k' || e.key === 'K') TREE.close(); return; }
       if ($('gov').open) { if (e.key === 'v' || e.key === 'V') GOV.close(); return; }
