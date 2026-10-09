@@ -20,7 +20,7 @@ window.TALES = (function () {
       const n = +e.key; if (n >= 1 && n <= 3) { const b = document.querySelector(`#tl-choices [data-tl="${n - 1}"]`); if (b && !b.getAttribute('aria-disabled')) { e.preventDefault(); choose(n - 1); } }
     });
     $('tl-x').addEventListener('click', close);
-    $('tale').addEventListener('close', () => { shown = ''; if (after) { const f = after; after = null; f(); } });
+    $('tale').addEventListener('close', () => { shown = ''; if (after) { const f = after; after = null; f(); } if (ctx.onClose) ctx.onClose(); });      // (put off, a story still waits on the turn button)
   }
   const isOpen = () => $('tale').open;
   // the story that waits, if there is one

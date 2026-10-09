@@ -815,6 +815,8 @@ server.listen(0, async () => {
     const r = await ev(() => { const S = __G.sim, c = S.playerCiv(); const med = S.ERAS[4][1] + 0.01; if (c.tech < med) { c.tech = med; c.era = S.eraOf(med); } __T.teach(c); S.rule.setForm(c.id, c, RULE.FORM.kingdom, 'reform'); __G.run(1);
       S.setStories(true); c.story = { n: S.year + 1, q: null, m: [], f: [], s: {} }; c.wealth = 8000; S.rule.ruleOf(c).auth = 120; return { year: S.year, on: document.getElementById('opt-stories').checked }; });
     check(r.on, 'the menu has stories switched on');
+    // (the new age is news that waits on the turn button: dealt with first, so that the button runs the turn)
+    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
     await ev(() => document.getElementById('turn').click());
     await page.waitForFunction(() => TALES.isOpen(), null, { timeout: 60000 }).catch(() => {});
     let q = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { open: TALES.isOpen(), active: __G.turnRun ? __G.turnRun.active : null, title: document.getElementById('tl-title').textContent, text: document.getElementById('tl-text').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: document.querySelectorAll('#tl-choices .tl-chip').length, foot: document.getElementById('tl-foot').textContent, q: !!(c.story && c.story.q), why: document.getElementById('report-why').textContent }; });
