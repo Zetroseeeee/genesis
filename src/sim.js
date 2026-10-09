@@ -1484,7 +1484,7 @@ function createSim(world, seed) {
   function recount() {
     popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); bestPop.fill(-1); rawPop.fill(0); held.fill(0); urban.fill(0); portCells.fill(-1);
     townsOf.fill(0); frontTech = 0; bandHi.fill(0); peakAt.fill(0);
-    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; fmOf[c] = fmNow(cv); if (cv.tech > frontTech) frontTech = cv.tech; }
+    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; fmOf[c] = fmNow(cv); if (landOn) landRow(cv); if (cv.tech > frontTech) frontTech = cv.tech; }
     for (let k = 0; k < LI.length; k++) {
       const i = LI[k]; const o = owner[i]; const c = o >= 0 ? civs[o] : null; const p = pop[i];
       if (!c) { level[i] = 0; continue; }
