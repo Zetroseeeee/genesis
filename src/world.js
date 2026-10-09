@@ -84,6 +84,8 @@
       const byForm = this.palMode === 'form' && sim.rule && window.RULE; const me = this.palMode === 'rel' && sim.diplo && window.DIPLO ? sim.playerCiv() : null; let stand = null;
       // (or, under the lens of renown, in the colour of how renowned it is against the usual for its age: culture.js BANDS)
       if (this.palMode === 'renown' && sim.culture && window.CULTURE) { const K = sim.culture; stand = (c) => CULTURE.BAND[CULTURE.band(K.rel(c.id), K.isGolden(c.id))].rgb; }
+      // (or, under the lens of sickness, by how fiercely a pestilence burns in it, or whether it is spared one lately: disease.js BANDS)
+      if (this.palMode === 'sick' && sim.disease && window.DISEASE) { const X = sim.disease, L = X.lens(new Float32Array(sim.MAXC)); stand = (c) => DISEASE.BANDS[X.bandOf(L[c.id], c.id)].rgb; }
       if (me) { if (!this.relRgb) { this.relRgb = {}; for (const k in DIPLO.STAND) { const h = DIPLO.STAND[k][1]; this.relRgb[k] = [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]; } }
         const within = new Uint8Array(sim.MAXC); for (const b of sim.diplo.reach(me.id)) within[b] = 1; within[me.id] = 1; stand = (c) => this.relRgb[within[c.id] ? sim.diplo.standing(me, c) : 'far']; }
       if (PP) { for (let p = 1; p < Math.min(4096, PP.list.length); p++) { const rgb = PP.rgbOf(p); this.palData[p * 4] = rgb[0] * 255; this.palData[p * 4 + 1] = rgb[1] * 255; this.palData[p * 4 + 2] = rgb[2] * 255; this.palData[p * 4 + 3] = 255; } }

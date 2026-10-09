@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -1169,7 +1169,7 @@ log('18. stories');
   P.wealth = 1e5; P.stability = 0.6; sim.rule.ruleOf(P).auth = 150;
   const S = sim.story; const told = (k, d) => { if (P.story) P.story.q = null; return S.tell(P, k, d); };
   // every story the realm can meet is told, read and answered, each of its choices in turn
-  let read = 0, bad = []; const keys = ['heir_cruel', 'old_ruler', 'bastard', 'birth', 'wedding', 'preacher', 'temple_lands', 'omen', 'library_fire', 'festival', 'monument', 'moneylenders', 'coiners', 'guild', 'silver', 'fair', 'bad_harvest', 'plague', 'flood', 'bandits', 'settlers', 'feud', 'petition', 'raid', 'scholars'];      // (a suitor is tried below: a marriage would bind the two realms, and no raiders come from a sworn friend)
+  let read = 0, bad = []; const keys = ['heir_cruel', 'old_ruler', 'bastard', 'birth', 'wedding', 'preacher', 'temple_lands', 'omen', 'library_fire', 'festival', 'monument', 'moneylenders', 'coiners', 'guild', 'silver', 'fair', 'bad_harvest', 'flood', 'bandits', 'settlers', 'feud', 'petition', 'raid', 'scholars'];      // (a suitor is tried below: a marriage would bind the two realms, and no raiders come from a sworn friend)
   for (const k of keys) for (let i = 0; i < 3; i++) {
     const d = k === 'birth' ? { p: small.id } : k === 'wedding' ? { a: girl.id, b: sp.id, o: -1 } : {};
     const why = told(k, d); if (why) { if (i === 0) bad.push(`${k}: ${why}`); break; }
@@ -1350,6 +1350,63 @@ log('20. intrigue');
   check(S.done > S.caught && S.caught > S.begun * 0.1, 'about half succeed, and some are found out');
   check(ms / 100 < 0.1, `intrigue is quick enough (${(ms / 100).toFixed(4)} ms a year)`);
   const size = JSON.stringify(realms.map((c) => c.intrigue)).length / 1024; check(size < 40, `what the realms' agents are about is saved in ${size.toFixed(0)} KB`);
+}
+}
+if (want(21)) {
+log('21. pestilence');
+{
+  const DS = window.DISEASE;
+  check(DS.KINDS.length === 6 && DS.KINDS.every((K) => K.dead > 0 && K.attack > 0 && K.burn >= 2 && K.virgin >= K.endemic && K.text.length > 30) && DS.BANDS.length === 4, 'six kinds of sickness, each worse among a people that never had it; four bands for the lens');
+  // a kingdom of the Iron Age (the player's) beside another, both in the old world
+  const sim = createSim(wd, 103), RF = window.RULE.FORM, X = sim.disease; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
+  const iron = sim.ERAS[2][1] + 0.01; sim.setPlayer(k0, 'Sickland'); const P = sim.playerCiv(); P.tech = iron; P.era = sim.eraOf(iron); teach(sim, P, 2); sim.rule.setForm(P.id, P, RF.kingdom, 'reform');
+  for (let d = 1; d <= 6; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); sim.pop[i] = 30; }
+  const B = sim.spawnTribe(k0 + 8, {}); B.tech = iron; B.era = sim.eraOf(iron); teach(sim, B, 2); B.aggression = 0; B.dip.think = 1e12;
+  for (let d = 7; d <= 10; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, B, k0 + 8); sim.pop[i] = 30; }
+  sim.touchAll(); sim.recount(); for (let y = 0; y < 3; y++) sim.tick(); sim.recount(); sim.setStories(true); if (P.story) { P.story.q = null; P.story.n = 1e12; }
+  X.out.length = 0;      // (no other sickness while this is tried)
+  // an outbreak begun in the neighbour: it burns there, kills, and goes over the border
+  { const why = X.seed(B.capital, 'pox'); let o = X.out.find((q) => q.k === DS.KK.pox.id);
+    check(why === null && !!o && o.inf[B.id] > 0 && o.n === 1, `an outbreak of smallpox begins in the neighbour (${o ? o.name : why})`);
+    let reached = -1; const first = o;
+    for (let n = 0; n < 5 && reached < 0; n++) {      // (it crosses a border as often as its spread says: tried with up to five outbreaks)
+      if (n) { for (let k = 0; k < DS.NK; k++) { X.imm[B.id * DS.NK + k] = -1e9; X.imm[P.id * DS.NK + k] = -1e9; } X.seed(B.capital, 'pox'); o = X.out.find((q) => q.k === DS.KK.pox.id && q !== first) || o; }
+      for (let y = 0; y < 40 && X.out.indexOf(o) >= 0; y++) { sim.tick(); if (reached < 0 && o.inf[P.id] > 0) reached = sim.year; if (P.story) P.story.q = null; } }
+    o = first;
+    check(o.dead > 0 && o.realms >= 2, `it kills (${o.dead.toFixed(1)}) and goes on to other realms (${o.realms})`);
+    check(reached > 0, `it crosses the border into the player's realm (${reached > 0 ? sim.fmtYear(reached) : 'never'})`);
+    const yr = sim.year; check(X.imm[B.id * DS.NK + DS.KK.pox.id] > yr - 30 && X.had[B.id * DS.NK + DS.KK.pox.id] >= 1, 'burned out, it leaves those who lived through it spared, and remembered'); }
+  // what makes it deadlier or milder: a people that never had it, the age's medicine
+  { X.seed(B.capital, 'measles'); const o = X.out.find((q) => q.k === DS.KK.measles.id); const kb = B.id * DS.NK + DS.KK.measles.id;
+    const h0 = X.had[kb]; X.had[kb] = 0; const v = X.deadly(o, B); X.had[kb] = 3; const e = X.deadly(o, B);
+    check(v / e > 15, `measles kills ${(v / e).toFixed(0)} times as many among a people that never had it`);
+    const era0 = B.era; B.era = 7; const m = X.deadly(o, B); B.era = era0; X.had[kb] = h0; check(m < e * 0.2, `and far fewer in an age that knows how to fight it (${(e / m).toFixed(1)} times fewer)`); }
+  // the player: shut against the sick, at a price in trade
+  { check(sim.shutAgainst(2) === null && P.sick.q === 2 && X.incF(P.id) < 0.9, 'the realm shut against the sick: income falls'); const v = sim.diseaseView(); check(v.q === 2, 'and the lens\'s key says so'); sim.shutAgainst(0); check(X.incF(P.id) === 1, 'opened again'); }
+  // the story when a pestilence reaches the realm: the gates shut, physicians sent
+  { X.out.length = 0; for (let k = 0; k < DS.NK; k++) X.imm[P.id * DS.NK + k] = -1e9; if (P.story) P.story.q = null; P.story.s = {};
+    X.seed(P.capital, 'plague'); const o = X.out.find((q) => q.k === DS.KK.plague.id); const v = sim.storyView();
+    check(!!v && v.k === 'plague' && v.title.includes(o.name.charAt(0).toUpperCase() + o.name.slice(1)) && !/undefined|NaN/.test(v.text + v.opts.map((q) => q.t + q.chips.map((c) => c.t).join()).join()), `the court is told: "${v ? v.title : 'nothing'}": ${v ? v.text.slice(0, 80) : ''}`);
+    const res = sim.storyChoose(0); check(typeof res === 'object' && P.sick.q === 2 && P.sick.until > sim.year && o.cure[P.id] < 1, `the gates and the harbours shut (until ${sim.fmtYear(P.sick.until)}), and fewer of the sick die (${o.cure[P.id]})`); }
+  // the god's plague goes on from where it was sent
+  { X.out.length = 0; sim.plague(B.capital, 4, false); check(X.out.some((q) => q.k === DS.KK.plague.id && q.inf[B.id] > 0), 'the god\'s plague is a pestilence that travels'); }
+  // saved and loaded; a world from before sickness travelled
+  { if (P.story) P.story.q = null; const saved = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(saved); const X2 = s2.disease;
+    check(X2.out.length === X.out.length && X2.out.every((o, n) => o.name === X.out[n].name && Math.abs(o.inf[B.id] - X.out[n].inf[B.id]) < 0.002) && Array.from(X2.had).join() === Array.from(X.had).join() && s2.playerCiv().sick.q === P.sick.q, `what is under way and what every people has had is saved with the world (${X.out.map((o) => o.name).join(', ')})`);
+    const old = JSON.parse(JSON.stringify(saved)); delete old.disease; const s3 = createSim(wd, 1); s3.load(old); check(s3.disease.out.length === 0, 'a world from before sickness travelled has none under way'); }
+  // a realm born of another has lived through what it had
+  { const C = sim.spawnTribe(k0 + 3 + 2 * W, { from: P.id }); if (C) check(DS.KINDS.every((K) => X.had[C.id * DS.NK + K.id] === X.had[P.id * DS.NK + K.id]), 'a realm born of another has had what it had'); }
+}
+// the world's sicknesses: arising where people live crowded in the old world, and reaching the Americas only with the ships
+{
+  const sim = createSim(wd, 12345); let ms = 0; for (let y = 0; y < 11500; y++) { sim.tick(); if (y >= 11400) ms += sim.disease.stats.ms; } const X = sim.disease, DS = window.DISEASE;
+  const am = sim.civs.filter((c) => c && c.capital >= 0 && (() => { const lon = ((c.capital % W) + 0.5) / W * 360 - 180; return lon < -30 && lon > -170; })()); const amHad = am.filter((c) => DS.KINDS.some((K) => X.had[c.id * DS.NK + K.id])).length;
+  log(`   ${sim.fmtYear(sim.year)}: ${X.stats.begun} outbreaks (${Object.keys(X.stats.by).map((k) => k + ' ' + X.stats.by[k]).join(', ')}), ${X.stats.reached} realms reached, ${Math.round(X.stats.dead)} dead; ${amHad} of ${am.length} realms of the Americas have had any; ${(ms / 100).toFixed(4)} ms a year`);
+  check(X.stats.begun > 60 && Object.keys(X.stats.by).length >= 4 && X.stats.dead > 0, `sicknesses arise and travel (${X.stats.begun} outbreaks, ${Object.keys(X.stats.by).length} kinds)`);
+  check(am.length > 10 && amHad <= am.length * 0.1, `the Americas have met none of them before the ships (${amHad} of ${am.length} realms)`);
+  check(ms / 100 < 0.15, `sickness is quick enough (${(ms / 100).toFixed(4)} ms a year)`);
+  const size = JSON.stringify(sim.save().disease).length / 1024; check(size < 60, `what sickness keeps is saved in ${size.toFixed(0)} KB`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

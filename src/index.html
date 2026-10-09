@@ -256,6 +256,8 @@
   #lensmenu .btn { justify-content: flex-start; text-align: left; }
   #govkey { position: absolute; right: 0; bottom: calc(100% + 46px); padding: 8px 10px 9px; display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; width: 236px; box-sizing: border-box; font-size: var(--fs-cap); }
   #govkey:not([hidden]) ~ #lensmenu { right: 242px; }      /* (the layers' menu opens beside the key, not over it) */
+  #govkey .gk-row { grid-column: 1 / -1; display: flex; gap: 4px; margin-top: 5px; } #govkey .gk-row .btn { flex: 1; min-height: 24px; padding: 2px 6px; font-size: 11px; letter-spacing: 0.04em; } #govkey .gk-note { grid-column: 1 / -1; color: var(--text-3); font-size: 11px; line-height: 1.35; margin-top: 2px; }
+  #govkey .gk-sick { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; } #govkey .gk-sick small { grid-column: 1 / -1; color: var(--text-3); font-size: 11px; }
   #govkey .micro { grid-column: 1 / -1; margin-bottom: 2px; } #govkey i { width: 10px; height: 10px; border-radius: 2px; } #govkey b { font-weight: 600; font-variant-numeric: tabular-nums lining-nums; color: var(--text-2); text-align: right; } #govkey .none { color: var(--text-3); } #govkey i.off { opacity: 0.3; }
   #lensbtn { position: absolute; left: 6px; top: 6px; min-height: 26px; padding: 3px 6px; opacity: 0.85; }
   #minimapbox { position: relative; contain: layout style; }      /* (not paint: the layers' menu and the lens's key open above the box) */
@@ -1235,6 +1237,7 @@
           <button class="btn" id="v-ppl" title="Who lives where, and in what tongue (I)">Peoples</button>
           <button class="btn" id="v-fth" title="Who believes what, and where the holy cities are (J)">Faiths</button>
           <button class="btn" id="v-ren" title="How renowned each realm is for its age, and who is in a golden age (Shift+Z)">Renown</button>
+          <button class="btn" id="v-sick" title="Where pestilence burns, and who is spared it (Shift+P)">Sickness</button>
         </div>
       </div>
     </div>
@@ -1432,6 +1435,7 @@
 <script src="story.js"></script>
 <script src="legacy.js"></script>
 <script src="intrigue.js"></script>
+<script src="disease.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>

@@ -49,8 +49,9 @@ window.INTRIGUE = (function () {
     const I = (cv) => cv.intrigue || (cv.intrigue = { s: null, next: year() + Math.round(turnOf(cv) * (2 + rnd() * 4)), found: [] });
     // (the year's round touches a realm only when its agents are at work or it is due to think of a scheme: what is on the realm is
     // kept in two flat arrays too, as a filter; the realm's own record is what counts, and is looked at again whenever the filter lets it through)
-    const nextT = new Float64Array(MAXC), busy = new Uint8Array(MAXC);
-    function sync() { for (let c = 0; c < MAXC; c++) { const g = civs[c] && civs[c].intrigue; nextT[c] = g ? g.next : 0; busy[c] = g && g.s ? 1 : 0; } }
+    // (a year BC is negative: a realm with no record yet is due at once, -Infinity, not at the year nought)
+    const nextT = new Float64Array(MAXC).fill(-Infinity), busy = new Uint8Array(MAXC);
+    function sync() { for (let c = 0; c < MAXC; c++) { const g = civs[c] && civs[c].intrigue; nextT[c] = g ? g.next : -Infinity; busy[c] = g && g.s ? 1 : 0; } }
     const count = (key, k) => { const o = stats.out[key] || (stats.out[key] = [0, 0, 0]); o[k]++; };
     // how good a realm's network is: what it knows of letters, envoys and the post, its laws, its ruler
     function partsOf(cv) {
@@ -133,7 +134,7 @@ window.INTRIGUE = (function () {
       const t0 = performance.now(), yr = year();
       for (let c = 0; c < MAXC; c++) {
         if (!busy[c] && yr < nextT[c]) continue;
-        const cv = civs[c]; if (!cv) { busy[c] = 0; nextT[c] = 0; continue; } const g = I(cv);
+        const cv = civs[c]; if (!cv) { busy[c] = 0; nextT[c] = -Infinity; continue; } const g = I(cv);
         if (g.s) {
           const s = g.s, b = civs[s.on]; if (!b) { g.s = null; busy[c] = 0; continue; }
           const years = Math.max(1, s.until - s.from); const pYear = 1 - Math.pow(1 - s.risk, 1 / years);      // (found out within its years as often as its risk says)

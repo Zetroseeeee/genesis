@@ -4,7 +4,8 @@
 // market, made a feudal monarchy, and given a family (a consort, a grown heir, a daughter, a small son); then the story k is
 // told (default 'heir_cruel') and its page opened. With choose: n the court answers with choice n, and the page shows what came
 // of it. Options in window.__scene: years, lon, lat, land, k, d (what the story is told with: for 'heritage', { from, to, paths,
-// did }; for 'spies', { o: 'near', k: 'murder', p: 'heir' }), choose (-1). Answers in window.__tale.
+// did }; for 'spies', { o: 'near', k: 'murder', p: 'heir' }), kind (for 'plague': the sickness begun in the capital), choose (-1).
+// Answers in window.__tale.
 (() => {
   const G = window.__G; if (!G) return 'no game';
   const P = Object.assign({ years: 11250, lon: 2.35, lat: 48.85, land: 26, k: 'heir_cruel', choose: -1 }, window.__scene || {});
@@ -39,7 +40,8 @@
     const M = G.mapcam; M.fly = null; M.lon = M.tLon = lon; M.lat = M.tLat = lat;
     // (what the story is told with may name a realm near by, o: 'near', and the heir, p: 'heir': the spies' story)
     const d = P.d ? JSON.parse(JSON.stringify(P.d)) : undefined; if (d && d.o === 'near') { const r = S.diplo.reach(c.id).filter((id) => S.civs[id]); d.o = r.length ? r[0] : -1; } if (d && d.p === 'heir') { const h = D.heirOf(c.id); d.p = h ? h.id : 0; }
-    const why = S.storyTell(P.k, d);
+    // (the story of a pestilence is told from a real one: it is begun in the capital, and tells itself)
+    let why = null; if (P.k === 'plague' && S.disease) { if (c.story) { c.story.q = null; c.story.s = {}; } why = S.disease.seed(c.capital, P.kind || 'plague'); } else why = S.storyTell(P.k, d);
     const v = S.storyView(); window.__tale = { year: S.year, realm: S.fullName(c), k: P.k, why: why || '', title: v ? v.title : '', opts: v ? v.opts.map((o) => o.t) : [] };
     if (v) { TALES.open(); if (P.choose >= 0) setTimeout(() => { const b = document.querySelector(`#tl-choices [data-tl="${P.choose}"]`); if (b) b.click(); window.__tale.out = document.getElementById('tl-outtext').textContent; }, 1500); }
   };

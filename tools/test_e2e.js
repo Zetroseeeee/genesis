@@ -917,6 +917,29 @@ server.listen(0, async () => {
     r = await ev(() => [...document.querySelectorAll('#log .fe')].map((e) => e.textContent).join(' | ')); check(/caught in/.test(r), 'the chronicle keeps it, under Intrigue: ' + r.slice(0, 120));
     await ev(() => { document.querySelector('#logfilters [data-f="all"]').click(); document.getElementById('chron').close(); __T.quiet(); });
   });
+  await scenario('pestilence: an outbreak reaches the realm and the court is asked; the tracker opens the lens of sickness, its key shuts and opens the realm; the realm\'s panel names it', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    // smallpox begun in the player's capital, with stories on (this scenario can run by itself)
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), X = S.disease; S.setStories(true); if (c.story) { c.story.q = null; c.story.s = {}; } X.out.length = 0; for (let k = 0; k < DISEASE.NK; k++) X.imm[c.id * DISEASE.NK + k] = -1e9; if (c.sick) c.sick.q = 0;
+      const why = X.seed(c.capital, 'pox'); __G.run(0); const o = X.out[0]; return { why, name: o ? o.name : '', q: c.story && c.story.q ? c.story.q.k : '' }; });
+    check(r.why === null && r.name && r.q === 'plague', `smallpox breaks out in the capital, and the court is told (${JSON.stringify(r)})`);
+    await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    r = await ev(() => ({ title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | ') }));
+    check(r.n === 3 && /fewer of the sick die/.test(r.chips) && /shut for \d+ years/.test(r.chips), `its page: "${r.title}" (${r.chips.slice(0, 140)})`);
+    await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2); await ev(() => { if (TALES.isOpen()) TALES.close(); });
+    r = await ev(() => ({ q: __G.sim.playerCiv().sick.q }));
+    check(r.q === 2, 'the gates and the harbours are shut');
+    // the tracker names it, and opens the lens of sickness with its key
+    r = await ev(() => { __G.run(0); const b = document.querySelector('#tk-body .trk.sick'); const t = b ? b.textContent : ''; if (b) b.click(); return { row: t }; }); await frames(3);
+    r = Object.assign(r, await ev(() => ({ on: document.getElementById('v-sick').classList.contains('on'), mode: __G.world.palMode, key: document.getElementById('govkey').textContent, shut: !!document.querySelector('#govkey [data-shut="2"].on') })));
+    check(/%/.test(r.row) && r.on && r.mode === 'sick' && /Pestilence: \d+ under way/.test(r.key) && r.shut, `the tracker's line (${r.row.slice(0, 60)}) opens the lens of sickness, with its key (${r.key.slice(0, 80)})`);
+    await ev(() => document.querySelector('#govkey [data-shut="0"]').click()); await frames(2);
+    r = await ev(() => ({ q: __G.sim.playerCiv().sick.q, toast: (window.__toasts || []).slice(-1)[0] || '' })); check(r.q === 0 && /open/.test(r.toast), 'the key opens the realm again: ' + r.toast);
+    // the realm's panel
+    r = await ev(() => { __G.select(__G.sim.playerCiv().capital); return document.getElementById('sc-kv').textContent; }); check(/Sickness/.test(r), 'the realm\'s panel names it');
+    await page.keyboard.press('Shift+P'); await frames(3); r = await ev(() => ({ on: document.getElementById('v-sick').classList.contains('on'), mode: __G.world.palMode })); check(!r.on && r.mode === 'realm', 'Shift+P turns the lens off');
+    await ev(() => { __G.sim.disease.out.length = 0; __T.quiet(); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);
