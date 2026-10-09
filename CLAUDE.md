@@ -751,6 +751,8 @@ Conventions that matter:
   **Emigrants**: from a realm's crowded land (above 85 % of what it feeds) a few cells a year send people to the realm's far
   land with room (a cell twenty and more from the capital, under a third full: one a year, chosen as by lot, `roomCell`) -
   colonies across the sea, a frontier far off. Look at the Mac's `peopled`, `peopled_west` and `land_panel` after touching it.
+  In such a world the early realms lie further apart, among foragers and herders, and the late ones crowd together: the appetite
+  for war of each age (`WAR_AGE` in `sim.js`) keeps the rhythm of wars the world had (the war-and-peace probe's header).
   A world saved before the land had kinds (no `land` in its save) is fed by the old map and the table of food of 0.37
   (`FOOD_037`) and has no settlers: an update must not starve anyone's people. The inspector names a cell's kind of land and
   its share of farmland.
