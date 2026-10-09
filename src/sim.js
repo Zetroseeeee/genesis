@@ -166,6 +166,9 @@ function createSim(world, seed) {
   // how readily a realm that rules itself goes to war with a neighbour it is stronger than, each time it looks about it (every ten years): times its
   // ruler's temper, and what diplo.js makes of the reason it could give and of what it thinks of them (see "new wars" in the tick)
   const WAR_RATE = 0.16; const foes = [];
+  // (in a world whose land has kinds the early realms lie further apart, among foragers and herders, and the late ones crowd together: the
+  //  appetite of each age is set so that the world fights as often as it did before, age by age - tools/diplo/probe.js)
+  const WAR_AGE = [1.5, 1.6, 1.5, 1.35, 1.25, 1.0, 0.75, 0.72, 0.72];
   const SCHOLARS = 0.04;      // coin a thousand people pay in a year for each step of Research above 1 (and keep, below it)
   const seaRange = (t) => t < 0.22 ? 0 : 3 + Math.pow((t - 0.22) / 0.5, 2) * 85;
   const reachOf = (t) => 2.5 + t * 95; // max distance from capital, cells
@@ -697,10 +700,11 @@ function createSim(world, seed) {
     return yy * W + ((x + dx + W) % W);
   }
   // whether a realm's settlers may take cell n of realm on's: two ages ahead, land nobody much lives on (a fifth of what the settlers'
-  // ways would feed there), no town, not the capital, within the settlers' reach, never the player's (his land is taken only in war)
+  // ways would feed there), no town, not the capital, within the settlers' reach, never the player's (his land is taken only in war),
+  // and never a small people's last fifteen regions; and not every year that they could
   const frontierLog = new Map();
   function frontier(c, on, n) {
-    const e = civs[on]; if (!e || e.player || c.era - e.era < 2 || level[n] >= 2 || e.capital === n || (flags[n] & 8)) return false;
+    const e = civs[on]; if (!e || e.player || c.era - e.era < 2 || level[n] >= 2 || e.capital === n || (flags[n] & 8) || cellsOf[on] < 15 || rnd() > 0.4) return false;
     return pop[n] < 0.2 * capacity(n, c) && cellDist(n, c.capital) < reachFor(c);
   }
   function claim(i, c, from) {
@@ -1008,7 +1012,7 @@ function createSim(world, seed) {
           } else if (landOn && on !== o && !isAtWar(c, on) && frontier(c, on, n)) {
             // settlers: a realm two ages ahead takes thinly peopled land of its neighbour's without a war (the steppe ploughed, the
             // forest cleared, the colonies of the new world pushing inland), and the neighbour does not forget it
-            budget[o] -= 1; claim(n, c, i); diplo.remember(civs[on], o, -4);
+            budget[o] -= 1; claim(n, c, i); diplo.remember(civs[on], o, -1.5);
             const key = o * MAXC + on; if (!(year - (frontierLog.get(key) || -1e9) < 30)) { frontierLog.set(key, year); const where = cellName.get(n) ? ' about ' + cellName.get(n) : '';
               if (c.player) logEvent(c, `Our settlers take land of ${fullName(civs[on])}${where}`, true, 'state', n); else logEvent(civs[on], `Settlers of ${fullName(c)} take land of ${fullName(civs[on])}${where}`, cellsOf[on] > 60, 'state', n); }
           } else if (on !== o && isAtWar(c, on)) {
@@ -1033,7 +1037,7 @@ function createSim(world, seed) {
           let n2 = ocean ? COAST[rint(COAST.length)] : yy * W + ((x + dx + W) % W);
           if (ocean) for (let t = 0; t < 7 && !fits(n2); t++) n2 = COAST[rint(COAST.length)];      // (the captains look along many shores for one to settle)
           if (fits(n2)) {
-            if (owner[n2] >= 0) diplo.remember(civs[owner[n2]], o, -4);
+            if (owner[n2] >= 0) diplo.remember(civs[owner[n2]], o, -1.5);
             budget[o] -= 1; claim(n2, c, i); if (!cellName.has(n2)) cellName.set(n2, people.nameAt(n2, c) || makeName(c.style, 2, 3));
             if (cellDist(n2, i) > 12) { logEvent(c, `Ships of ${fullName(c)} found ${cellName.get(n2)} across the sea`, cellDist(n2, i) > 30 || c.player); if (legacy) legacy.colony(c); }
           }
@@ -1091,7 +1095,7 @@ function createSim(world, seed) {
         }
         if (nOld) { const A = diplo.stats.appetite; A.asked++; A.old += nOld; A.open += foes.length / 2; if (!foes.length) A.shut++; else A.kept += Math.min(nOld, 3 * foes.length / 2); }      // (for the probe: how much of the old appetite for war finds somebody it may fall on)
         if (foes.length) {
-          const nNew = foes.length / 2, mean = fSum / nNew; const base = a.aggression * tv(a, 'agg', 1) * WAR_RATE * (a.policy.stance === 'aggressive' ? 2 : 1) * Math.min(3, nOld / nNew) / Math.max(0.5, Math.min(1.3, mean));
+          const nNew = foes.length / 2, mean = fSum / nNew; const base = a.aggression * tv(a, 'agg', 1) * WAR_RATE * (landOn ? WAR_AGE[Math.max(0, Math.min(8, a.era | 0))] : 1) * (a.policy.stance === 'aggressive' ? 2 : 1) * Math.min(3, nOld / nNew) / Math.max(0.5, Math.min(1.3, mean));
           for (let k = 0; k < foes.length; k += 2) { const w = foes[k + 1]; if (rnd() < base * w.f * w.g) { diplo.declare(a, foes[k], w.key); break; } }
         }
       }

@@ -16,6 +16,10 @@
 //                                         to their lords in every age
 //   bound to somebody                     four realms in five from the Classical age on
 //   people                                within a few per cent of the same seed before diplomacy
+// Since 0.38 a world's land has kinds (land.js): its people crowd where history's did, early realms lie further apart and late
+// ones closer, and the appetite of each age is set to keep the rhythm of wars above (WAR_AGE in sim.js). Measured then over 12345
+// and 777: wars begun in a whole history 4,500 and 4,500 (5,200 and 4,500 before); realms in AD 2000 225-240 (some forty more peoples
+// are swallowed over the ages, by settlers and by lords who join their vassals to the crown); vassals 40-55; the five greatest 14-18 %.
 // If wars fall off, look at the line "appetite": pacts and fear should leave a realm somebody to fight about half the time.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;
