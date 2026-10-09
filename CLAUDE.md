@@ -708,8 +708,10 @@ Conventions that matter:
   it with hatred, a neighbour it cannot abide: `rivalsOf`), by what it needs (learning when behind, discord and sabotage at war,
   claims at peace, murder under a conqueror or a tyrant). It was measured not to move the world (the war-and-peace probe over
   12345 and 777): about seven hundred schemes in a world's history, half succeeding, a quarter found out, a handful of wars over
-  agents. A year of it is a few hundredths of a millisecond. Saved with the realm (`civ.intrigue`) and the world
-  (`save().intrigue`: its dice and counts); a world saved before intrigue has no agents abroad.
+  agents. A year of it is a few hundredths of a millisecond: the round touches only realms whose agents are at work or that
+  are due to think (two flat arrays, a filter on what is on the realms: after setting a realm's record by hand, `sync()`).
+  Saved with the realm (`civ.intrigue`) and the world (`save().intrigue`: its dice and counts); a world saved before intrigue
+  has no agents abroad.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by
