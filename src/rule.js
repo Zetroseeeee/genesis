@@ -346,7 +346,7 @@ window.RULE = (function () {
   //         works(c): workshops in its towns, sat(c, 'food' | 'luxury' | 'arms'), living(c), traded(c): the share of what it uses that crosses
   //         its border, warsN(cv), tongue(cv): the name of its tongue, nameOf(cv), event(cv, text, important, kind: 'state' for a change of government),
   //         shake(cv, by): stability falls, lose(cv, share): country people die or leave, fine(cv, share of a year's income), split(cv, why),
-  //         crown(cv): a new ruler, alarm(cv, kind): the player should be told,
+  //         crown(cv, how): a new ruler (how the form changed), alarm(cv, kind): the player should be told,
   //         news(cv, text): something the whole world hears of }
   function create(host) {
     age(); const { MAXC, civs } = host;
@@ -480,7 +480,7 @@ window.RULE = (function () {
       if (how === 'quiet') return; stats.forms++; if (how === 'grown') stats.grown++; else if (how === 'seized') stats.seized++; else if (how === 'passed') stats.passed++;
       if (stats.moves) { const mk = was.key + ' > ' + F.key + (how === 'reform' ? '' : ' (' + how + ')'); stats.moves[mk] = (stats.moves[mk] || 0) + 1; }      // (only counted when a tool asks: stats.moves = {})
       if (how !== 'grown') host.shake(cv, how === 'seized' ? 0.12 : 0.08);      // (a people that outgrows its old ways does so without a quarrel)
-      if (how === 'seized' || was.succ !== F.succ) host.crown(cv);
+      if (how === 'seized' || was.succ !== F.succ) host.crown(cv, how);      // (how: whether he was put down, or the realm grew or reformed about him: dynasty.js)
       if (how !== 'seized') host.event(cv, told(cv, was, F, before, how), host.cellsOf[c] > 40, 'state');
     }
     // a reform is begun (the authority is spent now, the change comes when its years are up); null when begun, else why not
