@@ -247,7 +247,7 @@
 
     // ---------- what the player does (works.js) ----------
     function setPatron(c, lvl) { const cv = civs[c]; if (!cv) return 'No realm'; cv.patron = Math.max(0, Math.min(3, lvl | 0)); return null; }
-    const commissionCost = (cv) => Math.round(80 + 60 * eraOf(cv));
+    const commissionCost = (cv) => Math.round(Math.max(80 + 60 * eraOf(cv), 2 * Math.max(0, cv.income || 0)));      // (what the age asks of a court, or two years of its income, whichever is more)
     function commission(c, gpId) {
       const cv = civs[c], gp = greatOf(gpId); if (!cv || !gp || gp.c !== c || gp.dies < year()) return 'Nobody to ask'; if (gp.made >= 3) return `${gp.name} has made all there is in him`;
       const wait = Math.max(5, TURN[eraOf(cv)]); if (gp.asked && year() - gp.asked < wait) return 'Asked too lately: give it a turn'; const cost = commissionCost(cv); if (cv.wealth < cost) return `Needs ${cost} coin`;
