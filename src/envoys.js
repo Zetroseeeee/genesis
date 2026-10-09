@@ -149,8 +149,7 @@ window.ENVOYS = (function () {
     if (db.owes[c.id] > y) lines.push(`<div class="dp-line">${svg(ICON.owes)}<span>They pay you reparations ${upto(db.owes[c.id], c)}</span></div>`);
     if (dc.owes[b.id] > y) lines.push(`<div class="dp-line warn">${svg(ICON.owes)}<span>You pay them reparations ${upto(dc.owes[b.id], c)}</span></div>`);
     h += `<div class="gv-sect"><span class="micro">Between you</span>${lines.join('') || '<div class="gv-note">Nothing is sworn between you, and nothing is owed.</div>'}</div>`;
-    h += atWar ? warPage(c, b) : peacePage(c, b);
-    h += schemesSect(c, b);
+    h += atWar ? warPage(c, b) : peacePage(c, b);      // (what your agents could do comes between pressing a realm and fighting it: schemesSect)
     return h;
   }
   // (what your agents could do there, how likely it is to work and to be found out, what it costs; or what they are about there now)
@@ -188,6 +187,7 @@ window.ENVOYS = (function () {
     // pressure: a claim, closed markets
     { const near = d.touches(c, b.id), has = d.claimUntil(c, b.id, 'claim') > s.year, cost = d.claimCost(c, b); const cl = !near ? 'You share no border' : has ? 'You hold a claim already' : d.bound(c, b) ? 'You are sworn not to' : null; const kn = S().know, needLaws = !kn.has[c.id * kn.ND + window.KNOW.ID.laws];
       h += `<div class="gv-sect"><span class="micro">Press them</span><div class="gv-acts"><button class="btn" data-dact="claim"${cl || needLaws || c.wealth < cost ? ' disabled' : ''} title="${esc(needLaws ? 'Needs Written laws' : cl || (c.wealth < cost ? 'Needs ' + cost + ' coin' : 'A right to their borderland, found or made: a reason for war for three turns. They will not like it.'))}">Lay claim to their borderland <span class="mk-dim">${cost} coin</span></button>${dc.ban[b.id] ? '' : `<button class="btn" data-dact="ban" data-k="on" title="Nothing passes between your markets and theirs, either way. It ends any trade agreement, and they will not like it.">Close your markets to them</button>`}</div></div>`; }
+    h += schemesSect(c, b);
     // war: what stands in the way, the reasons that could be given, what each costs, who would come in
     { const no = d.cannotFight(c, b); let w = '';
       if (no) w = `<div class="gv-note">${esc(no)}.</div>`;
@@ -204,6 +204,7 @@ window.ENVOYS = (function () {
     const s = S(), d = DK(), P = DP(); const sc = d.score(c, b), len = s.year - c.wars[b.id]; const side = d.D(c).side[b.id], their = d.D(b).side[c.id]; let h = '';
     const goal = d.D(c).goal[b.id] || d.D(b).goal[c.id]; const mine = d.D(c).goal[b.id] !== undefined;
     h += `<div class="gv-sect"><span class="micro">The war</span><div class="dp-score"><span>Lost</span><span class="gv-bar"><i class="${sc > 0.05 ? 'pos' : sc < -0.05 ? 'neg' : ''}" style="margin-left:${sc >= 0 ? 50 : 50 + 50 * sc}%;width:${Math.abs(50 * sc)}%"></i><u style="left:50%"></u></span><span>Won</span></div><div class="gv-note">${turns(len, c)} of war. ${sc > 0.1 ? 'It goes your way' : sc < -0.1 ? 'It goes against you' : 'Neither side is winning'}: each side is judged by the land it has lost since the war began.${goal && goal !== 'ally' ? ' ' + (mine ? 'You' : 'They') + ' began it: ' + esc(lc(P.CAUSES[goal].name)) + '.' : ''}</div></div>`;
+    h += schemesSect(c, b);
     const no = d.cannotSue(c, b);
     if (side !== undefined) { const f = s.civs[side]; h += `<div class="gv-sect"><span class="micro">Peace</span><div class="gv-note">You fight beside ${f ? link(f) : 'a friend'}: the war ends when theirs does. You can go home on your own, but they will not forget it, and your word suffers.</div><div class="gv-acts"><button class="btn" data-dact="abandon">Make a peace of your own</button></div></div>`; return h; }
     if (their !== undefined) { const f = s.civs[their]; h += `<div class="gv-sect"><span class="micro">Peace</span><div class="gv-note">They fight beside ${f ? link(f) : 'a friend'}: make peace there, and this war ends with it.</div></div>`; return h; }

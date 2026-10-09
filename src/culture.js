@@ -202,7 +202,7 @@
       renown.fill(0); lately.fill(0); bld.fill(0);
       for (const w of works) { if (w.lost) continue; const o = owner[w.at]; w.held = o >= 0 && civs[o] ? o : -1; if (w.held >= 0) renown[w.held] += w.value; }
       for (const g of greats) { if (g.c < 0 || !civs[g.c]) continue; if (yr - g.born <= winY(eraOf(civs[g.c])) && lately[g.c] < 255) lately[g.c]++; if (g.kind === BUILDER && g.dies >= yr && bld[g.c] < 255) bld[g.c]++; }
-      for (let c = 0; c < MAXC; c++) if (civs[c]) renown[c] += 4 * (h.wonders[c] || 0) + (h.extra ? h.extra(c) : 0);      // (and what the realm's deeds bring it for some turns: a monument, a triumph, a voyage: story.js)
+      for (let c = 0; c < MAXC; c++) if (civs[c]) renown[c] = Math.max(0, renown[c] + 4 * (h.wonders[c] || 0) + (h.extra ? h.extra(c) : 0));      // (and what the realm's deeds bring it for some turns: a monument, a triumph, a voyage: story.js; never below none: what an age leaves is measured against the age, and a realm with no renown of its own was left with less than none, and with no stability at all)
     }
     // a lesser work is forgotten six turns after it was made (a lost one at once); a masterpiece never is; the dead are
     // forgotten with their works, six turns after their death
@@ -227,7 +227,7 @@
     function bornCiv(c) { prog[c] = 0; had[c] = 0; born[c] = 0; golden[c] = -1e9; renown[c] = 0; lately[c] = 0; bld[c] = 0; }
 
     // ---------- what the simulation asks ----------
-    const rel = (c) => { const cv = civs[c]; if (!cv) return 1; return (renown[c] + 1) / (NORM[eraOf(cv)] + 1); };
+    const rel = (c) => { const cv = civs[c]; if (!cv) return 1; return (Math.max(0, renown[c]) + 1) / (NORM[eraOf(cv)] + 1); };
     // pride: steadier for renown above the usual for the age, less so for less (and a golden age lifts it)
     function unrest(cv) { const r = Math.log2(rel(cv.id)) / 3; return 0.03 * Math.max(-1, Math.min(1, r)) + (isGolden(cv.id) ? 0.02 : 0); }
     // its own people take others in faster, or slower (people.js)
