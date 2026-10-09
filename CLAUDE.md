@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~33 min for all 43).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~34 min for all 44).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
@@ -130,6 +130,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   many people are kept and what they cost in a save and a year. Hold it to its header; run it after touching
   `dynasty.js` or how the sim crowns a ruler, and then the war-and-peace probe (deaths come with age now, and a line that
   fails is what a royal marriage inherits).
+- `node tools/story/probe.js [seed,seed] [last year]` — the stories of a world through the ages: how many the autopilot's
+  realms are told and of which kinds, which choice of each they take, what lasts on them, how long a year of stories
+  takes. Run it after touching `story.js`, then the war-and-peace probe over 12345 and 777.
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -236,6 +239,8 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand; the faith; the court (`court.js`) |
 | `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
 | `src/bank.js` | `BANK` | The Treasury, the market screen's last tab: debts and who holds them, borrowing and repaying, repudiation, the coin, the price of money, banking houses and companies (shares bought and sold), panics of late |
+| `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
+| `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
 | `src/court.js` | `COURT` | The Court, the laws screen's last tab: the ruling family as a tree of faces (parents, the throne and consort, brothers and sisters, children, grandchildren), the line of succession, a regency, the house and its reigns; a person's page (raise as, pass over, marry) |
 | `src/works.js` | `WORKS` | The culture screen: renown against the age, the next great person, the golden age, patronage, the living great people (commissions), the works held and lost; the world's renowned realms, golden ages, great people of late and greatest works |
 | `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
@@ -623,6 +628,33 @@ Conventions that matter:
   dynasties makes its rulers people (`settle`). The module throws its own dice; a year of it is about a fifth of a
   millisecond, its save a few hundred kilobytes. After touching it run `tools/dynasty/probe.js` and the war-and-peace
   probe over 12345 and 777.
+- **Stories** (`story.js`; `sim.story`; the page is `tales.js`). About once a turn (0.55 to 1.3 turns apart) something
+  comes before the player's court: one of forty stories (`STORY.LIST`: the court and the family, faith, culture, coin and
+  trade, the land, the estates, war and peace, learning), drawn by weight among those that can happen to the realm as it is
+  (`w(x)`: its age, what it knows, its family, towns, faith, neighbours, estates, coin; none told again within three
+  turns), told from it (`make(x)`: who and where, kept with the story as `d`) and painted (`art`: `st_*` and the `ev_*`
+  of the disasters, in the art list). A story offers two or three choices, and **each says what it does before it is
+  taken** (`chips`, from what the choice's `fx` holds: stability now, coin in the realm's unit `U` (the age's floor, or a
+  year and a half of its gross; kept with the story), authority, the estates' content (`bump`), years of its learning,
+  renown, people, what another realm thinks of you, a claim, something that lasts some years, and the deeds: raise or pass
+  over a child, a death, a name, a son out of wedlock, a regency ended, stepping down for the heir (`newRuler(cv, false,
+  'abdicate')`), a royal marriage, a loan, a faith preached, a colony across the sea, a master's commission, a story that
+  follows); some turn on a chance (`odds`: a fever breaks, reparations are paid), told after the choice. What lasts is on
+  the realm (`cv.story.m`: [key, until, stability, income, learning, renown]) and read like any other factor: stability
+  (`stabilityParts().story`), gross income (`incF`), insight (`insF`, `insightParts().tales`), renown (`renOf`, added by
+  culture.js's yearly count, which starts from nothing). Follow-ups (`cv.story.f`) come when their year comes, if they
+  still can: the acknowledged son grown, the captain's ships, the inventor's machine, the plot carried through (the
+  ruler murdered: `murder`). A birth and a royal wedding in the player's family are told when they happen
+  (`storyTell` in `dynastyNews`). The player's waits (`cv.story.q`, saved with the realm): a story that comes during a
+  turn stops it and its page opens; it is an attention item that the turn button opens instead of going on; Esc puts it
+  off; unanswered after two turns it lapses into its quietest choice (`lapse`). The menu can switch stories off
+  (`sim.setStories`; then nothing is told to the player). **The autopilot's realms** of 25 regions and more meet the same
+  stories every two to five turns and choose by what they need and what their rulers are like (`score`: coin when poor,
+  quiet when restless, the estates weighed by their power, the ruler's leaning, some chance); the great ones' choices go
+  into their chronicles. They were measured not to move the world's numbers (war-and-peace probe over 12345 and 777). The
+  places stories happen in come from a list of each realm's settlements made once a decade (`townsOf_` in `sim.js`; a pass
+  over the land is a millisecond). The module throws its own dice; a year of it is under half a millisecond. After
+  touching it run `tools/story/probe.js` (which choices are taken: none always, none never) and the war-and-peace probe.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

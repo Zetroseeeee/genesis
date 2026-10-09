@@ -809,6 +809,44 @@ server.listen(0, async () => {
     check(q.how === 'clear' && /Osric/.test(q.name) && /takes the throne at 24/.test(q.told) && /Osric/.test(q.card || ''), `the king dies: ${q.told}`);
     await ev(() => { GOV.close(); __G.select(__G.sim.playerCiv().capital); });
   });
+  await scenario('stories: one comes during the turn, which stops and opens its page; its choices say what they cost; the court answers and sees what came of it; put off, it waits on the turn button; keys 1-3 choose', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (GOV.isOpen()) GOV.close(); if (TALES.isOpen()) TALES.close(); });
+    // a kingdom of the Middle Ages with coin and authority to spare; stories on, the next one due at once
+    const r = await ev(() => { const S = __G.sim, c = S.playerCiv(); const med = S.ERAS[4][1] + 0.01; if (c.tech < med) { c.tech = med; c.era = S.eraOf(med); } __T.teach(c); S.rule.setForm(c.id, c, RULE.FORM.kingdom, 'reform'); __G.run(1);
+      S.setStories(true); c.story = { n: S.year + 1, q: null, m: [], f: [], s: {} }; c.wealth = 8000; S.rule.ruleOf(c).auth = 120; return { year: S.year, on: document.getElementById('opt-stories').checked }; });
+    check(r.on, 'the menu has stories switched on');
+    // (the new age is news that waits on the turn button: dealt with first, so that the button runs the turn)
+    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
+    await ev(() => document.getElementById('turn').click());
+    await page.waitForFunction(() => TALES.isOpen(), null, { timeout: 60000 }).catch(() => {});
+    let q = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { open: TALES.isOpen(), active: __G.turnRun ? __G.turnRun.active : null, title: document.getElementById('tl-title').textContent, text: document.getElementById('tl-text').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: document.querySelectorAll('#tl-choices .tl-chip').length, foot: document.getElementById('tl-foot').textContent, q: !!(c.story && c.story.q), why: document.getElementById('report-why').textContent }; });
+    check(q.open && q.q && q.title.length > 3 && q.text.length > 40 && q.n >= 2 && q.n <= 3 && q.chips >= 2, `a story stops the turn and its page opens: "${q.title}", ${q.n} choices, ${q.chips} effects (${q.why})`);
+    check(/Unanswered by/.test(q.foot), `the page says what happens if nobody answers: ${q.foot}`);
+    // the court answers: what came of it is shown, the story is done, and the turn may go on
+    const i = await ev(() => { const b = [...document.querySelectorAll('#tl-choices .tl-choice')].find((x) => !x.getAttribute('aria-disabled')); return b ? +b.dataset.tl : -1; });
+    const c0 = await ev(() => __G.sim.story.stats.chosen);
+    await page.click(`#tl-choices [data-tl="${i}"]`); await frames(1);
+    q = await ev(() => ({ out: !document.getElementById('tl-out').hidden, said: document.getElementById('tl-outchoice').textContent, chosen: __G.sim.story.stats.chosen, waiting: !!__G.sim.playerCiv().story.q }));
+    check(q.out && q.said.length > 3 && !q.waiting, `the court answers: ${q.said}`); check(q.chosen === c0 + 1, 'the choice is counted');
+    await page.click('#tl-done'); await frames(2);
+    q = await ev(() => ({ open: TALES.isOpen(), turn: document.getElementById('turn').className })); check(!q.open && !/story/.test(q.turn), `the page closes, and the turn button is free (${q.turn})`);
+    // a story put off waits on the turn button, which opens it again rather than going on
+    await ev(() => { const S = __G.sim; S.storyTell('festival'); TALES.open(); }); await frames(1);
+    await page.keyboard.press('Escape'); await frames(2);
+    q = await ev(() => ({ open: TALES.isOpen(), turn: document.getElementById('turn').className, l1: document.getElementById('turn1').textContent, year: __G.sim.year }));
+    check(!q.open && /good/.test(q.turn) && /story/i.test(q.l1), `put off, the story waits on the turn button: ${q.l1}`);
+    await page.click('#turn'); await frames(2);
+    q = await ev((y) => ({ open: TALES.isOpen(), same: __G.sim.year === y, title: document.getElementById('tl-title').textContent }), q.year);
+    check(q.open && q.same && /festival/i.test(q.title), `the turn button opens it again, and time does not go on: ${q.title}`);
+    // keys: 1 chooses the first choice, Enter closes what came of it
+    await page.keyboard.press('1'); await frames(1); q = await ev(() => ({ out: !document.getElementById('tl-out').hidden })); check(q.out, 'key 1 chooses the first choice');
+    { const y0 = await ev(() => __G.sim.year); await page.keyboard.press('Enter'); await frames(2); q = await ev((y) => ({ open: TALES.isOpen(), other: [...document.querySelectorAll('dialog[open]')].map((d) => d.id).join(','), running: __G.turnRun.active, same: __G.sim.year === y }), y0);
+      check(!q.open, 'Enter closes the page'); check(!q.other && !q.running && q.same, `the Enter that closes the page is not the turn button's (open: ${q.other || 'nothing'}, ${q.running ? 'time runs' : 'time stands'})`); }
+    // stories off: nothing comes before the court
+    await ev(() => { const el = document.getElementById('opt-stories'); el.checked = false; el.dispatchEvent(new Event('change')); });
+    q = await ev(() => ({ on: __G.sim.storiesOn, why: __G.sim.storyTell('omen') })); check(!q.on && !!q.why, `with stories switched off, none is told (${q.why})`);
+    await ev(() => { const el = document.getElementById('opt-stories'); el.checked = true; el.dispatchEvent(new Event('change')); __T.quiet(); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);
@@ -817,7 +855,7 @@ server.listen(0, async () => {
 
   // ---------- layouts ----------
   await scenario('layout: from 800x500 to 1920x1080 the HUD stays inside the viewport and the launchers clear of the minimap', async (check) => {
-    for (const vp of [{ width: 800, height: 500 }, { width: 1260, height: 700 }, { width: 1920, height: 1080 }]) {      // (1260: just wide enough for the launchers' names, where they come nearest the minimap)
+    for (const vp of [{ width: 800, height: 500 }, { width: 1260, height: 700 }, { width: 1920, height: 1080 }]) {      // (1260: the launchers without their names; 1920: with them)
       await page.setViewportSize(vp); await wait(300); await frames(3); await ev(() => { document.getElementById('l-build').click(); __G.select(__G.sim.playerCiv().capital); }); await frames(2);
       const r = await ev(() => { const ids = ['tl', 'tr', 'left', 'bl', 'bc', 'br', 'turn', 'minimapbox']; const out = []; for (const id of ids) { const el = document.getElementById(id); if (!el || getComputedStyle(el).display === 'none') continue; const b = el.getBoundingClientRect(); if (b.width === 0) continue; if (b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1) out.push(`${id} ${Math.round(b.left)},${Math.round(b.top)}-${Math.round(b.right)},${Math.round(b.bottom)}`); } const a = document.getElementById('left').getBoundingClientRect(), d = document.getElementById('bc').getBoundingClientRect(); const overlap = a.left < d.right && d.left < a.right && a.top < d.bottom && d.top < a.bottom;
         // (the bar of launchers stops short of the minimap and the turn button, and none of its names is cut off)

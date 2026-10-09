@@ -202,7 +202,7 @@
       renown.fill(0); lately.fill(0); bld.fill(0);
       for (const w of works) { if (w.lost) continue; const o = owner[w.at]; w.held = o >= 0 && civs[o] ? o : -1; if (w.held >= 0) renown[w.held] += w.value; }
       for (const g of greats) { if (g.c < 0 || !civs[g.c]) continue; if (yr - g.born <= winY(eraOf(civs[g.c])) && lately[g.c] < 255) lately[g.c]++; if (g.kind === BUILDER && g.dies >= yr && bld[g.c] < 255) bld[g.c]++; }
-      for (let c = 0; c < MAXC; c++) if (civs[c]) renown[c] += 4 * (h.wonders[c] || 0);
+      for (let c = 0; c < MAXC; c++) if (civs[c]) renown[c] += 4 * (h.wonders[c] || 0) + (h.extra ? h.extra(c) : 0);      // (and what the realm's deeds bring it for some turns: a monument, a triumph, a voyage: story.js)
     }
     // a lesser work is forgotten six turns after it was made (a lost one at once); a masterpiece never is; the dead are
     // forgotten with their works, six turns after their death

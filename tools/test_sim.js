@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -1145,6 +1145,76 @@ log('17. dynasties');
   check(how.clear > how.child && how.child > 0 && how.kin + how.extinct > 0 && how.clear > 0.55 * byBlood, `thrones go mostly to grown heirs (${how.clear} of ${byBlood}), now and then to a child (${how.child}), and lines fail (${how.kin + how.extinct})`);
   check(size < 450, `the courts are saved in ${size.toFixed(0)} KB`);
   check(ms / 100 < 0.6, `dynasties are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
+}
+}
+if (want(18)) {
+log('18. stories');
+{
+  const ST = window.STORY; const art = JSON.parse(fs.readFileSync('data/tex/atlas.json', 'utf8')).ui;
+  check(ST.LIST.length >= 36, `there are stories (${ST.LIST.length})`);
+  for (const st of ST.LIST) check(!!art[st.art] && st.opts.length >= 2 && st.opts.length <= 3 && (st.lapse || 0) < st.opts.length, `${st.k}: a painting (${st.art}), two or three choices and one taken when nobody answers`);
+  // a player's kingdom of the Middle Ages, with towns, a temple, an academy, a market, a harbour, a family and neighbours
+  const sim = createSim(wd, 103), D = sim.dynasty, RF = window.RULE.FORM; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
+  const med = sim.ERAS[4][1] + 0.01; sim.setPlayer(k0, 'Taleland'); const P = sim.playerCiv(); P.tech = med; P.era = sim.eraOf(med); teach(sim, P, 4); sim.rule.setForm(P.id, P, RF.kingdom, 'reform');
+  for (let d = 1; d <= 6; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); sim.pop[i] = 30; }
+  const B = sim.spawnTribe(k0 + 8, {}); B.tech = med; B.era = sim.eraOf(med); teach(sim, B, 4); B.aggression = 0; B.dip.think = 1e12; sim.rule.setForm(B.id, B, RF.kingdom, 'reform');
+  for (let d = 7; d <= 10; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, B, k0 + 8); sim.pop[i] = 30; }
+  sim.special[k0] |= 4 | 2 | 8; sim.special[k0 + 2] |= 4; sim.touchAll(); sim.recount(); for (let y = 0; y < 3; y++) sim.tick(); sim.recount();
+  { const f = sim.faith.found(B.id, B.capital, { name: 'the Faith of the Hills', tenets: ['mission', 'peace'] }); sim.faith.news.length = 0; void f; }
+  const r = D.rulerOf(P.id); const y0 = sim.year; let sp = D.of(r.s); if (!sp) { sp = D.make({ n: 'Ama', f: !r.f, b: r.b, c: P.id, d: y0 + 40 }); r.s = sp.id; sp.s = r.id; }
+  for (const id of r.k) D.P.delete(id); r.k = []; sp.k = [];
+  const mk = (n, f, age, t) => { const k = D.make({ n, f, b: y0 - age, h: r.h, p: r.f ? sp.id : r.id, m: r.f ? r.id : sp.id, c: P.id, t: t || 'steward', d: y0 + 60 }); r.k.push(k.id); sp.k.push(k.id); return k; };
+  const heir = mk('Ceol', false, 17, 'tyrant'), girl = mk('Hild', true, 19), small = mk('Eni', false, 5); r.b = Math.min(r.b, y0 - 64); P.ruler.since = Math.min(P.ruler.since, y0 - 20);
+  P.wealth = 1e5; P.stability = 0.6; sim.rule.ruleOf(P).auth = 150;
+  const S = sim.story; const told = (k, d) => { if (P.story) P.story.q = null; return S.tell(P, k, d); };
+  // every story the realm can meet is told, read and answered, each of its choices in turn
+  let read = 0, bad = []; const keys = ['heir_cruel', 'old_ruler', 'bastard', 'birth', 'wedding', 'preacher', 'temple_lands', 'omen', 'library_fire', 'festival', 'monument', 'moneylenders', 'coiners', 'guild', 'silver', 'fair', 'bad_harvest', 'plague', 'flood', 'bandits', 'settlers', 'feud', 'petition', 'raid', 'scholars'];      // (a suitor is tried below: a marriage would bind the two realms, and no raiders come from a sworn friend)
+  for (const k of keys) for (let i = 0; i < 3; i++) {
+    const d = k === 'birth' ? { p: small.id } : k === 'wedding' ? { a: girl.id, b: sp.id, o: -1 } : {};
+    const why = told(k, d); if (why) { if (i === 0) bad.push(`${k}: ${why}`); break; }
+    const v = sim.storyView(); if (!v || !v.title || !v.text || /undefined|NaN|\[object/.test(v.title + v.text + v.opts.map(o => o.t + o.hint + o.chips.map(q => q.t).join()).join())) { bad.push(`${k}: ${v ? v.title + ' / ' + v.text.slice(0, 80) : 'no page'}`); break; }
+    if (k === 'old_ruler' && i === 0) continue;      // (stepping down is tried below)
+    const res = sim.storyChoose(i); if (typeof res === 'string') { if (!/Needs/.test(res)) bad.push(`${k} ${i}: ${res}`); continue; } read++;
+    if (!Array.isArray(res.chips)) bad.push(`${k} ${i}: no account of what it did`);
+    P.wealth = 1e5; sim.rule.ruleOf(P).auth = 150;
+  }
+  check(!bad.length && read >= 60, `every story is told, read and answered (${read} answers${bad.length ? '; ' + bad.join('; ') : ''})`);
+  // what a choice does: coin by the realm's measure, stability now and for some years, authority, the estates, a factor on income and learning
+  { P.story.m = []; const U = S.unitOf(P); told('festival'); const w0 = P.wealth, s0 = P.stability; sim.storyChoose(0);
+    check(P.wealth === w0 + Math.round(-0.5 * U) && Math.abs(P.stability - Math.min(1, s0 + 0.03)) < 1e-9 && Math.abs(sim.stabilityParts(P).story - 0.02) < 1e-9, `a festival paid for: ${Math.round(0.5 * U)} coin, stability now and for a turn (${sim.stabilityParts(P).story.toFixed(2)})`); }
+  { const R = sim.rule.ruleOf(P), EK = window.RULE.EK; told('temple_lands'); const a0 = R.auth, b0 = R.bump[EK.priests], w0 = P.wealth; sim.storyChoose(0);
+    check(R.auth === a0 - 20 && R.bump[EK.priests] < b0 - 0.15 && P.wealth > w0, 'the temples\' lands seized: authority spent, the priests furious, the treasury full'); }
+  { P.story.m = []; told('silver'); sim.storyChoose(0); told('scholars'); sim.storyChoose(0); const ip = sim.insightParts(P);
+    check(S.incF(P.id) > 1.07 && Math.abs(ip.tales - 1.06) < 1e-9 && S.modsOf(P.id).some(m => m.k === 'silver'), `a crown mine and the new learning: income ×${S.incF(P.id).toFixed(2)}, insight ×${ip.tales.toFixed(2)}`); }
+  { told('monument'); sim.storyChoose(0); for (let y = 0; y < 6; y++) sim.tick(); check(S.renOf(P.id) > 5 && sim.culture.renown[P.id] >= S.renOf(P.id) - 0.01, `a monument brings renown for some turns (${S.renOf(P.id).toFixed(1)}; the realm's ${sim.culture.renown[P.id].toFixed(1)})`); }
+  { told('raid'); const v = sim.storyView(); const o = B.id; sim.storyChoose(1); check(v && v.title.includes(sim.fullName(B)) && sim.diplo.claimUntil(P, o, 'claim') > sim.year, 'raiders from the neighbour: raiding them back gives a claim on their land'); }
+  { const w = told('suitor'); if (!w) { sim.storyChoose(0); check(sim.diplo.has(P, B.id, 'marriage'), 'a suitor accepted: the two houses are joined by marriage'); } else check(true, 'no suitor could come (' + w + ')'); }
+  { const n0 = r.k.length; told('bastard'); sim.storyChoose(0); const kid = D.of(r.k[r.k.length - 1]); check(r.k.length === n0 + 1 && D.court[P.id].passed.includes(kid.id), `a son out of wedlock acknowledged: ${kid.n}, last in the line`); }
+  { told('heir_sickly'); const v = sim.storyView(); const who = v ? (D.familyOf(P.id).kids.find(k => v.text.includes(k.n)) || null) : null; const res = sim.storyChoose(0);
+    check(!!who && typeof res === 'object' && /breaks|can do nothing/.test(res.text) && (D.alive(who, sim.year) === /breaks/.test(res.text)), `a fever in the nursery: ${res.text || res}`); }
+  // stepping down: the heir is crowned, and the chronicle says so
+  { const heir0 = D.heirOf(P.id); told('old_ruler'); const was = P.ruler.name; const res = sim.storyChoose(0);
+    check(typeof res === 'object' && heir0 && P.ruler.pid === heir0.id && P.events.slice(-4).some(e => /steps down/.test(e.text)), `the old ruler steps down: ${was} -> ${P.ruler.name}`); }
+  // a plot let be: the ruler is murdered at the feast
+  { const was = P.ruler.name, pid = P.ruler.pid; S.tell(P, 'coup', { r: pid }); check(P.ruler.pid !== pid && P.events.slice(-4).some(e => /is murdered/.test(e.text)) && !!sim.storyView(), `a plot carried through: ${was} is murdered, and the new ruler is asked what to do`); sim.storyChoose(2); }
+  // a story nobody answers lapses into its quietest choice; one that waits is saved with the world
+  { told('petition'); const q = P.story.q; const saved = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(saved); const v2 = s2.storyView();
+    check(!!v2 && v2.title === sim.storyView().title && JSON.stringify(s2.story.modsOf(P.id)) === JSON.stringify(S.modsOf(P.id)), `a story waiting for its answer is saved with the world (${v2 ? v2.title : 'lost'}), and what stories left behind`);
+    const l0 = S.stats.lapsed; while (sim.year <= q.u) sim.tick(); check(!P.story.q && S.stats.lapsed === l0 + 1, 'unanswered, a story lapses into its quietest choice'); }
+  // the player may have no stories at all
+  { sim.setStories(false); P.story.n = 0; for (let y = 0; y < 200; y++) sim.tick(); check(!P.story.q && !!sim.storyTell('omen'), 'with stories off, nothing comes before the court'); sim.setStories(true); }
+}
+// the autopilot's realms meet stories too, quickly enough, and what they chose is written into the great realms' chronicles
+{
+  const sim = createSim(wd, 12345); for (let y = 0; y < 11000; y++) sim.tick(); const S = sim.story;
+  let ms = 0; for (let y = 0; y < 100; y++) { sim.tick(); ms += S.stats.ms; }
+  const lines = sim.civs.filter(Boolean).reduce((n, c) => n + c.events.filter(e => e.type === 'story').length, 0);
+  log(`   ${sim.fmtYear(sim.year)}: ${S.stats.told} stories told to the autopilot's realms (${Object.keys(S.stats.by).length} kinds); ${lines} lines in chronicles; ${(ms / 100).toFixed(3)} ms a year`);
+  check(S.stats.ai > 500 && Object.keys(S.stats.by).length >= 20, `the autopilot's realms meet stories of many kinds (${S.stats.ai}, ${Object.keys(S.stats.by).length} kinds)`);
+  check(lines > 0, 'the great realms\' choices are written into their chronicles');
+  check(ms / 100 < 0.6, `stories are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
+  const size = JSON.stringify(sim.civs.filter(Boolean).map(c => c.story)).length / 1024; check(size < 120, `what the realms' stories keep is saved in ${size.toFixed(0)} KB`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

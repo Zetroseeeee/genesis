@@ -176,7 +176,7 @@
     }
     // Who now takes a realm's throne. why: 'death' (the ruler died), 'term' (his years in office are up), 'fall' (he was put down:
     // a rising, the army, a victor), 'reform' (the realm's government came to be one in which rulers come otherwise, and he stepped
-    // aside), 'first' (a new realm). Answers the person, how it
+    // aside), 'abdicate' (he stepped down for his heir: story.js), 'first' (a new realm). Answers the person, how it
     // went ('clear': a grown heir; 'child': a regency; 'kin': a kinsman; 'extinct': the line failed, a new house; 'new': no line),
     // and the character the realm is ruled by now (a child's regent's).
     function succeed(c, kind, why, ep) {
@@ -190,7 +190,7 @@
       }
       const H0 = old && old.h ? houses.get(old.h) : null;
       let heir = null, how = 'new';
-      if (old && why === 'death' && dynastic(kind)) {
+      if (old && (why === 'death' || why === 'abdicate') && dynastic(kind)) {      // (one who steps down for his heir hands the throne down the line as at his death)
         ensureKids(old, cv); heir = heirOf(c, yr, kind);
         if (heir) how = ageOf(heir, yr) < ADULT ? 'child' : 'clear';
         else if (H0 && !H0.ended && H0.n >= 2 && rnd() < KIN_SHARE) { heir = outsider(c, kind, { house: H0.id, name: rnd() < 0.5 ? bare(pick(H0.line)[0]) : undefined }); how = 'kin'; }
@@ -314,6 +314,28 @@
       return 'Nothing to do';
     }
 
+    // ---------- what the realm's stories do (story.js) ----------
+    // one of a court dies now (a fever, a plot): not the ruler, whose death is the sim's to tell
+    function kill(id) { const p = of(id), yr = year(); if (!p || !alive(p, yr) || (p.r && !p.r[1])) return false; p.d = yr; for (let c = 0; c < MAXC; c++) { const C = court[c]; if (C && C.regent && C.regent.pid === id && civs[c]) { const R2 = regentFor(c, of(C.ruler), null, yr); R2.until = C.regent.until; C.regent = R2; news.push({ kind: 'regent', c, p: R2.pid, year: yr }); } } return true; }
+    // a name in a realm's tongue, and what a newborn might be called: the name it was given, a forebear's, a new one
+    const freshName = (c) => nameIn(tongueOf(civs[c]), 2, 3);
+    function nameChoices(c, id) {
+      const k = of(id); if (!k) return null; const kin = [];
+      for (const a of [of(k.p), of(k.m)]) { if (!a) continue; for (const g of [of(a.p), of(a.m)]) if (g && g.f === k.f && bare(g.n) !== k.n) kin.push([bare(g.n), g]); if (a.f === k.f && bare(a.n) !== k.n) kin.push([bare(a.n), a]); }
+      const H = houses.get(k.h); const fo = H && of(H.founder); if (fo && fo.f === k.f && bare(fo.n) !== k.n) kin.unshift([bare(fo.n), fo]);
+      let fresh = nameIn(tongueOf(civs[c]), 2, 3); for (let t = 0; t < 4 && (fresh === k.n || kin.some((q) => q[0] === fresh)); t++) fresh = nameIn(tongueOf(civs[c]), 2, 3);
+      const fb = kin[0] || null; return { given: k.n, forebear: fb ? fb[0] : null, after: fb ? fb[1] : null, fresh };
+    }
+    function rename(id, n) { const p = of(id); if (!p || (p.r && !p.r[1]) || !n) return false; p.n = n; return true; }
+    // a child of the ruler's, acknowledged: last in the line while his father rules
+    function bastard(c, name, age) {
+      const cv = civs[c], C = court[c]; const r = C && of(C.ruler); if (!cv || !r) return null; const yr = year();
+      const k = person({ n: name || nameIn(tongueOf(cv), 2, 3), f: false, b: yr - Math.max(0, age | 0), h: r.h, p: r.f ? 0 : r.id, m: r.f ? r.id : 0, c, t: drawTrait(cv) });
+      k.d = Math.max(yr + 5, k.b + lifespan(eraOf(cv), true)); r.k.push(k.id); C.passed.push(k.id); return k;
+    }
+    // a child on the throne is declared of age before the time
+    function endRegency(c) { const C = court[c]; if (!C || !C.regent) return false; C.regent = null; news.push({ kind: 'ofage', c, p: C.ruler, year: year() }); return true; }
+
     // ---------- saved with the world ----------
     // (a person: [id, name, female, born, died, house, father, mother, spouse, character, face, realm + 1, [reign], epithet, raised,
     // wedded and children not yet thrown (only while that is so)];
@@ -345,6 +367,7 @@
     }
 
     return { P, houses, court, stats, news, step, succeed, recrown, diesNow, traitOf, married, gone, born, settle, heirOf, lineFor, familyOf, houseOf, rulerOf, regentOf, kinOf, unrest, act, raiseCost,
+      kill, freshName, nameChoices, rename, bastard, endRegency,
       ageOf, alive, of, save, load, hazard, lifespan, make: person, wed, TRAITS, ADULT, dynastic, numbered };
   }
 

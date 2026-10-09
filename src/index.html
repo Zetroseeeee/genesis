@@ -475,6 +475,36 @@
   #upd-chip { display: flex; align-items: center; gap: 7px; align-self: center; margin: 0 2px 0 10px; min-height: 28px; padding: 3px 9px; text-transform: none; letter-spacing: 0.02em; font-size: var(--fs-cap); }
   /* what's new */
   #news .modal { width: min(640px, calc(100vw - 32px)); }
+  /* ----- a story before the court (tales.js): the painting, the story in the chronicle's voice, the choices and what they bring ----- */
+  #tale .modal { width: min(780px, calc(100vw - 32px)); overflow-y: auto; position: relative; }
+  .tl-fig { margin: 0; position: relative; aspect-ratio: 2.15 / 1; overflow: hidden; background: #0a0d14; }
+  .tl-fig img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; display: block; animation: tlin 0.9s ease-out both; }
+  .tl-fig::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgb(8 11 18 / 0) 46%, rgb(18 24 34 / 0.78) 84%, var(--surface-raised) 100%); pointer-events: none; }
+  @keyframes tlin { from { transform: scale(1.035); opacity: 0; } to { transform: none; opacity: 1; } }
+  .tl-x { position: absolute; top: 10px; right: 10px; z-index: 2; background: rgb(8 11 18 / 0.55); }
+  .tl-page { padding: 0 34px 24px; position: relative; margin-top: -60px; z-index: 1; }
+  .tale.noart .tl-page { margin-top: 0; padding-top: 28px; }
+  .tl-date { font-size: var(--fs-cap); color: var(--gold); letter-spacing: 0.06em; font-weight: 600; text-shadow: 0 1px 6px rgb(0 0 0 / 0.95); }
+  .tl-title { font-family: var(--display); font-weight: 600; font-size: calc(30px * var(--ui-scale)); letter-spacing: 0.03em; line-height: 1.12; margin: 4px 0 14px; color: #F3E7C9; text-shadow: 0 2px 18px rgb(0 0 0 / 0.9); }
+  .tl-text { font-family: var(--serif); font-style: italic; font-size: calc(16.5px * var(--ui-scale)); line-height: 1.62; color: rgb(236 233 226 / 0.92); margin: 0 0 20px; max-width: 64ch; }
+  .tl-choices { display: flex; flex-direction: column; gap: 8px; }
+  .tl-choice { display: flex; gap: 14px; align-items: flex-start; text-align: left; width: 100%; padding: 12px 16px 12px 12px; background: rgb(255 255 255 / 0.035); border: 1px solid var(--rule); border-left: 2px solid rgb(214 178 94 / 0.35); border-radius: var(--radius); color: var(--text); cursor: pointer; font: inherit; transition: background .12s, border-color .12s; }
+  .tl-choice:hover, .tl-choice:focus-visible { background: rgb(214 178 94 / 0.09); border-color: rgb(214 178 94 / 0.55); border-left-color: var(--gold); outline: none; }
+  .tl-choice[aria-disabled] { opacity: 0.55; cursor: not-allowed; }
+  .tl-choice[aria-disabled]:hover { background: rgb(255 255 255 / 0.035); border-color: var(--rule); border-left-color: rgb(214 178 94 / 0.35); }
+  .tl-n { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgb(214 178 94 / 0.5); color: var(--gold-2); font-family: var(--display); font-weight: 700; font-size: 13px; display: grid; place-items: center; margin-top: 1px; }
+  .tl-c { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .tl-t { font-weight: 600; font-size: var(--fs-key); line-height: 1.3; }
+  .tl-h { color: var(--text-2); font-size: var(--fs-body); }
+  .tl-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .tl-chip { font-size: var(--fs-cap); padding: 1px 8px; border-radius: 9px; background: rgb(255 255 255 / 0.06); color: var(--text-2); white-space: nowrap; }
+  .tl-chip.pos { color: var(--pos); background: rgb(111 207 123 / 0.1); } .tl-chip.neg { color: #F3A09A; background: rgb(240 101 90 / 0.1); } .tl-chip.warn { color: var(--warn); background: rgb(242 185 75 / 0.1); } .tl-chip.why { color: #F0655A; background: rgb(240 101 90 / 0.16); font-weight: 600; }
+  .tl-foot { color: var(--text-3); font-size: var(--fs-cap); margin: 14px 0 0; }
+  .tl-out { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; border-top: 1px solid var(--rule); padding-top: 14px; }
+  .tl-outchoice { font-weight: 600; color: var(--gold-2); }
+  .tl-outtext { font-family: var(--serif); font-style: italic; font-size: calc(16px * var(--ui-scale)); line-height: 1.6; margin: 0; max-width: 64ch; }
+  @media (max-width: 560px) { .tl-page { padding: 0 16px 16px; margin-top: -40px; } .tl-title { font-size: 23px; } .tl-choice { padding: 10px 12px 10px 10px; } }
+  @media (prefers-reduced-motion: reduce) { .tl-fig img { animation: none; } }
   #news .pbody { gap: 18px; }
   #news .note h3 { font-family: var(--body); font-size: 15.5px; font-weight: 600; line-height: 1.35; color: var(--text); }
   #news .note time { display: block; font-size: 12px; color: var(--text-3); margin-bottom: 2px; font-variant-numeric: tabular-nums; }
@@ -952,7 +982,7 @@
     #economy .eco .d { display: none; }
     #left { width: 320px; }
   }
-  @media (max-width: 1240px) {      /* (a narrow window has room for the signs, not for their names: the tooltip still says what each is) */
+  @media (max-width: 1320px) {      /* (a narrow window has room for the signs, not for their names: the tooltip still says what each is; ten of them with their names need 1,300 px beside the minimap) */
     :root { --bar: calc(40px * var(--ui-scale)); }
     #bl .btn { font-size: 0; gap: 0; padding: 0 11px; min-width: 0; min-height: 36px; flex-direction: row; } #bl .btn svg { width: 19px; height: 19px; }
   }
@@ -1174,6 +1204,19 @@
   </div>
 </div></dialog>
 
+<dialog id="tale" aria-labelledby="tl-title"><div class="modal panel tale" tabindex="-1">
+  <button class="btn icon ghost tl-x" id="tl-x" title="Later (Esc): the story waits">✕</button>
+  <figure class="tl-fig" id="tl-fig"><img id="tl-img" alt=""></figure>
+  <div class="tl-page">
+    <div class="tl-date" id="tl-date"></div>
+    <h2 class="tl-title" id="tl-title"></h2>
+    <p class="tl-text" id="tl-text"></p>
+    <div class="tl-choices" id="tl-choices" role="group" aria-label="What will you do?"></div>
+    <div class="tl-out" id="tl-out" hidden><span class="tl-outchoice" id="tl-outchoice"></span><p class="tl-outtext" id="tl-outtext"></p><span class="tl-chips" id="tl-outchips"></span><button class="btn primary" id="tl-done">Continue</button></div>
+    <p class="tl-foot" id="tl-foot"></p>
+  </div>
+</div></dialog>
+
 <dialog id="menu"><div class="modal panel">
   <div class="phead"><h2 class="display" id="m-title">Menu</h2><button class="btn icon ghost" id="m-close">✕</button></div>
   <div class="pbody">
@@ -1185,6 +1228,7 @@
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-autotilt" checked> Tilt the camera automatically when zooming in</label>
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-textures" checked> Painted materials on buildings and ground (needs WebGL2)</label>
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-continuous"> Continuous time (WorldBox style) instead of turns</label>
+    <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-stories" checked> Stories: now and then something comes before your court and asks you to choose</label>
     <div class="hint">Controls · Enter or space: advance / stop · B: city · R: realm · M: market · K: knowledge · V: laws · F: diplomacy · Y: your host · G: powers · C: chronicle · T, O, X, I: trade, government, relations and peoples on the map · drag: move · scroll: zoom to cursor · right-drag or shift-drag: tilt and turn · WASD/arrows: move · Q E: turn · Page Up/Down: tilt · N: north up · U: top-down · H: home · Esc: cancel/close · F9: hide HUD</div>
     <details class="hint sources" id="m-sources"><summary>Where the world comes from</summary>
       <p><b>The picture of the Earth.</b> NASA's Blue Marble Next Generation (R. Stöckli, E. Vermote, N. Saleous, R. Simmon and D. Herring, NASA Earth Observatory, 2005): the land as the MODIS instrument saw it through 2004, at 500 m. Each hemisphere is shown in its summer; the towns of our own day are painted over with the country round them.</p>
@@ -1253,6 +1297,7 @@
 <script src="culture.js"></script>
 <script src="finance.js"></script>
 <script src="dynasty.js"></script>
+<script src="story.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -1274,5 +1319,6 @@
 <script src="envoys.js"></script>
 <script src="works.js"></script>
 <script src="court.js"></script>
+<script src="tales.js"></script>
 <script src="troops.js"></script>
 <script src="main.js"></script>
