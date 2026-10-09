@@ -748,6 +748,9 @@ Conventions that matter:
   first farmers (`homeOf`). **Settlers**: a realm two ages ahead takes land of its neighbour's where few live (a fifth of what
   its own ways would feed there; no town, no capital, never the player's) without a war, and the neighbour remembers it
   (`frontier`); ocean navigation (`oceans`) plants colonies on any shore across the ocean where nobody holds it or few live.
+  **Emigrants**: from a realm's crowded land (above 85 % of what it feeds) a few cells a year send people to the realm's far
+  land with room (a cell twenty and more from the capital, under a third full: one a year, chosen as by lot, `roomCell`) -
+  colonies across the sea, a frontier far off. Look at the Mac's `peopled`, `peopled_west` and `land_panel` after touching it.
   A world saved before the land had kinds (no `land` in its save) is fed by the old map and the table of food of 0.37
   (`FOOD_037`) and has no settlers: an update must not starve anyone's people. The inspector names a cell's kind of land and
   its share of farmland.
