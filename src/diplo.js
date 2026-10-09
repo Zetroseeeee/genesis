@@ -102,6 +102,8 @@ window.DIPLO = (function () {
     // (something of this realm's runs out then: its record is looked through no sooner)
     const soon = (cv, until) => { const d = D(cv); if (until < d.next) d.next = until; };
     const setClaim = (a, key, until) => { const d = D(a); d.claim[key] = until; if (until < d.next) d.next = until; };
+    // a claim come by otherwise than by paying for it: raiders over the border, a holy city demanded (story.js)
+    const grantClaim = (a, bid) => { if (!a || !civs[bid] || bid === a.id) return; setClaim(a, bid * 4, Math.max(D(a).claim[bid * 4] || -Infinity, year() + CLAIM_TURNS * pace(a))); };
     const era = (cv) => Math.max(0, Math.min(8, cv.era | 0)), pace = (cv) => PACE[era(cv)];
     const nameOf = (cv) => host.nameOf(cv);
     const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -586,7 +588,7 @@ window.DIPLO = (function () {
     }
     return { stats, D, tick, step, born, died, wake, heir, reach, opinion, reasons, judge, cannot, propose, answer, breakPact, release, rebel, annex, cannotJoin, gift, giftWorth, claim, claimCost, embargo, causes, warCost, cannotFight, declare,
       abandon, score, termsFor, wouldEnd, cannotSue, sue, conclude, fell, warsEnd, warWith, think, has, pactOf, anyPact, bound, friends, lordOf, vassalsOf, threatTo, standing, memOf, remember, tradeShare, trIn, trOut, touches, ratio, seal, subject,
-      union, join, closed, agreed, termOf, ver, partnersOf, claimUntil, holds, askedAt, CLAIMS };
+      union, join, closed, agreed, termOf, ver, partnersOf, claimUntil, holds, askedAt, grantClaim, CLAIMS };
   }
   return { PACE, PACTS, PACT, VASSAL, OPENS, CAUSES, TERMS, TERM_TEXT, RANK, MOODS, moodOf, STAND, TRIBUTE, REPARATION, REPARATION_TURNS, CLAIM_TURNS, UNION_TURNS, UNJUST_STAB, UNJUST_REP, creedGap, create };
 })();
