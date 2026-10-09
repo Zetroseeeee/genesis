@@ -831,7 +831,7 @@ function createSim(world, seed) {
         cv.stability -= 0.25 + rnd() * 0.3;
         logEvent(cv, `${pick(['Famine', 'A revolt of the provinces', 'Plague and famine', 'A bad harvest and a hard winter', 'Bankruptcy of the court', 'A great fire in the capital'])} shakes ${fullName(cv)}`, cellsOf[c] > 300 || cv.player);
       }
-      cv.stability = Math.max(0, Math.min(1, cv.stability));
+      cv.stability = cv.stability > 0 ? Math.min(1, cv.stability) : cv.stability === cv.stability ? 0 : (st.nan = (st.nan || 0) + 1, 0.5);      // (a number that is no number is put right here, and counted: one such once spread through a whole world)
       // expansion budget
       const drive = cv.player ? (cv.policy.stance === 'consolidate' ? 0 : cv.policy.stance === 'aggressive' ? 1.6 : 0.7) : cv.expansion * (cv.policy.stance === 'aggressive' ? 1.5 : 1) * tv(cv, 'exp', 1);
       budget[c] = drive * (0.12 + Math.pow(cellsOf[c], 0.5) * 0.012) * (0.4 + cv.stability * 0.6) * RF[ro + RK.expand];
