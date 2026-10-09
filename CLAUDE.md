@@ -724,7 +724,9 @@ Conventions that matter:
   (`endemic`), in towns, on ships, with armies. **An outbreak** (named: "the Great Pestilence", "the Speckled Monster"...) arises
   once in eighty years or so for each kind, in the most crowded realm of an age that breeds it **in the old world** (`cradle` in
   `sim.js`: not the Americas, not Australia), and goes realm to realm: over borders, along the market's links (harbours and
-  caravans: `ships`), with armies at war, less into a realm shut against it. In each realm it reaches it rises, burns and dies
+  caravans: `ships`), with armies at war, less into a realm shut against it and less as the realm it would go to has learned
+  public health (`PASS`: the ports' quarantines from the Renaissance, sanitation, vaccines; without it a modern pestilence
+  lingered for decades in a hundred realms at once). In each realm it reaches it rises, burns and dies
   away (`curve`, `burn` longer in a large realm), taking each year a share of its people from all its land at once (`killF`:
   the simulation's next pass over the land takes it, so sickness has no pass of its own - it must stay a tenth of a millisecond
   a year, and asks for partners by index, `pN` and `pAt` in `diplo.js`, and for the share in towns the year's pass counted,
@@ -736,7 +738,8 @@ Conventions that matter:
   that never had it, outbreak or none: so the Americas meet the crowd sicknesses of the old world when the ships come, all of
   them within a century or two, as history did. A realm may shut its harbours (`q` 1: half the chance of catching it, 5% less
   income) or everything (2: a seventh, 12% less); the autopilot's neighbours that know hospitals shut their harbours to an
-  outbreak next door for a turn, now and then. While a pestilence burns, a realm is less stable (`unrest`: up to 0.05). The god's
+  outbreak next door for a turn, now and then. While a pestilence burns, a realm is less stable (`unrest`: up to 0.05, times the
+  age's `AGE`: the fear follows the dying). The god's
   plague is an outbreak that travels. The player hears of it as a story (`plague` in `story.js`, told from the outbreak: the gates
   shut for some years, physicians sent, or let it run), news, a line on what is under way and on a realm's panel. The world's
   people stay near history's count with it (`tools/know/people.js`; it takes them early, they grow back). Saved with the world

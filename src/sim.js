@@ -508,7 +508,7 @@ function createSim(world, seed) {
     popScale, canBorrow: (cv) => !!finance && finance.canBorrow(cv.id) && finance.room(cv.id) > 1, borrow: (cv, amt) => { if (finance) finance.borrow(cv.id, Math.min(amt, finance.room(cv.id))); },
     colony: colonyFor, heritage: (cv, era, path) => { if (cv.legacy) { cv.legacy.her.push([era, path, year]); if (cv.legacy.her.length > 9) cv.legacy.her.shift(); } }, abdicate: (cv) => newRuler(cv, false, 'abdicate'), murder: (cv) => { murdered = true; rulerDies(cv); murdered = false; }, log: (cv, text, important) => logEvent(cv, text, important, 'story'), quiet: () => !storiesOn,
     // (a pestilence: what it is and where it came from; the gates shut for some years; what the court did against it)
-    outbreak: (id) => { const o = disease && disease.out.find((q) => q.id === id); return o ? { name: o.name, kind: DISEASE.KINDS[o.k].name, k: DISEASE.KINDS[o.k].key, from: o.fromName, at: cellName.get(o.at) || '' } : null; },
+    outbreak: (id) => { const o = disease && disease.out.find((q) => q.id === id); return o ? { name: o.name, kind: DISEASE.KINDS[o.k].name, k: DISEASE.KINDS[o.k].key, from: o.fromName, fromId: o.from, at: cellName.get(o.at) || '' } : null; },
     quarantine: (cv, q, years) => { if (disease) disease.quarantine(cv, q, years); }, cure: (cv, id, f) => { if (disease) disease.cure(cv, id, f); } }) : null;
   // what each realm will be remembered for (legacy.js): what a realm has, as its ambitions ask it; what costs a pass over a long
   // list (the workshops, the market's links, the faiths kept, great people and masterpieces) is counted for every realm at once,

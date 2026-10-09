@@ -298,8 +298,10 @@
     make: (x, d) => (d && x.outbreak(d.o) ? { o: d.o, i: x.town('port') } : null), still: (x, d) => !!x.outbreak(d.o),
     title: (x, d) => `${cap(x.outbreak(d.o).name)} in ${x.cell(d.i)}`,
     text: (x, d) => { const o = x.outbreak(d.o), by = x.ports() ? 'ships' : 'caravans';
-      return x.era >= 6 ? `${cap(o.name)} has come to ${x.cell(d.i)} from ${o.from}: ${SYMPTOM[o.k] || 'a fever no doctor knows'}. The hospitals are full, the schools are closed, and those who can are leaving the city.`
-        : `${cap(o.name)} has come to ${x.cell(d.i)} with the ${by} from ${o.from}: ${SYMPTOM[o.k] || 'fever, and death'}. The dead are buried at night, and those who can are leaving.`; },
+      // (begun in the realm itself, it has not come from anywhere)
+      const came = o.fromId === x.c ? `${cap(o.name)} has broken out in ${x.cell(d.i)}` : x.era >= 6 ? `${cap(o.name)} has come to ${x.cell(d.i)} from ${o.from}` : `${cap(o.name)} has come to ${x.cell(d.i)} with the ${by} from ${o.from}`;
+      return x.era >= 6 ? `${came}: ${SYMPTOM[o.k] || 'a fever no doctor knows'}. The hospitals are full, the schools are closed, and those who can are leaving the city.`
+        : `${came}: ${SYMPTOM[o.k] || 'fever, and death'}. The dead are buried at night, and those who can are leaving.`; },
     opts: [
       { t: () => 'Close the gates and the harbours', hint: () => 'Fewer will catch it; trade stops for a while.', fx: (x) => ({ q: [2, Math.max(3, Math.round(x.turn / 2))], cure: 0.8, est: { merchants: -0.05 } }), log: (x, d) => `${cap(x.cell(d.i))} is shut against ${x.outbreak(d.o).name}` },
       { t: (x) => (x.era >= 3 ? `Send the ${healers(x)}, and burn the bedding` : `Pray, and let the ${est(x, 'priests')} lead processions`), hint: (x) => (x.era >= 3 ? 'Costly, and it helps.' : 'The gods may hear.'), fx: (x) => (x.era >= 3 ? { coin: -0.7, cure: 0.6 } : { est: { priests: 0.05 }, stab: 0.02, cure: 0.95 }), log: () => '' },
