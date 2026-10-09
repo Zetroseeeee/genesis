@@ -617,7 +617,8 @@ Conventions that matter:
   pass over an heir or restore one, marry a grown child into the nobility; births, deaths, comings of age and matches go
   to the chronicle (`dynastyNews`). What is kept: the living, and the dead a court still needs (parents, brothers and
   sisters, children and theirs: `prune` every twenty years); a house's last six reigns (forty of the player's) and its
-  count; a house off its throne for sixty years (a great one 150, the player's 400). Saved packed (`save().dynasty`: a
+  count; a house off its throne for sixty years (a great one 150, the player's 400); the sim saves a realm's last three
+  rulers only (`cv.rulers`: the reigns are the houses' now). Saved packed (`save().dynasty`: a
   person is an array with its blanks left off, children are found again from their parents); a world saved before
   dynasties makes its rulers people (`settle`). The module throws its own dice; a year of it is about a fifth of a
   millisecond, its save a few hundred kilobytes. After touching it run `tools/dynasty/probe.js` and the war-and-peace
