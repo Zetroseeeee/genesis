@@ -732,6 +732,40 @@
   .gv-tenet { appearance: none; text-align: left; font: inherit; color: var(--text); background: rgb(18 24 34); border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
   .gv-tenet b { font-size: 13px; font-weight: 600; } .gv-tenet small { font-size: 11.5px; color: var(--text-3); line-height: 1.4; } .gv-tenet:hover { border-color: rgb(214 178 94 / 0.5); }
   .gv-tenet.on { background: linear-gradient(90deg, rgb(185 139 240 / 0.22), rgb(185 139 240 / 0.06)), rgb(22 29 41); border-color: var(--cul); } .gv-tenet.on small { color: var(--text-2); } .gv-tenet:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  /* the court: the ruling family as a tree of faces, the line of succession, the house */
+  .ct-house { display: flex; align-items: center; gap: 14px; padding: 14px 16px 12px 14px; border-bottom: 1px solid var(--rule); background: linear-gradient(90deg, rgb(214 178 94 / 0.10), transparent 70%); }
+  .ct-house h3 { margin: 2px 0 3px; font-family: var(--display); font-size: calc(22px * var(--ui-scale)); font-weight: 600; letter-spacing: 0.05em; line-height: 1.1; color: var(--gold-2); }
+  .ct-house small { font-family: var(--serif); font-style: italic; font-size: 12.5px; color: var(--text-2); }
+  .ct-regency { display: flex; align-items: center; gap: 12px; margin: 10px 16px 2px 14px; padding: 8px 12px; border: 1px solid rgb(242 185 75 / 0.45); border-radius: var(--radius); background: rgb(242 185 75 / 0.07); font-size: 13px; line-height: 1.45; }
+  .ct-regency b { color: var(--warn); font-weight: 600; margin-right: 4px; } .ct-regency small { color: var(--text-3); font-size: 12px; }
+  .ct-gen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+  .ct-grand { display: flex; flex-direction: column; gap: 8px; min-width: 0; } .ct-branch { display: flex; flex-direction: column; gap: 4px; } .ct-branch .micro { text-transform: none; letter-spacing: 0.02em; }
+  .ct-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 9px; align-items: center; width: 206px; box-sizing: border-box; padding: 5px 8px 5px 5px; border: 1px solid var(--rule); border-top-color: var(--edge-hi); border-radius: var(--radius); background: rgb(22 29 41); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .ct-card:hover { border-color: rgb(214 178 94 / 0.6); } .ct-card:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; } .ct-card.sel { outline: 2px solid var(--select); outline-offset: 1px; }
+  .ct-card.big { width: 280px; padding: 7px 10px 7px 7px; border-color: rgb(214 178 94 / 0.55); background: linear-gradient(90deg, rgb(214 178 94 / 0.18), rgb(214 178 94 / 0.04)), rgb(22 29 41); }
+  .ct-card.big b { font-family: var(--display); font-size: calc(15px * var(--ui-scale)); letter-spacing: 0.03em; }
+  .ct-card.heir { border-color: rgb(214 178 94 / 0.7); box-shadow: inset 2px 0 0 var(--gold); }
+  .ct-card.dead { background: rgb(15 20 29); border-color: rgb(255 255 255 / 0.04); } .ct-card.dead .ct-face { filter: grayscale(0.85) brightness(0.7); } .ct-card.dead .ct-txt { opacity: 0.6; }
+  .ct-face { display: block; border-radius: 3px; box-shadow: 0 1px 6px rgb(0 0 0 / 0.45); }
+  .ct-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; } .ct-txt b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+  .ct-txt small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums lining-nums; }
+  .ct-txt em { font-style: normal; font-size: 11px; color: var(--gold-2); } .ct-txt em.young { color: var(--text-2); }
+  .ct-mk { position: absolute; top: 4px; right: 5px; display: flex; color: var(--gold); font-style: normal; } .ct-mk svg { width: 14px; height: 14px; }
+  .ct-mk.passed { top: auto; bottom: 4px; font-size: 10px; color: var(--warn); letter-spacing: 0.02em; } .ct-mk.wed { top: auto; bottom: 5px; color: var(--text-3); } .ct-mk.wed svg { width: 12px; height: 12px; }
+  .ct-mk.heir ~ .ct-mk.wed { right: 5px; }
+  .ct-wed { display: flex; color: var(--gold); margin: 0 2px; } .ct-wed svg { width: 18px; height: 18px; }
+  .ct-line, .ct-reigns { margin: 0; padding: 0 0 0 22px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.4; } .ct-line li.none { list-style: none; margin-left: -22px; color: var(--text-3); }
+  .ct-line li::marker, .ct-reigns li::marker { color: var(--text-3); font-variant-numeric: tabular-nums lining-nums; } .ct-reigns b { font-weight: 600; } .ct-line .mk-dim, .ct-reigns .mk-dim { font-size: 12px; }
+  .ct-reigns { list-style: none; padding-left: 0; } .ct-reigns li:first-child b { color: var(--gold-2); }
+  .ct-phead { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; align-items: center; }
+  .ct-phead h3 { margin: 0 0 2px; font-family: var(--display); font-size: calc(20px * var(--ui-scale)); font-weight: 600; letter-spacing: 0.04em; line-height: 1.15; } .ct-phead .micro { text-transform: none; letter-spacing: 0.01em; font-weight: 400; }
+  .ct-age { margin-top: 4px; font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums lining-nums; }
+  .ct-facts { display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.45; color: var(--text-2); } .ct-facts .linkish { color: var(--gold-2); }
+  .ct-char { font-size: 13px; line-height: 1.5; color: var(--text-2); } .ct-char b { color: var(--text); font-weight: 600; }
+  .ct-raise { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .ct-tr { appearance: none; font: inherit; font-size: 12.5px; text-align: left; color: var(--text); background: rgb(18 24 34); border: 1px solid var(--rule); border-radius: var(--radius); padding: 6px 9px; cursor: pointer; }
+  .ct-tr:hover:not([disabled]) { border-color: rgb(214 178 94 / 0.6); } .ct-tr[disabled] { opacity: 0.45; cursor: default; } .ct-tr:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  .ct-tr.on { opacity: 1; border-color: var(--gold); background: linear-gradient(90deg, rgb(214 178 94 / 0.22), rgb(214 178 94 / 0.06)), rgb(22 29 41); color: var(--gold-2); } .ct-tr.lean { border-style: dashed; border-color: rgb(214 178 94 / 0.45); }
   .gv-fname { display: flex; gap: 6px; } .gv-fname input { flex: 1; min-width: 0; font: inherit; font-size: 14px; color: var(--text); background: rgb(0 0 0 / 0.3); border: 1px solid var(--rule); border-radius: var(--radius); padding: 6px 9px; }
   .gv-fname input:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
   .gv-mis { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; } .gv-mis span { display: flex; flex-direction: column; min-width: 0; } .gv-mis small { font-size: 11px; color: var(--text-3); } .gv-mis .btn { min-height: 26px; padding: 3px 10px; white-space: nowrap; } .gv-mis .btn[disabled] { opacity: 0.45; }
@@ -1110,12 +1144,13 @@
 <dialog id="gov"><div class="modal panel" tabindex="-1">
   <div class="phead"><h2 class="display">Laws</h2><span class="micro" id="gv-sub"></span><span id="gv-auth"></span><button class="btn icon ghost" id="gv-close" title="Close (Esc)">✕</button></div>
   <div class="gv-now" id="gv-now"></div>
-  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button></div>
+  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button><button data-gtab="court">Court</button></div>
   <div class="gv-body">
     <section data-gpane="laws" class="gv-split"><div class="gv-list" id="gv-laws"></div><aside class="gv-info" id="gv-info"></aside></section>
     <section data-gpane="form" class="gv-split" hidden><div class="gv-list" id="gv-forms"></div><aside class="gv-info" id="gv-finfo"></aside></section>
     <section data-gpane="estates" id="gv-estates" hidden></section>
     <section data-gpane="faith" class="gv-split" hidden><div class="gv-list" id="gv-faiths"></div><aside class="gv-info" id="gv-fthinfo"></aside></section>
+    <section data-gpane="court" class="gv-split" hidden><div class="gv-list" id="gv-court"></div><aside class="gv-info" id="gv-ctinfo"></aside></section>
   </div>
 </div></dialog>
 
@@ -1217,6 +1252,7 @@
 <script src="faith.js"></script>
 <script src="culture.js"></script>
 <script src="finance.js"></script>
+<script src="dynasty.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -1237,5 +1273,6 @@
 <script src="gov.js"></script>
 <script src="envoys.js"></script>
 <script src="works.js"></script>
+<script src="court.js"></script>
 <script src="troops.js"></script>
 <script src="main.js"></script>

@@ -15,7 +15,7 @@ const args = process.argv.slice(2); const seeds = (args.find((a) => /^\d+(,\d+)*
 const W = 720, H = 360, N = W * H; const png = PNG.sync.read(fs.readFileSync(path.join(root, 'data/world.png')));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
 for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.data[i * 4 + 1] / 255; wd.flags[i] = png.data[i * 4 + 2]; wd.land[i] = png.data[i * 4 + 2] & 1; }
-for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'sim']) (0, eval)(fs.readFileSync(path.join(root, 'src/' + f + '.js'), 'utf8'));
+for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'dynasty', 'sim']) (0, eval)(fs.readFileSync(path.join(root, 'src/' + f + '.js'), 'utf8'));
 const R = window.RULE; const NK = R.NK; const sum = [], wsum = new Float64Array(9), sumR = [], wsumR = new Float64Array(9); for (let e = 0; e < 9; e++) { sum.push(new Float64Array(NK)); sumR.push(new Float64Array(NK)); }
 const BY_PEOPLE = { food: 1, grow: 1, health: 1, hunger: 1, trade: 1, work: 1, yield: 1 };
 for (const seed of seeds) {

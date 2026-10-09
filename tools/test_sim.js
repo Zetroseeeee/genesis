@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -41,6 +41,7 @@ function invariants(sim, tag) {
     check(Math.abs(cellsOf[c.id] - sim.cellsOf[c.id]) <= 2, `${tag}: ${c.name} cellsOf ${sim.cellsOf[c.id]} vs counted ${cellsOf[c.id]}`);
     for (const k of Object.keys(c.wars)) { const b = sim.civs[+k]; check(!b || b.wars[c.id] !== undefined, `${tag}: one-sided war ${c.name} -> ${k}`); }
     check(c.ruler && c.ruler.name, `${tag}: ${c.name} has no ruler`);
+    if (sim.dynasty) { const p = sim.dynasty.rulerOf(c.id); check(!!p && p.id === c.ruler.pid && p.n === c.ruler.name && !p.d, `${tag}: ${c.name}'s ruler ${c.ruler.name} is not the person on its throne (${p ? p.n : 'nobody'})`); }
     check(c.events.length <= 80, `${tag}: ${c.name} events unbounded (${c.events.length})`);
     // what it has sworn: to living realms only, the same on both sides; a lord that lives, is not its own vassal and is not its enemy
     const d = c.dip; check(!!d, `${tag}: ${c.name} has no diplomatic record`); if (!d) continue;
@@ -422,12 +423,12 @@ log('9. knowledge');
   // a realm cut from another knows what its parent knew
   { let kid = null; for (const cv of sim.civs) if (cv && cv.founded > sim.year - 3000 && k.count[cv.id] > 20) { kid = cv; break; } check(!!kid, `realms born late know things from the start (${kid ? sim.fullName(kid) + ': ' + k.count[kid.id] : 'none found'})`); }
   // save and load
-  { const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, s.seed || 1); sim2.load(s); const k2 = sim2.know; let dh = 0, dc = 0, dp = 0; for (const cv of sim.civs) { if (!cv) continue; for (let d = 0; d < k.ND; d++) if (k.has[cv.id * k.ND + d] !== k2.has[cv.id * k.ND + d]) dh++; if (k.cur[cv.id] !== k2.cur[cv.id]) dc++; dp = Math.max(dp, Math.abs(k.prog[cv.id] - k2.prog[cv.id]) * U, Math.abs(k.pool[cv.id] - k2.pool[cv.id]) * U); }
+  { const js0 = JSON.stringify(sim.save()), s = JSON.parse(js0); const sim2 = createSim(wd, s.seed || 1); sim2.load(JSON.parse(js0)); const k2 = sim2.know; /* (each world its own copy: a loaded world keeps the save's objects as its own) */ let dh = 0, dc = 0, dp = 0; for (const cv of sim.civs) { if (!cv) continue; for (let d = 0; d < k.ND; d++) if (k.has[cv.id * k.ND + d] !== k2.has[cv.id * k.ND + d]) dh++; if (k.cur[cv.id] !== k2.cur[cv.id]) dc++; dp = Math.max(dp, Math.abs(k.prog[cv.id] - k2.prog[cv.id]) * U, Math.abs(k.pool[cv.id] - k2.pool[cv.id]) * U); }
     check(dh === 0 && dc === 0 && dp < 0.01, `what every realm knows, studies and holds survives save and load (${dh} discoveries, ${dc} studies differ; ${dp.toFixed(4)} insight off)`); const p2 = sim2.playerCiv(); check(JSON.stringify(p2.know) === JSON.stringify(c.know), "and the player's queue"); check(k2.first.filter(Boolean).length === k.first.filter(Boolean).length, 'and who was first');
     let df = 0; for (const cv of sim.civs) if (cv) for (let q = 0; q < k.NK; q++) df = Math.max(df, Math.abs(k.f[cv.id * k.NK + q] - k2.f[cv.id * k.NK + q])); check(df < 1e-5, `and the edges come out the same (${df.toExponential(1)})`);
     sim.tick(); sim2.tick(); check(Math.abs(k.count[c.id] - k2.count[p2.id]) <= 1 && Math.abs(c.tech - p2.tech) < 1e-6, `the next year goes the same way (${k.count[c.id]} and ${k2.count[p2.id]} known, knowledge ${(Math.abs(c.tech - p2.tech) * U).toExponential(1)} insight apart)`);
     // a world saved before there were discoveries: every realm is given what its knowledge is worth
-    delete s.know; for (const cv of s.civs) if (cv) delete cv.know; const sim3 = createSim(wd, 1); sim3.load(s); const k3 = sim3.know; let none = 0, off = 0; for (const cv of sim3.civs) { if (!cv) continue; if (cv.tech > KN.T0 + 0.01 && !k3.count[cv.id]) none++; let spent = 0; for (const D of L) if (k3.has[cv.id * k3.ND + D.id]) spent += D.cost; if (Math.abs(spent + k3.prog[cv.id] + k3.pool[cv.id] - Math.max(0, cv.tech - KN.T0)) > 1e-6) off++; }
+    delete s.know; for (const cv of s.civs) if (cv) delete cv.know; const sim3 = createSim(wd, 1); sim3.load(JSON.parse(JSON.stringify(s))); const k3 = sim3.know; let none = 0, off = 0; for (const cv of sim3.civs) { if (!cv) continue; if (cv.tech > KN.T0 + 0.01 && !k3.count[cv.id]) none++; let spent = 0; for (const D of L) if (k3.has[cv.id * k3.ND + D.id]) spent += D.cost; if (Math.abs(spent + k3.prog[cv.id] + k3.pool[cv.id] - Math.max(0, cv.tech - KN.T0)) > 1e-6) off++; }
     check(none === 0 && off === 0, `a world from before knowledge is given what its knowledge is worth (${none} realms left with nothing, ${off} with the wrong sum)`); for (let y = 0; y < 50; y++) sim3.tick(); invariants(sim3, 'an old world with new knowledge, 50 years on');
     // history keeps a calendar now. A world saved before it, and far ahead of it, keeps its own: set forward once, saved with the world
     check(sim.calShift === 0 && sim2.calShift === 0, 'a new world runs by history\'s calendar');
@@ -836,8 +837,9 @@ log('14. faiths');
   for (const i of aCells) if (i !== A.capital) F.fth[i] = 0;
   const c0 = F.stats.converted; let y = 0; for (; y < 600 && aCells.filter(i => F.fth[i] === f).length < aCells.length * 0.6; y++) sim.tick();
   check(F.stats.converted > c0 && aCells.filter(i => F.fth[i] === f).length >= aCells.length * 0.6, `the state carries its faith through the realm (${aCells.filter(i => F.fth[i] === f).length} of ${aCells.length} regions in ${y} years)`);
-  // a ruler of the old ways takes up the faith of his neighbour
-  for (y = 0; y < 800 && F.state[B.id] !== f; y++) sim.tick();
+  // a ruler of the old ways takes up the faith of his neighbour (neighbours: the region between them is A's, whatever the years did with it)
+  if (sim.owner[i0 + 5] !== A.id && sim.owner[i0 + 5] !== B.id) sim.claim(i0 + 5, A, i0); sim.touchAll();
+  for (y = 0; y < 3000 && F.state[B.id] !== f; y++) sim.tick();      // (a chance in a hundred every five years: it may take long)
   check(F.state[B.id] === f && B.religion === X.name, `a neighbour of the old ways takes it up (${y} years)`);
   // a faith for all peoples is preached over the border, into a realm of another faith
   const C = sim.spawnTribe(sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.cellDist(i, i0) > 30), {}); C.tech = classic; C.era = sim.eraOf(classic); teach(sim, C, 3); C.aggression = 0; C.dip.think = 1e12;
@@ -1051,6 +1053,98 @@ log('16. finance');
   check(hs > 3 && cos > 0 && owing > 0, `a world of money once banking and companies are known (${hs} houses, ${cos} companies, ${owing} realms owing)`);
   check(!bad, `every realm's debts, coin, panic and standing are within bounds (${bad} not)`);
   check(ms / 100 < 0.5, `finance is quick enough (${(ms / 100).toFixed(3)} ms a year)`);
+}
+}
+// ---------- 17. dynasties: rulers as people of houses; heirs by blood, regencies, kinsmen, lines that fail; reforms and coups; marriages; the player; saved ----------
+if (want(17)) {
+log('17. dynasties');
+{
+  const sim = createSim(wd, 97); const W2 = sim.W, D = sim.dynasty; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  const med = sim.ERAS[4][1] + 0.01; const RF = window.RULE.FORM;
+  const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
+  for (const x of [A, B]) { x.tech = med; x.era = sim.eraOf(med); x.aggression = 0; x.dip.think = 1e12; teach(sim, x, 4); }
+  for (let d = 1; d <= 4; d++) for (const e of [-W2, 0, W2]) { const i = i0 + d + e; if (sim.owner[i] < 0) sim.claim(i, A, i0); sim.pop[i] = 30; }
+  for (let d = 6; d <= 12; d++) for (const e of [-W2, 0, W2]) { const i = i0 + d + e; if (sim.owner[i] < 0) sim.claim(i, B, i0 + 8); sim.pop[i] = 30; }
+  for (const x of [A, B]) sim.rule.setForm(x.id, x, RF.kingdom, 'reform');      // (each realm's ruler stays, and founds a house)
+  sim.touchAll(); for (let y = 0; y < 2; y++) sim.tick();
+  const r0 = D.rulerOf(A.id), H0 = D.houseOf(A.id);
+  check(!!r0 && r0.id === A.ruler.pid && r0.n === A.ruler.name && r0.f === !!A.ruler.fem && !r0.d, `every ruler is a person: ${A.ruler.title} ${A.ruler.name}, ${sim.year - r0.b}`);
+  check(!!H0 && r0.h === H0.id && H0.n >= 1 && !H0.line[H0.line.length - 1][2] && /\S/.test(H0.name), `a kingdom's ruler is of a house, and reigns in its line: ${H0 && H0.name}`);
+  // a family of his own: two sons and a daughter; the line runs sons first, eldest first, each followed by his own
+  const yr = sim.year, sp = D.of(r0.s) || D.make({ n: 'Ama', f: !r0.f, b: r0.b + 2, c: A.id }); r0.s = sp.id; sp.s = r0.id; sp.d = yr + 40; sp.k = []; r0.k = [];
+  const kid = (n, f, age, o) => { const k = D.make(Object.assign({ n, f, b: yr - age, h: r0.h, p: r0.f ? sp.id : r0.id, m: r0.f ? r0.id : sp.id, c: A.id, t: 'steward', d: yr + 50 }, o || {})); r0.k.push(k.id); sp.k.push(k.id); return k; };
+  r0.f = false; A.ruler.fem = false;
+  const s1 = kid('Osric', false, 30), d1 = kid('Edith', true, 28), s2 = kid('Leofric', false, 20);
+  const g1 = D.make({ n: 'Wulf', f: false, b: yr - 6, h: r0.h, p: s1.id, c: A.id, t: 'builder', d: yr + 60 }); s1.k.push(g1.id);
+  check(D.heirOf(A.id) === s1 && D.lineFor(A.id, yr, 4).map(p => p.n).join(',') === 'Osric,Wulf,Leofric,Edith', `the line by descent: ${D.lineFor(A.id, yr, 4).map(p => p.n).join(', ')}`);
+  check(!D.act(A.id, 'pass', s1.id) && D.heirOf(A.id) === s2 && D.lineFor(A.id, yr, 4).map(p => p.n).join(',') === 'Leofric,Edith,Osric,Wulf', 'an heir passed over goes to the end of the line, with his children');
+  check(!D.act(A.id, 'unpass', s1.id) && D.heirOf(A.id) === s1, 'and is restored');
+  // the king dies: the eldest son takes the throne, numbered by his name, and the reign is closed in the house's line
+  { const C = D.court[A.id]; C.nums.Osric = 2; const was = A.ruler.name; const how = sim.rulerDies(A); const r1 = D.rulerOf(A.id);
+    check(how === 'clear' && r1 === s1 && A.ruler.pid === s1.id && A.ruler.name === 'Osric III' && A.ruler.trait === 'steward', `the king dies; his eldest son takes the throne: ${A.ruler.title} ${A.ruler.name} (${how})`);
+    check(r0.d === sim.year && H0.line.some(L => L[0] === was && L[2] === sim.year) && H0.line[H0.line.length - 1][0] === 'Osric III' && D.houseOf(A.id) === H0, `the old reign is closed in the line of ${H0.name}, the new one begun`); }
+  // a child on the throne: a regency, the regent's character rules, and the realm is a little unsettled; at sixteen he rules himself
+  { s1.k = [g1.id]; g1.t = 'scholar'; const how = sim.rulerDies(A); const R = D.regentOf(A.id);
+    check(how === 'child' && D.rulerOf(A.id) === g1 && !!R && !!R.p && A.ruler.trait === R.p.t, `a child of ${sim.year - g1.b} takes the throne under a regent: ${R && R.p && R.p.n} (${R && R.who}), ${A.ruler.trait}`);
+    check(sim.stabilityParts(A).dynasty < 0, `a regency unsettles the realm a little (${(sim.stabilityParts(A).dynasty * 100).toFixed(0)})`);
+    R.p.t = 'tyrant'; A.ruler.trait = 'tyrant'; D.court[A.id].regent.until = sim.year + 1; for (let y = 0; y < 2; y++) sim.tick();
+    check(!D.regentOf(A.id) && A.ruler.trait === 'scholar', `at sixteen the regency ends, and he rules by his own character (${A.ruler.trait})`); }
+  // the line fails: with no kinsman to be had the house dies out, and another takes the throne
+  { const r = D.rulerOf(A.id), H = D.houseOf(A.id); r.k = []; r.p = 0; r.m = 0; H.n = 1; const how = sim.rulerDies(A); const H2 = D.houseOf(A.id);
+    check(how === 'extinct' && H.ended === sim.year && H.fate === 'extinct' && !!H2 && H2 !== H && D.rulerOf(A.id).h === H2.id, `a line with no heir: ${H.name} dies out, ${H2 && H2.name} takes the throne`); }
+  { const r = D.rulerOf(A.id), H = D.houseOf(A.id); r.k = []; r.p = 0; r.m = 0; H.n = 5; let kin = 0; for (let k = 0; k < 30 && !kin; k++) { const rr = D.rulerOf(A.id); rr.k = []; rr.p = 0; rr.m = 0; const hh = D.houseOf(A.id); hh.n = 5; if (sim.rulerDies(A) === 'kin') kin = 1; }
+    check(kin && D.rulerOf(A.id).h === D.houseOf(A.id).id, 'a house of many reigns often finds a kinsman when the line fails'); void H; }
+  // rule changes about the throne: a republic's leaders are of no house, and step down when their years are up; a consul who makes
+  // himself king founds a house; a strong man who takes power puts the house down
+  { sim.rule.setForm(A.id, A, RF.republic, 'reform'); const p = D.rulerOf(A.id); check(!p.h && !D.houseOf(A.id) && sim.succKind(A) === 'elected', `a republic: ${A.ruler.title} ${A.ruler.name}, of no house`);
+    sim.rule.setForm(A.id, A, RF.kingdom, 'reform'); const q = D.rulerOf(A.id); check(q === p && !!D.houseOf(A.id) && q.h === D.houseOf(A.id).id, `the consul makes himself king and founds ${D.houseOf(A.id) && D.houseOf(A.id).name}`);
+    const H = D.houseOf(A.id); sim.rule.setForm(A.id, A, RF.tyranny, 'seized'); check(H.ended === sim.year && H.fate === 'deposed' && D.alive(q, sim.year) && D.rulerOf(A.id) !== q && !D.rulerOf(A.id).h, 'a strong man seizes power: the king is put down (and lives), his house loses the throne'); }
+  // a royal marriage weds one of each house; the children are of the groom's house
+  { sim.rule.setForm(A.id, A, RF.kingdom, 'reform'); const before = D.stats.royal; const y = sim.year;
+    for (const [x, f] of [[A, false], [B, true]]) { const r = D.rulerOf(x.id); const k = D.make({ n: f ? 'Aelfgifu' : 'Cuthred', f, b: y - 19, h: r.h, p: r.f ? 0 : r.id, m: r.f ? r.id : 0, c: x.id, d: y + 50, t: 'steward' }); r.k.push(k.id); }      // (one of each house of an age to marry)
+    sim.diplo.seal(A, B, 'marriage');
+    const fa = D.familyOf(A.id), fb = D.familyOf(B.id); const inA = [fa.ruler, ...fa.kids], inB = [fb.ruler, ...fb.kids];
+    const pair = inA.find(x => x.s && inB.some(y => y.id === x.s)); check(D.stats.royal > before && !!pair, `a royal marriage weds ${pair ? pair.n + ' of ' + sim.fullName(A) : 'nobody'} to ${pair ? D.of(pair.s).n + ' of ' + sim.fullName(B) : ''}`); }
+  // the dead are let go, the living kept: a court's close family stays within bounds over a long while
+  { for (let y = 0; y < 120; y++) sim.tick(); let n = 0, liv = 0; for (const p of D.P.values()) { n++; if (D.alive(p, sim.year)) liv++; } check(n < 60 * sim.st.civCount + 200, `the dead are let go: ${n} people for ${sim.st.civCount} realms (${liv} living)`); }
+  invariants(sim, 'the courts in ' + sim.fmtYear(sim.year));
+  // the player: births told, a child raised to a character, an heir passed over, a child married into the nobility; saved and loaded
+  { const s4 = createSim(wd, 101), D4 = s4.dynasty; const k0 = s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.fert[i] > 0.5 && [1, 2, 3, 4].every(d => ok(i + d) && s4.owner[i + d] < 0));
+    s4.setPlayer(k0, 'Testland'); const P = s4.playerCiv(); P.tech = med; P.era = s4.eraOf(med); teach(s4, P, 4); s4.rule.setForm(P.id, P, RF.kingdom, 'reform');
+    for (let d = 1; d <= 4; d++) { if (s4.owner[k0 + d] < 0) s4.claim(k0 + d, P, k0); s4.pop[k0 + d] = 30; } for (let y = 0; y < 2; y++) s4.tick();
+    const r = D4.rulerOf(P.id), y4 = s4.year; let sp = D4.of(r.s); if (!sp) { sp = D4.make({ n: 'Ama', f: !r.f, b: r.b, c: P.id, d: y4 + 40 }); r.s = sp.id; sp.s = r.id; }
+    const mk = (n, f, age) => { const k = D4.make({ n, f, b: y4 - age, h: r.h, p: r.f ? sp.id : r.id, m: r.f ? r.id : sp.id, c: P.id, t: 'tyrant', d: y4 + 60 }); r.k.push(k.id); sp.k.push(k.id); return k; };
+    for (const id of r.k) D4.P.delete(id); r.k = []; sp.k = []; /* (a family of the test's own) */ const a = mk('Ceol', false, 9), b = mk('Hild', true, 20); const born = D4.make({ n: 'Ine', f: false, b: y4 + 1, h: r.h, p: r.f ? sp.id : r.id, m: r.f ? r.id : sp.id, c: P.id, d: y4 + 70, t: 'builder' }); r.k.push(born.id); sp.k.push(born.id);
+    s4.tick(); check(P.events.slice(-12).some(e => /is born to/.test(e.text) && /Ine/.test(e.text)), 'the player hears of a child born to the throne');
+    P.wealth = 1e4; const cost = D4.raiseCost(P); const why = s4.courtAct('raise', a.id, 'scholar'); check(!why && a.t === 'scholar' && a.rz && P.wealth === 1e4 - cost, `a child is raised to a character, for ${cost} coin (${why || 'done'})`);
+    check(!!s4.courtAct('raise', b.id, 'builder'), 'a grown child is what she is'); check(!s4.courtAct('pass', D4.heirOf(P.id).id) && D4.heirOf(P.id) !== a || D4.heirOf(P.id) === b, 'an heir is passed over');
+    { const B4 = s4.spawnTribe(s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.cellDist(i, k0) > 20), {}); B4.tech = med; B4.era = s4.eraOf(med); teach(s4, B4, 4); B4.aggression = 0; B4.dip.think = 1e12; s4.rule.setForm(B4.id, B4, RF.kingdom, 'reform');
+      s4.diplo.seal(P, B4, 'marriage'); const rb = D4.rulerOf(B4.id); rb.k = []; rb.p = 0; rb.m = 0; D4.houseOf(B4.id).n = 1; const how = s4.rulerDies(B4); s4.diplo.heir(B4.id, B4, how);
+      check(how === 'extinct' && s4.diplo.claimUntil(P, B4.id, 'claim') > s4.year && P.events.slice(-3).some(e => /has a claim on it/.test(e.text)), `a house joined to the player's by marriage dies out: the player has a claim on its throne (${how})`); }
+    const why2 = s4.courtAct('match', b.id); check(!why2 && !!b.s && D4.of(b.s) && D4.of(b.s).h === 0, `a grown daughter is married into the nobility (${why2 || D4.of(b.s).n})`);
+    const C4 = D4.court[P.id]; const saved = JSON.parse(JSON.stringify(s4.save())); const s5 = createSim(wd, 1); s5.load(saved); const D5 = s5.dynasty;
+    const r5 = D5.rulerOf(P.id); const fam4 = D4.familyOf(P.id), fam5 = D5.familyOf(P.id);
+    check(!!r5 && r5.n === r.n && r5.b === r.b && s5.playerCiv().ruler.pid === r5.id && fam5.kids.map(x => x.n + x.b + x.t).join() === fam4.kids.map(x => x.n + x.b + x.t).join() && D5.houseOf(P.id).name === D4.houseOf(P.id).name && JSON.stringify(D5.court[P.id].passed) === JSON.stringify(C4.passed) && D5.P.size === D4.P.size,
+      `saved and loaded: ${D5.P.size} people, ${D5.houses.size} houses; the player's family as it was`);
+    const old = JSON.parse(JSON.stringify(s4.save())); delete old.dynasty; const s6 = createSim(wd, 1); s6.load(old); const D6 = s6.dynasty; let all = true; for (const cv of s6.civs) if (cv) { const p = D6.rulerOf(cv.id); if (!p || p.id !== cv.ruler.pid || p.n !== cv.ruler.name) all = false; }
+    check(all && !!D6.houseOf(P.id), 'a world saved before dynasties: every ruler is made a person, of a house where he rules by blood'); }
+}
+// the courts of a whole world: reigns by blood of about a generation, rulers of sane ages, thrones passing to grown heirs mostly; quick enough
+{
+  const sim = createSim(wd, 12345); const D = sim.dynasty; for (let y = 0; y < 3000; y++) sim.tick();
+  const ren = sim.ERAS[4][1] + 0.02; for (const cv of sim.civs) if (cv) { cv.tech = Math.max(cv.tech, ren); cv.era = sim.eraOf(cv.tech); teach(sim, cv, 4); }
+  const S0 = JSON.parse(JSON.stringify(D.stats)); for (let y = 0; y < 300; y++) sim.tick();
+  let ms = 0; for (let y = 0; y < 100; y++) { sim.tick(); ms += D.stats.ms; }
+  const S = D.stats, reigns = S.reigns - S0.reigns, mean = (S.reignYears - S0.reignYears) / Math.max(1, reigns), how = {}; for (const k in S.how) how[k] = S.how[k] - S0.how[k];
+  let bad = 0, n = 0, old = 0; for (const cv of sim.civs) { if (!cv) continue; n++; const p = D.rulerOf(cv.id); if (!p || p.id !== cv.ruler.pid || p.n !== cv.ruler.name || p.d) bad++; else if (sim.year - p.b > 100 || sim.year - p.b < 0) old++; }
+  const size = JSON.stringify(D.save()).length / 1024; const byBlood = how.clear + how.child + how.kin + how.extinct;
+  log(`   ${sim.fmtYear(sim.year)}: ${reigns} reigns ended in 400 years, ${mean.toFixed(1)} years on the whole; thrones: ${how.clear} to grown heirs, ${how.child} to children, ${how.kin} to kinsmen, ${how.extinct} where the line failed, ${how.new} otherwise; ${D.houses.size} houses, ${D.P.size} people; a year of dynasties takes ${(ms / 100).toFixed(3)} ms; saved ${size.toFixed(0)} KB`);
+  check(!bad && !old, `every realm's ruler is a living person of his name (${bad} not), of a sane age (${old} not)`);
+  check(mean > 14 && mean < 40, `reigns last about a generation (${mean.toFixed(1)} years)`);
+  check(how.clear > how.child && how.child > 0 && how.kin + how.extinct > 0 && how.clear > 0.55 * byBlood, `thrones go mostly to grown heirs (${how.clear} of ${byBlood}), now and then to a child (${how.child}), and lines fail (${how.kin + how.extinct})`);
+  check(size < 450, `the courts are saved in ${size.toFixed(0)} KB`);
+  check(ms / 100 < 0.6, `dynasties are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

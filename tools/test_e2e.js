@@ -778,6 +778,37 @@ server.listen(0, async () => {
     check(r.debt === 0 && r.stand < 0.2 && r.told, 'and then the debts are gone, and the realm\'s standing with them');
     await ev(() => { MARKET.close(); __G.select(__G.sim.playerCiv().capital); });
   });
+  await scenario('dynasties: the ruler\'s card, the Court (the family as a tree of faces, the line, the house), a child raised, an heir passed over and restored, a match, the king dies and his son is crowned', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (TREE.isOpen()) TREE.close(); if (GOV.isOpen()) GOV.close(); if (ENVOYS.isOpen()) ENVOYS.close(); if (WORKS.isOpen()) WORKS.close(); if (MARKET.isOpen()) MARKET.close(); });
+    // a kingdom of the Middle Ages, its king of fifty with a family: a grown son, a daughter of twelve, a son of seven
+    const r = await ev(() => { const S = __G.sim, c = S.playerCiv(), D = S.dynasty; const med = S.ERAS[4][1] + 0.01; if (c.tech < med) { c.tech = med; c.era = S.eraOf(med); } __T.teach(c); S.rule.setForm(c.id, c, RULE.FORM.kingdom, 'reform'); __G.run(1);
+      const k = D.rulerOf(c.id), y = S.year; k.f = false; c.ruler.fem = false; c.ruler.title = S.rule.naming(c).titles[0]; k.b = y - 50; let sp = D.of(k.s); if (!sp) { sp = D.make({ n: 'Ama', f: true, b: y - 44, c: c.id, d: y + 30 }); k.s = sp.id; sp.s = k.id; } for (const id of k.k) D.P.delete(id); k.k = []; sp.k = [];
+      const kid = (n, f, age) => { const x = D.make({ n, f, b: y - age, h: k.h, p: k.id, m: sp.id, c: c.id, d: y + 60, t: 'steward' }); k.k.push(x.id); sp.k.push(x.id); return x.id; };
+      const a = kid('Osric', false, 24), b = kid('Edith', true, 12), d = kid('Leofric', false, 7); c.wealth = 5000; __G.select(c.capital);
+      return { a, b, d, house: D.houseOf(c.id) ? D.houseOf(c.id).name : '', card: document.getElementById('sc-ruler-sub').textContent, heir: document.getElementById('sc-ruler-trait').textContent || '' }; });
+    check(!!r.house && r.card.includes(r.house.charAt(0).toUpperCase() + r.house.slice(1)) && /aged 50\b/.test(r.card) && /Heir: Osric, 24/.test(r.heir), `the ruler's card: ${r.card} · ${r.heir}`);
+    await page.click('#sc-ruler [data-court]'); await frames(2);
+    let q = await ev(() => ({ open: GOV.isOpen(), tab: (document.querySelector('#gv-tabs button.on') || {}).dataset?.gtab, cards: document.querySelectorAll('#gv-court .ct-card').length, faces: document.querySelectorAll('#gv-court canvas.ct-face').length, heir: !!document.querySelector('#gv-court .ct-card.heir'), line: document.querySelectorAll('#gv-court .ct-line li').length, page: (document.querySelector('#gv-ctinfo h3') || {}).textContent }));
+    check(q.open && q.tab === 'court' && q.cards >= 5 && q.faces >= q.cards && q.heir && q.line >= 3, `the Court: ${q.cards} of the family with their faces, the heir marked, ${q.line} in the line`);
+    check(/Osric/.test(q.page || ''), `the heir's page is open: ${q.page}`);
+    // the youngest raised a scholar
+    await page.click(`#gv-court [data-court="${r.d}"]`); await frames(1); await page.click('#gv-ctinfo [data-cact="raise"][data-t="scholar"]'); await frames(1);
+    q = await ev((id) => { const p = __G.sim.dynasty.of(id); return { t: p.t, rz: p.rz, on: !!document.querySelector('#gv-ctinfo .ct-tr.on[data-t="scholar"]') }; }, r.d);
+    check(q.t === 'scholar' && q.rz && q.on, 'the youngest is to be raised a scholar');
+    // the eldest passed over: the line moves; restored
+    await page.click(`#gv-court [data-court="${r.a}"]`); await frames(1); await page.click('#gv-ctinfo [data-cact="pass"]'); await frames(1);
+    q = await ev(() => { const S = __G.sim; return { heir: S.dynasty.heirOf(S.playerCiv().id).n, first: (document.querySelector('#gv-court .ct-line li .linkish') || {}).textContent }; });
+    check(q.heir === 'Leofric' && /Leofric/.test(q.first || ''), `the eldest passed over: the heir is ${q.heir}`);
+    await page.click('#gv-ctinfo [data-cact="unpass"]'); await frames(1);
+    q = await ev(() => ({ heir: __G.sim.dynasty.heirOf(__G.sim.playerCiv().id).n })); check(q.heir === 'Osric', 'and restored');
+    // a match for the grown son
+    await page.click('#gv-ctinfo [data-cact="match"]'); await frames(1);
+    q = await ev((id) => { const D = __G.sim.dynasty; const p = D.of(id); return { s: p.s && D.of(p.s) ? D.of(p.s).n : '' }; }, r.a); check(!!q.s, `the eldest is married into the nobility: to ${q.s}`);
+    // the king dies: his son is crowned, and the chronicle says so
+    q = await ev(() => { const S = __G.sim, c = S.playerCiv(); const how = S.rulerDies(c); GOV.render(); return { how, name: c.ruler.name, told: c.events.slice(-3).map((e) => e.text).join(' / '), card: (document.querySelector('#gv-court .ct-card.big b') || {}).textContent }; });
+    check(q.how === 'clear' && /Osric/.test(q.name) && /takes the throne at 24/.test(q.told) && /Osric/.test(q.card || ''), `the king dies: ${q.told}`);
+    await ev(() => { GOV.close(); __G.select(__G.sim.playerCiv().capital); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);

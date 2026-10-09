@@ -616,14 +616,18 @@
   pbodyEl.addEventListener('scroll', scrollHint, { passive: true }); window.addEventListener('resize', scrollHint);
   function eventsHtml(list, n) { return list.slice(-n).reverse().map(e => `<div><b>${sim.fmtYear(e.year)}</b><span>${esc(e.text)}</span></div>`).join(''); }
   let portraitKey = '';
+  // the ruler's card: the face (with the house's look), the house, the age and the years on the throne, the character the realm
+  // is ruled by (a regent's, for a child), and the heir; the player's opens the court
   function renderRuler(c) {
     const r = c.ruler; if (!r) { $('sc-ruler').hidden = true; return; } $('sc-ruler').hidden = false;
-    const T = sim.TRAITS[r.trait]; const reign = sim.year - r.since; const age = reign + 22 + ((r.seed || 0) % 24);
-    const key = `${c.id}:${r.seed}:${c.era}:${Math.floor(age / 10)}:${c.color}`;
-    if (key !== portraitKey) { portraitKey = key; if (window.PORTRAIT) PORTRAIT.draw($('sc-portrait'), { seed: r.seed || (r.name.length * 7919), culture: TOWN.CULTURES[TOWN.civCulture(sim, c)], era: c.era, fem: !!r.fem, trait: r.trait, color: c.color, age }); }
+    const D = sim.dynasty, p = D && r.pid ? D.of(r.pid) : null, H = p && p.h ? D.houses.get(p.h) : null;
+    const T = sim.TRAITS[r.trait]; const reign = sim.year - r.since; const age = p ? sim.year - p.b : reign + 22 + ((r.seed || 0) % 24);
+    const key = `${c.id}:${r.seed}:${c.era}:${Math.floor(age / 10)}:${c.color}:${H ? H.seed : 0}:${r.trait}`;
+    if (key !== portraitKey) { portraitKey = key; if (window.PORTRAIT) PORTRAIT.draw($('sc-portrait'), { seed: r.seed || (r.name.length * 7919), culture: TOWN.CULTURES[TOWN.civCulture(sim, c)], era: c.era, fem: !!r.fem, trait: p && age < 16 ? 'steward' : r.trait, color: c.color, age, house: H ? H.seed : 0, child: !!p && age < 16 }); }
     $('sc-ruler-name').textContent = `${r.title} ${r.name}`;
-    $('sc-ruler-sub').textContent = `${T ? T.label : 'Ruler'} · ${reign < 1 ? 'new to the throne' : reign + ' year' + (reign === 1 ? '' : 's') + ' on the throne'}`;
-    $('sc-ruler-trait').innerHTML = T ? `<b>${esc(T.label)}.</b> ${esc(T.desc)}` : '';
+    $('sc-ruler-sub').textContent = `${H ? H.name.charAt(0).toUpperCase() + H.name.slice(1) + ' · ' : ''}${p ? 'aged ' + age + ' · ' : ''}${reign < 1 ? 'new to the throne' : reign + ' year' + (reign === 1 ? '' : 's') + ' on the throne'}`;
+    const R = D ? D.regentOf(c.id) : null, heir = D && H ? D.heirOf(c.id) : null; const mine = c.player;
+    $('sc-ruler-trait').innerHTML = (R && R.p ? `<b>A regency.</b> ${esc(R.who === 'noble' ? 'The noble' : (r.fem ? 'Her ' : 'His ') + R.who)} ${esc(R.p.n)} rules until ${esc(sim.fmtYear(R.until))}: ${esc(T ? T.a : '')}.` : T ? `<b>${esc(T.label)}.</b> ${esc(T.desc)}` : '') + (heir ? ` <span class="hint">Heir: ${esc(heir.n)}, ${sim.year - heir.b}.</span>` : H ? ' <span class="hint">No heir.</span>' : '') + (mine && D ? ' <button class="linkish" data-court="0">The court</button>' : '');
   }
   function openRealm() { const c = sim.playerCiv(); if (!c) { toast('No realm yet'); return; } select(c.capital); $('policy').open = true; }
   function openCity() { const c = sim.playerCiv(); if (!c) { toast('No realm yet'); return; } const i = selected >= 0 && sim.owner[selected] === c.id && sim.level[selected] ? selected : c.capital; select(i); const [lon, lat] = placeOf(i); if (GEO.distKm(lon, lat, mapcam.lon, mapcam.lat) > 40 || mapcam.dist > viewDist(i) * 3) mapcam.flyTo(lon, lat, viewDist(i), { duration: 1.6 }); setTimeout(() => $('sel-build').scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); }
@@ -1016,7 +1020,7 @@
     $('hc-halt').addEventListener('click', () => { if (hostSel < 0) return; sim.army.halt(hostSel); toast('Your host halts and makes camp'); hostCardKey = ''; updateHostCard(); });
     $('hc-home').addEventListener('click', () => { if (hostSel < 0) return; sim.army.disband(hostSel); toast('Your host goes home: the levy is over'); closeHost(); refreshAll(true); });
     $('hc-x').addEventListener('click', () => closeHost());
-    $('left').addEventListener('click', (e) => { const ch = e.target.closest('.goodchip[data-good]'); if (ch && mode === 'play') MARKET.open('board', +ch.dataset.good); const kg = e.target.closest('[data-kgo]'); if (kg && mode === 'play') TREE.open('tree', kg.dataset.kgo); const go = e.target.closest('[data-gopen]'); if (go && mode === 'play') GOV.open('laws'); const gg = e.target.closest('[data-ggo]'); if (gg && mode === 'play' && sim.playerCiv()) GOV.open(null, gg.dataset.ggo); const dg = e.target.closest('[data-dgo]'); if (dg && mode === 'play' && sim.playerCiv()) ENVOYS.open('realms', +dg.dataset.dgo); const fg = e.target.closest('[data-faith]'); if (fg && mode === 'play' && sim.playerCiv()) GOV.openFaith(+fg.dataset.faith); const cu = e.target.closest('[data-cult]'); if (cu && mode === 'play' && sim.playerCiv()) WORKS.open('mine'); });
+    $('left').addEventListener('click', (e) => { const ch = e.target.closest('.goodchip[data-good]'); if (ch && mode === 'play') MARKET.open('board', +ch.dataset.good); const kg = e.target.closest('[data-kgo]'); if (kg && mode === 'play') TREE.open('tree', kg.dataset.kgo); const go = e.target.closest('[data-gopen]'); if (go && mode === 'play') GOV.open('laws'); const gg = e.target.closest('[data-ggo]'); if (gg && mode === 'play' && sim.playerCiv()) GOV.open(null, gg.dataset.ggo); const dg = e.target.closest('[data-dgo]'); if (dg && mode === 'play' && sim.playerCiv()) ENVOYS.open('realms', +dg.dataset.dgo); const fg = e.target.closest('[data-faith]'); if (fg && mode === 'play' && sim.playerCiv()) GOV.openFaith(+fg.dataset.faith); const cu = e.target.closest('[data-cult]'); if (cu && mode === 'play' && sim.playerCiv()) WORKS.open('mine'); const ct = e.target.closest('[data-court]'); if (ct && mode === 'play' && sim.playerCiv()) GOV.openCourt(+ct.dataset.court || 0); });
     $('lensbtn').addEventListener('click', () => { $('lensmenu').hidden = !$('lensmenu').hidden; });
     $('opt-continuous').checked = settings.continuous; $('opt-continuous').addEventListener('change', (e) => { settings.continuous = e.target.checked; if (turnRun.active) endTurn('stopped'); paused = true; applySettings(); updateTurnButton(); updateClock(); });
     attachTip($('date'), () => `<b>${sim.fmtYear(sim.year)}</b>${fmtInt(sim.year + 10000)} years since the first spring.`);
@@ -1146,7 +1150,7 @@
   function homeRefresh() {
     const has = hasSave(); const pc = has && previewing && sim ? sim.playerCiv() : null;
     $('btn-load').hidden = !has; $('btn-load').classList.toggle('first', has); $('btn-choose').classList.toggle('first', !has);
-    $('home-save').textContent = !has ? '' : pc ? `${sim.fullName(pc)}, ${sim.fmtYear(sim.year)}` : previewing && sim ? `Your world, ${sim.fmtYear(sim.year)}` : 'Your saved world';
+    $('home-save').textContent = !has ? '' : pc ? `${sim.fullName(pc)}, ${sim.fmtYear(sim.year)}${pc.ruler ? ' · ' + pc.ruler.title + ' ' + pc.ruler.name : ''}` : previewing && sim ? `Your world, ${sim.fmtYear(sim.year)}` : 'Your saved world';      // (who rules it now)
     $('home-eras').hidden = !pc; if (pc) $('home-eras').innerHTML = sim.ERAS.map((e, k) => `<i class="${k < pc.era ? 'past' : k === pc.era ? 'now' : ''}"></i>`).join('') + `<span>${esc(sim.ERAS[pc.era][0])}</span>`;
     { const tape = $('home-tape'); const line = pc ? MARKET.homeLine() : ''; tape.hidden = !line; if (line) tape.innerHTML = line; }
     $('home-new-s').textContent = has ? 'Choose where your people begin (replaces your saved world)' : 'Choose where your people begin';
