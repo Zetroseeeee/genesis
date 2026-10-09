@@ -405,7 +405,7 @@
   function updateEconomy() {
     const c = sim && sim.playerCiv();
     const set = (id, v, d, dcls) => { const el = $('eco-' + id); if (!el) return; el.textContent = v; const de = $('eco-' + id + '-d'); de.textContent = d || ''; de.className = 'd ' + (dcls || ''); };
-    if (!c) { for (const e of ECO) set(e.id, '—', ''); $('id-name').textContent = mode === 'choose' ? 'Choosing a homeland' : 'The World'; $('id-era').textContent = 'Before history'; $('id-sw').style.background = '#5b6779'; return; }
+    if (!c) { for (const e of ECO) set(e.id, '—', ''); $('id-name').textContent = mode === 'choose' ? 'Choosing a homeland' : 'The World'; $('id-era').textContent = 'Before history'; $('id-sw').style.background = '#5b6779'; $('id-who').textContent = ''; if (sealKey) { sealKey = ''; const g = $('id-face').getContext('2d'); g.clearRect(0, 0, 112, 112); } delete document.body.dataset.age; return; }
     if (sim.year - lastSample.year >= 20) { if (lastSample.year > -1e8) { lastSample.dPop = sim.popOf[c.id] - lastSample.pop; lastSample.dCells = sim.cellsOf[c.id] - lastSample.cells; } lastSample.pop = sim.popOf[c.id]; lastSample.cells = sim.cellsOf[c.id]; lastSample.year = sim.year; }
     const inc = c.income || 0;
     set('coin', fmtInt(c.wealth), fmtSigned(inc), inc >= 0 ? 'pos' : 'neg');
@@ -418,6 +418,58 @@
     { const g = GOV.tile(); if (g) set('rule', String(Math.floor(g.auth)), g.demand ? 'demand' : g.reform ? g.reform.left + ' yrs' : g.angry ? 'unrest' : g.army ? 'the army' : '', g.demand || g.angry || g.army ? 'neg' : ''); }
     { const K = sim.culture; if (K) { const rel = K.rel(c.id), gold = K.isGolden(c.id); set('art', fmtInt(K.renown[c.id]), gold ? 'golden age' : K.pace(c.id) > 0 || K.renown[c.id] > 0 ? (rel >= 10 ? Math.round(rel) : rel.toFixed(1)) + '× usual' : '', gold ? 'pos' : rel < 0.67 ? 'warn' : ''); } }
     $('id-name').textContent = sim.fullName(c); $('id-era').textContent = sim.ERAS[c.era][0] + ' · ' + sim.govName(c); $('id-sw').style.background = c.color;
+    if (document.body.dataset.age !== String(c.era)) document.body.dataset.age = c.era;      // (the interface is set in the metal of the player's age)
+    renderSeal(c);
+  }
+  // the seal: the ruler's face, as the court and the realm's card have it, and who rules
+  let sealKey = '';
+  function renderSeal(c) {
+    const r = c.ruler; if (!r) return; const D = sim.dynasty, p = D && r.pid ? D.of(r.pid) : null, H = p && p.h ? D.houses.get(p.h) : null;
+    const age = p ? sim.year - p.b : (sim.year - r.since) + 22 + ((r.seed || 0) % 24); const R = D ? D.regentOf(c.id) : null;
+    const key = `${c.id}:${r.seed}:${c.era}:${Math.floor(age / 10)}:${c.color}:${H ? H.seed : 0}:${r.trait}`;
+    if (key !== sealKey && window.PORTRAIT) { sealKey = key; PORTRAIT.draw($('id-face'), { seed: r.seed || (r.name.length * 7919), culture: TOWN.CULTURES[TOWN.civCulture(sim, c)], era: c.era, fem: !!r.fem, trait: p && age < 16 ? 'steward' : r.trait, color: c.color, age, house: H ? H.seed : 0, child: !!p && age < 16 }); }
+    $('id-who').textContent = `${r.title} ${r.name}${p ? ', ' + age : ''}${R ? ' · ' + (R.n || 'a regent') + ' rules for ' + (r.fem ? 'her' : 'him') : ''}`;
+  }
+
+  // ---------- what is under way (the plate on the right, under the date): a story waiting, what the scholars study, a demand, the
+  // reform, the works nearest done, the hosts in the field, the wars and how they stand, a golden age, debts. Each line opens its page.
+  const TK_ICON = { work: '<path d="M14.5 4.5l5 5-2 2-5-5zM12.5 6.5l-8.5 8.5v4h4l8.5-8.5"/>', host: '<path d="M6 21V3.5M6 4.5h11l-2.5 3.5L17 11.5H6"/>', war: '<path d="M4 4l11 11M15.5 4L4.5 15M3 21l3.5-3.5M21 21l-3.5-3.5M14 14l7 7M10 14l-7 7"/>', gold: '<path d="M7 20c-3.5-3-4.500-8.500-2-13M17 20c3.5-3 4.500-8.500 2-13M5.5 11.5c1.5 0 2.500 1 3 2.500M18.5 11.5c-1.5 0-2.500 1-3 2.500M6 7.500c1.200.300 2 1.200 2.300 2.300M18 7.500c-1.200.300-2 1.200-2.300 2.300M12 6l1.100 2.300 2.400.300-1.800 1.600.500 2.400L12 11.400 9.800 12.600l.500-2.400L8.500 8.600l2.400-.300z"/>', reform: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>' };
+  let tkKey = '', tkRows = [];
+  function updateTracker() {
+    const el = $('tracker'); const c = sim && mode === 'play' ? sim.playerCiv() : null;
+    if (!c) { if (!el.hidden) el.hidden = true; return; }
+    const rows = [];
+    const v = c.story && c.story.q && window.TALES ? TALES.waiting() : null;
+    if (v) rows.push({ k: 'story', cls: 'good', t: v.title, n: '', s: 'A story waits before your court', act: 'story' });
+    const t = TREE.tile(); if (t) { if (t.d) rows.push({ k: 'study', t: t.d.name, n: TREE.yrs(t.years), bar: t.prog, act: 'study' }); else if (t.waiting) rows.push({ k: 'study', cls: 'warn', t: 'Choose what to study', n: '', s: 'Your scholars await your word', act: 'study' }); }
+    const g = GOV.tile(); if (g) { if (g.demand) rows.push({ k: 'demand', cls: 'warn', t: `${g.demand.who} demand ${g.demand.law.name}`, n: g.demand.left + ' yrs', s: 'Grant it, or refuse it', act: 'gov' }); if (g.reform) rows.push({ k: 'reform', t: g.reform.x.name, n: g.reform.left + ' yrs', bar: g.reform.prog, act: 'gov' }); }
+    const works = []; for (const [i, wl] of sim.works) { if (sim.owner[i] !== c.id || !wl || !wl.length) continue; const w = wl[0]; works.push([w.start + w.dur - sim.year, i, w, wl.length]); }
+    works.sort((a, b) => a[0] - b[0]);
+    for (const [left, i, w, n] of works.slice(0, 3)) rows.push({ k: 'work', icon: BUILD_ICON(w.k), t: buildName(w.k, i), n: Math.max(0, left) + ' yrs', s: (sim.cellName.get(i) || 'a settlement') + (n > 1 ? ` · then ${n - 1} more` : ''), bar: clamp((sim.year - w.start) / Math.max(1, w.dur), 0, 1), act: 'cell', i });
+    if (works.length > 3) rows.push({ k: 'work', t: `${works.length - 3} more works under way`, n: '', s: 'Your settlements, in the realm\'s panel', act: 'realm', small: true });
+    for (const a of sim.army.of(c.id).slice(0, 2)) rows.push({ k: 'host', t: a.name, n: sim.army.fmtMen(a.men), s: (HOST_ST[a.state] || 'In the field') + (a.state === 'siege' ? ' · ' + Math.round(a.siege * 100) + '%' : ''), act: 'host', id: a.id });
+    for (const k of Object.keys(c.wars)) { const b = sim.civs[+k]; if (!b) continue; const sc = sim.diplo ? sim.diplo.score(c, b) : 0; rows.push({ k: 'war', cls: 'war', t: sim.fullName(b), n: Math.abs(sc) < 0.005 ? 'even' : (sc > 0 ? '+' : '−') + Math.round(Math.abs(sc) * 100), s: `At war since ${sim.fmtYear(c.wars[k])}`, act: 'war', id: b.id, tip: 'How the war stands: the share of its land the other side has lost since it began, less yours' }); }
+    const K = sim.culture; if (K && K.isGolden(c.id)) rows.push({ k: 'gold', cls: 'good', t: 'A golden age', n: '', s: 'Until ' + sim.fmtYear(K.goldenNeed(c.id).until), act: 'cult' });
+    const F = sim.finance; if (F && F.debt[c.id] > 0.5) rows.push({ k: 'debt', cls: c.wealth < 0 ? 'warn' : '', t: 'Debts of ' + fmtInt(F.debt[c.id]), n: (100 * F.rateOf[c.id]).toFixed(1) + '%', s: 'Interest ' + fmtInt(F.debt[c.id] * F.rateOf[c.id]) + ' a year', act: 'fin' });
+    const key = rows.map((r) => [r.k, r.cls, r.t, r.n, r.s, r.bar === undefined ? '' : Math.round(r.bar * 40)].join('|')).join('/') + ':' + (settings.trackerFolded ? 1 : 0);
+    el.hidden = !rows.length; el.classList.toggle('folded', !!settings.trackerFolded); $('tk-fold').setAttribute('aria-expanded', String(!settings.trackerFolded));
+    if (key === tkKey) return; tkKey = key; tkRows = rows;
+    $('tk-body').innerHTML = rows.map((r, k) => `<button class="trk ${r.k} ${r.cls || ''}${r.small ? ' small' : ''}" data-tk="${k}"${r.tip ? ` title="${esc(r.tip)}"` : ''}><span class="ic"><svg viewBox="0 0 24 24">${r.icon || TK_ICON[r.k] || T_ICON[r.k] || T_ICON.story}</svg></span><span class="t">${esc(r.t)}</span><span class="n">${esc(r.n || '')}</span>${r.bar !== undefined ? `<span class="bar"><i style="width:${Math.round(r.bar * 100)}%"></i></span>` : `<span class="s">${esc(r.s || '')}</span>`}</button>`).join('');
+  }
+  function trackerAct(r) {
+    if (!r || !sim) return;
+    switch (r.act) {
+      case 'story': TALES.open(); break;
+      case 'study': TREE.open(); break;
+      case 'gov': GOV.open(); break;
+      case 'cell': { const [lon, lat] = placeOf(r.i); mapcam.flyTo(lon, lat, viewDist(r.i), { duration: 1.4 }); select(r.i); break; }
+      case 'realm': openRealm(); break;
+      case 'host': { const a = sim.army.byId(r.id); if (a) { selectHost(a.id); const [lon, lat] = sim.army.cellLL(a.cell); mapcam.flyTo(lon, lat, Math.min(Math.max(mapcam.dist, 0.004), 0.03), { duration: 1.4 }); } break; }
+      case 'war': ENVOYS.open(null, r.id); break;
+      case 'cult': WORKS.open(); break;
+      case 'fin': MARKET.open('fin'); break;
+    }
+    updateTurnButton();
   }
 
   // ---------- attention queue + the turn button ----------
@@ -510,6 +562,13 @@
     { const t = ENVOYS.tile(); if (t && t.offers.some((o) => o.since > turnRun.start && (o.kind === 'peace' || o.kind === 'call' || o.kind === 'submit') && !seen.ack.has('offer' + o.id))) { endTurn('envoy'); return; } }
     if (recent.some(e => e.type === 'disaster' && !seen.ack.has('dis' + e.year + e.loc))) { endTurn('disaster'); return; }
   }
+  // what needs the player, as a row of seals beside the turn button: the nearest is what the button opens; each opens its own
+  let notesKey = '', notesList = [];
+  function renderNotes(q) {
+    const key = q.map((a) => a.id + ':' + a.cls + ':' + a.t2).join('|'); if (key === notesKey) return; notesKey = key; notesList = q.slice(0, 7);
+    const box = $('notes'); box.innerHTML = notesList.map((a, k) => `<button class="note ${a.cls || ''}" data-note="${k}" aria-label="${esc(a.t1 + ': ' + a.t2)}"><svg viewBox="0 0 24 24">${T_ICON[a.kind] || T_ICON.era}</svg></button>`).join('') + (q.length > 7 ? `<span class="more">+${q.length - 7}</span>` : '');
+    box.querySelectorAll('.note').forEach((el) => { const a = notesList[+el.dataset.note]; attachTip(el, () => `<b>${esc(a.t1)}</b>${esc(a.t2)}${a.body ? `<div class="hint">${esc(a.body)}</div>` : ''}`); });
+  }
   function updateTurnButton() {
     const b = $('turn'); const l1 = $('turn1'), l2 = $('turn2'), ico = $('turnico'), badge = $('turnbadge'), fill = $('turnfill');
     const c = sim && sim.playerCiv();
@@ -517,17 +576,17 @@
     const eraP = () => { const ref = c || { tech: 0, era: 0 }; const next = sim.ERAS[ref.era + 1]; const from = sim.ERAS[ref.era][1]; return next ? clamp((ref.tech - from) / (next[1] - from), 0, 1) : 1; };
     badge.hidden = true;
     if (!sim) return;
-    if (!c) { setState('over', 'Gone', 'Your people are no more · menu', 'gone'); fill.style.strokeDashoffset = '295.3'; return; }
+    if (!c) { setState('over', 'Gone', 'Your people are no more · menu', 'gone'); fill.style.strokeDashoffset = '295.3'; renderNotes([]); return; }
     const av = $('advisor');
     const softAdvice = () => { av.classList.remove('att'); av.dataset.att = ''; av.dataset.tool = ''; av.dataset.go = ''; av.dataset.ack = ''; av.dataset.market = ''; av.dataset.know = ''; av.dataset.gov = ''; const adv = computeAdvice(); if (adv) { av.hidden = false; $('advisor-text').textContent = adv.text; av.dataset.tool = adv.tool || ''; av.dataset.go = adv.go >= 0 ? adv.go : ''; av.dataset.ack = adv.ack || ''; av.dataset.market = adv.market || ''; av.dataset.know = adv.know || ''; av.dataset.gov = adv.gov || ''; } else av.hidden = true; };
     if (settings.continuous) {
       setState(paused ? 'advance' : 'running', paused ? 'Play' : 'Pause', '', paused ? 'play' : 'pause'); fill.style.strokeDashoffset = (295.3 * (1 - eraP())).toFixed(1); b.title = paused ? 'Run time (Enter)' : 'Pause (Enter)';
-      const q = computeAttention();
+      const q = computeAttention(); renderNotes(q);
       if (q.length) { av.hidden = false; av.classList.add('att'); av.dataset.att = '1'; av.dataset.tool = ''; av.dataset.go = ''; av.dataset.ack = ''; $('advisor-text').textContent = `${q[0].t1}: ${q[0].t2}`; } else softAdvice();
       return;
     }
-    if (turnRun.active) { const p = clamp((sim.year - turnRun.start) / Math.max(1, turnRun.target - turnRun.start), 0, 1); setState('running', sim.fmtYear(sim.year), 'click to stop', 'stop'); fill.style.strokeDashoffset = (295.3 * (1 - p)).toFixed(1); av.hidden = true; return; }
-    const q = computeAttention();
+    if (turnRun.active) { const p = clamp((sim.year - turnRun.start) / Math.max(1, turnRun.target - turnRun.start), 0, 1); setState('running', sim.fmtYear(sim.year), 'click to stop', 'stop'); fill.style.strokeDashoffset = (295.3 * (1 - p)).toFixed(1); av.hidden = true; renderNotes([]); return; }
+    const q = computeAttention(); renderNotes(q);
     if (q.length) { const a = q[0]; setState(a.cls, a.t1, 'click to see', a.kind); if (q.length > 1) { badge.hidden = false; badge.textContent = q.length; } fill.style.strokeDashoffset = '0'; b.title = a.body || a.t2; av.hidden = false; av.classList.add('att'); av.dataset.att = '1'; av.dataset.tool = ''; av.dataset.go = ''; av.dataset.ack = ''; $('advisor-text').textContent = a.t2; }
     else { const n = turnLength(); setState('advance', 'Advance', `${n} years`, 'play'); fill.style.strokeDashoffset = (295.3 * (1 - eraP())).toFixed(1); b.title = `Advance ${n} years to ${sim.fmtYear(sim.year + n)} (Enter)`;
       if (!seen.turns) { av.hidden = false; av.classList.remove('att'); av.dataset.att = ''; av.dataset.tool = ''; av.dataset.go = ''; av.dataset.ack = ''; $('advisor-text').textContent = `Press Advance: ${n} years pass while you watch, and time stops if anything needs you.`; return; }
@@ -576,6 +635,18 @@
     $('btn-pause').classList.toggle('on', paused);
     let best = 0; for (const c of sim.civs) if (c && c.tech > best) best = c.tech;
     $('worldera').textContent = sim.st.civCount ? sim.ERAS[sim.eraOf(best)][0] : 'Before history';
+    // the nine ages: the player's (or, without a realm, the world's front) as far as it has come, and where the world's front is
+    { const pc = sim.playerCiv(), t = pc ? pc.tech : best, e = sim.eraOf(t), lead = sim.eraOf(best), from = e ? sim.ERAS[e][1] : 0, next = sim.ERAS[e + 1];
+      const p = next ? clamp((t - from) / (next[1] - from), 0, 1) : 1; const key = `${e}:${Math.round(p * 50)}:${lead}:${pc ? 1 : 0}`;
+      if (key !== agesKey) { agesKey = key; [...$('ages').children].forEach((el, k) => { el.className = (k < e ? 'past' : k === e ? 'now' : '') + (pc && k === lead && lead > e ? ' lead' : ''); if (k === e) el.style.setProperty('--p', Math.round(p * 100) + '%'); }); } }
+  }
+  let agesKey = '';
+  function agesTip() {
+    const pc = sim && sim.playerCiv(); let best = 0; for (const c of sim.civs) if (c && c.tech > best) best = c.tech;
+    const t = pc ? pc.tech : best, e = sim.eraOf(t), lead = sim.eraOf(best);
+    const rows = sim.ERAS.map((E, k) => `<div class="row"><span>${k === e ? '<b style="display:inline;color:var(--m-hi)">' + E[0] + '</b>' : E[0]}</span><span class="num">${k === 0 ? 'from the first fields' : 'at ' + Math.round(E[1] * 100) + '% knowledge'}</span></div>`).join('');
+    const next = sim.ERAS[e + 1], from = e ? sim.ERAS[e][1] : 0;
+    return `<b>${pc ? 'Your people are in the ' + sim.ERAS[e][0] : 'The world is in the ' + sim.ERAS[lead][0]}</b>${rows}<div class="hint">${next ? `${Math.round(100 * clamp((t - from) / (next[1] - from), 0, 1))}% of the way to the ${next[0]}. ` : ''}${pc && lead > e ? `The most learned realm of the world is in the ${sim.ERAS[lead][0]}. ` : ''}Click for where you stand in knowledge.</div>`;
   }
   function setSpeedIdx(i) { speedIdx = clamp(i, 0, SPEEDS.length - 1); paused = false; updateClock(); updateTurnButton(); }
 
@@ -905,7 +976,7 @@
     cands.sort((a, b) => b.pri - a.pri);
     const r = stage.getBoundingClientRect(); const GRID = 32; const cols = Math.ceil((r.width + 200) / GRID), rows = Math.ceil((r.height + 200) / GRID); const occ = new Uint8Array(cols * rows);
     // HUD panels reserve their cells so labels never sit under the interface
-    if (labelTick % 30 === 0 || !hudRects.length || performance.now() - hudRectsT > 1500) { hudRectsT = performance.now(); hudRects.length = 0; for (const id of ['tl', 'tr', 'left', 'right', 'bl', 'bc', 'report', 'advisor', 'turn', 'mapwrap']) { const el = $(id); if (!el || (id === 'left' && !el.classList.contains('open'))) continue; const b = el.getBoundingClientRect(); if (b.width > 0 && b.height > 0) hudRects.push([b.left - r.left, b.top - r.top, b.right - r.left, b.bottom - r.top]); } }
+    if (labelTick % 30 === 0 || !hudRects.length || performance.now() - hudRectsT > 1500) { hudRectsT = performance.now(); hudRects.length = 0; for (const id of ['tl', 'tr', 'tracker', 'left', 'right', 'bl', 'bc', 'report', 'advisor', 'notes', 'turn', 'mapwrap']) { const el = $(id); if (!el || (id === 'left' && !el.classList.contains('open'))) continue; const b = el.getBoundingClientRect(); if (b.width > 0 && b.height > 0) hudRects.push([b.left - r.left, b.top - r.top, b.right - r.left, b.bottom - r.top]); } }
     for (const [x0, y0, x1, y1] of hudRects) { const gx0 = Math.max(0, Math.floor((x0 + 100) / GRID)), gx1 = Math.min(cols - 1, Math.floor((x1 + 100) / GRID)), gy0 = Math.max(0, Math.floor((y0 + 100) / GRID)), gy1 = Math.min(rows - 1, Math.floor((y1 + 100) / GRID)); for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) occ[gy * cols + gx] = 1; }
     const placedIds = new Set(); let n = 0; let nProjNull = 0, nBlocked = 0, nMeasured = 0;
     for (const c of cands) {
@@ -1053,6 +1124,17 @@
     $('btn-close').addEventListener('click', deselect);
     $('btn-fly').addEventListener('click', () => { if (selected < 0) return; const [lon, lat] = placeOf(selected); mapcam.flyTo(lon, lat, Math.min(mapcam.dist, viewDist(selected)), { duration: 1.8 }); });
     $('l-chronicle').addEventListener('click', () => openChronicle('log')); $('l-empire').addEventListener('click', () => openRealm());
+    // the seal opens the realm; the date and its ages, where the realm stands in knowledge; the plate on the right, what each line names
+    $('id-seal').addEventListener('click', () => { if (sim && mode === 'play' && sim.playerCiv()) openRealm(); });
+    attachTip($('id-seal'), () => { const c = sim && sim.playerCiv(); if (!c || !c.ruler) return ''; const D = sim.dynasty, p = D && c.ruler.pid ? D.of(c.ruler.pid) : null, H = p && p.h ? D.houses.get(p.h) : null, heir = D && H ? D.heirOf(c.id) : null; const T = sim.TRAITS[c.ruler.trait];
+      return `<b>${esc(sim.fullName(c))}</b><div>${esc(sim.ERAS[c.era][0] + ' · ' + sim.govName(c))}</div><div class="row" style="margin-top:6px"><span>${esc(c.ruler.title + ' ' + c.ruler.name)}</span><span>${p ? sim.year - p.b : ''}</span></div>${H ? `<div>${esc(H.name.charAt(0).toUpperCase() + H.name.slice(1))}</div>` : ''}${T ? `<div>${esc(T.label)}: ${esc(T.desc)}</div>` : ''}${heir ? `<div class="row"><span>Heir</span><span>${esc(heir.n)}, ${sim.year - heir.b}</span></div>` : ''}<div class="hint">Click for your realm; the Court (V) has your family.</div>`; });
+    $('date').addEventListener('click', () => { if (sim && mode === 'play' && sim.playerCiv()) TREE.open('stand'); });
+    attachTip($('date'), () => (sim ? agesTip() : ''));
+    $('notes').addEventListener('click', (e) => { const b = e.target.closest('[data-note]'); if (!b) return; const a = notesList[+b.dataset.note]; if (a && a.act) { $('tip').hidden = true; a.act(); } notesKey = ''; updateTurnButton(); });
+    $('tk-body').addEventListener('click', (e) => { const b = e.target.closest('[data-tk]'); if (b) trackerAct(tkRows[+b.dataset.tk]); });
+    $('tk-fold').addEventListener('click', () => { settings.trackerFolded = !settings.trackerFolded; try { localStorage.setItem('genesis-settings', JSON.stringify(settings)); } catch (e) {} tkKey = ''; updateTracker(); });
+    // the ornaments of the age at the corners of the great plates
+    for (const el of document.querySelectorAll('.modal.panel, #tracker')) for (const k of ['tl', 'tr', 'bl', 'br']) { const o = document.createElement('i'); o.className = 'orn ' + k; o.setAttribute('aria-hidden', 'true'); el.appendChild(o); }
     $('chron-close').addEventListener('click', () => $('chron').close());
     document.querySelectorAll('#chron .tabs button').forEach(b => b.addEventListener('click', () => setCTab(b.dataset.ctab)));
     $('v-pol').addEventListener('click', () => { view.political = !view.political; globals.uPolitical.value = view.political ? 1 : 0; $('v-pol').classList.toggle('on', view.political); });
@@ -1130,7 +1212,7 @@
     const n = {}, pp = {}; let pop = 0; for (const c of sim.civs) { if (!c) continue; const k = RULE.FORM[sim.rule.ruleOf(c).gov].kind; n[k] = (n[k] || 0) + 1; pp[k] = (pp[k] || 0) + sim.popOf[c.id]; pop += sim.popOf[c.id]; }
     el.innerHTML = '<span class="micro">How the world is governed</span>' + Object.keys(RULE.KINDS).map((k) => `<i class="${n[k] ? '' : 'off'}" style="background:${RULE.KINDS[k][1]}"></i><span class="${n[k] ? '' : 'none'}">${RULE.KINDS[k][0]}</span><b>${n[k] ? Math.round(100 * pp[k] / Math.max(1e-9, pop)) + '%' : ''}</b>`).join('');
   }
-  function refreshAll(force) { updateEconomy(); updateTurnButton(); updateClock(); updateDock(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); ENVOYS.refresh(); WORKS.refresh(); if (view.gov || view.rel || view.ppl || view.fth || view.ren) renderGovKey(); }
+  function refreshAll(force) { updateEconomy(); updateTurnButton(); updateClock(); updateDock(); updateTracker(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); ENVOYS.refresh(); WORKS.refresh(); if (view.gov || view.rel || view.ppl || view.fth || view.ren) renderGovKey(); }
 
   // ---------- home screen, version, updates ----------
   // version.json is written by the build: what this game is and what changed lately. window.desktop is the app's
