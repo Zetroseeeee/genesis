@@ -354,3 +354,6 @@ culture_world | tools/scenes/culture.js | {years:10300,lon:23,lat:38.5,tab:'worl
 culture_lens  | tools/scenes/peoples.js | {years:11000,lon:40,lat:35,alt:7500,lens:'ren'} | | 170
 # --- finance: the Treasury in AD 1650 (debts and who holds them, the coin debased, banking houses and companies of the world, shares abroad) ---
 treasury      | tools/scenes/treasury.js | {years:11650,lon:4.9,lat:52.4} | | 175
+# --- dynasties: the Court in AD 1250 (the ruling family as a tree of faces, the line of succession, the house and its reigns); a child king under a regent ---
+court         | tools/scenes/court.js | {years:11250,lon:2.35,lat:48.85} | | 170
+court_regency | tools/scenes/court.js | {years:11250,lon:2.35,lat:48.85,regency:true,pick:'ruler'} | | 170

@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~32 min for all 42).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~33 min for all 43).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
@@ -123,6 +123,13 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   borrowed, repaid, defaulted on, debased and restored, banking houses opened and failed, companies chartered and crashed,
   panics, how much the autopilot's courts hold in turns of their income. Hold it to its header; run it after touching
   `finance.js`, and then the war-and-peace probe.
+- `node tools/dynasty/probe.js [seed,seed] [last year]` — the people who rule through the ages: how realms' rulers come
+  (by blood, named, chosen, elected, seized), how long reigns by blood last and at what age their rulers die, how thrones
+  passed (to a grown heir, to a child under a regent, to a kinsman, to a new house where a line failed), houses begun and
+  ended (died out, put down), regencies, royal matches, the ages of rulers and of ruling houses, the oldest houses, how
+  many people are kept and what they cost in a save and a year. Hold it to its header; run it after touching
+  `dynasty.js` or how the sim crowns a ruler, and then the war-and-peace probe (deaths come with age now, and a line that
+  fails is what a royal marriage inherits).
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -210,6 +217,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/people.js` | `PEOPLE` | The peoples of the world: who lives in every region, each people's tongue and family, how peoples are taken into those who rule them and drift apart, what ruling others costs a realm; pure data |
 | `src/faith.js` | `FAITH` | The faiths of the world: what every region keeps, the holy cities, faiths founded, carried by the state, preached and taken up, churches that break away, what other faiths cost a realm; the player's faith (founding with tenets, taking up another, missionaries); pure data |
 | `src/culture.js` | `CULTURE` | Great people (nine kinds), their works, renown and golden ages: who is born where, what they make, where it is kept and who holds it, what it brings the realm, what is forgotten; the player's patronage and commissions; pure data |
+| `src/dynasty.js` | `DYNASTY` | The people who rule: every ruler a person with a family, a character and a face; houses and the line of their reigns; who comes after whom (the line by descent, regents for a child, kinsmen, lines that fail); marriages, royal ones with them; the player's court (raising children, passing over an heir, matches); pure data |
 | `src/finance.js` | `FINANCE` | Money: what every realm owes and to whom, the rate it pays, its standing with lenders, defaults; its coin and what it is worth (debasing, restoring); banking houses and chartered companies of the world; panics; the autopilot's purse (what a court keeps, what a war costs); pure data |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
@@ -225,9 +233,10 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
 | `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
-| `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand |
+| `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand; the faith; the court (`court.js`) |
 | `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
 | `src/bank.js` | `BANK` | The Treasury, the market screen's last tab: debts and who holds them, borrowing and repaying, repudiation, the coin, the price of money, banking houses and companies (shares bought and sold), panics of late |
+| `src/court.js` | `COURT` | The Court, the laws screen's last tab: the ruling family as a tree of faces (parents, the throne and consort, brothers and sisters, children, grandchildren), the line of succession, a regency, the house and its reigns; a person's page (raise as, pass over, marry) |
 | `src/works.js` | `WORKS` | The culture screen: renown against the age, the next great person, the golden age, patronage, the living great people (commissions), the works held and lost; the world's renowned realms, golden ages, great people of late and greatest works |
 | `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
@@ -578,6 +587,41 @@ Conventions that matter:
   interest paid and what came back, the empty-treasury notice points to credit. Saved (`save().finance`); a world saved
   before finance owes nothing and has no houses. The module throws its own dice; a year of it is about a fifth of a
   millisecond. After touching it run `tools/finance/probe.js` and the war-and-peace probe over 12345 and 777.
+- **Dynasties** (`dynasty.js`; `sim.dynasty`). Every ruler is a person (born, dead or not, of a house, a father and a
+  mother, a spouse, children, a character `t` from the sim's traits, a face `sd`), and `cv.ruler.pid` names the one on the
+  throne; a realm's court (`court[c]`) holds its ruler, his house, a regent, those passed over and how many of each name
+  its throne has had (numbers from the Bronze Age: Eadric III). **A ruler's death comes with his years**: the year's roll
+  is the sim's as it always was, held against a hazard by age (Gompertz, more at war, less from the Industrial age:
+  `hazard`) instead of a flat one in 34, and as many deaths a year as that gave (the world's wars, risings and breakaways
+  were fitted to them): reigns of about thirty-four years, rulers dying at seventy or so; those who come from outside a
+  line come young enough to reign as long (`AGE`). How rulers follow one another is `sim.succKind`: blood; named (an empire's: the ablest grown child); party,
+  chosen, holy (numbered), elected and seized rulers are of no house. By blood the throne goes down the line by descent
+  (`lineFor`: each child followed by its own line, sons before daughters, the eldest first, those passed over last; then
+  brothers and sisters and theirs), passing by anyone who rules a realm of his own; failing all, a kinsman of a house of
+  two reigns or more (`KIN_SHARE`), else the house dies out and another begins. A child under sixteen rules under a
+  regent (mother, father, an uncle or aunt, else a great noble) whose character is the realm's until he comes of age
+  (`traitOf`; the sim sets `cv.ruler.trait` at 'ofage'); a regency costs a little stability, and a succession is disputed
+  the more readily the further the throne went from a grown heir (`RISK_HOW` in `sim.js`). Where a realm grows or
+  reforms into rule by blood its ruler stays and founds a house (`recrown`; rule's `crown(cv, how)` says how the form
+  changed); a rising, a coup or a victor's terms put him down (his house 'deposed'), a reform into other rule has him
+  step aside. **Families**: rulers and their children marry at about eighteen (the player's a few years later) into the
+  nobility, or into a house the realm has sworn a royal marriage with (sealing one weds one of each house at once:
+  `host.married` in `diplo.js`); a marriage's children are thrown at the wedding (their years, fates and leanings: about
+  four a marriage before the modern ages, two after, a third dying young), named in the people's tongue and half the
+  time for a forebear; a child's character shows from birth (as often as not the ruling parent's) and is fixed at
+  sixteen. Children of rulers who are of no house are thrown only once they matter (`ensureKids`). **Inheritance**: where
+  houses are joined by marriage and a line fails, the other may inherit its crown (`diplo.heir(c, cv, how)`, `INHERIT`:
+  on the whole the flat rate it was before). Faces: a house's seed gives its people three in four of its features, and a
+  child has a child's face (`portrait.js`: `o.house`, `o.child`). The player (`sim.courtAct`; the Court tab, `court.js`;
+  the ruler's card shows house, age, regent and heir and opens it): raise a child under sixteen to a character (coin),
+  pass over an heir or restore one, marry a grown child into the nobility; births, deaths, comings of age and matches go
+  to the chronicle (`dynastyNews`). What is kept: the living, and the dead a court still needs (parents, brothers and
+  sisters, children and theirs: `prune` every twenty years); a house's last six reigns (forty of the player's) and its
+  count; a house off its throne for sixty years (a great one 150, the player's 400). Saved packed (`save().dynasty`: a
+  person is an array with its blanks left off, children are found again from their parents); a world saved before
+  dynasties makes its rulers people (`settle`). The module throws its own dice; a year of it is about a fifth of a
+  millisecond, its save a few hundred kilobytes. After touching it run `tools/dynasty/probe.js` and the war-and-peace
+  probe over 12345 and 777.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

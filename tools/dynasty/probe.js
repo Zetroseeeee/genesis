@@ -2,11 +2,12 @@
 // under a regent, to a kinsman, to a new house when a line fails), how many houses there are and how they end, royal marriages,
 // and what it costs.
 //   node tools/dynasty/probe.js [seed[,seed...]] [last year]
-// What to hold it to: reigns of about twenty-five years where power passes by blood (from twenty-two to thirty), rulers who die
-// at sixty or so before the modern ages and in their seventies after; most thrones going to a grown son or daughter, one in ten
-// or so to a child (a regency), a few in a hundred to a kinsman, and a line failing now and then (a house dies out once in some
-// centuries); houses that last a century or two and a few that last many; a year of it a small fraction of a millisecond, and a
-// save of a few hundred kilobytes at most. Run the war-and-peace probe after it (deaths now come with age).
+// What to hold it to: reigns of thirty-two to thirty-six years on the whole, by blood and otherwise (the old flat roll of one in
+// 34 gave that many deaths a year, and the world's wars, risings and breakaways were fitted to them), rulers dying at about
+// seventy; most thrones going to a grown son or daughter, about one in ten to a child (a regency), a few in a hundred to a
+// kinsman, and a line failing one time in ten or so (a house dies out once in some centuries); ruling houses some centuries
+// old, a few much older; a year of it a small fraction of a millisecond, and a save of a few hundred kilobytes at most. Run the
+// war-and-peace probe after it.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 global.performance = global.performance || require('perf_hooks').performance;
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;
@@ -41,7 +42,7 @@ for (const seed of seeds) {
     console.log(`           since: ${d('reigns')} reigns ended; by blood ${hd.length}, mean ${mean(hd, (e) => e.len)} yrs (deaths ${deaths.length}, at ${mean(deaths, (e) => e.age)}); others ${ho.length}, mean ${mean(ho, (e) => e.len)} yrs`);
     console.log(`           thrones: clear ${dh('clear')}, child ${dh('child')}, kinsman ${dh('kin')}, line failed ${dh('extinct')}, new ${dh('new')}; houses ended ${d('ended')} (died out ${d('extinct')}, put down ${d('deposed')}); regencies now ${regents}; royal matches ${d('royal')}`);
     console.log(`           rulers of houses: age ${q(ages, 0.1)} / ${q(ages, 0.5)} / ${q(ages, 0.9)}; ruling houses' age ${q(hAge, 0.5)} / ${q(hAge, 0.9)} / ${hAge[hAge.length - 1] || 0} yrs; a year ${(ms / years).toFixed(3)} ms`);
-    const old = living.slice().sort((a, b) => a.founded - b.founded).slice(0, 3).map((x) => `${x.name} (${sim.civs[x.c] ? sim.fullName(sim.civs[x.c]) : '?'}, since ${sim.fmtYear(x.founded)}, ${x.line.length} reigns)`).join('; ');
+    const old = living.slice().sort((a, b) => a.founded - b.founded).slice(0, 3).map((x) => `${x.name} (${sim.civs[x.c] ? sim.fullName(sim.civs[x.c]) : '?'}, since ${sim.fmtYear(x.founded)}, ${x.n} reigns)`).join('; ');
     if (old) console.log(`           oldest: ${old}`);
     was = JSON.parse(JSON.stringify(S)); ends.length = 0; ms = 0; years = 0;
   }

@@ -2,7 +2,8 @@
 // them, the forms of government, the estates of the realm (who holds power, how content they are and why), what the
 // ruler's authority allows, the reform under way and whatever an estate is demanding; and the faith of the realm (the
 // faiths of its people and around it, a faith's page, founding one, taking up another, missionaries, a church of one's
-// own). It reads the simulation's rule and faiths (sim.rule, rule.js; sim.faith, faith.js) and calls their few actions.
+// own); and the court (court.js: the ruling family, the line of succession, the house). It reads the simulation's rule and
+// faiths (sim.rule, rule.js; sim.faith, faith.js) and calls their few actions.
 window.GOV = (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
@@ -60,6 +61,7 @@ window.GOV = (function () {
     document.querySelectorAll('#gv-tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.gtab)));
     $('gov').addEventListener('close', () => { lastSig = ''; });
     $('gov').addEventListener('click', (e) => {
+      if (tab === 'court' && window.COURT && COURT.click(e, S(), (m) => { if (ctx.toast) ctx.toast(m); })) { if (ctx.afterAct) ctx.afterAct(); render(); return; }
       const a = e.target.closest('[data-gact]'); if (a) { act(a.dataset.gact, a.dataset.k); return; }
       const j = e.target.closest('[data-kgo]'); if (j && ctx.openTree) { close(); ctx.openTree(j.dataset.kgo); return; }
       const g = e.target.closest('[data-ggo]'); if (g) { show(g.dataset.ggo); return; }
@@ -80,6 +82,8 @@ window.GOV = (function () {
   function close() { const d = $('gov'); if (d.open) d.close(); }
   // open the screen at the faith of the realm, or at a faith's page ('new': founding one)
   function openFaith(f) { if (f !== undefined) selFaith = f; open('faith'); }
+  // open the screen at the court, at a person of the family (or the heir)
+  function openCourt(id) { if (window.COURT) COURT.select(id || 0); open('court'); }
   function setTab(t) { tab = t; document.querySelectorAll('#gv-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.gtab === t)); document.querySelectorAll('#gov [data-gpane]').forEach((p) => { p.hidden = p.dataset.gpane !== t; }); render(); }
 
   // ----- what the player does -----
@@ -244,7 +248,7 @@ window.GOV = (function () {
   function render() {
     const s = S(); if (!s || !isOpen()) return; const c = me(); if (!c) return;
     $('gv-sub').textContent = `${s.fullName(c)} · ${RL().FORM[RU().ruleOf(c).gov].name} · ${s.fmtYear(s.year)}`;
-    renderNow(); if (tab === 'laws') renderLaws(); else if (tab === 'form') renderForms(); else if (tab === 'faith') renderFaith(); else renderEstates();
+    renderNow(); if (tab === 'laws') renderLaws(); else if (tab === 'form') renderForms(); else if (tab === 'faith') renderFaith(); else if (tab === 'court') { if (window.COURT) COURT.render($('gv-court'), $('gv-ctinfo'), s, c); } else renderEstates();
     lastSig = sig();
   }
   const sig = () => { const s = S(), c = me(); if (!c) return String(s.year); const Q = RU().ruleOf(c); const F = s.faith; return `${s.year}:${Q.gov}:${Object.values(Q.laws).join(',')}:${Q.reform ? Q.reform.key : ''}:${Q.demand ? Q.demand.key : ''}:${Math.floor(Q.auth)}:${F ? F.state[c.id] + '/' + F.pending[c.id] + '/' + F.missionTo[c.id] : ''}:${Math.floor(c.wealth)}`; };
@@ -261,5 +265,5 @@ window.GOV = (function () {
   }
   // what a discovery opens here, as lines for its page in the knowledge tree
   function opensLines(key) { const R = RL(); return R.opens(key).map((x) => x.cat === undefined ? `A form of government: <button class="linkish" data-ggo="${x.key}">${esc(x.name)}</button>` : `A law of ${esc(R.CAT[x.cat].name.toLowerCase())}: <button class="linkish" data-ggo="${x.key}">${esc(x.name)}</button>`); }
-  return { init, open, openFaith, close, isOpen, refresh, render, show, tile, opensLines, gives, moodWord, mult, GIVE, NAME, CICON, EICON, svg };
+  return { init, open, openFaith, openCourt, close, isOpen, refresh, render, show, tile, opensLines, gives, moodWord, mult, GIVE, NAME, CICON, EICON, svg };
 })();

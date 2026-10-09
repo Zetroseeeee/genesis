@@ -290,7 +290,7 @@ function createSim(world, seed) {
     lose: (cv, share) => { for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === cv.id && level[i] < 2) pop[i] *= 1 - share; } },
     fine: (cv, share) => { cv.wealth -= Math.max(0, cv.income || 0) * RULE.PACE[cv.era] * share; },
     split: (cv, why) => { const far = pickFarCell(cv); if (far >= 0) splitCiv(cv, far, Math.ceil(cellsOf[cv.id] * (0.15 + rnd() * 0.25)), why); },
-    crown: (cv) => newRuler(cv, false) });
+    crown: (cv, how) => newRuler(cv, false, how) });      // (how the government changed: a ruler put down, or one who stays as the realm reforms about him)
   const RF = rule.f, RK = rule.K, NRF = rule.NK;
   // where a realm's stability is heading, and why (the tick uses the sum, the page shows the parts)
   const SP = { wars: 0, overreach: 0, taxes: 0, stance: 0, temples: 0, wonders: 0, luxuries: 0, hunger: 0, ruler: 0, knowledge: 0, rule: 0, peoples: 0, faiths: 0, culture: 0, finance: 0, dynasty: 0, target: 1 };      // (the tick's own, written over for every realm: the page gets a fresh one)
@@ -430,6 +430,8 @@ function createSim(world, seed) {
     c.ruler = r; c.rulers.push(r); if (c.rulers.length > 60) c.rulers.shift();
     if (!first && (c.player || rnd() < 0.15)) logEvent(c, crowned(c, r, S, kind, old, why), cellsOf[c.id] > 250 && rnd() < 0.2, 'ruler');
   }
+  // a ruler dies now, as he would at the year's roll (for tests and scenes): who comes after him, and how the throne passed
+  function rulerDies(cv) { const succ = rule.succession(cv); dying = true; if (succ === 'elected' || !rule.passes(cv.id, cv)) newRuler(cv, false, 'death'); dying = false; return lastHow; }
   // how a new ruler is told: who died and at what age, whose child the heir is and how old, who rules for a child, the line that
   // failed and the house that begins
   function crowned(c, r, S, kind, old, why) {
@@ -1290,7 +1292,7 @@ function createSim(world, seed) {
     knows(c, i) { return !!goods[i] && !!c && c.era >= gera[i] && !!gmask[c.id * NG + goods[i]]; },
     // the discovery the player's realm lacks to raise this work here (null: none, whatever else may stand in the way)
     needFor(kind, i) { const c = playerCiv(); if (!c) return null; if (kind === 'farm') return i >= 0 && infra[i] < 5 ? know.lacks(c.id, 'farm', infra[i] + 1) : null; if (kind === 'walls') return i >= 0 && walls[i] < 3 ? know.lacks(c.id, 'walls', walls[i] + 1) : null; if (kind === 'mine') return i >= 0 && goods[i] ? know.estate(c.id, goods[i]) : null; return know.lacks(c.id, kind); },
-    tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, faithCosts, faithAct, faithNews, cultureNews, financeNews, financeAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = finance.act(c.id, what, a, b); financeNews(); return r; }, dynastyNews, courtAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = dynasty.act(c.id, what, a, b); dynastyNews(); return r; }, plague, meteor, bounty,
+    tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, faithCosts, faithAct, faithNews, cultureNews, financeNews, financeAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = finance.act(c.id, what, a, b); financeNews(); return r; }, dynastyNews, rulerDies, courtAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = dynasty.act(c.id, what, a, b); dynastyNews(); return r; }, plague, meteor, bounty,
     TRAITS, traitOf, fullName, fmtYear, describeCell, isAtWar, capacity, eraOf, strength, save, load, recount, rnd, religionName, makeName, logEvent, evolveGovAll,
     settlementsOf(id) { const out = []; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === id && level[i]) out.push(i); } out.sort((a, b) => pop[b] - pop[a]); return out; },
     cultivation(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 0; const c = civs[o]; const K = capacity(i, c); const farm = Math.min(1, Math.max(0, (c.tech - 0.025) / 0.1)); return K > 0.01 ? Math.min(1, pop[i] / K) * farm * (level[i] ? 1 : 0.6) : 0; },

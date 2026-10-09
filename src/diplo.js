@@ -511,10 +511,12 @@ window.DIPLO = (function () {
     function union(big, small, text) { stats.unions++; host.event(big, text, true, small); host.absorb(big, small, 'joined to ' + nameOf(big)); }
     // a ruler by blood has died: where houses are joined by marriage, now and then one inherits the other (the simulation calls this
     // at a succession, saying how the throne passed: dynasty.js). Above all where the line failed; seldom where it held.
-    const INHERIT = { extinct: 0.09, kin: 0.02, child: 0.004, clear: 0.0025 };
+    const INHERIT = { extinct: 0.05, kin: 0.012, child: 0.0025, clear: 0.0015 };      // (on the whole what it was before dynasties, a flat 0.006: the war-and-peace probe counts the vassals and unions it makes)
     function heir(c, cv, how) {
       if (cv.player || !host.blood(cv)) return; const d = D(cv); const p = how ? INHERIT[how] || 0 : 0.006;
       for (const k in d.pact) { const o = civs[+k]; if (!o || !has(cv, o.id, 'marriage')) continue; if (!host.blood(o)) { dropPact(cv, o, 'marriage'); continue; }
+        // (the player's house, joined to one whose line fails, has a claim on its throne: a cause for war, for some turns)
+        if (o.player && (how === 'extinct' || how === 'kin')) { setClaim(o, cv.id * 4 + CLAIMS.claim, year() + CLAIM_TURNS * pace(o)); host.event(o, `The line of ${nameOf(cv)} has failed${how === 'kin' ? ' and a far kinsman sits its throne' : ''}: your house, joined to its own by marriage, has a claim on it`, true, cv); continue; }
         if (host.rnd() < p && !lordOf(cv) && !lordOf(o) && !host.atWar(cv, o.id)) { const big = host.cellsOf[o.id] >= host.cellsOf[c] ? o : cv, small = big === o ? cv : o; if (small.player || big.player) continue;
           const failed = how === 'extinct' || how === 'kin';      // (the throne of cv came open: its own line failed, or held by a thread)
           if (host.cellsOf[small.id] < host.cellsOf[big.id] * 0.35 && opinion(small, big) > 20) { stats.heirs++; union(big, small, small === cv && failed ? `The line of ${nameOf(cv)} fails, and ${host.ruler(big)}, of a house joined to it by marriage, inherits its lands` : `By the marriage of their houses, ${host.ruler(big)} inherits the crown of ${nameOf(small)}: its lands are joined to ${nameOf(big)}`); }

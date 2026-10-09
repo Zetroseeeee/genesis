@@ -36,7 +36,8 @@
   const dynastic = (kind) => kind === 'blood' || kind === 'named';
   const numbered = (kind) => dynastic(kind) || kind === 'holy';
   // how old a ruler is who comes to power from outside a line, by how he comes to it
-  const AGE = { blood: [24, 45], named: [24, 45], seized: [28, 44], chosen: [32, 50], holy: [42, 60], elected: [40, 62], party: [45, 62] };
+  // (young enough that a reign lasts about as long as one by blood: the world was fitted to rulers who reigned some thirty-four years)
+  const AGE = { blood: [24, 45], named: [24, 45], seized: [26, 42], chosen: [26, 42], holy: [30, 46], elected: [40, 62], party: [30, 46] };
   const KIN_SHARE = 0.4;    // (a house of two reigns or more has branches: how often one of them gives the throne a kinsman when the line fails)
 
   function create(h) {
@@ -77,9 +78,10 @@
     const modern = (e) => e >= 6;
     const youngDeath = (e) => (modern(e) ? 0.05 : e >= 4 ? 0.28 : 0.35);
     function lifespan(e, grown) { if (!grown && rnd() < youngDeath(e)) return 1 + Math.floor(rnd() * 14); const m = modern(e) ? 76 : 62, s = modern(e) ? 10 : 12; const a = m + s * (rnd() + rnd() + rnd() - 1.5) * 1.4; return Math.max(ADULT + 4, Math.min(98, Math.round(a))); }
-    // (Gompertz: a little at any age, and doubling every eight years; a war adds to it. Reigns come out at about 26 years
-    // before the modern ages, as the old flat roll of one in 34 gave something like: tools/dynasty/probe.js measures them)
-    function hazard(age, e, war) { const A = modern(e) ? 0.003 : 0.006, B = modern(e) ? 0.0005 : 0.001; return Math.min(0.9, A + B * Math.exp(0.085 * (age - 20)) + (war ? 0.006 : 0)); }
+    // (Gompertz: a little at any age, and doubling every eight years; a war adds to it. Reigns by blood come out at some
+    // thirty-four years, as the old flat roll of one in 34 gave: the world's wars, risings and breakaways were fitted to that
+    // many deaths a year. tools/dynasty/probe.js measures them)
+    function hazard(age, e, war) { const A = modern(e) ? 0.002 : 0.0035, B = modern(e) ? 0.00035 : 0.0006; return Math.min(0.9, A + B * Math.exp(0.085 * (age - 20)) + (war ? 0.006 : 0)); }
     // the year one now living dies, by the same hazard (one who steps down, a regent from among the nobles)
     function deathFrom(p, cv) { const e = eraOf(cv), yr = year(); let a = Math.max(0, yr - p.b); for (let n = 0; n < 90; n++, a++) if (rnd() < hazard(a, e, false)) return yr + 1 + n; return yr + 90; }
 
@@ -131,11 +133,12 @@
     // the living children of a person, eldest first
     function kidsOf(p, yr) { if (!p) return []; return p.k.map(of).filter((k) => alive(k, yr)).sort((x, y) => x.b - y.b); }
     // the line of succession, by descent: each child followed by its own line, sons before daughters, the eldest first,
-    // those the ruler passed over (and their lines) last; then the ruler's brothers and sisters and theirs
+    // those the ruler passed over (and their lines) last; then the ruler's brothers and sisters and theirs. One who already
+    // rules a realm of his own is passed by (two crowns on one head are diplomacy's affair: a union, diplo.heir).
     function order(p, yr, out, n, passed, skip, depth) {
       const kids = p.k.map(of).filter((k) => k && k.b <= yr && k.id !== skip).sort((x, y) => (x.f - y.f) || (x.b - y.b));
       if (passed && passed.length) kids.sort((x, y) => (passed.includes(x.id) ? 1 : 0) - (passed.includes(y.id) ? 1 : 0));
-      for (const k of kids) { if (alive(k, yr)) { out.push(k); if (out.length >= n) return; } if (depth < 4) { order(k, yr, out, n, null, 0, depth + 1); if (out.length >= n) return; } }
+      for (const k of kids) { if (alive(k, yr) && !(k.r && !k.r[1])) { out.push(k); if (out.length >= n) return; } if (depth < 4) { order(k, yr, out, n, null, 0, depth + 1); if (out.length >= n) return; } }      // (one who rules elsewhere is passed by: his line is not)
     }
     function lineFor(c, yr, n) {
       const C = court[c]; const r = C && of(C.ruler); if (!r) return []; yr = yr === undefined ? year() : yr; n = n || 1;
@@ -145,7 +148,7 @@
     // who comes after a ruler: the line; an emperor names the ablest of his grown children
     function heirOf(c, yr, kind) {
       const C = court[c]; const r = C && of(C.ruler); if (!r) return null; yr = yr === undefined ? year() : yr; kind = kind || kindOf(civs[c]);
-      if (kind === 'named') { const able = kidsOf(r, yr).filter((k) => ageOf(k, yr) >= ADULT && !C.passed.includes(k.id) && (k.t === 'builder' || k.t === 'scholar' || k.t === 'steward' || k.t === 'conqueror')); if (able.length) return able[0]; }
+      if (kind === 'named') { const able = kidsOf(r, yr).filter((k) => ageOf(k, yr) >= ADULT && !C.passed.includes(k.id) && !(k.r && !k.r[1]) && (k.t === 'builder' || k.t === 'scholar' || k.t === 'steward' || k.t === 'conqueror')); if (able.length) return able[0]; }
       return lineFor(c, yr, 1)[0] || null;
     }
 
@@ -288,9 +291,9 @@
       const W = (m, f) => (b && b.f ? f : m); if (!a || !b) return W('kinsman', 'kinswoman');
       const sib = (x, y) => !!x && !!y && x.id !== y.id && ((!!x.p && x.p === y.p) || (!!x.m && x.m === y.m));
       if (a.s === b.id) return W('husband', 'wife'); if (b.p === a.id || b.m === a.id) return W('son', 'daughter'); if (a.p === b.id || a.m === b.id) return W('father', 'mother');
-      const pb = of(b.p) || of(b.m), pa = of(a.p) || of(a.m);
-      if (pb && (pb.p === a.id || pb.m === a.id)) return W('grandson', 'granddaughter'); if (sib(a, b)) return W('brother', 'sister');
-      if (pb && sib(a, pb)) return W('nephew', 'niece'); if (pa && sib(pa, b)) return W('uncle', 'aunt'); if (pa && pb && sib(pa, pb)) return 'cousin';
+      const pbs = [of(b.p), of(b.m)].filter(Boolean), pa = of(a.p) || of(a.m);      // (through either parent)
+      if (pbs.some((x) => x.p === a.id || x.m === a.id)) return W('grandson', 'granddaughter'); if (sib(a, b)) return W('brother', 'sister');
+      if (pbs.some((x) => sib(a, x))) return W('nephew', 'niece'); if (pa && sib(pa, b)) return W('uncle', 'aunt'); if (pa && pbs.some((x) => sib(pa, x))) return 'cousin';
       return W('kinsman', 'kinswoman');
     }
     // a regency unsettles a realm a little (the sim's stability asks)
@@ -341,7 +344,7 @@
     }
 
     return { P, houses, court, stats, news, step, succeed, recrown, diesNow, traitOf, married, gone, born, settle, heirOf, lineFor, familyOf, houseOf, rulerOf, regentOf, kinOf, unrest, act, raiseCost,
-      ageOf, alive, of, save, load, hazard, lifespan, TRAITS, ADULT, dynastic, numbered };
+      ageOf, alive, of, save, load, hazard, lifespan, make: person, wed, TRAITS, ADULT, dynastic, numbered };
   }
 
   window.DYNASTY = { create, ADULT, WED, ROMAN, HOUSE_FORMS, dynastic, numbered };
