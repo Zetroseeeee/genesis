@@ -90,7 +90,8 @@ function createSim(world, seed) {
   const soil = world.soil, LM = !!(LAND && soil); let landOn = LM;
   const NLC = LAND ? LAND.NC : 1, NLA = LAND ? LAND.NA : 1;
   const kcls = new Uint8Array(N), farmA = new Float32Array(N), forA = new Float32Array(N), homeW = new Float32Array(N);
-  const landK = new Float32Array(MAXC * NLC), wfOf = new Float32Array(MAXC).fill(1);      // (and what each realm's continent farms with: 1 the old world's beasts and crops)
+  const landK = new Float32Array(MAXC * NLC), wfOf = new Float32Array(MAXC).fill(1);
+  const roomKey = new Uint32Array(MAXC), roomCell = new Int32Array(MAXC).fill(-1);      // (each realm's far land with room for emigrants this year)      // (and what each realm's continent farms with: 1 the old world's beasts and crops)
   const RCF = new Float32Array([1, 1, 1.25, 1.25, 1.15, 1.15, 1.35, 1.35]);      // (by a cell's river and coast bits: water to drink, fish, boats)
   let LSCALE = 1, WSCALE = 1;
   if (LM) {
@@ -882,6 +883,7 @@ function createSim(world, seed) {
     meanTech = techN ? techSum / techN : 0.02;
     // pass 1: growth + accumulate (order-independent); the dead of last year's sickness are taken first (disease.js: a share of each realm)
     const sick = disease && disease.dying() ? disease.killF : null;
+    roomKey.fill(0xFFFFFFFF); roomCell.fill(-1);
     for (let k = 0; k < LI.length; k++) {
       const i = LI[k]; const o = owner[i]; const c = o >= 0 ? civs[o] : null;
       let p = pop[i]; if (sick !== null && o >= 0) { const q = sick[o]; if (q > 0) p *= 1 - q; }
@@ -891,6 +893,8 @@ function createSim(world, seed) {
         p += r * p * Math.max(-10, 1 - p / Math.max(K, 0.01)); // overfull land empties by at most ~a quarter a year
         if (p < 0.001) p = 0;
         pop[i] = p;
+        // (a far cell of a realm with room in it, one a year chosen as by lot: where its emigrants go - colonies across the sea, a frontier far off)
+        if (landOn && c && p < 0.35 * K && K > 0.3 && c.capital >= 0) { const hk = Math.imul(i ^ Math.imul(year, 0x27D4EB2D), 0x165667B1) >>> 0; if (hk < roomKey[o] && cellDist(i, c.capital) > 20) { roomKey[o] = hk; roomCell[o] = i; } }
       }
       if (c) {
         popOf[o] += p; cellsOf[o]++;
@@ -1035,6 +1039,8 @@ function createSim(world, seed) {
           }
         }
       }
+      // emigrants: from crowded land to the realm's far land where there is room (roomCell), a few cells a year
+      if (landOn && p > 0.85 * K && r1 > 0.97) { const n4 = roomCell[o]; if (n4 >= 0 && owner[n4] === o) { const m = Math.min(p * 0.04, 0.6 * capacity(n4, c) - pop[n4]); if (m > 0) { pop[i] -= m; pop[n4] += m; } } }
       // internal migration towards emptier good land
       if (p > 0.6 * K) {
         const n3 = nbOf(i, rint(8));
