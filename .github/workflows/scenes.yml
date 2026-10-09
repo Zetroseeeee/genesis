@@ -51,6 +51,9 @@ jobs:
         env:
           ONLY: ${{ github.event.inputs.only }}
           GENESIS_SMOKE_SIZE: ${{ github.event.inputs.size }}
+          # (the app gives up on a page this long after it starts and a minute and a half more: a scene that runs history for
+          #  three minutes and more, a story's, came out as no picture at all)
+          GENESIS_SMOKE_TIMEOUT: '240'
         run: |
           set -uo pipefail
           mkdir -p out

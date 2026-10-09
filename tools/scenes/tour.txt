@@ -370,4 +370,4 @@ tale_fever    | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'heir_s
 tale_raid     | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'raid'} | | 170
 heritage      | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'heritage',d:{from:3,to:4,paths:[4,5,0],did:[1,1,0]}} | | 170
 spies         | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'spies',d:{o:'near',k:'murder',p:'heir'}} | | 170
-pestilence    | tools/scenes/tale.js | {years:10300,lon:2.35,lat:48.85,k:'plague',kind:'plague'} | | 195
+pestilence    | tools/scenes/tale.js | {years:10750,lon:2.35,lat:48.85,k:'plague',kind:'plague'} | | 220
