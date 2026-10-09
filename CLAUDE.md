@@ -137,6 +137,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   fulfilled and left undone, the firsts and when they were taken, the heritages chosen, the most remembered realms against the
   middle one, which ambitions are common and which rare, how long a year of legacies takes. Run it after touching `legacy.js`
   or what it asks of a realm; the header says what to hold it to.
+- `node tools/intrigue/probe.js [seed,seed] [last year]` — spies and schemes through the ages: how many schemes the world's realms
+  begin and of which kind, how many succeed, fail and are found out, how many wars are fought over agents caught, how strong the
+  networks are age by age, how long a year of it takes. Run it after touching `intrigue.js` or the deeds in `sim.js`, then the
+  war-and-peace probe over 12345 and 777.
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -243,6 +247,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand; the faith; the court (`court.js`) |
 | `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
 | `src/bank.js` | `BANK` | The Treasury, the market screen's last tab: debts and who holds them, borrowing and repaying, repudiation, the coin, the price of money, banking houses and companies (shares bought and sold), panics of late |
+| `src/intrigue.js` | `INTRIGUE` | Spies and schemes: six schemes (steal learning, sow discord, forge a claim, set back works, stir a rising, murder an heir) and what a network is made of; one world's intrigue: each realm's agents and the scheme they are on, the foreign agents it caught, the autopilot's schemes; pure data (the deeds are the host's) |
 | `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
@@ -682,6 +687,31 @@ Conventions that matter:
   Points are only what a realm is remembered for: nothing in the world's balance hangs on them. The numbers to hold it to are in
   the header of `tools/legacy/probe.js`. Saved with the realm (`civ.legacy`) and the world (`save().legacy`: the firsts, the
   hall, the races); a world saved before legacies begins with nothing remembered, each realm in its own age.
+- **Intrigue** (`intrigue.js`; `sim.intrigue`; the Intrigue tab and the foot of a realm's page in `envoys.js`). Every realm that
+  writes keeps agents abroad. Its **network** is a number: one for each of writing, envoys, letters, embassies, the telegraph, the
+  wireless, computers and networks it knows (`NET`), a half or one for laws that watch (`NETLAW` in `sim.js`: police, a watched
+  people, intendants, a digital state, the censor, the party line, a walled net) and for a ruler who trusts nobody or reads every
+  letter. Six **schemes** (`SCHEMES`: each stands on a discovery, costs coin in story.js's unit by the schemer's income, takes a
+  turn or two): steal their learning (the dearest discovery of theirs the schemer could study now comes home whole, else years
+  of their learning), sow discord (stability −0.08, their strongest estate angered), forge a claim (a reason for war across a
+  border), set back their works (the greatest work under way loses half its time again), stir up a rising (their angriest estate
+  rises, as rule.js has estates rise), murder their heir (where the crown goes by blood). A realm's agents are on one scheme at a
+  time (`civ.intrigue.s`). Its odds and its risk are the scheme's own times what the two networks are against each other (each
+  point 18 % likelier to work, 15 % less likely to be found out; a shared border helps), between 5 % and 90 %; the risk is spread
+  over its years (`pYear`). **Found out**, it ends: the victim remembers it (`mind`: 25 to 80), the schemer's word falls by a sixth
+  of that, and the victim keeps the record (`civ.intrigue.found`); where the scheme was an act of war (discord, a rising, murder)
+  that is a reason for war for three turns (`spies` in `DIPLO.CAUSES`, from `caughtFrom` by `host.spied`). The player hears of
+  agents caught as a story (`spies`: theirs in his realm, hanged, ransomed or turned; `spies_ours`: his own in theirs, an apology,
+  a denial or their envoys expelled; painting `st_spy`) and of what foreign agents did as news (`news`, toasted by `main.js`).
+  **The autopilot** (`think`): a realm of twenty regions that writes looks once in two to six turns, schemes about half the time
+  (nine in ten under a tyrant, a quarter under a pious ruler) against a rival (at war with it, holding a claim on it, remembering
+  it with hatred, a neighbour it cannot abide: `rivalsOf`), by what it needs (learning when behind, discord and sabotage at war,
+  claims at peace, murder under a conqueror or a tyrant). It was measured not to move the world (the war-and-peace probe over
+  12345 and 777): about seven hundred schemes in a world's history, half succeeding, a quarter found out, a handful of wars over
+  agents. A year of it is a few hundredths of a millisecond: the round touches only realms whose agents are at work or that
+  are due to think (two flat arrays, a filter on what is on the realms: after setting a realm's record by hand, `sync()`).
+  Saved with the realm (`civ.intrigue`) and the world (`save().intrigue`: its dice and counts); a world saved before intrigue
+  has no agents abroad.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

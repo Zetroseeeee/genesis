@@ -334,7 +334,7 @@ server.listen(0, async () => {
   await scenario('chronicle modal: tabs, filters, click-to-fly, close', async (check) => {
     await page.keyboard.press('c'); await frames(2);
     let r = await ev(() => ({ open: document.getElementById('chron').open, log: document.querySelectorAll('#log .fe').length, filters: document.querySelectorAll('#logfilters .btn').length }));
-    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 13, `thirteen filters (${r.filters})`);
+    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 14, `fourteen filters (${r.filters})`);
     await ev(() => document.querySelector('#logfilters [data-f="mine"]').click()); const mine = await ev(() => [...document.querySelectorAll('#log .fe')].every(e => e.classList.contains('mine'))); check(mine, 'Mine filter shows only own events');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="powers"]').click()); check((await ev(() => document.querySelectorAll('#powers .pw').length)) > 3, 'powers list');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="graphs"]').click()); await frames(2); check((await ev(() => { const c = document.getElementById('g-world'); return c.width > 0 && c.height > 0; })), 'graphs drawn');
@@ -541,7 +541,7 @@ server.listen(0, async () => {
     // the screen: F opens it; the realms, what they think and why
     await page.keyboard.press('f'); await frames(3);
     r = await ev(() => { const rows = [...document.querySelectorAll('#dp-list .dp-row')]; return { open: document.getElementById('dip').open, rows: rows.length, mine: window.__dip.every(id => rows.some(b => +b.dataset.dsel === id)), word: document.getElementById('dp-word').textContent, tabs: [...document.querySelectorAll('#dp-tabs button')].map(b => b.textContent.trim()).join('|'), groups: [...document.querySelectorAll('#dp-list .dp-grp')].map(b => b.textContent).join('|'), filters: document.querySelectorAll('#dp-list [data-dfilter]').length }; });
-    check(r.open && r.rows >= 2 && r.mine, `F opens Diplomacy with the realms within reach (${r.rows} rows)`); check(/^50/.test(r.word) && /ordinary/.test(r.word), 'the player\'s word is shown: ' + r.word); check(r.tabs === 'Realms|Envoys|Wars|Your standing' && r.filters === 5 && /On your borders/.test(r.groups), `tabs, filters and groups (${r.tabs}; ${r.groups})`);
+    check(r.open && r.rows >= 2 && r.mine, `F opens Diplomacy with the realms within reach (${r.rows} rows)`); check(/^50/.test(r.word) && /ordinary/.test(r.word), 'the player\'s word is shown: ' + r.word); check(r.tabs === 'Realms|Envoys|Wars|Intrigue|Your standing' && r.filters === 5 && /On your borders/.test(r.groups), `tabs, filters and groups (${r.tabs}; ${r.groups})`);
     await ev(() => document.querySelector(`#dp-list .dp-row[data-dsel="${window.__dip[0]}"]`).click()); await frames(2);
     r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[0]]; const info = document.getElementById('dp-info'); const props = [...info.querySelectorAll('.dp-prop')].map(p => ({ name: p.querySelector('b').textContent, st: p.querySelector('.st').textContent, off: p.classList.contains('off'), dis: p.querySelector('button').disabled }));
       return { name: info.querySelector('h3').textContent, full: S.fullName(a), mood: info.querySelector('.dp-mood b').textContent, o: S.diplo.opinion(a, c), why: [...info.querySelectorAll('.gv-sect .gv-why span')].slice(0, 9).map(x => x.textContent).join('; '), props, gifts: info.querySelectorAll('[data-dact="gift"]').length, war: !!info.querySelector('[data-dact="war"]'), causes: [...info.querySelectorAll('.dp-cause b')].map(x => x.textContent).join('|'), none: /Nothing is sworn/.test(info.textContent) }; });
@@ -873,6 +873,49 @@ server.listen(0, async () => {
     q = await ev(() => ({ her: document.querySelector('#legacy .lg-her').textContent, carried: (__G.sim.playerCiv().legacy.her || []).length }));
     check(q.carried >= 1 && /Into the/.test(q.her), `what the realm carries is shown (${q.her.slice(0, 90)})`);
     await ev(() => { document.getElementById('chron').close(); __T.quiet(); });
+  });
+  await scenario('intrigue: a realm\'s page says what your agents could do there and how likely it is; a scheme begun, on the tracker, called home; the Intrigue tab; foreign agents caught and the court asked', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    // a neighbour set down beside the player's land, who knows its age and keeps still; the player's people can write and send envoys (this scenario can run by itself)
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), W = S.W; const mine = (i) => S.owner[i] === c.id; let t = null;
+      for (const i of S.LI) { if (t) break; const o = S.owner[i]; if (!S.land[i] || (S.flags[i] & 8) || S.fert[i] <= 0.05 || ![i - 1, i + 1, i - W, i + W].some(mine)) continue; if (o >= 0 && (o === c.id || S.civs[o].capital === i)) continue; S.owner[i] = -1; t = S.spawnTribe(i, {}); if (!t) S.owner[i] = o; }
+      if (!t) return { made: false }; t.tech = Math.max(t.tech, c.tech); t.era = S.eraOf(t.tech); __T.teach(t, Math.max(2, c.era), true); t.aggression = 0; t.dip.think = 1e12; t.ruler.trait = 'steward'; S.intrigue.I(t).next = 1e12;
+      for (const k of ['writing', 'envoys', 'letters']) S.know.learn(c.id, c, KNOW.ID[k], true); for (const k of Object.keys(c.wars)) { const e = S.civs[+k]; if (e) S.diplo.conclude(c, e, 'white'); }
+      for (const x of S.civs) if (x && !x.player) { S.intrigue.I(x).next = 1e12; x.intrigue.s = null; }      // (nobody else's agents are about while this is tried)
+      c.wealth = 1e5; if (c.intrigue) c.intrigue.s = null; S.recount(); S.touchAll(); window.__spy = t.id; __G.run(1); S.touchAll(); return { made: true, reach: S.diplo.reach(c.id).includes(t.id) }; });
+    check(r.made && r.reach, `a neighbour within reach of the player's agents (${JSON.stringify(r)})`);
+    // its page: what each scheme would take there, and the two networks
+    await ev(() => ENVOYS.open(null, window.__spy)); await frames(2);
+    r = await ev(() => { const info = document.getElementById('dp-info'); const cards = [...info.querySelectorAll('.dp-scheme')]; return { n: cards.length, head: (info.querySelector('.dp-spyhead') || { textContent: '' }).textContent, on: cards.filter((x) => !x.querySelector('button').disabled).map((x) => x.querySelector('b').textContent), st: (cards.find((x) => !x.querySelector('button').disabled) || { textContent: '' }).querySelector('.st').textContent, off: (cards.find((x) => x.querySelector('button').disabled) || { textContent: '' }).querySelector('.st').textContent }; });
+    check(r.n === 6 && /Your network/.test(r.head) && /theirs/.test(r.head), `the page names six schemes and the two networks (${r.head})`);
+    check(r.on.includes('Sow discord') && /\d+% to succeed/.test(r.st) && /\d+% to be found out/.test(r.st) && /coin/.test(r.st), `what one would take there: ${r.st}`); check(/Needs|No heir|nothing|angry|border/.test(r.off), 'and why another cannot be begun: ' + r.off);
+    // a scheme begun: paid for, under way on the page and on the tracker
+    await ev(() => { window.__toasts.length = 0; document.querySelector('#dp-info [data-dact="scheme"][data-k="discord"]').click(); }); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { s: c.intrigue.s ? c.intrigue.s.k : '', on: !!document.querySelector('#dp-info .dp-scheme.on [data-dact="unscheme"]'), toast: (window.__toasts || []).join(' | ') }; });
+    check(r.s === 'discord' && r.on && /Your agents set out for/.test(r.toast), `begun: ${r.toast}`);
+    await ev(() => ENVOYS.close()); await ev(() => __G.run(0)); await frames(1);
+    r = await ev(() => { const b = document.querySelector('#tk-body .trk.spy'); const t = b ? b.textContent : ''; if (b) b.click(); return { row: t, open: document.getElementById('dip').open, tab: (document.querySelector('#dp-tabs button.on') || {}).textContent }; }); await frames(2);
+    check(/Sow discord/.test(r.row) && r.open && r.tab === 'Intrigue', `the tracker's line opens the Intrigue tab (${r.row})`);
+    r = await ev(() => { const el = document.getElementById('dp-intrigue'); return { net: (el.querySelector('.dp-stat b') || { textContent: '' }).textContent, parts: el.querySelectorAll('.dp-parts span').length, on: !!el.querySelector('.dp-scheme.on'), text: el.textContent }; });
+    check(r.on && r.parts >= 2 && /Caught in your realm/.test(r.text) && /Lately/.test(r.text), `the Intrigue tab: the network (${r.net}, ${r.parts} parts), the scheme under way, the agents caught`);
+    await ev(() => document.querySelector('#dp-intrigue [data-dact="unscheme"]').click()); await frames(2);
+    r = await ev(() => ({ s: __G.sim.playerCiv().intrigue.s, idle: /wait for orders/.test(document.getElementById('dp-intrigue').textContent) }));
+    check(!r.s && r.idle, 'called home: the agents wait for orders'); await ev(() => ENVOYS.close());
+    // foreign agents caught in the player's realm: the court is asked what to do with them
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), t = S.civs[window.__spy]; S.setStories(true); if (c.story) { c.story.q = null; c.story.n = 1e12; } t.wealth = 1e5; const why = S.intrigue.begin(t, c, 'discord'); if (why) return { why };
+      t.intrigue.s.risk = 0.99; for (let y = 0; y < 30 && t.intrigue.s; y++) { if (c.story && c.story.q && c.story.q.k !== 'spies') c.story.q = null; __G.run(1); } return { why: '', left: !!t.intrigue.s, q: c.story && c.story.q ? c.story.q.k : '' }; });
+    check(!r.why && !r.left && r.q === 'spies', `a neighbour's agents are caught (${JSON.stringify(r)})`);
+    await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    r = await ev(() => ({ open: TALES.isOpen(), title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | '), art: (document.querySelector('#tale img, #tale .tl-art') || {}).src || getComputedStyle(document.querySelector('#tale .tl-art') || document.body).backgroundImage }));
+    check(r.open && /^Spies of /.test(r.title) && r.n === 3 && /authority/.test(r.chips) && /coin/.test(r.chips), `the court is asked: "${r.title}" (${r.chips.slice(0, 120)})`);
+    await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2); await ev(() => { if (TALES.isOpen()) TALES.close(); });
+    await ev(() => ENVOYS.open('intrigue')); await frames(2);
+    r = await ev(() => document.getElementById('dp-intrigue').textContent); check(/a reason for war until/.test(r) && /carrying gold to your great families/.test(r), 'the agents caught are kept, with a reason for war against those who sent them');
+    await ev(() => ENVOYS.close());
+    // the chronicle keeps it under Intrigue
+    await ev(() => __G.openChronicle('log')); await frames(1); await ev(() => document.querySelector('#logfilters [data-f="intrigue"]').click()); await frames(1);
+    r = await ev(() => [...document.querySelectorAll('#log .fe')].map((e) => e.textContent).join(' | ')); check(/caught in/.test(r), 'the chronicle keeps it, under Intrigue: ' + r.slice(0, 120));
+    await ev(() => { document.querySelector('#logfilters [data-f="all"]').click(); document.getElementById('chron').close(); __T.quiet(); });
   });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
