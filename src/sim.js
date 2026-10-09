@@ -15,6 +15,7 @@ function createSim(world, seed) {
   const PEOPLE = window.PEOPLE;  // who lives where, in what tongue (people.js, loaded before this file)
   const FAITH = window.FAITH;    // who believes what, and where the holy cities are (faith.js, loaded before this file)
   const CULTURE = window.CULTURE;      // great people, great works, renown (culture.js, loaded before this file)
+  const FINANCE = window.FINANCE;      // coin, credit, banking houses, companies, panics (finance.js, loaded before this file)
   const { land, fert, elev, flags } = world;   // land Uint8, fert Float32 0..1, elev Uint8, flags Uint8 (1 land,2 river,4 coast,8 ice)
 
   // ---------- RNG ----------
@@ -168,6 +169,7 @@ function createSim(world, seed) {
   let people = null;    // (the peoples of the world and their tongues: people.js)
   let faith = null;     // (the faiths of the world, and where they are held: faith.js)
   let culture = null;   // (great people, their works and the renown of realms: culture.js)
+  let finance = null;   // (coin, debts, banking houses, companies and panics: finance.js)
   function fullName(c) { return rule ? rule.fullName(c) : c.name; }
   function religionName(st) {
     const base = makeName(st, 1, 2);
@@ -242,6 +244,7 @@ function createSim(world, seed) {
     if (people) people.born(home, c, opts.from, style);
     if (faith) faith.born(id, home, opts.from === undefined ? -1 : opts.from);      // (the faith of the people there, or of the realm it broke from)
     if (culture) culture.newRealm(id, opts.from === undefined ? -1 : opts.from);
+    if (finance) finance.born(id);
     if (!cellName.has(home)) cellName.set(home, (people && people.nameAt(home, c)) || makeName(style, 2, 3));
     newRuler(c, true);
     if (!c.player && opts.from === undefined) { know.settle(id, c); rule.settle(id, c); fmOf[id] = fmNow(c); }      // (what a people already knew, and how it ruled itself, when it settled down; the player chooses)
@@ -286,7 +289,7 @@ function createSim(world, seed) {
     crown: (cv) => newRuler(cv, false) });
   const RF = rule.f, RK = rule.K, NRF = rule.NK;
   // where a realm's stability is heading, and why (the tick uses the sum, the page shows the parts)
-  const SP = { wars: 0, overreach: 0, taxes: 0, stance: 0, temples: 0, wonders: 0, luxuries: 0, hunger: 0, ruler: 0, knowledge: 0, rule: 0, peoples: 0, faiths: 0, culture: 0, target: 1 };      // (the tick's own, written over for every realm: the page gets a fresh one)
+  const SP = { wars: 0, overreach: 0, taxes: 0, stance: 0, temples: 0, wonders: 0, luxuries: 0, hunger: 0, ruler: 0, knowledge: 0, rule: 0, peoples: 0, faiths: 0, culture: 0, finance: 0, target: 1 };      // (the tick's own, written over for every realm: the page gets a fresh one)
   function stabParts(cv, into) {
     const c = cv.id, ro = c * NRF; const wars = warsOf(cv); const P = into || {};
     P.wars = -wars * 0.12; P.overreach = -0.5 * Math.max(0, cellsOf[c] / spanOf(cv) - 1); P.taxes = -(cv.policy.tax - 1) * 0.3; P.stance = cv.policy.stance === 'aggressive' ? -0.12 : 0; P.temples = Math.min(0.15, temples[c] * 0.03); P.wonders = Math.min(0.15, wonders[c] * 0.05);
@@ -294,7 +297,8 @@ function createSim(world, seed) {
     P.peoples = people ? people.unrest(cv) : 0;      // (other peoples than its rulers', beyond what the age's realms hold: people.js)
     P.faiths = faith ? faith.unrest(cv) : 0;      // (other faiths than the realm's, likewise: faith.js)
     P.culture = culture ? culture.unrest(cv) : 0;      // (pride in its renown, against what realms of its age hold, and a golden age: culture.js)
-    P.target = 1 + P.wars + P.overreach + P.taxes + P.stance + P.temples + P.wonders + P.luxuries + P.hunger + P.ruler + P.knowledge + P.rule + P.peoples + P.faiths + P.culture; return P;
+    P.finance = finance ? finance.unrest(cv) : 0;      // (dear bread after a debasement, a panic, a default not long ago: finance.js)
+    P.target = 1 + P.wars + P.overreach + P.taxes + P.stance + P.temples + P.wonders + P.luxuries + P.hunger + P.ruler + P.knowledge + P.rule + P.peoples + P.faiths + P.culture + P.finance; return P;
   }
   const spanOf = (cv) => (40 + cv.tech * 3000) * KF[cv.id * NKF + KK.reach] * RF[cv.id * NRF + RK.reach];      // how many regions a realm holds without strain
   const fmNow = (cv) => foodMult(cv.tech) * KF[cv.id * NKF + KK.food] * RF[cv.id * NRF + RK.food];      // how many a unit of land feeds: the age's table, what the realm knows of farming against its age, and its laws
@@ -378,6 +382,13 @@ function createSim(world, seed) {
     inspire: (c, years) => { const cv = civs[c]; if (!cv || !(years > 0)) return 0; const g = Math.min(1 - cv.tech, insight(cv) * years); if (g > 0) cv.tech += g; return Math.max(0, g); },
     // (the arts: so many turns of the authority the realm gathers, at once)
     acclaim: (c, turns) => { const cv = civs[c]; if (!cv || !(turns > 0)) return 0; const R = rule.ruleOf(cv); const g = Math.min(RULE.AUTH_MAX - R.auth, rule.gainOf(c, cv) * RULE.PACE[cv.era] * turns); if (!(g > 0)) return 0; R.auth = Math.round((R.auth + g) * 1000) / 1000; return g; } });
+  // (the realms a realm trades with by the market's links; its share of the world's trade, reckoned once a year)
+  const partnersOf = (c) => { const out = []; for (const L of market.links) { if (L.a === c) out.push(L.b); else if (L.b === c) out.push(L.a); } return out; };
+  let tradeYear = -1e9, tradeAll = 1; const tradeShare = (c) => { if (tradeYear !== year) { tradeYear = year; let t = 0; for (let k = 0; k < MAXC; k++) if (civs[k]) t += market.expV[k] + market.impV[k]; tradeAll = Math.max(1e-6, t); } return (market.expV[c] + market.impV[c]) / tradeAll; };
+  finance = FINANCE.create({ civs, MAXC, owner, STYLES, cellName, people, year: () => year, seed, townsOf, markets, ports,
+    knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1, warsN: (cv) => warsOf(cv), trait: (cv) => (cv.ruler ? cv.ruler.trait : ''), nameOf: (cv) => fullName(cv),
+    near: (c) => nearNb[c] || lastNb[c], partners: partnersOf, remember: (a, bid, by) => diplo.remember(a, bid, by), trade: tradeShare,
+    townOf: (c) => (townPick[c] >= 0 && owner[townPick[c]] === c ? townPick[c] : -1), portOf: (c) => { const n = Math.min(4, ports[c]); return n ? portCells[c * 4] : -1; } });
   function pickTrait(c) {
     const w = { conqueror: 1 + (c.aggression > 0.6 ? 1 : 0), builder: 1, pious: c.religion ? 1.4 : 0.6, scholar: c.era >= 3 ? 1.3 : 0.4, merchant: c.era >= 2 ? 1.2 : 0.3, tyrant: 0.5, steward: 1, navigator: c.era >= 3 && ports[c.id] ? 1.4 : 0.2 };
     let sum = 0; for (const k in w) sum += w[k]; let r = rnd() * sum; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return 'steward';
@@ -399,7 +410,7 @@ function createSim(world, seed) {
     for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c.id && level[i] >= 2) markRuin(i, c.era, c.culture); }
     // (its enemies' wars with it are over now: left on their lists until they next looked, they passed to whoever was born under its number)
     for (const k in c.wars) { const e = civs[+k]; if (e && e.wars[c.id] !== undefined) { delete e.wars[c.id]; warCnt[e.id] = -1; } }
-    c.alive = false; civCount--; st.civCount = civCount; civs[c.id] = null; freeIds.push(c.id); mightOf[c.id] = 0; diplo.died(c.id); army.died(c.id); if (faith) faith.gone(c.id); if (culture) culture.gone(c.id);
+    c.alive = false; civCount--; st.civCount = civCount; civs[c.id] = null; freeIds.push(c.id); mightOf[c.id] = 0; diplo.died(c.id); army.died(c.id); if (faith) faith.gone(c.id); if (culture) culture.gone(c.id); if (finance) finance.gone(c.id);
     pushWorld({ year, text: `${fullName(c)} is no more${why ? ' — ' + why : ''}.`, civ: c.id, type: 'state', loc: c.capital, dead: true });
   }
 
@@ -556,6 +567,25 @@ function createSim(world, seed) {
     }
   }
 
+  // what finance did, for the chronicle (finance.js keeps its news): the player's dealings; defaults, houses failing, companies
+  // crashing and panics where they are great or touch the player
+  function financeNews() {
+    const big = (cv) => cv && (cv.player || cellsOf[cv.id] > 120);
+    while (finance.news.length) {
+      const n = finance.news.shift(), cv = n.c >= 0 ? civs[n.c] : null; if (!cv) continue; const me = cv.player; const F = finance;
+      if (n.kind === 'borrow' && me) logEvent(cv, `The court borrows ${Math.round(n.amt)} coin, at ${(100 * F.rateOf[cv.id]).toFixed(1)}% a year`, false, 'state');
+      else if (n.kind === 'repay' && me) logEvent(cv, `The court repays ${Math.round(n.amt)} coin of its debts`, false, 'state');
+      else if (n.kind === 'default') { const hurt = (n.ruined || []).map((b) => civs[b]).filter(Boolean); logEvent(cv, `${cap(fullName(cv))} defaults on ${Math.round(n.amt)} coin of debts${hurt.length ? `, ruining lenders in ${hurt.slice(0, 3).map((b) => fullName(b)).join(', ')}` : ''}`, big(cv) || hurt.some((b) => b.player), 'state'); }
+      else if (n.kind === 'debase') logEvent(cv, me ? (n.printed ? `The court prints money: ${Math.round(n.gain)} coin, and prices will rise` : `The court debases the ${F.coin(cv.id) || 'coin'}: ${Math.round(n.gain)} coin, and prices will rise`) : `${cap(fullName(cv))} ${n.printed ? 'prints money' : 'debases its coin'}`, me || (big(cv) && cellsOf[cv.id] > 300), 'state');
+      else if (n.kind === 'restore' && (me || big(cv))) logEvent(cv, me ? `The court restores the ${F.coin(cv.id) || 'coin'} to its full weight` : `${cap(fullName(cv))} restores its coin`, me, 'state');
+      else if (n.kind === 'house') { const x = F.houseOf(n.h); if (x && (me || cellsOf[cv.id] > 200)) logEvent(cv, `${x.name} opens its doors in ${cellName.get(x.at) || fullName(cv)}`, me, 'state', x.at); }
+      else if (n.kind === 'fail') { const x = F.houseOf(n.h); if (x) logEvent(cv, `${x.name} fails${n.why ? ': ' + n.why : ''}`, big(cv), 'disaster', x.at); }
+      else if (n.kind === 'company') { const co = F.companies.find((y) => y.id === n.co); if (co && (me || cellsOf[cv.id] > 200)) logEvent(cv, `${co.name} is chartered in ${cellName.get(co.at) || fullName(cv)}`, me, 'state', co.at); }
+      else if (n.kind === 'crash') { const co = F.companies.find((y) => y.id === n.co); if (co) logEvent(cv, `The shares of ${co.name} collapse`, big(cv) || (player >= 0 && co.hold[player] > 0), 'disaster', co.at); }
+      else if (n.kind === 'panic' && n.text && (me || big(cv))) logEvent(cv, `Panic in the markets of ${fullName(cv)}: ${n.text.charAt(0).toLowerCase() + n.text.slice(1)}`, me, 'disaster');
+    }
+  }
+
   // ---------- history (for the chronicle graphs) ----------
   const history = []; // {year, pop, wild, civs, top:[[id,pop,cells]...]}
   function record() {
@@ -629,7 +659,8 @@ function createSim(world, seed) {
       const living = market.LS[c], customs = market.rev[c];
       cv.trade = { living, customs, imp: market.impV[c], exp: market.expV[c] };
       // (taxes by the rate, by what the realm's law of taxes brings in and its state spends; the army and the scholars; what the customs took)
-      const gross = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * (1 + ports[c] * 0.05 + Math.min(0.3, markets[c] * 0.04) + Math.min(0.3, mines[c] * 0.05) + 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1))) * tv(cv, 'income', 1) * KF[c * NKF + KK.income] * RF[ro + RK.tax];
+      const gross = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * (1 + ports[c] * 0.05 + Math.min(0.3, markets[c] * 0.04) + Math.min(0.3, mines[c] * 0.05) + 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1))) * tv(cv, 'income', 1) * KF[c * NKF + KK.income] * RF[ro + RK.tax] * (finance ? finance.taxF(c) : 1);
+      cv.gross = gross;      // (what lenders lend against: finance.js)
       const income = gross * (1 - RF[ro + RK.cost]) - popOf[c] * 0.05 * (cv.policy.military - 1) * (cv.policy.military > 1 ? RF[ro + RK.upkeep] : 1) - popOf[c] * SCHOLARS * (cv.policy.research - 1) + customs * RF[ro + RK.customs] + diplo.trIn[c] - diplo.trOut[c];      // (and what vassals and the beaten pay, or what is paid to a lord or a victor)
       cv.income = income; cv.wealth += income;
       // stability: drifts to a target set by war, overreach, taxes and stance; crises knock it down
@@ -739,6 +770,8 @@ function createSim(world, seed) {
     faith.step(); faithNews();
     // great people and their works, renown and golden ages (culture.js)
     culture.step(); cultureNews();
+    // credit, coin, banking houses, companies and panics (finance.js)
+    finance.step(); financeNews();
     // diplomacy every 10 ticks (staggered)
     for (let c = 0; c < MAXC; c++) {
       const a = civs[c]; if (!a || tickCount % 10 !== c % 10) continue;
@@ -1096,7 +1129,7 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(cellsOf[c.id] > 20 || c.player ? -30 : -8), rulers: c.rulers.slice(-10) } : null), worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
-      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : undefined,
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : undefined,
     };
   }
   function load(s) {
@@ -1137,6 +1170,7 @@ function createSim(world, seed) {
     if (!people.load(s.peoples)) people.settle();      // (a world saved before there were peoples: every realm's land its own people's)
     if (!faith.load(s.faiths)) faith.settle();      // (a world saved before faiths had regions: every realm's land of its realm's faith)
     culture.load(s.culture);      // (a world saved before culture has had no great people yet)
+    finance.load(s.finance);      // (a world saved before finance owes nothing, and has no houses yet)
   }
   // who touches whom by land, read off the map (the tick keeps it up from border contacts afterwards)
   function touchAll() {
@@ -1171,7 +1205,7 @@ function createSim(world, seed) {
     popOf, cellsOf, strengthOf, mightOf, acad, temples, ports, markets, wonders, worldEvents, allEvents, history, ERAS, COST,
     volcanoes, fires, floods, quakes, battles, plagues, ruins, rubble, get comet() { return comet; },
     goods, gera, GOODS, GOOD_ID, market, rawPop, held, urban, satOf, touchAll, IND, ind, indN, indAt, workName, eff,
-    know, insightParts, reachFor, townsOf, rule, diplo, get army() { return army; }, get people() { return people; }, get faith() { return faith; }, get culture() { return culture; }, covetOf, spanOf, levyYears, stabilityParts: stabParts, govName: (c) => RULE.FORM[rule.ruleOf(c).gov].name,
+    know, insightParts, reachFor, townsOf, rule, diplo, get army() { return army; }, get people() { return people; }, get faith() { return faith; }, get culture() { return culture; }, get finance() { return finance; }, covetOf, spanOf, levyYears, stabilityParts: stabParts, govName: (c) => RULE.FORM[rule.ruleOf(c).gov].name,
     // the year in which history's first realm had come to know this much (for the page: how far ahead of its time a realm is)
     // the year in which the first peoples knew this much, by this world's calendar (history's own, unless the world came from before the calendar)
     histYear(t) { return histYearOf(t) - calShift; }, get calShift() { return calShift; }, foodMult, get foodOld() { return foodTab === FOOD_015; },
@@ -1179,17 +1213,18 @@ function createSim(world, seed) {
     // where a realm's yearly income comes from (the same sum the tick makes), for the ledger
     incomeParts(cv) {
       // (how the people lived and what the customs took as the year's income was reckoned: the market moves on after it, and the ledger is the income's)
-      const c = cv.id, ro = c * NRF, base = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * tv(cv, 'income', 1) * KF[c * NKF + KK.income] * RF[ro + RK.tax], living = cv.trade ? cv.trade.living : market.LS[c], rev = cv.trade ? cv.trade.customs : market.rev[c];
+      const c = cv.id, ro = c * NRF, base = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * tv(cv, 'income', 1) * KF[c * NKF + KK.income] * RF[ro + RK.tax] * (finance ? finance.taxF(c) : 1), living = cv.trade ? cv.trade.living : market.LS[c], rev = cv.trade ? cv.trade.customs : market.rev[c];
       const parts = { taxes: base, ports: base * ports[c] * 0.05, markets: base * Math.min(0.3, markets[c] * 0.04), mines: base * Math.min(0.3, mines[c] * 0.05), living: base * 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1)), customs: rev * RF[ro + RK.customs], upkeep: popOf[c] * 0.05 * (cv.policy.military - 1) * (cv.policy.military > 1 ? RF[ro + RK.upkeep] : 1), scholars: popOf[c] * SCHOLARS * (cv.policy.research - 1) };
       parts.state = (parts.taxes + parts.ports + parts.markets + parts.mines + parts.living) * RF[ro + RK.cost];      // (what the realm's laws spend: schools, doles, officials)
       parts.tribute = diplo.trIn[c] - diplo.trOut[c];      // (what vassals and the beaten pay it, less what it pays a lord or a victor)
-      parts.net = parts.taxes + parts.ports + parts.markets + parts.mines + parts.living + parts.customs - parts.upkeep - parts.scholars - parts.state + parts.tribute; return parts;
+      parts.paid = finance ? finance.paid[c] : 0; parts.got = finance ? finance.got[c] : 0;      // (interest paid to lenders; interest and dividends that came back: finance.js)
+      parts.net = parts.taxes + parts.ports + parts.markets + parts.mines + parts.living + parts.customs - parts.upkeep - parts.scholars - parts.state + parts.tribute - parts.paid + parts.got; return parts;
     },
     // does this realm's age know how to work what this cell yields?
     knows(c, i) { return !!goods[i] && !!c && c.era >= gera[i] && !!gmask[c.id * NG + goods[i]]; },
     // the discovery the player's realm lacks to raise this work here (null: none, whatever else may stand in the way)
     needFor(kind, i) { const c = playerCiv(); if (!c) return null; if (kind === 'farm') return i >= 0 && infra[i] < 5 ? know.lacks(c.id, 'farm', infra[i] + 1) : null; if (kind === 'walls') return i >= 0 && walls[i] < 3 ? know.lacks(c.id, 'walls', walls[i] + 1) : null; if (kind === 'mine') return i >= 0 && goods[i] ? know.estate(c.id, goods[i]) : null; return know.lacks(c.id, kind); },
-    tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, faithCosts, faithAct, faithNews, cultureNews, plague, meteor, bounty,
+    tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, faithCosts, faithAct, faithNews, cultureNews, financeNews, financeAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = finance.act(c.id, what, a, b); financeNews(); return r; }, plague, meteor, bounty,
     TRAITS, traitOf, fullName, fmtYear, describeCell, isAtWar, capacity, eraOf, strength, save, load, recount, rnd, religionName, makeName, logEvent, evolveGovAll,
     settlementsOf(id) { const out = []; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === id && level[i]) out.push(i); } out.sort((a, b) => pop[b] - pop[a]); return out; },
     cultivation(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 0; const c = civs[o]; const K = capacity(i, c); const farm = Math.min(1, Math.max(0, (c.tech - 0.025) / 0.1)); return K > 0.01 ? Math.min(1, pop[i] / K) * farm * (level[i] ? 1 : 0.6) : 0; },

@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~30 min for all 41).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~32 min for all 42).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
@@ -118,6 +118,11 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   its header: the great realms about one great person a turn from the Iron Age on, half that in the Bronze Age, the
   middle ones a third to a half of that; a golden age for a few realms in a hundred at a time. Run it twice over two
   seeds after touching how great people come, what their works are worth or bring, or what renown is.
+- `node tools/finance/probe.js [seed,seed] [last year]` — money through the ages: how many realms can borrow and how
+  many owe, what the world owes against its income, what the usual debtor owes and pays, the greatest debtors, what was
+  borrowed, repaid, defaulted on, debased and restored, banking houses opened and failed, companies chartered and crashed,
+  panics, how much the autopilot's courts hold in turns of their income. Hold it to its header; run it after touching
+  `finance.js`, and then the war-and-peace probe.
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -205,6 +210,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/people.js` | `PEOPLE` | The peoples of the world: who lives in every region, each people's tongue and family, how peoples are taken into those who rule them and drift apart, what ruling others costs a realm; pure data |
 | `src/faith.js` | `FAITH` | The faiths of the world: what every region keeps, the holy cities, faiths founded, carried by the state, preached and taken up, churches that break away, what other faiths cost a realm; the player's faith (founding with tenets, taking up another, missionaries); pure data |
 | `src/culture.js` | `CULTURE` | Great people (nine kinds), their works, renown and golden ages: who is born where, what they make, where it is kept and who holds it, what it brings the realm, what is forgotten; the player's patronage and commissions; pure data |
+| `src/finance.js` | `FINANCE` | Money: what every realm owes and to whom, the rate it pays, its standing with lenders, defaults; its coin and what it is worth (debasing, restoring); banking houses and chartered companies of the world; panics; the autopilot's purse (what a court keeps, what a war costs); pure data |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
@@ -221,6 +227,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand |
 | `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
+| `src/bank.js` | `BANK` | The Treasury, the market screen's last tab: debts and who holds them, borrowing and repaying, repudiation, the coin, the price of money, banking houses and companies (shares bought and sold), panics of late |
 | `src/works.js` | `WORKS` | The culture screen: renown against the age, the next great person, the golden age, patronage, the living great people (commissions), the works held and lost; the world's renowned realms, golden ages, great people of late and greatest works |
 | `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
@@ -539,6 +546,38 @@ Conventions that matter:
   (`save().culture`; a great person's works are found again from the works); a world saved before culture has had no
   great people yet. The module throws its own dice; a year of it is a tenth of a millisecond. After touching it run
   `tools/culture/probe.js` over 12345 and 777 (twice with `--write`) and the war-and-peace probe.
+- **Finance** (`finance.js`; `sim.finance`). From the tribute lists a realm can borrow against its income (`cv.gross`,
+  kept by the tick): as much as would take four tenths of it in interest at the rate it pays (`LIMIT`, never more than
+  eight years of it), times its standing (`stand`); the rate is its age's (`BASE`: a fifth in the Bronze Age to three and
+  a half per cent in the Information Age) times what lenders make of it (its debts against its income, its standing,
+  war, unrest, a panic, a debased coin) less what it knows of money (`CUT`: coinage, banking, the exchange, central
+  banking, global finance). It pays the interest every year (a house keeps half, its realm three tenths in taxes) and
+  repays when it can. Lenders: banking houses first (its own, then those of the realms it touches or trades with), then
+  its own lenders (the temples, the moneylenders, its bankers, its bondholders) a quarter dearer (`HOME`). A default
+  wipes the debts: the houses that lent lose more than their share of it, the realm's standing drops to a tenth (halfway
+  back in three turns), the realms whose houses it ruined remember it (diplomacy's memory) and a panic runs. A banking
+  house is founded where banking is known, in a trading realm (as many as its share of the world's trade and its markets
+  carry: a great trading realm several, the usual realm none), named for its family by the age; it lends its capital out
+  four times over (`LEVER`), its capital settling toward what its loans earn and what the merchants deposit, and fails
+  when its borrowers have cost it more than it has, or in a run. **The coin**: from coinage a realm strikes one, named in
+  its people's tongue; a debasement (`DEBASE`; from central banking, money printed) brings coin now and puts prices
+  ahead of incomes (`dear`: taxes worth less, unrest, less trust) until they settle or the coin is restored (coin).
+  **Companies**: from the chartered companies, in harbour realms, for the far trade; returns by the realm's share of the
+  world's trade, dividends to the holders by their shares (the player buys and sells at the price of the hour), a mania
+  now and then that runs the shares up for some years and ends in a crash. **Panics** (a house failing, a company
+  crashing, a default): in the realm's markets and a third of it in its trading partners'; dearer, scarcer credit, less
+  trade, unrest; halfway gone in three years, half that with a central bank. Time constants are in years, capped by the
+  turn (`dearHalf`, `panicHalf`, `standHalf`), so that a panic is a panic in every age. **The autopilot's purse**: a court
+  spends what it holds beyond a turn of its income (halfway in half a turn: a realm's treasury was a number nothing
+  bounded); a war costs it its income and half again for each war beside the first, paid out of the purse down to what
+  it keeps for its works and beyond that with borrowed money (wars were what states borrowed for: so the autopilot builds
+  on in a war, as it did); with nobody left to lend it debases and at last defaults. What it does, measured: taxes times
+  `taxF` (a debasement's dear prices, a panic), stability by `unrest` (dear bread, a panic, a default lately). The
+  player (`sim.financeAct`; the Treasury tab of the market, `bank.js`): borrow, repay, repudiate (asked twice), debase or
+  restore the coin, charter a house or a company, buy and sell shares; the ledger and the treasury's tooltip show the
+  interest paid and what came back, the empty-treasury notice points to credit. Saved (`save().finance`); a world saved
+  before finance owes nothing and has no houses. The module throws its own dice; a year of it is about a fifth of a
+  millisecond. After touching it run `tools/finance/probe.js` and the war-and-peace probe over 12345 and 777.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

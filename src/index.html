@@ -737,6 +737,26 @@
   .gv-mis { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; } .gv-mis span { display: flex; flex-direction: column; min-width: 0; } .gv-mis small { font-size: 11px; color: var(--text-3); } .gv-mis .btn { min-height: 26px; padding: 3px 10px; white-space: nowrap; } .gv-mis .btn[disabled] { opacity: 0.45; }
   @media (max-width: 900px) { .gv-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(120px, 44%); } .gv-info { border-left: 0; border-top: 1px solid var(--rule); } .gv-ecols { grid-template-columns: minmax(0, 1fr); } .gv-row { grid-template-columns: minmax(0, 1fr); gap: 6px; } .gv-now { flex-wrap: wrap; gap: 6px 14px; padding: 6px 14px; } .gv-demand { margin-left: 0; white-space: normal; flex-wrap: wrap; } }
 
+  /* ----- the treasury: the market screen's last tab (bank.js) ----- */
+  .bk-head { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .bk-card { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px 13px; border: 1px solid var(--rule); border-top-color: var(--edge-hi); border-radius: var(--radius); background: rgb(18 24 34); min-width: 0; }
+  .bk-card small { font-size: 12.5px; color: var(--text-2); line-height: 1.45; } .bk-big { font-family: var(--display); font-size: calc(24px * var(--ui-scale)); font-weight: 600; letter-spacing: 0.04em; line-height: 1.1; color: var(--coin); font-variant-numeric: lining-nums; }
+  .bk-stand, .bk-fine { position: relative; height: 6px; border-radius: 3px; background: rgb(255 255 255 / 0.08); overflow: hidden; } .bk-stand i, .bk-fine i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--neg), var(--warn) 45%, var(--pos)); }
+  .bk-fine i { background: linear-gradient(90deg, #8E8A7A, #E2E2E6); }
+  .bk-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 2px; } .bk-row .micro { min-width: 52px; } .bk-row .btn { min-height: 26px; padding: 3px 10px; white-space: nowrap; }
+  #mk-fin .btn[disabled] { opacity: 0.45; cursor: default; } .btn.danger { border-color: rgb(240 101 90 / 0.45); color: #F3A09A; } .btn.danger.armed { background: rgb(240 101 90 / 0.18); color: #fff; border-color: var(--neg); }
+  .bk-know { display: flex; flex-wrap: wrap; gap: 4px; } .bk-know span { padding: 2px 7px; border-radius: 9px; border: 1px solid var(--rule); color: var(--text-3); font-size: 11px; } .bk-know span.on { border-color: rgb(242 207 91 / 0.45); color: var(--coin); }
+  .bk-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 30px; align-items: start; } .bk-sect { display: flex; flex-direction: column; gap: 5px; min-width: 0; } .bk-sub { margin-top: 12px; }
+  .bk-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(50px, 110px) auto; gap: 10px; align-items: center; padding: 6px 9px; border-radius: var(--radius); background: rgb(255 255 255 / 0.025); }
+  .bk-line .nm, .bk-co .nm { display: flex; flex-direction: column; min-width: 0; } .bk-line b, .bk-co b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .bk-line small, .bk-co small { font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bk-line em, .bk-co em { font-style: normal; font-size: 12.5px; color: var(--text-2); text-align: right; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; } .bk-line .gv-bar { height: 5px; } .bk-line .gv-bar i { background: var(--coin); }
+  .bk-line.me, .bk-co.me { box-shadow: inset 0 0 0 1px rgb(242 207 91 / 0.35); background: rgb(242 207 91 / 0.05); } .bk-line.dead { background: none; opacity: 0.6; }
+  .bk-co { display: grid; grid-template-columns: minmax(0, 1fr) 80px 40px auto; gap: 10px; align-items: center; padding: 6px 9px; border-radius: var(--radius); background: rgb(255 255 255 / 0.025); } .bk-co.hot { box-shadow: inset 0 0 0 1px rgb(242 185 75 / 0.4); }
+  .bk-co .gold { color: var(--coin); } .bk-co .warn { color: var(--warn); } .bk-btns { display: flex; gap: 4px; } .bk-btns .btn { min-height: 24px; padding: 2px 9px; }
+  .bk-spark { width: 80px; height: 22px; fill: none; stroke-width: 1.6; stroke-linejoin: round; } .bk-spark.up { stroke: var(--pos); } .bk-spark.dn { stroke: var(--neg); }
+  .dp-log-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; font-size: 12.5px; line-height: 1.4; color: var(--text-2); } .dp-log-row b { font-weight: 500; color: var(--text-3); font-variant-numeric: tabular-nums lining-nums; }
+  @media (max-width: 1000px) { .bk-head { grid-template-columns: minmax(0, 1fr); } .bk-cols { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+
   /* ----- the culture screen (works.js) ----- */
   #cult .modal { width: min(1320px, calc(100vw - 32px)); height: calc(100vh - 64px); }
   #cult .linkish { appearance: none; background: none; border: 0; padding: 0; font: inherit; font-size: var(--fs-cap); color: var(--gold-2); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-align: left; align-self: flex-start; }
@@ -1067,12 +1087,13 @@
 <dialog id="market"><div class="modal panel" tabindex="-1">
   <div class="phead"><h2 class="display">Market</h2><span class="micro" id="mk-sub"></span><span id="mk-purse"></span><button class="btn icon ghost" id="mk-close" title="Close (Esc)">✕</button></div>
   <div class="mk-tape" id="mk-tape"></div>
-  <div class="tabs" id="mk-tabs"><button class="on" data-mtab="board">Goods</button><button data-mtab="trade">Trade</button><button data-mtab="works">Workshops</button><button data-mtab="ledger">Ledger</button></div>
+  <div class="tabs" id="mk-tabs"><button class="on" data-mtab="board">Goods</button><button data-mtab="trade">Trade</button><button data-mtab="works">Workshops</button><button data-mtab="ledger">Ledger</button><button data-mtab="fin">Treasury</button></div>
   <div class="mk-body">
     <section data-mpane="board" class="mk-board"><div class="mk-list"><div class="filters" id="mk-filters"></div><div class="mk-table" id="mk-table"></div></div><div class="mk-good" id="mk-good"></div></section>
     <section data-mpane="trade" id="mk-trade" hidden></section>
     <section data-mpane="works" id="mk-works" hidden></section>
     <section data-mpane="ledger" id="mk-ledger" hidden></section>
+    <section data-mpane="fin" id="mk-fin" hidden></section>
   </div>
 </div></dialog>
 
@@ -1195,6 +1216,7 @@
 <script src="people.js"></script>
 <script src="faith.js"></script>
 <script src="culture.js"></script>
+<script src="finance.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -1210,6 +1232,7 @@
 <script src="movers.js"></script>
 <script src="events.js"></script>
 <script src="market.js"></script>
+<script src="bank.js"></script>
 <script src="tree.js"></script>
 <script src="gov.js"></script>
 <script src="envoys.js"></script>

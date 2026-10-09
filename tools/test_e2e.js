@@ -737,6 +737,47 @@ server.listen(0, async () => {
     await page.keyboard.press('Shift+Z'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, key: document.getElementById('govkey').hidden })); check(r.mode === 'realm' && r.key, 'and off again');
     await ev(() => { const S = __G.sim, c = S.playerCiv(); c.patron = 1; __G.select(c.capital); });
   });
+  await scenario('finance: the Treasury, borrowing and repaying, the coin debased, a banking house and a company, shares, the ledger, repudiation', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (TREE.isOpen()) TREE.close(); if (GOV.isOpen()) GOV.close(); if (ENVOYS.isOpen()) ENVOYS.close(); if (WORKS.isOpen()) WORKS.close(); });
+    // a realm of the Renaissance with a harbour at its seat, its treasury low
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(); const ren = S.ERAS[5][1] + 0.01; if (c.tech < ren) { c.tech = ren; c.era = S.eraOf(ren); } __T.teach(c); S.special[c.capital] |= 1; S.recount(); __G.run(2); c.wealth = 50; const F = S.finance; return { can: F.canBorrow(c.id), room: F.room(c.id), coin: F.coin(c.id), debt: F.debt[c.id] }; });
+    check(r.can && r.room > 1 && r.coin.length >= 3 && r.debt === 0, `the realm can borrow (up to ${Math.round(r.room)}), and strikes a coin: the ${r.coin}`);
+    await ev(() => MARKET.open('fin')); await frames(2);
+    r = await ev(() => ({ open: MARKET.isOpen(), tab: (document.querySelector('#mk-tabs button.on') || {}).dataset?.mtab, cards: document.querySelectorAll('#mk-fin .bk-card').length, borrow: document.querySelectorAll('#mk-fin [data-fact="borrow"]').length, text: document.getElementById('mk-fin').textContent }));
+    check(r.open && r.tab === 'fin' && r.cards === 3 && r.borrow > 0 && /The coin/.test(r.text) && /The price of money/.test(r.text), `the Treasury: debts, the coin, the price of money, and ${r.borrow} ways to borrow`);
+    await page.click('#mk-fin [data-fact="borrow"]'); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.finance; return { debt: F.debt[c.id], wealth: c.wealth, lenders: document.querySelectorAll('#mk-fin .bk-sect .bk-line').length, told: c.events.slice(-4).some((e) => /borrows/.test(e.text)) }; });
+    check(r.debt > 0 && r.wealth > 50 && r.lenders > 0 && r.told, `borrowed ${Math.round(r.debt)}: the treasury has it, the lenders are listed, and the chronicle says so`);
+    const d1 = r.debt; await page.click('#mk-fin [data-fact="repay"]'); await frames(2);
+    r = await ev(() => ({ debt: __G.sim.finance.debt[__G.sim.playerCiv().id] })); check(r.debt < d1, `repaid: ${Math.round(d1)} -> ${Math.round(r.debt)}`);
+    await page.click('#mk-fin [data-fact="debase"]'); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.finance; return { fine: F.fine[c.id], dear: F.dear[c.id], restore: !!document.querySelector('#mk-fin [data-fact="restore"]'), text: document.getElementById('mk-fin').textContent }; });
+    check(r.fine < 1 && r.dear > 0 && r.restore && /% of its (weight|worth)/.test(r.text), `the coin debased: ${Math.round(r.fine * 100)}% of its weight, prices ${Math.round(r.dear * 100)}% ahead, and a way back`);
+    await ev(() => { __G.sim.playerCiv().wealth = 1e6; MARKET.render(); }); await frames(1);
+    await page.click('#mk-fin [data-fact="house"]'); await frames(2); await page.click('#mk-fin [data-fact="company"]'); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.finance; return { houses: F.housesOf(c.id).length, cos: F.companiesOf(c.id).length, mine: document.querySelectorAll('#mk-fin .bk-line.me, #mk-fin .bk-co.me').length }; });
+    check(r.houses === 1 && r.cos === 1 && r.mine >= 2, 'a banking house and a company chartered, and shown as yours');
+    // another realm's company: shares bought and sold at the price of the hour
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.finance; const o = S.civs.find((x) => x && x !== c && x.capital >= 0); const co = F.charter(o.id, { at: o.capital, cap: 500 }); MARKET.render(); return { id: co.id }; }); await frames(1);
+    await page.click(`#mk-fin [data-fact="buy"][data-k="${r.id}"]`); await frames(2);
+    let q = await ev((id) => { const S = __G.sim, c = S.playerCiv(), F = S.finance; const co = F.companies.find((y) => y.id === id); return { sh: F.sharesOf(co, c.id), sell: !!document.querySelector(`#mk-fin [data-fact="sell"][data-k="${id}"]`) }; }, r.id);
+    check(q.sh > 0 && q.sell, 'shares of another realm\'s company bought');
+    await page.click(`#mk-fin [data-fact="sell"][data-k="${r.id}"]`); await frames(2);
+    q = await ev((id) => { const S = __G.sim, c = S.playerCiv(), F = S.finance; const co = F.companies.find((y) => y.id === id); return { sh: F.sharesOf(co, c.id) }; }, r.id); check(!q.sh, 'and sold');
+    // the ledger shows the interest
+    await ev(() => { __G.run(1); MARKET.open('ledger'); }); await frames(2);
+    r = await ev(() => ({ text: document.getElementById('mk-ledger').textContent, debt: __G.sim.finance.debt[__G.sim.playerCiv().id] }));
+    check(r.debt <= 0 || /Interest to lenders/.test(r.text), 'the ledger shows the interest paid');
+    // repudiation asks twice
+    await ev(() => { const S = __G.sim, c = S.playerCiv(); if (!(S.finance.debt[c.id] > 0)) { c.wealth = 0; S.finance.borrow(c.id, 100); } MARKET.open('fin'); }); await frames(2);
+    await page.click('#mk-fin [data-fact="default"]'); await frames(1);
+    r = await ev(() => ({ debt: __G.sim.finance.debt[__G.sim.playerCiv().id], armed: (document.querySelector('#mk-fin [data-fact="default"]') || {}).textContent || '' }));
+    check(r.debt > 0 && /certain/i.test(r.armed), 'repudiation asks again first');
+    await page.click('#mk-fin [data-fact="default"]'); await frames(2);
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), F = S.finance; return { debt: F.debt[c.id], stand: F.stand[c.id], told: c.events.slice(-4).some((e) => /defaults/.test(e.text)) }; });
+    check(r.debt === 0 && r.stand < 0.2 && r.told, 'and then the debts are gone, and the realm\'s standing with them');
+    await ev(() => { MARKET.close(); __G.select(__G.sim.playerCiv().capital); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);
