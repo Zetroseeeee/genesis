@@ -132,6 +132,7 @@
     {"id": "st_festival", "ar": "16:9", "p": "A night festival in a town square, strings of lanterns overhead, a great bonfire, musicians and dancers in a ring, children carrying small torches, the whole town gathered and celebrating."},
     {"id": "st_plot", "ar": "16:9", "p": "Conspirators in silk robes whispering around a single candle in a dark chamber of an East Asian palace, one passing a sealed scroll, a servant listening behind a lacquered screen, moonlight through paper windows."},
     {"id": "st_fair", "ar": "16:9", "p": "A great trade fair in the courtyard of a desert caravanserai, camels unloading bales of silk and sacks of spice, merchants from many lands haggling under awnings, carpets and copper pots, a domed gate behind."},
-    {"id": "st_monument", "ar": "16:9", "p": "A ruler and his architect inspecting a colossal stepped stone monument under construction in a tropical river valley, thousands of workers hauling blocks up earthen ramps on ropes, scaffolding and dust in the evening light."}
+    {"id": "st_monument", "ar": "16:9", "p": "A ruler and his architect inspecting a colossal stepped stone monument under construction in a tropical river valley, thousands of workers hauling blocks up earthen ramps on ropes, scaffolding and dust in the evening light."},
+    {"id": "st_spy", "ar": "16:9", "job": "5cb98929-a25b-4966-98e6-81ee0190a514", "ts": "20261009_125326", "p": "A captured spy in a dark travelling cloak forced to his knees by two guards before a ruler and his council in a torchlit stone chamber at night; on a heavy table in front of them lie the evidence: an opened letter in cipher, a broken wax seal, a small glass vial and a slim dagger; courtiers watching warily from the shadows of the arches."}
   ]
 }

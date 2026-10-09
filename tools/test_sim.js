@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -558,7 +558,7 @@ log('11. diplomacy');
   // the tables hang together
   check(DP.PACTS.length === 5 && DP.PACTS.every(P => KN.ID[P.need] !== undefined && P.turns >= 2 && P.text.length > 30) && KN.ID[DP.VASSAL.need] !== undefined, 'five pacts and vassalage, each standing on a real discovery');
   check(Object.keys(DP.OPENS).length >= 5 && Object.keys(DP.OPENS).every(k => KN.ID[k] !== undefined && DP.OPENS[k].length > 20), 'what else discoveries open between realms (a claim, vassals, embassies, the wireless, unification) is said of real discoveries');
-  check(Object.keys(DP.CAUSES).length === 11 && Object.values(DP.CAUSES).every(C => C.name && C.text.length > 15 && ['land', 'tribute', 'vassal', 'regime', 'none'].includes(C.goal)), 'eleven causes of war (the holy city among them), each with something to win');
+  check(Object.keys(DP.CAUSES).length === 12 && Object.values(DP.CAUSES).every(C => C.name && C.text.length > 15 && ['land', 'tribute', 'vassal', 'regime', 'none'].includes(C.goal)), 'twelve causes of war (the holy city and agents caught among them), each with something to win');
   check(Object.values(DP.STAND).every(([n, h]) => n && /^#[0-9A-F]{6}$/i.test(h)) && Object.keys(DP.TERMS).every(t => DP.TERM_TEXT[t] && DP.RANK[t] !== undefined), 'standings have a colour, terms a rank and a line');
   check(DP.moodOf(80) === 'devoted' && DP.moodOf(0) === 'indifferent' && DP.moodOf(-20) === 'wary' && DP.moodOf(-90) === 'bitter', 'opinions have words');
   check(DP.UNJUST_STAB[0] === 0 && DP.UNJUST_STAB[1] === 0 && DP.UNJUST_REP[8] > DP.UNJUST_REP[3] && DP.UNJUST_REP[3] > 0, 'the early ages keep no account of unprovoked wars; the later ones do');
@@ -1273,6 +1273,83 @@ log('19. legacies');
   check(best[0] > best[Math.min(20, best.length - 1)] * 1.5, 'some realms are remembered far more than others');
   check(ms / 100 < 0.6, `legacies are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
   const size = JSON.stringify(realms.map(c => c.legacy)).length / 1024; check(size < 120, `what the realms are remembered for is saved in ${size.toFixed(0)} KB`);
+}
+}
+if (want(20)) {
+log('20. intrigue');
+{
+  const IN = window.INTRIGUE, art = JSON.parse(fs.readFileSync('data/tex/atlas.json', 'utf8')).ui, K = window.KNOW;
+  check(IN.SCHEMES.length === 6 && IN.SCHEMES.every((x) => K.ID[x.need] !== undefined && x.odds > 0 && x.risk > 0 && x.cost > 0 && x.text.length > 30 && x.at), 'six schemes, each standing on a discovery there is, with its odds, its risk and its cost');
+  check(IN.NET.every((k) => K.ID[k] !== undefined), `a network is made of discoveries there are (${IN.NET.join(', ')})`);
+  for (const k of ['spies', 'spies_ours']) { const st = window.STORY.LIST.find((x) => x.k === k); check(!!st && !!art[st.art] && st.follow, `the story of agents caught (${k}) has a painting there is (${st ? st.art : ''})`); }
+  // a player's kingdom of the Renaissance, beside another that keeps still and has an heir
+  const sim = createSim(wd, 103), RF = window.RULE.FORM, X = sim.intrigue, D = sim.dynasty; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
+  const ren = sim.ERAS[5][1] + 0.01; sim.setPlayer(k0, 'Spyland'); const P = sim.playerCiv(); P.tech = ren; P.era = sim.eraOf(ren); teach(sim, P, 4, ['printing', 'embassies']); sim.rule.setForm(P.id, P, RF.kingdom, 'reform');      // (the neighbour knows the rest of the age: something to steal)
+  for (let d = 1; d <= 6; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); sim.pop[i] = 30; }
+  const B = sim.spawnTribe(k0 + 8, {}); B.tech = ren; B.era = sim.eraOf(ren); teach(sim, B, 5); B.aggression = 0; B.dip.think = 1e12; sim.rule.setForm(B.id, B, RF.kingdom, 'reform');
+  for (let d = 7; d <= 10; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, B, k0 + 8); sim.pop[i] = 30; }
+  sim.touchAll(); sim.recount(); for (let y = 0; y < 3; y++) sim.tick(); sim.recount(); sim.setStories(true);
+  if (B.intrigue) B.intrigue.next = 1e12; for (const c of sim.civs) if (c && !c.player) { c.aggression = 0; if (c.dip) c.dip.think = 1e12; if (!c.intrigue) X.I(c); c.intrigue.next = 1e12; c.intrigue.s = null; }      // (nobody else schemes while this is tried)
+  const rb = D.rulerOf(B.id); if (rb && !D.heirOf(B.id)) { const k = D.make({ n: 'Odo', f: false, b: sim.year - 18, h: rb.h, p: rb.id, c: B.id, t: 'steward', d: sim.year + 60 }); rb.k.push(k.id); }
+  P.wealth = 1e5; P.ruler.trait = 'steward'; B.ruler.trait = 'steward'; if (P.story) { P.story.q = null; P.story.n = 1e12; }      // (no other story comes before the court while this is tried)
+  // the network: what the realm knows, its laws, its ruler
+  { const parts = X.partsOf(P), n = X.netOf(P); const known = IN.NET.filter((k) => sim.know.knows(P.id, k)).length;
+    check(Math.abs(n - parts.reduce((t, p) => t + p[1], 0)) < 1e-9 && n >= known && known >= 4, `a Renaissance realm's network is what it knows of letters and envoys (${parts.map((p) => p[0] + ' ' + p[1]).join(', ')})`);
+    P.ruler.trait = 'tyrant'; check(X.netOf(P) === n + 1, 'and a ruler who trusts nobody'); P.ruler.trait = 'steward';
+    sim.rule.setLaw(P.id, P, window.RULE.LAW.police, 'reform'); check(X.netOf(P) === n + 1 && X.partsOf(P).some((p) => p[0] === window.RULE.LAW.police.name), `and its laws (${window.RULE.LAW.police.name})`); }
+  // what can be done to the neighbour, and why not
+  const V = sim.intrigueView(B.id);
+  check(!!V && V.schemes.length === 6 && V.schemes.every((x) => x.odds >= 0.05 && x.odds <= 0.9 && x.risk >= 0.04 && x.risk <= 0.9 && x.years >= 2 && x.cost > 0), `the page of a realm says what each scheme would take there (${V ? V.schemes.map((x) => `${x.key} ${Math.round(x.odds * 100)}%/${Math.round(x.risk * 100)}%${x.why ? ' (' + x.why + ')' : ''}`).join(', ') : ''})`);
+  check(V.schemes.find((x) => x.key === 'murder').why === null && V.schemes.find((x) => x.key === 'claim').why === null, 'their heir can be struck at, and a claim forged across the border');
+  { const odd = X.oddsOf(P, B, 'discord').odds; P.ruler.trait = 'tyrant'; check(X.oddsOf(P, B, 'discord').odds > odd && X.oddsOf(B, P, 'discord').risk < 0.9, 'a better network makes a scheme likelier to work'); P.ruler.trait = 'steward'; }
+  const stone = sim.civs.find((c) => c && !c.player && c.era === 0 && c !== B);
+  if (stone) check(X.cannot(stone, B, 'learn') === 'Needs Writing' || /reach|Writing/.test(X.cannot(stone, B, 'learn') || ''), `a people that cannot write keeps no agents (${X.cannot(stone, B, 'learn')})`);
+  // a scheme begun: paid for, under way, one at a time; called off
+  // (a scheme carried to its end with the odds and the risk given; pre is asked just before the end, keep each year; the realms keep their age)
+  const tick = (keep) => { P.tech = ren; B.tech = ren; if (keep) keep(); sim.tick(); };
+  const run = (key, odds, risk, pre, keep) => { P.wealth = 1e5; const why = sim.scheme(B.id, key); if (why) return why; const s = P.intrigue.s; s.odds = odds; s.risk = risk; while (P.intrigue.s && sim.year < s.until - 1) tick(keep); if (pre) pre(); for (let y = 0; y < 5 && P.intrigue.s; y++) tick(keep); return null; };
+  { const w0 = P.wealth, cost = X.costOf(P, 'claim'); check(sim.scheme(B.id, 'claim') === null && P.wealth === w0 - cost && P.intrigue.s && P.intrigue.s.k === 'claim', `a scheme is paid for at once (${cost} coin) and under way`);
+    check(sim.scheme(B.id, 'discord') === 'Your agents are at work there already', 'one scheme at a time'); const v = sim.intrigueView(); check(!!v.s && v.s.realm === sim.fullName(B) && v.s.p >= 0 && v.s.left > 0, `the scheme under way, for the Intrigue tab (${v.s ? v.s.scheme + ', ' + v.s.left + ' years left' : ''})`);
+    check(sim.unscheme() === null && !P.intrigue.s, 'and called off'); }
+  // each scheme, carried through
+  { const y0 = sim.year; run('claim', 1, 0); check(sim.diplo.claimUntil(P, B.id, 'claim') > sim.year && sim.year > y0, 'a claim forged: a reason for war against them'); }
+  { const n0 = sim.know.count[P.id], why = run('learn', 1, 0); check(!why && sim.know.count[P.id] === n0 + 1 && P.events.some((e) => e.type === 'intrigue' && /secret of/.test(e.text)), `their learning stolen: a discovery comes home (${why || (P.events.filter((e) => e.type === 'intrigue').pop() || {}).text})`); }
+  { let s0 = 0; const why = run('discord', 1, 0, () => { s0 = B.stability; }); check(!why && B.stability < s0 - 0.05, `discord sown: their realm restless (${why || s0.toFixed(2) + ' -> ' + B.stability.toFixed(2)})`); }
+  { sim.works.set(B.capital, [{ k: 'temple', slot: -1, start: sim.year, dur: 200 }]); const w = sim.works.get(B.capital)[0]; const st0 = w.start; const why = run('sabotage', 1, 0); check(!why && w.start === st0 + 100, `their works set back by half their time (${why || (w.start - st0) + ' years'})`); }
+  const anHeir = () => { let h = D.heirOf(B.id); if (!h) { const r2 = D.rulerOf(B.id); h = D.make({ n: 'Odo', f: false, b: sim.year - 18, h: r2.h, p: r2.id, c: B.id, t: 'steward', d: sim.year + 60 }); r2.k.push(h.id); } return D.heirOf(B.id); };
+  { let h = anHeir(); const why = run('murder', 1, 0, () => { h = anHeir(); });
+    check(!why && !!h && !D.alive(h, sim.year) && P.events.some((e) => e.type === 'intrigue' && /strike at the house/.test(e.text)), `their heir murdered (${why || (h ? h.n : 'nobody')})`); }
+  { const R = sim.rule.ruleOf(B), p = B.id * window.RULE.NE; let e = 0; for (let k = 1; k < window.RULE.NE; k++) if (sim.rule.power[p + k] > sim.rule.power[p + e]) e = k; R.mood[e] = 0.05;
+    const r0 = (X.stats.out.rising || [0])[0]; let u = 0; const why = run('rising', 1, 0, () => { u = sim.year; }, () => { R.mood[e] = 0.05; });
+    check(!why && (X.stats.out.rising || [0])[0] === r0 + 1 && R.rose >= u, `a rising stirred among their ${window.RULE.estateName(e, B.era).toLowerCase()} (${why || 'in ' + sim.fmtYear(R.rose)})`); }
+  // found out: remembered, the schemer's word worth less, and (an act of war) a reason for war
+  { const o0 = sim.diplo.opinion(B, P), r0 = sim.diplo.D(P).rep; P.story.q = null; run('discord', 0, 0.99, null, () => { if (P.story.q && P.story.q.k !== 'spies_ours') P.story.q = null; });
+    check(sim.diplo.opinion(B, P) < o0 - 20 && sim.diplo.D(P).rep < r0 && B.intrigue.found.some((f) => f[1] === P.id && f[2] === 'discord'), `found out: they remember it (${o0.toFixed(0)} -> ${sim.diplo.opinion(B, P).toFixed(0)}), and the schemer's word is worth less`);
+    check(sim.diplo.causes(B, P).some((c) => c.key === 'spies'), 'an act of war found out is a reason for war against the schemer');
+    const v = sim.storyView(); check(!!v && v.k === 'spies_ours' && v.title.includes(sim.fullName(B)) && v.opts.length === 3, `the player hears of his agents caught (${v ? v.title : 'nothing'})`); sim.storyChoose(0); }
+  // foreign agents caught in the player's realm: a story, and a reason for war
+  { if (P.story) P.story.q = null; B.wealth = 1e5; const why = X.begin(B, P, 'discord'); check(why === null, 'a neighbour sets its agents on the player: ' + (why || 'begun')); B.intrigue.s.risk = 0.99;
+    for (let y = 0; y < 20 && B.intrigue.s; y++) tick(() => { if (P.story.q && P.story.q.k !== 'spies') P.story.q = null; }); const v = sim.storyView();      // (a birth in the family would make it wait a year)
+    check(!!v && v.k === 'spies' && v.title.includes(sim.fullName(B)) && !/undefined|NaN/.test(v.text + v.opts.map((o) => o.t + o.chips.map((q) => q.t).join()).join()), `foreign agents caught in the realm: "${v ? v.title : 'nothing'}": ${v ? v.text.slice(0, 90) : ''}`);
+    check(sim.diplo.causes(P, B).some((c) => c.key === 'spies') && sim.intrigueView().found.some((f) => f.by === B.id && f.open > sim.year), 'and a reason for war against them, for three turns');
+    const a0 = sim.rule.ruleOf(P).auth; sim.storyChoose(0); check(sim.rule.ruleOf(P).auth > a0 - 1e-9, 'hanged before the palace'); }
+  // saved with the world: the scheme under way, the agents caught; a world from before intrigue has none
+  { P.wealth = 1e5; if (P.story) P.story.q = null; sim.scheme(B.id, 'discord'); const saved = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(saved); const P2 = s2.playerCiv();
+    check(JSON.stringify(P2.intrigue) === JSON.stringify(P.intrigue) && s2.intrigue.stats.begun === X.stats.begun && !!s2.intrigueView().s, `spies and schemes are saved with the world (${X.stats.begun} begun)`);
+    const old = JSON.parse(JSON.stringify(saved)); delete old.intrigue; for (const c of old.civs) if (c) delete c.intrigue; const s3 = createSim(wd, 1); s3.load(old); for (let y = 0; y < 3; y++) s3.tick(); check(!s3.intrigueView().s && s3.playerCiv().intrigue.found.length === 0, 'a world from before intrigue begins with no agents abroad'); }
+  // a realm that is gone: whatever was aimed at it comes to nothing
+  { const id = B.id; X.gone(id); check(!P.intrigue.s, 'a scheme against a realm that is gone comes to nothing'); }
+}
+// the autopilot's realms scheme too, now and then, quickly enough
+{
+  const sim = createSim(wd, 12345); let ms = 0; for (let y = 0; y < 11000; y++) { sim.tick(); if (y >= 10900) ms += sim.intrigue.stats.ms; } const X = sim.intrigue, S = X.stats;
+  const realms = sim.civs.filter(Boolean); const lines = realms.reduce((n, c) => n + c.events.filter((e) => e.type === 'intrigue').length, 0);
+  log(`   ${sim.fmtYear(sim.year)}: ${S.begun} schemes begun, ${S.done} succeeded, ${S.failed} failed, ${S.caught} found out (${Object.keys(S.by).map((k) => k + ' ' + S.by[k]).join(', ')}); ${lines} lines in chronicles; ${(ms / 100).toFixed(4)} ms a year`);
+  check(S.begun > 100 && Object.keys(S.by).length >= 4 && S.caught > 10 && S.done > 20, `the world's realms scheme against their rivals (${S.begun} begun, ${Object.keys(S.by).length} kinds)`);
+  check(S.done > S.caught && S.caught > S.begun * 0.1, 'about half succeed, and some are found out');
+  check(ms / 100 < 0.1, `intrigue is quick enough (${(ms / 100).toFixed(4)} ms a year)`);
+  const size = JSON.stringify(realms.map((c) => c.intrigue)).length / 1024; check(size < 40, `what the realms' agents are about is saved in ${size.toFixed(0)} KB`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

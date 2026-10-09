@@ -430,8 +430,39 @@
       { t: () => 'Let the judges deal with it', hint: () => 'Slowly.', fx: () => ({ stab: -0.02 }), log: () => '' },
     ], lapse: 2 });
 
+  // ----- spies (intrigue.js tells these when agents are caught: theirs in your realm, or yours in theirs) -----
+  const SPY_WHAT = { learn: 'copying the letters of their scholars', discord: 'carrying gold to their great families', claim: 'forging charters in their archives', sabotage: 'with tinder among their works', rising: 'with arms for their malcontents', murder: 'with poison meant for their heir' };
+  const spyMind = (k) => (window.INTRIGUE && window.INTRIGUE.SK[k] ? window.INTRIGUE.SK[k].mind : 30);
+  S({ k: 'spies', art: 'st_spy', follow: true, w: (x, d) => (d && x.civ(d.o) ? 1 : 0),
+    make: (x, d) => (d && x.civ(d.o) && SPY_WHAT[d.k] ? { o: d.o, k: d.k, i: d.i >= 0 ? d.i : x.town(d.k === 'learn' ? 'academy' : ''), e: d.e, p: d.p || 0 } : null), still: (x, d) => !!x.civ(d.o),
+    title: (x, d) => `Spies of ${x.name(x.civ(d.o))}`,
+    text: (x, d) => { const O = x.name(x.civ(d.o)), at = x.cell(d.i), p = d.p ? x.P(d.p) : null;
+      if (d.k === 'learn') return `Men of ${O} were taken at ${at}, copying the letters of your ${est(x, 'scholars')} by lamplight. Under questioning they named the house in ${O} that paid them.`;
+      if (d.k === 'discord') return `A merchant of ${O} was taken at ${at} carrying gold and letters to your great families. The letters promise much to whoever turns against ${x.R ? x.R.title + ' ' + x.R.name : 'the crown'}.`;
+      if (d.k === 'claim') return `Clerks of ${O} were taken in your archives at ${at} with old charters, some of them not so old: deeds that would give their ruler a right to your borderland.`;
+      if (d.k === 'sabotage') return `Men of ${O} were taken by night among the works at ${at}, with oil and tinder. They had been paid to burn the scaffolding.`;
+      if (d.k === 'rising') return `Agents of ${O} were taken at ${at} with a cart of arms and printed sheets for your ${d.e >= 0 ? window.RULE.estateName(d.e, x.era).toLowerCase() : 'malcontents'}. More of them are still at large.`;
+      return `A cook in the kitchens of ${x.cap} was taken with a phial of poison meant for ${p ? styled(x, p) : 'your heir'}. ${x.era >= 6 ? 'The money in her account' : 'She was paid in coin that'} came from ${O}.`; },
+    opts: [
+      { t: (x) => (x.era >= 6 ? 'Try them, and hang them' : 'Hang them before the palace'), hint: () => 'Everyone will know what becomes of spies here.', fx: (x, d) => ({ auth: 5, stab: 0.02, op: [[d.o, -10]] }), log: (x, d) => `Spies of ${x.name(x.civ(d.o))} are hanged in ${x.cap}` },
+      { t: (x, d) => `Send them home to ${x.name(x.civ(d.o))}, for a ransom`, hint: () => 'Coin, and a little goodwill.', fx: (x, d) => ({ coin: 0.5, op: [[d.o, 8]] }), log: () => '' },
+      { t: () => 'Turn them, and send them back with false letters', hint: () => 'If their masters believe them, their secrets are yours.', fx: () => ({}),
+        odds: (x, d) => [[0.55, { text: `${cap(x.name(x.civ(d.o)))} believes every word. With the next letters come its own secrets, and proof of what it intended.`, fx: { ins: 0.6, claim: d.o } }], [0.45, { text: 'Their masters see through it. The agents are never heard of again.', fx: { op: [[d.o, -5]] } }]],
+        log: () => '' },
+    ], lapse: 0 });
+
+  S({ k: 'spies_ours', art: 'st_spy', follow: true, w: (x, d) => (d && x.civ(d.o) ? 1 : 0),
+    make: (x, d) => (d && x.civ(d.o) && SPY_WHAT[d.k] ? { o: d.o, k: d.k } : null), still: (x, d) => !!x.civ(d.o),
+    title: (x, d) => `Your agents taken in ${x.name(x.civ(d.o))}`,
+    text: (x, d) => { const o = x.civ(d.o); return `Your agents were taken in ${x.name(o)} ${SPY_WHAT[d.k]}. ${o.ruler ? o.ruler.title + ' ' + o.ruler.name : 'Their ruler'} has had them paraded through the streets, and an envoy waits at your gate for your answer.`; },
+    opts: [
+      { t: () => 'Apologise, and pay for the insult', hint: () => 'They will forget it sooner.', fx: (x, d) => ({ coin: -0.6, op: [[d.o, Math.round(spyMind(d.k) / 2)]] }), log: (x, d) => `${cap(x.realm)} apologises to ${x.name(x.civ(d.o))} for its agents` },
+      { t: () => 'Deny everything', hint: () => 'Nobody will believe you; nobody can prove it.', fx: (x, d) => ({ auth: 3, op: [[d.o, -5]] }), log: () => '' },
+      { t: () => 'Expel their envoys in turn', hint: () => 'Let them know you will not be lectured.', fx: (x, d) => ({ auth: 6, est: { soldiers: 0.03 }, op: [[d.o, -15]] }), log: (x, d) => `${cap(x.realm)} expels the envoys of ${x.name(x.civ(d.o))}` },
+    ], lapse: 1 });
+
   // ----- learning -----
-  const HERESY = ['', '', '', 'the earth is a sphere, and turns', 'the old books can be wrong', 'the earth goes round the sun', 'living things change, slowly, into others', 'time itself runs slower for whatever moves fast', 'a machine may one day think'];
+  const HERESY =['', '', '', 'the earth is a sphere, and turns', 'the old books can be wrong', 'the earth goes round the sun', 'living things change, slowly, into others', 'time itself runs slower for whatever moves fast', 'a machine may one day think'];
   S({ k: 'scholars', art: 'st_scholars', w: (x) => (x.era >= 3 && x.acad() >= 1 ? 0.55 : 0),
     make: (x) => ({ i: x.town('academy') }), title: () => 'A dispute in the academy',
     text: (x, d) => `In the academy of ${x.cell(d.i)} the ${est(x, 'scholars')} are at war with words. A young master teaches that ${HERESY[Math.max(3, x.era)]}, and the old masters demand that he be silenced.`,

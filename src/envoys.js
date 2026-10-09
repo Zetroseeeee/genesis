@@ -13,7 +13,9 @@ window.ENVOYS = (function () {
     alliance: 'M5 5l14 14M19 5L5 19M5 5h3.500M5 5v3.500M19 5h-3.500M19 5v3.500', marriage: 'M5 13a4 4 0 1 0 8 0a4 4 0 1 0-8 0M11 13a4 4 0 1 0 8 0a4 4 0 1 0-8 0M9 9l-1-3h2zM15 9l-1-3h2z',
     vassal: 'M4 18h16l1-10-5 4-4-7-4 7-5-4z', lord: 'M4 18h16l1-10-5 4-4-7-4 7-5-4zM4 21h16', war: 'M4 4l16 16M20 4L4 20', ban: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16M6.500 6.500l11 11',
     gift: 'M4 10h16v10H4zM12 10v10M3 10h18M12 10c-2-4-6-3-4 0M12 10c2-4 6-3 4 0', claim: 'M6 21V4h11l-2.500 3.500L17 11H6', peace: 'M5 19c0-8 5-13 14-14 0 9-5 14-14 14zM5 19l8-8',
-    envoy: 'M4 6h16v12H4zM4 7l8 6 8-6', truce: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16M12 8v4l3 2', word: 'M6 4h12v13H6zM9 8h6M9 11h6M12 17v3.500l-2-1.500', owes: 'M12 5v14M8 9h5a2 2 0 0 1 0 4H9a2 2 0 0 0 0 4h6',
+    envoy: 'M4 6h16v12H4zM4 7l8 6 8-6', spy: 'M2.500 12s3.500-6.500 9.500-6.500S21.500 12 21.500 12 18 18.500 12 18.500 2.500 12 2.500 12zM12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6',
+    learn: 'M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14', discord: 'M3.500 5h11v7.500H8l-4.500 3.500zM9.500 15.500V17h6l4.500 3.500V11h-3', sabotage: 'M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z',
+    rising: 'M12 21V9M7.500 3v4a4.500 4.500 0 0 0 9 0V3M12 3v6', murder: 'M12 2.500l2 3v9.500h-4V5.500zM7.500 15h9M12 15v6.500', truce: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16M12 8v4l3 2', word: 'M6 4h12v13H6zM9 8h6M9 11h6M12 17v3.500l-2-1.500', owes: 'M12 5v14M8 9h5a2 2 0 0 1 0 4H9a2 2 0 0 0 0 4h6',
   };
   const MOOD_CLS = { devoted: 'pos', friendly: 'pos', warm: 'good', indifferent: '', wary: 'warn', hostile: 'neg', bitter: 'neg' };
   const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v);
@@ -72,6 +74,7 @@ window.ENVOYS = (function () {
     const s = S(), c = me(); if (!s || !c) return; const d = DK(), P = DP(); const b = sel >= 0 ? s.civs[sel] : null; let msg = null, map = false;
     if (what === 'answer') { const o = d.D(c).offers.find((x) => x.id === +k); const from = o ? s.civs[o.from] : null; const no = d.answer(c, +k, v === 'yes'); msg = no || (from ? (v === 'yes' ? `Agreed with ${s.fullName(from)}` : `${s.fullName(from)} is turned away`) : null); map = true; }
     else if (what === 'fly') { if (b && b.capital >= 0 && ctx.flyTo) { close(); ctx.flyTo(b.capital); } return; }
+    else if (what === 'unscheme') { msg = s.unscheme() || 'Your agents are called home'; }
     else if (!b) return;
     else if (what === 'propose') { const no = d.propose(c, b, k); msg = no ? (no === 'They refuse' ? `${s.fullName(b)} refuses` : no) : k === 'vassal' ? `${s.fullName(b)} bends the knee` : k === 'protect' ? `${s.fullName(b)} takes you under its protection` : `${s.fullName(b)} agrees: ${P.PACT[k].name.toLowerCase()}`; map = !no; }
     else if (what === 'break') { const no = d.breakPact(c, b, k); msg = no || (k === 'vassal' ? `${s.fullName(b)} is released from its oath` : `${P.PACT[k].name} thrown over`); map = true; }
@@ -83,6 +86,7 @@ window.ENVOYS = (function () {
     else if (what === 'abandon') { msg = d.abandon(c, b) || `A peace of your own with ${s.fullName(b)}`; map = true; }
     else if (what === 'annex') { const name = s.fullName(b); const no = d.annex(c, b); msg = no || `${name} is joined to your crown`; if (!no) sel = -1; map = !no; }
     else if (what === 'rebel') { msg = d.rebel(c) || `You have thrown off the yoke of ${s.fullName(b)}`; map = true; }
+    else if (what === 'scheme') { const no = s.scheme(b.id, k); const S = window.INTRIGUE && window.INTRIGUE.SK[k]; msg = no || `Your agents set out for ${s.fullName(b)}: ${S ? lc(S.name) : k}`; }
     if (msg && ctx.toast) ctx.toast(msg);
     if (map && ctx.redraw) ctx.redraw(); if (ctx.afterAct) ctx.afterAct(); render();
   }
@@ -146,7 +150,25 @@ window.ENVOYS = (function () {
     if (dc.owes[b.id] > y) lines.push(`<div class="dp-line warn">${svg(ICON.owes)}<span>You pay them reparations ${upto(dc.owes[b.id], c)}</span></div>`);
     h += `<div class="gv-sect"><span class="micro">Between you</span>${lines.join('') || '<div class="gv-note">Nothing is sworn between you, and nothing is owed.</div>'}</div>`;
     h += atWar ? warPage(c, b) : peacePage(c, b);
+    h += schemesSect(c, b);
     return h;
+  }
+  // (what your agents could do there, how likely it is to work and to be found out, what it costs; or what they are about there now)
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  function schemesSect(c, b) {
+    const s = S(), IN = window.INTRIGUE; if (!IN || !s.intrigueView) return ''; const V = s.intrigueView(b.id); if (!V) return '';
+    const kn = s.know; if (!kn.has[c.id * kn.ND + window.KNOW.ID.writing]) return `<div class="gv-sect"><span class="micro">Your agents</span><div class="gv-note">A realm keeps agents abroad once its people can write: <button class="linkish" data-kgo="writing">Writing</button>.</div></div>`;
+    const head = `<div class="dp-spyhead"><span>Your network <b class="num">${V.net.toFixed(1).replace(/\.0$/, '')}</b></span><span>theirs <b class="num">${V.theirs.toFixed(1).replace(/\.0$/, '')}</b></span><span class="mk-dim">${V.net > V.theirs + 0.4 ? 'Your agents are the better' : V.net + 0.4 < V.theirs ? 'Their watchmen are the better' : 'An even match'}</span></div>`;
+    if (V.s && V.s.on === b.id) return `<div class="gv-sect"><span class="micro">Your agents</span>${head}${underWay(V.s)}</div>`;
+    const card = (x) => { const no = x.why, key = no && /^Needs [A-Z]/.test(no) && !/coin$/.test(no) ? x.need : null;
+      const st = no ? (key ? `Needs <button class="linkish" data-kgo="${key}">${esc(no.slice(6))}</button>` : `<span class="mk-dim">${esc(no)}</span>`) : `<span><b class="${x.odds >= 0.5 ? 'pos' : x.odds < 0.3 ? 'neg' : ''}">${pct(x.odds)}</b> to succeed</span><span><b class="${x.risk >= 0.4 ? 'neg' : x.risk < 0.2 ? 'pos' : ''}">${pct(x.risk)}</b> to be found out</span><span>${turns(x.years, c)}</span><span>${x.cost} coin</span>`;
+      return `<div class="dp-prop dp-scheme${no ? ' off' : ''}"><span class="ic">${svg(ICON[x.key] || ICON.spy)}</span><div><b>${esc(x.name)}</b><small>${esc(x.text)}${x.war ? ' Found out, it is a reason for war against you.' : ''}</small><div class="st">${st}</div></div><button class="btn" data-dact="scheme" data-k="${x.key}"${no ? ' disabled' : ''}>Begin</button></div>`; };
+    return `<div class="gv-sect"><span class="micro">Your agents</span>${head}${V.s ? `<div class="gv-note">Your agents are at work in ${link(s.civs[V.s.on])}: ${esc(lc(V.s.scheme))}. Call them home first.</div>` : ''}${V.schemes.map(card).join('')}</div>`;
+  }
+  // (a scheme under way: how far along, the odds, a way to call it off)
+  function underWay(x) {
+    const s = S(), c = me(); const b = s.civs[x.on];
+    return `<div class="dp-prop dp-scheme on"><span class="ic">${svg(ICON[x.key] || ICON.spy)}</span><div><b>${esc(x.scheme)}</b><small>In ${b ? link(b) : esc(x.realm)} since ${s.fmtYear(x.from)}: done ${x.left > 0 ? 'in ' + x.left + ' year' + (x.left === 1 ? '' : 's') : 'this year'}. Every year it might be found out.</small><span class="gv-bar"><i style="width:${Math.max(3, Math.round(x.p * 100))}%"></i></span><div class="st"><span><b>${pct(x.odds)}</b> to succeed</span><span><b>${pct(x.risk)}</b> to be found out</span><span class="mk-dim">${x.cost || 0} coin spent</span></div></div><button class="btn" data-dact="unscheme" title="The coin spent is not returned">Call them home</button></div>`;
   }
   // (at peace: what could be proposed, sent or pressed, and what a war would take)
   function peacePage(c, b) {
@@ -253,16 +275,36 @@ window.ENVOYS = (function () {
     $('dp-standing').innerHTML = h + `<div>${r}</div></div>`;
   }
 
+  // ----- spies and schemes: your network and what makes it, your agents, the foreign agents caught in your realm -----
+  function renderIntrigue(c) {
+    const s = S(), IN = window.INTRIGUE; const V = s.intrigueView ? s.intrigueView() : null; if (!V || !IN) { $('dp-intrigue').innerHTML = ''; return; }
+    const y = s.year, d = DK(); const kn = s.know, writes = !!kn.has[c.id * kn.ND + window.KNOW.ID.writing];
+    let L = `<div class="dp-stat"><span class="ic">${svg(ICON.spy)}</span><div><span class="micro">Your network</span><b>${V.net >= 6 ? 'formidable' : V.net >= 4 ? 'strong' : V.net >= 2 ? 'able' : V.net >= 1 ? 'young' : 'none'} <span class="num">${V.net.toFixed(1).replace(/\.0$/, '')}</span></b><span class="gv-bar"><i style="width:${Math.max(2, Math.min(100, V.net * 10)).toFixed(0)}%"></i></span>`;
+    L += V.parts.length ? `<div class="dp-parts">${V.parts.map(([t, v]) => `<span>${esc(t)}<em>+${String(v).replace(/^0\./, '.')}</em></span>`).join('')}</div>` : '';
+    L += `<p class="gv-note">Each point of yours over theirs makes a scheme likelier to work and less likely to be found out, and theirs over yours the other way; a shared border helps your agents. Writing, envoys, letters, embassies, the telegraph, the wireless and the machines that listen each add one; so do some laws (police, intendants, the censor) and a ruler who trusts nobody.</p></div></div>`;
+    L += `<div class="micro dp-h">Your agents</div>`;
+    if (!writes) L += `<div class="gv-note">A realm keeps agents abroad once its people can write: <button class="linkish" data-kgo="writing">Writing</button>.</div>`;
+    else if (V.s) L += underWay(V.s);
+    else L += `<div class="dp-empty"><b>Your agents wait for orders.</b>Choose a realm under Realms: what they could do there, and how likely it is to work, is at the foot of its page.</div>`;
+    const near = d.reach(c.id).map((id) => s.civs[id]).filter(Boolean).map((b) => [b, s.intrigue.netOf(b)]).sort((a, z) => z[1] - a[1]).slice(0, 6);
+    if (near.length) L += `<div class="micro dp-h" style="margin-top:8px">The best watched within reach</div>${near.map(([b, n]) => `<div class="dp-line">${sw(b)}<span>${link(b)}<small>${n > V.net + 0.4 ? 'better than yours' : n + 0.4 < V.net ? 'weaker than yours' : 'a match for yours'}</small></span><span class="num">${n.toFixed(1).replace(/\.0$/, '')}</span></div>`).join('')}`;
+    let R = `<div class="micro dp-h">Caught in your realm</div>`;
+    R += V.found.length ? V.found.map((f) => `<div class="dp-line${f.open ? ' warn' : ''}">${svg(ICON.spy)}<span>${s.civs[f.by] ? link(s.civs[f.by]) : esc(f.name)}: ${esc(lc(f.scheme))}<small>${s.fmtYear(f.year)}${f.open ? ` · a reason for war ${upto(f.open, c)}` : f.war ? '' : ' · not an act of war'}</small></span></div>`).join('') : '<div class="gv-note">No foreign agents have been caught in your realm. That is not to say there are none.</div>';
+    const ev = c.events.filter((e) => e.type === 'intrigue').slice(-10).reverse();
+    R += `<div class="micro dp-h" style="margin-top:18px">Lately</div>${ev.length ? `<div class="dp-log">${ev.map((e) => `<div><b>${s.fmtYear(e.year)}</b><span>${esc(e.text)}</span></div>`).join('')}</div>` : '<div class="gv-note">Nothing your agents have done, and nothing done to you that you know of.</div>'}`;
+    $('dp-intrigue').innerHTML = `<div class="dp-cols"><div>${L}</div><div>${R}</div></div>`;
+  }
+
   function render() {
     const s = S(); if (!s || !isOpen()) return; const c = me(); if (!c) return; const d = DK(); const dc = d.D(c);
     const wars = Object.keys(c.wars).length; $('dp-sub').textContent = `${s.fullName(c)} · ${s.fmtYear(s.year)}${wars ? ` · at war with ${wars === 1 ? s.fullName(s.civs[+Object.keys(c.wars)[0]] || c) : wars + ' realms'}` : ' · at peace'}`;
     $('dp-word').innerHTML = `${svg(ICON.word)}<b>${Math.round(dc.rep)}</b><span>your word: ${wordOf(dc.rep)}</span>`;
     { const b = document.querySelector('#dp-tabs [data-dtab="envoys"]'); if (b) b.innerHTML = `Envoys${dc.offers.length ? `<span class="dp-n">${dc.offers.length}</span>` : ''}`; }
     if (tab === 'realms') { renderList(c); const b = sel >= 0 ? s.civs[sel] : null; const el = $('dp-info'); const top = el.scrollTop; el.innerHTML = b ? page(c, b) : `<div class="dp-empty"><b>Nobody to deal with yet.</b></div>`; el.scrollTop = top; }
-    else if (tab === 'envoys') renderEnvoys(c); else if (tab === 'wars') renderWars(c); else renderStanding(c);
+    else if (tab === 'envoys') renderEnvoys(c); else if (tab === 'wars') renderWars(c); else if (tab === 'intrigue') renderIntrigue(c); else renderStanding(c);
     lastSig = sig();
   }
-  const sig = () => { const s = S(), c = me(); if (!c) return String(s.year); const d = DK(), dc = d.D(c); return `${s.year}:${tab}:${sel}:${filter}:${cause}:${dc.offers.map((o) => o.id).join(',')}:${d.ver[c.id]}:${Object.keys(c.wars).join(',')}:${Math.floor(c.wealth / 5)}:${Math.round(dc.rep)}`; };
+  const sig = () => { const s = S(), c = me(); if (!c) return String(s.year); const d = DK(), dc = d.D(c); return `${s.year}:${tab}:${sel}:${filter}:${cause}:${dc.offers.map((o) => o.id).join(',')}:${d.ver[c.id]}:${Object.keys(c.wars).join(',')}:${Math.floor(c.wealth / 5)}:${Math.round(dc.rep)}:${c.intrigue && c.intrigue.s ? c.intrigue.s.k + c.intrigue.s.on : ''}:${c.intrigue ? c.intrigue.found.length : 0}`; };
   function refresh() { const s = S(); if (!s || !isOpen()) return; if (sig() !== lastSig) render(); }
   // for the turn button and the realm's panel: what waits on the player, and how he stands with another realm
   function tile() {
@@ -277,7 +319,9 @@ window.ENVOYS = (function () {
   // what a discovery opens between realms, as lines for its page in the knowledge tree
   function opensLines(key) {
     const P = DP(); const out = []; const named = P.PACTS.filter((p) => p.need === key).map((p) => `<b>${esc(p.name)}</b>`);
-    if (named.length) out.push(`Your envoys can propose: ${named.join(', ')}`); if (P.OPENS[key]) out.push(P.OPENS[key]); return out;
+    if (named.length) out.push(`Your envoys can propose: ${named.join(', ')}`); if (P.OPENS[key]) out.push(P.OPENS[key]);
+    const IN = window.INTRIGUE; if (IN) { const sc = IN.SCHEMES.filter((x) => x.need === key).map((x) => `<b>${esc(x.name)}</b>`); if (sc.length) out.push(`Your agents can: ${sc.join(', ')}`); if (IN.NET.indexOf(key) >= 0) out.push('Your agents abroad grow <b>better at their work</b>, and foreign ones are caught more often'); }
+    return out;
   }
   return { init, open, close, isOpen, refresh, render, show, tile, standing, opensLines, ICON, svg, MOOD_CLS };
 })();

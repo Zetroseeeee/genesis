@@ -50,6 +50,7 @@ window.DIPLO = (function () {
     creed: { name: 'A war of creeds', goal: 'regime', text: 'They are ruled by a creed yours cannot live beside.' },
     ally: { name: 'An ally\'s war', goal: 'none', text: 'Sworn to stand beside a friend.' },
     rebel: { name: 'Rebellion', goal: 'vassal', text: 'A vassal that has thrown off its lord.' },
+    spies: { name: 'Their agents caught', goal: 'tribute', text: 'Their agents were caught at work in your realm: sowing discord, stirring up a rising, or with poison for your heir.' },
   };
   // what an unprovoked war costs, by age: quiet at home, and trust abroad (the ages before writing kept no such accounts)
   const UNJUST_STAB = [0, 0, 0.02, 0.04, 0.05, 0.07, 0.1, 0.14, 0.16], UNJUST_REP = [0, 0, 3, 5, 6, 8, 12, 16, 18];
@@ -332,6 +333,7 @@ window.DIPLO = (function () {
     function causes(a, b) {
       const out = [], da = D(a), y = year(); const add = (key) => out.push(Object.assign({ key, just: true }, CAUSES[key]));
       if (da.claim[b.id * 4 + 3] > y) add('rebel'); if (da.claim[b.id * 4 + 1] > y) add('reconquest'); if (da.claim[b.id * 4] > y) add('claim'); if (da.claim[b.id * 4 + 2] > y) add('refused');
+      if (host.spied && host.spied(a, b) > -Infinity) add('spies');      // (their agents caught at an act of war: intrigue.js)
       { const fa = faithOf(a), fb = faithOf(b), fl = host.faithLaw(a); if (fa && fb && fa !== fb && (fl === 'established' || fl === 'orthodoxy' || (host.sword && host.sword(a)))) add('holy');      // (a faith that holds with the sword needs no law to make it just)
         if (fa && host.holyHeld && host.holyHeld(a) === b.id && touches(a, b.id)) add('holycity'); }
       if (touches(a, b.id) && host.covets(a, b)) add('covet'); if (host.knows(a.id, 'nationalism')) { const fa = host.folk ? host.folk(a) : host.tongue(a); if (fa && fa === (host.folk ? host.folk(b) : host.tongue(b))) add('kin'); }      // (one people under two flags)
@@ -356,7 +358,7 @@ window.DIPLO = (function () {
       if (W.stab) host.shake(a, W.stab); if (W.rep) da.rep = Math.max(0, da.rep - W.rep);
       da.goal[b.id] = C.key; delete da.side[b.id]; delete D(b).side[a.id]; delete D(b).goal[a.id]; remember(b, a.id, W.broke ? -40 : -22); count(stats.wars, C.key);
       const g = C.key === 'covet' ? host.covets(a, b) : '';
-      host.declareWar(a, b, C.key === 'none' ? (a.player ? 'by decree' : pick(['over a border dispute', 'for glory', 'to seize its fields', 'after an insult to its ruler', 'to punish raids', '', ''])) : C.key === 'covet' ? `for its ${g.toLowerCase()}` : C.key === 'holy' ? 'for the faith' : C.key === 'holycity' ? 'for the holy city of its faith' : C.key === 'claim' ? 'to make good its claim' : C.key === 'reconquest' ? 'to win back what it lost' : C.key === 'kin' ? 'to unite its people' : C.key === 'refused' ? 'for tribute refused' : C.key === 'creed' ? 'against a creed it cannot abide' : C.key === 'rebel' ? 'to bring a rebel vassal to heel' : '');
+      host.declareWar(a, b, C.key === 'none' ? (a.player ? 'by decree' : pick(['over a border dispute', 'for glory', 'to seize its fields', 'after an insult to its ruler', 'to punish raids', '', ''])) : C.key === 'covet' ? `for its ${g.toLowerCase()}` : C.key === 'holy' ? 'for the faith' : C.key === 'holycity' ? 'for the holy city of its faith' : C.key === 'claim' ? 'to make good its claim' : C.key === 'reconquest' ? 'to win back what it lost' : C.key === 'kin' ? 'to unite its people' : C.key === 'refused' ? 'for tribute refused' : C.key === 'creed' ? 'against a creed it cannot abide' : C.key === 'rebel' ? 'to bring a rebel vassal to heel' : C.key === 'spies' ? 'to avenge the plots of its agents' : '');
       if (W.broke) host.event(a, `${cap(nameOf(a))} breaks its ${PACT[W.broke].name.toLowerCase()} with ${nameOf(b)}`, true, b);
       // friends: those sworn to b's defence; a's allies and vassals
       for (const x of friends(b, false)) if (x !== a && !host.atWar(x, a.id) && !bound(x, a) && D(x).lord !== a.id) call(x, b, a);
