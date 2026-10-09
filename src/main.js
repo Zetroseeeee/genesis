@@ -1150,7 +1150,7 @@
   function homeRefresh() {
     const has = hasSave(); const pc = has && previewing && sim ? sim.playerCiv() : null;
     $('btn-load').hidden = !has; $('btn-load').classList.toggle('first', has); $('btn-choose').classList.toggle('first', !has);
-    $('home-save').textContent = !has ? '' : pc ? `${sim.fullName(pc)}, ${sim.fmtYear(sim.year)}` : previewing && sim ? `Your world, ${sim.fmtYear(sim.year)}` : 'Your saved world';
+    $('home-save').textContent = !has ? '' : pc ? `${sim.fullName(pc)}, ${sim.fmtYear(sim.year)}${pc.ruler ? ' · ' + pc.ruler.title + ' ' + pc.ruler.name : ''}` : previewing && sim ? `Your world, ${sim.fmtYear(sim.year)}` : 'Your saved world';      // (who rules it now)
     $('home-eras').hidden = !pc; if (pc) $('home-eras').innerHTML = sim.ERAS.map((e, k) => `<i class="${k < pc.era ? 'past' : k === pc.era ? 'now' : ''}"></i>`).join('') + `<span>${esc(sim.ERAS[pc.era][0])}</span>`;
     { const tape = $('home-tape'); const line = pc ? MARKET.homeLine() : ''; tape.hidden = !line; if (line) tape.innerHTML = line; }
     $('home-new-s').textContent = has ? 'Choose where your people begin (replaces your saved world)' : 'Choose where your people begin';

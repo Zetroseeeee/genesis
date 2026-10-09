@@ -100,7 +100,7 @@
     const alive = (p, yr) => !!p && p.b <= yr && (p.d === 0 || p.d > yr);
     const ageOf = (p, yr) => (p ? (yr === undefined ? year() : yr) - p.b : 0);
     const of = (id) => (id ? P.get(id) || null : null);
-    // a reign in its house's line: begun when he takes the throne, closed when he leaves it (the last ten kept, forty of the player's)
+    // a reign in its house's line: begun when he takes the throne, closed when he leaves it (the last six kept, forty of the player's)
     const lineCap = (H) => (civs[H.c] && civs[H.c].player ? 40 : MAXLINE);
     function lineRec(p) { const H = houses.get(p.h); if (!H) return null; let L = H.line.length ? H.line[H.line.length - 1] : null; if (!L || L[2]) { L = [p.n, p.r ? p.r[0] : year(), 0, '', p.f ? 1 : 0]; H.line.push(L); H.n++; while (H.line.length > lineCap(H)) H.line.shift(); } return L; }
     function endLine(p, yr) { const H = houses.get(p.h); if (!H || !H.line.length) return; const L = H.line[H.line.length - 1]; if (!L[2]) { L[0] = p.n; L[2] = yr; L[3] = p.ep; } }
@@ -233,6 +233,7 @@
       for (let c = 0; c < MAXC; c++) {
         const cv = civs[c], C = court[c]; if (!cv || !C) continue; const r = of(C.ruler); if (!r) continue;
         if (C.regent && yr >= C.regent.until) { C.regent = null; news.push({ kind: 'ofage', c, p: r.id, year: yr }); }
+        else if (C.regent && !alive(of(C.regent.pid), yr)) { const R2 = regentFor(c, r, null, yr); R2.until = C.regent.until; C.regent = R2; news.push({ kind: 'regent', c, p: R2.pid, year: yr }); }      // (a regent who dies is followed by another)
         if (cv.player) {      // (the player hears of his family: children and grandchildren born and lost, who comes of age, a spouse's death)
           for (const id of r.k) { const k = of(id); if (!k) continue; if (k.b === yr) { stats.born++; news.push({ kind: 'born', c, p: k.id, year: yr }); } else if (k.d === yr) news.push({ kind: 'died', c, p: k.id, year: yr }); else if (k.b + ADULT === yr && k.d > yr) news.push({ kind: 'grown', c, p: k.id, year: yr });
             for (const g of k.k) { const q = of(g); if (q && q.b === yr) news.push({ kind: 'grand', c, p: q.id, year: yr }); } }

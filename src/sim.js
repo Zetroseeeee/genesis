@@ -637,6 +637,7 @@ function createSim(world, seed) {
       const n = D.news.shift(), cv = n.c >= 0 ? civs[n.c] : null; if (!cv) continue; const p = D.of(n.p), me = cv.player, R = cv.ruler;
       if (n.kind === 'ofage') { if (R && R.pid === n.p && p) { if (p.t) R.trait = p.t; if (big(cv)) logEvent(cv, `${R.title} ${R.name} comes of age, and rules ${p.f ? 'herself' : 'himself'} now: ${TRAITS[R.trait].a}`, me, 'ruler'); } }
       else if (!p) continue;
+      else if (n.kind === 'regent') { if (R) { R.trait = D.traitOf(cv.id) || R.trait; if (big(cv)) logEvent(cv, `The regent of ${fullName(cv)} dies; ${p.n}, ${TRAITS[p.t] ? TRAITS[p.t].a : 'a noble'}, rules for ${R.title} ${R.name} now`, me, 'ruler'); } }
       else if (n.kind === 'born' && me) { const o = D.of(p.p === R.pid ? p.m : p.p); logEvent(cv, `A ${p.f ? 'daughter' : 'son'} is born to ${R.title} ${R.name}${o ? ' and ' + o.n : ''}: ${p.n}`, false, 'ruler'); }
       else if (n.kind === 'grand' && me) { const par = D.of(p.p) || D.of(p.m); logEvent(cv, `A ${p.f ? 'granddaughter' : 'grandson'} is born to ${R.title} ${R.name}: ${p.n}, ${p.f ? 'daughter' : 'son'} of ${styled(cv, par)}`, false, 'ruler'); }
       else if (n.kind === 'died' && me) { const heir = D.heirOf(cv.id); logEvent(cv, `${styled(cv, p)} dies, ${D.ageOf(p) < 2 ? 'in infancy' : 'aged ' + D.ageOf(p)}${heir ? `: ${styled(cv, heir)} is heir now` : ''}`, false, 'ruler'); }

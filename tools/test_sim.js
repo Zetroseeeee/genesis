@@ -423,12 +423,12 @@ log('9. knowledge');
   // a realm cut from another knows what its parent knew
   { let kid = null; for (const cv of sim.civs) if (cv && cv.founded > sim.year - 3000 && k.count[cv.id] > 20) { kid = cv; break; } check(!!kid, `realms born late know things from the start (${kid ? sim.fullName(kid) + ': ' + k.count[kid.id] : 'none found'})`); }
   // save and load
-  { const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, s.seed || 1); sim2.load(s); const k2 = sim2.know; let dh = 0, dc = 0, dp = 0; for (const cv of sim.civs) { if (!cv) continue; for (let d = 0; d < k.ND; d++) if (k.has[cv.id * k.ND + d] !== k2.has[cv.id * k.ND + d]) dh++; if (k.cur[cv.id] !== k2.cur[cv.id]) dc++; dp = Math.max(dp, Math.abs(k.prog[cv.id] - k2.prog[cv.id]) * U, Math.abs(k.pool[cv.id] - k2.pool[cv.id]) * U); }
+  { const js0 = JSON.stringify(sim.save()), s = JSON.parse(js0); const sim2 = createSim(wd, s.seed || 1); sim2.load(JSON.parse(js0)); const k2 = sim2.know; /* (each world its own copy: a loaded world keeps the save's objects as its own) */ let dh = 0, dc = 0, dp = 0; for (const cv of sim.civs) { if (!cv) continue; for (let d = 0; d < k.ND; d++) if (k.has[cv.id * k.ND + d] !== k2.has[cv.id * k.ND + d]) dh++; if (k.cur[cv.id] !== k2.cur[cv.id]) dc++; dp = Math.max(dp, Math.abs(k.prog[cv.id] - k2.prog[cv.id]) * U, Math.abs(k.pool[cv.id] - k2.pool[cv.id]) * U); }
     check(dh === 0 && dc === 0 && dp < 0.01, `what every realm knows, studies and holds survives save and load (${dh} discoveries, ${dc} studies differ; ${dp.toFixed(4)} insight off)`); const p2 = sim2.playerCiv(); check(JSON.stringify(p2.know) === JSON.stringify(c.know), "and the player's queue"); check(k2.first.filter(Boolean).length === k.first.filter(Boolean).length, 'and who was first');
     let df = 0; for (const cv of sim.civs) if (cv) for (let q = 0; q < k.NK; q++) df = Math.max(df, Math.abs(k.f[cv.id * k.NK + q] - k2.f[cv.id * k.NK + q])); check(df < 1e-5, `and the edges come out the same (${df.toExponential(1)})`);
     sim.tick(); sim2.tick(); check(Math.abs(k.count[c.id] - k2.count[p2.id]) <= 1 && Math.abs(c.tech - p2.tech) < 1e-6, `the next year goes the same way (${k.count[c.id]} and ${k2.count[p2.id]} known, knowledge ${(Math.abs(c.tech - p2.tech) * U).toExponential(1)} insight apart)`);
     // a world saved before there were discoveries: every realm is given what its knowledge is worth
-    delete s.know; for (const cv of s.civs) if (cv) delete cv.know; const sim3 = createSim(wd, 1); sim3.load(s); const k3 = sim3.know; let none = 0, off = 0; for (const cv of sim3.civs) { if (!cv) continue; if (cv.tech > KN.T0 + 0.01 && !k3.count[cv.id]) none++; let spent = 0; for (const D of L) if (k3.has[cv.id * k3.ND + D.id]) spent += D.cost; if (Math.abs(spent + k3.prog[cv.id] + k3.pool[cv.id] - Math.max(0, cv.tech - KN.T0)) > 1e-6) off++; }
+    delete s.know; for (const cv of s.civs) if (cv) delete cv.know; const sim3 = createSim(wd, 1); sim3.load(JSON.parse(JSON.stringify(s))); const k3 = sim3.know; let none = 0, off = 0; for (const cv of sim3.civs) { if (!cv) continue; if (cv.tech > KN.T0 + 0.01 && !k3.count[cv.id]) none++; let spent = 0; for (const D of L) if (k3.has[cv.id * k3.ND + D.id]) spent += D.cost; if (Math.abs(spent + k3.prog[cv.id] + k3.pool[cv.id] - Math.max(0, cv.tech - KN.T0)) > 1e-6) off++; }
     check(none === 0 && off === 0, `a world from before knowledge is given what its knowledge is worth (${none} realms left with nothing, ${off} with the wrong sum)`); for (let y = 0; y < 50; y++) sim3.tick(); invariants(sim3, 'an old world with new knowledge, 50 years on');
     // history keeps a calendar now. A world saved before it, and far ahead of it, keeps its own: set forward once, saved with the world
     check(sim.calShift === 0 && sim2.calShift === 0, 'a new world runs by history\'s calendar');
@@ -837,8 +837,9 @@ log('14. faiths');
   for (const i of aCells) if (i !== A.capital) F.fth[i] = 0;
   const c0 = F.stats.converted; let y = 0; for (; y < 600 && aCells.filter(i => F.fth[i] === f).length < aCells.length * 0.6; y++) sim.tick();
   check(F.stats.converted > c0 && aCells.filter(i => F.fth[i] === f).length >= aCells.length * 0.6, `the state carries its faith through the realm (${aCells.filter(i => F.fth[i] === f).length} of ${aCells.length} regions in ${y} years)`);
-  // a ruler of the old ways takes up the faith of his neighbour
-  for (y = 0; y < 800 && F.state[B.id] !== f; y++) sim.tick();
+  // a ruler of the old ways takes up the faith of his neighbour (neighbours: the region between them is A's, whatever the years did with it)
+  if (sim.owner[i0 + 5] !== A.id && sim.owner[i0 + 5] !== B.id) sim.claim(i0 + 5, A, i0); sim.touchAll();
+  for (y = 0; y < 3000 && F.state[B.id] !== f; y++) sim.tick();      // (a chance in a hundred every five years: it may take long)
   check(F.state[B.id] === f && B.religion === X.name, `a neighbour of the old ways takes it up (${y} years)`);
   // a faith for all peoples is preached over the border, into a realm of another faith
   const C = sim.spawnTribe(sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.cellDist(i, i0) > 30), {}); C.tech = classic; C.era = sim.eraOf(classic); teach(sim, C, 3); C.aggression = 0; C.dip.think = 1e12;

@@ -23,6 +23,11 @@
     ctx.clearRect(0, 0, S, S); ctx.save(); ctx.scale(u, u);
     // backdrop: the realm's colour, darkened, with a soft light
     const bg = ctx.createRadialGradient(28, 22, 4, 32, 32, 34); bg.addColorStop(0, rgbShade(col, 0.75)); bg.addColorStop(1, rgbShade(col, 0.28)); ctx.fillStyle = bg; ctx.fillRect(0, 0, 64, 64);
+    // the head's measure, and long hair, which falls behind the shoulders (drawn over the neck it read as a beard)
+    const jaw = fem || kid ? 1 : 1.08; const hw = 11 * (0.95 + r(4) * 0.12) * (kid ? 1.03 : 1), hh = 13.5 * (0.95 + r(5) * 0.1) * (kid ? 0.9 : 1);
+    const headY = 24;
+    const style = r(6); const long = fem ? style < 0.7 : style < 0.15; const bald = !fem && era >= 0 && r(7) < 0.14 && (o.age || 40) > 35;
+    if (long) { ctx.fillStyle = hairC; ctx.beginPath(); ctx.ellipse(32, headY + 7, hw + 3.5, hh + 8, 0, 0, Math.PI * 2); ctx.fill(); }
     // shoulders and robe
     const robe = era >= 7 ? (fem ? rgbShade(col, 0.9) : '#2a2f3a') : rank === 'ruler' ? rgbShade(col, 1.15) : rank === 'royal' ? rgbShade(col, 0.75 + r(21) * 0.5) : ['#5b4a3a', '#3e4a5c', '#4f5a3a', '#6a3f3a', '#4a4058'][Math.floor(r(21) * 5)];
     ctx.fillStyle = robe; ctx.beginPath(); ctx.moveTo(6, 64); ctx.quadraticCurveTo(10, 44, 24, 42); ctx.lineTo(40, 42); ctx.quadraticCurveTo(54, 44, 58, 64); ctx.closePath(); ctx.fill();
@@ -31,11 +36,6 @@
     // neck
     ctx.fillStyle = shade(skin, 0.86); ctx.fillRect(27, 34, 10, 10);
     // head
-    const jaw = fem || kid ? 1 : 1.08; const hw = 11 * (0.95 + r(4) * 0.12) * (kid ? 1.03 : 1), hh = 13.5 * (0.95 + r(5) * 0.1) * (kid ? 0.9 : 1);
-    const headY = 24;
-    // hair behind (long hair / bun)
-    const style = r(6); const long = fem ? style < 0.7 : style < 0.15; const bald = !fem && era >= 0 && r(7) < 0.14 && (o.age || 40) > 35;
-    if (long) { ctx.fillStyle = hairC; ctx.beginPath(); ctx.ellipse(32, headY + 6, hw + 3.5, hh + 6, 0, 0, Math.PI * 2); ctx.fill(); }
     ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(32, headY, hw, hh, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = shade(skin, 0.92); ctx.beginPath(); ctx.ellipse(32, headY + 4, hw * 0.98 * jaw, hh * 0.72, 0, 0, Math.PI); ctx.fill(); // lower face shading
     ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(32, headY + 1, hw * 0.9, hh * 0.78, 0, 0, Math.PI); ctx.fill();

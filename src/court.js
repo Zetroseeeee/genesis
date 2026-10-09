@@ -15,7 +15,7 @@ window.COURT = (function () {
   // ----- words -----
   const royal = (D, fam) => D.dynastic(fam.kind);
   // what one of the family is called at court: Prince Eadric, the King's brother; plain names where rulers are not of a house
-  function styled(D, fam, p) { if (!p) return ''; if (p === fam.ruler) return `${fam.title} ${p.n}`; return royal(D, fam) && p.h && p.h === fam.ruler.h ? `${p.f ? 'Princess' : 'Prince'} ${p.n}` : p.n; }
+  function styled(D, fam, p) { if (!p) return ''; if (p === fam.ruler) return `${fam.title} ${p.n}`; if (p.r && p.r[1] && p.c === fam.c && fam.titles) return `${fam.titles[p.f ? 1 : 0]} ${p.n}`; return royal(D, fam) && p.h && p.h === fam.ruler.h ? `${p.f ? 'Princess' : 'Prince'} ${p.n}` : p.n; }      // (one who reigned here before is called by the throne's title)
   function ageText(s, D, p) { const yr = s.year; if (p.b > yr) return 'not yet born'; if (!D.alive(p, yr)) { const a = p.d - p.b; return a < 2 ? `died in infancy, ${s.fmtYear(p.d)}` : `died aged ${a}, ${s.fmtYear(p.d)}`; } const a = yr - p.b; return a < 1 ? 'born this year' : `${a} year${a === 1 ? '' : 's'} old`; }
   // a character as the court knows it: a child's shows from six, and is fixed at sixteen
   function charOf(s, D, p) {
@@ -44,7 +44,7 @@ window.COURT = (function () {
   function render(host, info, s, c) {
     const D = s.dynasty; if (!D) { host.innerHTML = ''; info.innerHTML = ''; return; }
     const fam = D.familyOf(c.id); if (!fam) { host.innerHTML = '<div class="gv-note" style="padding:16px">Nobody rules here yet.</div>'; info.innerHTML = ''; return; }
-    fam.title = c.ruler ? c.ruler.title : ''; const yr = s.year, r = fam.ruler, H = fam.house, rf = royal(D, fam);
+    fam.title = c.ruler ? c.ruler.title : ''; fam.c = c.id; fam.titles = s.rule && s.rule.naming ? s.rule.naming(c).titles : null; const yr = s.year, r = fam.ruler, H = fam.house, rf = royal(D, fam);
     const field = (t, note) => `<div class="gv-field">${svg(CROWN)}<b>${t}</b><small>${note}</small></div>`;
     // (the head: the house, and how rulers come here)
     const how = { blood: 'The throne passes by blood, to the eldest son and his line, then the daughters', named: 'The emperor names his heir from among his grown children', seized: 'Whoever can take power holds it', chosen: 'The elders choose who leads', holy: 'The priests choose who leads', elected: 'Those who lead are elected for a term of years', party: 'The party names who leads' }[fam.kind] || '';
@@ -78,7 +78,7 @@ window.COURT = (function () {
     if (!p) return ''; const yr = s.year, r = fam.ruler, alive = D.alive(p, yr), age = yr - p.b, ch = charOf(s, D, p);
     const mine = p === r || r.k.includes(p.id) || r.k.some((id) => { const k = D.of(id); return k && k.k.includes(p.id); });
     const pos = fam.line.indexOf(p); const ORD = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth'];
-    const role = p === r ? `${fam.title} of ${s.fullName(c)}` : fam.heir === p ? `Heir to the throne · ${D.kinOf(r, p)} of the ${fam.title.toLowerCase()}` : `${cap(D.kinOf(r, p))} of the ${fam.title.toLowerCase()}`;
+    const role = p === r ? `${fam.title} of ${c.name}` : fam.heir === p ? `Heir to the throne · ${D.kinOf(r, p)} of the ${fam.title.toLowerCase()}` : `${cap(D.kinOf(r, p))} of the ${fam.title.toLowerCase()}`;
     const head = `<div class="ct-phead">${face(p, 96, s, c, D, 'big')}<div><h3>${esc(styled(D, fam, p))}</h3><div class="micro">${esc(role)}</div><div class="ct-age">${esc(ageText(s, D, p))}${alive && p.b < yr ? ' · born ' + s.fmtYear(p.b) : ''}</div></div></div>`;
     const lines = [];
     const dad = D.of(p.p), mum = D.of(p.m); if (dad || mum) lines.push(`${p.f ? 'Daughter' : 'Son'} of ${[dad, mum].filter(Boolean).map((x) => `<button class="linkish" data-court="${x.id}">${esc(styled(D, fam, x))}</button>`).join(' and ')}`);
