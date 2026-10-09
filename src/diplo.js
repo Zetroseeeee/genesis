@@ -166,6 +166,8 @@ window.DIPLO = (function () {
         if (fa && fb) { if (fa === fb) put('The same faith', SAME_FAITH); else { const fl = host.faithLaw(a), base = fl === 'orthodoxy' ? -16 : fl === 'established' ? -10 : fl === 'tolerance' || fl === 'secular' || fl === 'godless' ? 0 : -6; const kin = !!host.faithKin && host.faithKin(a, b);
           put(kin ? 'Another church of the same faith' : 'Another faith', Math.round(base * (host.trait(a) === 'pious' ? 1.5 : 1) * (kin ? 0.8 : 1) + (host.faithT ? host.faithT(a, 'hate') : 0))); } }
         if (fa && host.holyHeld && host.holyHeld(a) === b.id) put('You hold the holy city of their faith', -Math.round(10 * Math.max(1, host.faithT(a, 'holy')))); }
+      // (the works of a realm of renown are admired by those of little: culture.js)
+      if (host.renownOf) { const ra = host.renownOf(a), rb = host.renownOf(b); if (rb > 2 * Math.max(4, ra) && host.renownRel(b) > 1.5) put('They admire your works', rb > 6 * Math.max(4, ra) ? 5 : 3); }
       const ka = host.kind(a), kb = host.kind(b); if (ka === kb && ka !== 'kin') put('Ruled alike', 4); else if (a.era >= 6 || b.era >= 6) put('Ruled by another creed', -creedGap(ka, kb));
       const near = touches(a, b.id); { const fa = host.folk ? host.folk(a) : 0; if (fa && fa === host.folk(b)) put('One people', 3); }      // (two realms of one people: people.js)
       { const ta = host.tongue(a); if (ta && ta === host.tongue(b)) put('Kindred speech', 5); else if (near && (a.era >= 6 || b.era >= 6)) put('Another nation on their border', -8); }      // (once peoples think of themselves as nations)

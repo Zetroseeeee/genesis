@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -900,6 +900,89 @@ log('14. faiths');
   check(alive.length > 10 && kept > held * 0.3, `a world of faiths once priests are known (${alive.length} faiths, kept by ${kept} of ${held} realms)`);
   check(!bad, `every realm's share of other faiths and its unrest are within bounds (${bad} not)`);
   check(ms / 100 < 1.5, `faiths are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
+}
+}
+// ---------- 15. culture: great people, their works and what they bring, renown, golden ages, the player, saved ----------
+if (want(15)) {
+log('15. culture');
+{
+  const sim = createSim(wd, 71); const W2 = sim.W, K = sim.culture, CU = window.CULTURE; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && ok(i + d - 2 * W2) && ok(i + d + 2 * W2)));
+  const classic = sim.ERAS[3][1] + 0.01;
+  const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
+  for (const x of [A, B]) { x.tech = classic; x.era = sim.eraOf(classic); x.aggression = 0; x.dip.think = 1e12; } teach(sim, A, 3); teach(sim, B, 0);      // (B knows no masonry: no great people come there)
+  for (let d = 1; d <= 4; d++) for (const e of [-2 * W2, -W2, 0, W2, 2 * W2]) { const i = i0 + d + e; if (sim.owner[i] < 0) sim.claim(i, A, i0); sim.pop[i] = 30; }
+  for (let d = 6; d <= 12; d++) for (const e of [-2 * W2, -W2, 0, W2, 2 * W2]) { const i = i0 + d + e; if (sim.owner[i] < 0) sim.claim(i, B, i0 + 8); sim.pop[i] = 30; }
+  for (let y = 0; y < 3; y++) sim.tick();
+  check(K.pace(A.id) > 0 && K.pace(B.id) === 0, `a realm that knows masonry works towards great people (${K.pace(A.id).toFixed(5)} a year), one that does not brings none forth`);
+  // a great person: of a kind the realm knows, born in one of its towns, named; he makes up to three works in the city
+  const gp = K.bear(A.id); const kinds = new Set(); for (let k = 0; k < 40; k++) { const g = K.bear(A.id); if (g) kinds.add(K.KINDS[g.kind].key); }
+  check(!!gp && gp.c === A.id && sim.owner[gp.at] === A.id && gp.name.length > 2 && K.alive.includes(gp), `a great person is born in a town of the realm: ${gp && gp.name}, ${gp && K.kindName(gp)}`);
+  check([...kinds].every(k => ['artist', 'builder', 'poet', 'sage', 'playwright', 'historian'].includes(k)) && kinds.size >= 3, `the kinds stand on what the realm knows (${[...kinds].join(', ')})`);
+  const w0 = K.make(gp); check(!!w0 && w0.at === gp.at && w0.value > 0 && gp.made === 1 && K.workOf(w0.id) === w0, `he makes a work in his city: ${w0 && w0.name} (${w0 && w0.value})`);
+  // what works bring: a sage's insight, the arts' authority, a master builder cheaper works while he lives
+  { const g = K.bear(A.id); g.kind = CU.KK.sage.id; const t0 = A.tech; K.make(g); check(A.tech > t0, `a sage's work brings insight (${((A.tech - t0) * 1e5).toFixed(0)})`);
+    const R = sim.rule.ruleOf(A); R.auth = 10; const p2 = K.bear(A.id); p2.kind = CU.KK.poet.id; K.make(p2); check(R.auth > 10, `a poet's brings authority (+${(R.auth - 10).toFixed(1)})`);
+    for (const x of K.alive) if (x.c === A.id && x.kind === CU.KK.builder.id) x.kind = CU.KK.poet.id; K.tally(sim.year); const f0 = K.buildF(A.id); const b = K.bear(A.id); b.kind = CU.KK.builder.id; K.tally(sim.year);
+    check(f0 === 1 && K.buildF(A.id) < 1, `a master builder living makes the realm's works cheaper (${K.buildF(A.id)})`); }
+  // renown: what the realm holds; whoever holds the city holds the work
+  K.tally(sim.year); const r0 = K.renown[A.id]; check(r0 > 0 && K.heldBy(A.id).length > 0, `a realm's renown is what it holds (${r0.toFixed(1)} from ${K.heldBy(A.id).length} works)`);
+  { const at = w0.at; sim.claim(at, B, i0 + 8); K.tally(sim.year); check(w0.held === B.id && K.renown[B.id] >= w0.value - 1e-6 && K.renown[A.id] < r0, `the conqueror of a city holds its works: ${sim.fullName(B)} now has ${w0.name}`);
+    sim.claim(at, A, i0); K.tally(sim.year); }
+  // a sacked city may lose its works for ever
+  { const g = K.bear(A.id); for (let k = 0; k < 12; k++) { const w = K.make(g); if (w) { w.at = A.capital; } g.made = 0; } const n0 = K.stats.lost; for (let k = 0; k < 6; k++) K.sacked(A.capital, B);
+    check(K.stats.lost > n0 && K.works.some(w => w.lost && w.at === A.capital), `a sacked city loses works for ever (${K.stats.lost - n0})`); }
+  // a lesser work is forgotten after some turns; a masterpiece never is
+  { const old = K.make(K.bear(A.id)), great = K.make(K.bear(A.id)); old.value = 3; great.value = 9; old.year -= 5000; great.year -= 5000; K.tally(sim.year);
+    check(!K.workOf(old.id) && !!K.workOf(great.id), 'a lesser work is forgotten, a masterpiece is not'); }
+  // pride, against the usual for the age; the pull of a renowned realm on others' peoples
+  { for (let k = 0; k < 30; k++) { const w = K.make(K.bear(A.id)); if (w) w.value = 9; } K.tally(sim.year); const gold = K.isGolden(A.id) ? 0.02 : 0;
+    const hi = K.unrest(A) - gold, lo = K.unrest(B); check(K.rel(A.id) > 2 && hi > 0 && hi <= 0.0301 && lo <= 0, `pride: renown above the usual steadies a realm (${(hi * 100).toFixed(1)}, ${K.rel(A.id).toFixed(1)} times the usual), little renown does not (${(lo * 100).toFixed(1)})`);
+    const sp = sim.stabilityParts(A); check(Math.abs(sp.culture - K.unrest(A)) < 1e-9, 'the realm\'s stability counts it');
+    check(K.pull(A.id) > 1 && K.pull(B.id) <= 1, `a renowned realm takes in other peoples faster (${K.pull(A.id).toFixed(2)} against ${K.pull(B.id).toFixed(2)})`); }
+  // diplomacy: a realm of little renown admires one of great renown
+  { const out = []; sim.diplo.opinion(B, A, out); check(out.some(r => /admire/.test(r[0])), 'a realm of little renown admires one of great renown: ' + out.map(r => r[0] + ' ' + r[1]).join(', ')); }
+  // a golden age: four great people within two turns, in a steady realm; great people come almost twice as often; unrest ends it
+  { const s2 = createSim(wd, 73), K2 = s2.culture; const j0 = s2.LI.find(i => ok(i) && s2.owner[i] < 0 && s2.fert[i] > 0.5 && [1, 2, 3].every(d => ok(i + d) && s2.owner[i + d] < 0)); const G = s2.spawnTribe(j0, {}); G.tech = classic; G.era = s2.eraOf(classic); teach(s2, G, 3); G.aggression = 0; G.dip.think = 1e12;
+    for (let d = 1; d <= 3; d++) { if (s2.owner[j0 + d] < 0) s2.claim(j0 + d, G, j0); s2.pop[j0 + d] = 30; } for (let y = 0; y < 3; y++) s2.tick();
+    G.stability = 0.9; for (let k = 0; k < 3; k++) K2.bear(G.id); K2.tally(s2.year); const before = K2.isGolden(G.id), p0 = K2.pace(G.id); K2.bear(G.id); K2.tally(s2.year);
+    check(!before && K2.isGolden(G.id) && Math.abs(K2.pace(G.id) / p0 - CU.GOLD.boost) < 1e-6 && K2.unrest(G) >= 0.02 - 0.03, `four great people within two turns begin a golden age (until ${s2.fmtYear(K2.golden[G.id])}): great people come ${CU.GOLD.boost} times as often`);
+    G.stability = 0.2; K2.tally(s2.year); check(!K2.isGolden(G.id) && K2.news.some(n => n.kind === 'goldenEnd'), 'unrest ends it');
+    G.stability = 0.9; for (let k = 0; k < 6; k++) K2.bear(G.id); K2.tally(s2.year); check(!K2.isGolden(G.id), 'and none begins again for some turns after'); }
+  // the player: patronage, what it costs, commissions; saved and loaded
+  { const s4 = createSim(wd, 79), K4 = s4.culture; const k0 = s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.fert[i] > 0.5 && [1, 2, 3, 4].every(d => ok(i + d) && s4.owner[i + d] < 0));
+    s4.setPlayer(k0, 'Testland'); const P = s4.playerCiv(); P.tech = classic; P.era = s4.eraOf(classic); teach(s4, P, 3); for (let d = 1; d <= 4; d++) { if (s4.owner[k0 + d] < 0) s4.claim(k0 + d, P, k0); s4.pop[k0 + d] = 30; } for (let y = 0; y < 3; y++) s4.tick();
+    const base = K4.pace(P.id); K4.setPatron(P.id, 3); const lav = K4.pace(P.id); K4.setPatron(P.id, 0); const none = K4.pace(P.id);
+    check(base > 0 && Math.abs(lav / base - 2.4) < 1e-6 && Math.abs(none / base - 0.6) < 1e-6, `patronage: lavish more than twice as often (${(lav / base).toFixed(2)}), none less often (${(none / base).toFixed(2)})`);
+    K4.setPatron(P.id, 3); P.income = 100; P.wealth = 1000; const g0 = K4.greats.length; K4.step(); check(Math.abs(P.wealth - (1000 - 20)) < 1e-6, `and a lavish court pays a fifth of the income for it (${(1000 - P.wealth).toFixed(1)})`); void g0;
+    const g = K4.bear(P.id); P.wealth = 5000; const n0 = K4.works.length; const why = K4.commission(P.id, g.id); const again = K4.commission(P.id, g.id);
+    check(!why && K4.works.length === n0 + 1 && P.wealth === 5000 - K4.commissionCost(P) && !!again, `a commission: a work at once for ${K4.commissionCost(P)} coin (${why || K4.works[K4.works.length - 1].name}); asked again at once: "${again}"`);
+    g.made = 3; g.asked = 0; check(!!K4.commission(P.id, g.id), 'and nothing from a master who has made all there is in him');
+    for (let k = 0; k < 5; k++) { const x = K4.bear(P.id); if (x) K4.make(x); } K4.tally(s4.year);
+    const saved = JSON.parse(JSON.stringify(s4.save())); const s5 = createSim(wd, 1); s5.load(saved); const K5 = s5.culture;
+    const same = K5.greats.length === K4.greats.length && K5.works.length === K4.works.length && K5.alive.length === K4.alive.length && Math.abs(K5.renown[P.id] - K4.renown[P.id]) < 1e-3 && Math.abs(K5.prog[P.id] - K4.prog[P.id]) < 1e-3 && Math.abs(K5.had[P.id] - K4.had[P.id]) < 1e-2 && K5.born[P.id] === K4.born[P.id] && s5.playerCiv().patron === 3
+      && K5.greats.every((x, k) => x.name === K4.greats[k].name && x.works.length === K4.greats[k].works.filter(id => K4.workOf(id)).length);
+    if (!same) console.log('   culture save:', K5.greats.length, K4.greats.length, K5.works.length, K4.works.length, K5.alive.length, K4.alive.length, K5.renown[P.id], K4.renown[P.id], K5.prog[P.id], K4.prog[P.id], K5.had[P.id], K4.had[P.id], K5.born[P.id], K4.born[P.id], s5.playerCiv().patron, K5.greats.map((x, k) => x.works.length + '/' + K4.greats[k].works.filter(id => K4.workOf(id)).length).join(' '));
+    check(same, `saved and loaded: ${K4.greats.length} great people, ${K4.works.length} works, renown ${K4.renown[P.id].toFixed(1)}, patronage`);
+    const old = JSON.parse(JSON.stringify(s4.save())); delete old.culture; const s6 = createSim(wd, 1); s6.load(old); check(s6.culture.greats.length === 0 && s6.culture.renown[P.id] >= 0, 'a world saved before culture has had no great people yet'); }
+  // a realm that is no more: its great people work no longer; its number given to a new realm brings none of it
+  { const small = sim.spawnTribe(sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.cellDist(i, i0) > 40), {}); small.tech = classic; small.era = sim.eraOf(classic); teach(sim, small, 3); small.aggression = 0; small.dip.think = 1e12;
+    const g = K.bear(small.id); const id = small.id; K.gone(id); check(g.c === -1 && g.dies <= sim.year && K.born[id] === 0 && K.livingOf(id).length === 0, 'a realm that is no more: its great people work no longer, and its number keeps nothing'); }
+  invariants(sim, 'the world of culture in ' + sim.fmtYear(sim.year));
+}
+// the culture of a whole world: great people from the Bronze Age, golden ages, works kept within bounds; quick enough
+{
+  const sim = createSim(wd, 12345); const K = sim.culture; for (let y = 0; y < 3000; y++) sim.tick();
+  const classic = sim.ERAS[3][1] + 0.02; for (const cv of sim.civs) if (cv) { cv.tech = Math.max(cv.tech, classic); cv.era = sim.eraOf(cv.tech); teach(sim, cv, 3); }
+  for (let y = 0; y < 400; y++) sim.tick();
+  let ms = 0; for (let y = 0; y < 100; y++) { sim.tick(); ms += K.stats.ms; }
+  let bad = 0, renowned = 0, held = 0; for (const cv of sim.civs) { if (!cv) continue; held++; const u = K.unrest(cv), r = K.renown[cv.id]; if (!(isFinite(r) && r >= 0 && u >= -0.031 && u <= 0.051 && K.pull(cv.id) >= 0.8 && K.pull(cv.id) <= 1.4)) bad++; if (K.rel(cv.id) > 2) renowned++; }
+  log(`   ${sim.fmtYear(sim.year)}: ${K.stats.born} great people born, ${K.alive.length} living; ${K.stats.works} works made, ${K.works.length} kept (${K.stats.forgot} forgotten, ${K.stats.lost} lost); ${K.stats.golden} golden ages; ${renowned} of ${held} realms renowned; a year of culture takes ${(ms / 100).toFixed(3)} ms; saved ${(JSON.stringify(K.save()).length / 1024).toFixed(0)} KB`);
+  check(K.stats.born > 100 && K.works.length > 50 && K.alive.length > 10, `a world of great people and works (${K.stats.born} born, ${K.works.length} works kept)`);
+  check(K.works.length <= 6000 && K.greats.length <= 5000 && K.works.every(w => w.value >= CU_MASTER() || (!w.lost && sim.year - w.year <= Math.max(30, 6 * window.CULTURE.TURN[w.era]) + 5)), `works and great people are kept within bounds: masterpieces and the works of the last six turns (${K.works.length}, ${K.greats.length})`);
+  check(!bad, `every realm's renown, pride and pull are within bounds (${bad} not)`);
+  check(ms / 100 < 0.5, `culture is quick enough (${(ms / 100).toFixed(3)} ms a year)`);
+  function CU_MASTER() { return window.CULTURE.MASTER; }
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

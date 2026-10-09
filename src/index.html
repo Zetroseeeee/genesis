@@ -10,7 +10,7 @@
     --edge-hi: rgb(255 255 255 / 0.10); --edge-lo: rgb(0 0 0 / 0.45); --rule: rgb(255 255 255 / 0.08);
     --text: #ECE9E2; --text-2: rgb(236 233 226 / 0.68); --text-3: rgb(236 233 226 / 0.45);
     --gold: #D6B25E; --gold-2: #EBC97C; --select: #7FE3FF;
-    --food: #7BD36B; --prod: #F0A24A; --coin: #F2CF5B; --sci: #5DA9F5; --cul: #B98BF0; --faith: #F1F1F1; --mil: #E45B5B; --inf: #5FD4C2;
+    --food: #7BD36B; --prod: #F0A24A; --coin: #F2CF5B; --sci: #5DA9F5; --cul: #B98BF0; --faith: #F1F1F1; --mil: #E45B5B; --inf: #5FD4C2; --art: #E7C98A;
     --pos: #6FCF7B; --neg: #F0655A; --warn: #F2B94B; --info: #8AB4F8;
     --body: 'Noto Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --display: 'Cinzel', 'Trajan Pro', Georgia, serif;
@@ -319,7 +319,7 @@
   .fe:hover { background: rgb(255 255 255 / 0.06); }
   .fe svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; margin-top: 2px; }
   .fe .y { color: var(--text-3); font-variant-numeric: tabular-nums; margin-right: 6px; }
-  .fe.war { color: #F3A09A; } .fe.era { color: var(--gold-2); } .fe.disaster { color: var(--warn); } .fe.faith { color: var(--cul); } .fe.state { color: var(--text); } .fe.ruler { color: var(--text-3); } .fe.mine { border-left: 2px solid var(--gold); padding-left: 6px; }
+  .fe.war { color: #F3A09A; } .fe.era { color: var(--gold-2); } .fe.disaster { color: var(--warn); } .fe.faith { color: var(--cul); } .fe.culture { color: var(--art); } .fe.state { color: var(--text); } .fe.ruler { color: var(--text-3); } .fe.mine { border-left: 2px solid var(--gold); padding-left: 6px; }
   @keyframes slidein { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .fe, .toast, #report { animation: none; } .lbl { transition: none; } #left { transition: none; } }
 
@@ -737,6 +737,40 @@
   .gv-mis { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; } .gv-mis span { display: flex; flex-direction: column; min-width: 0; } .gv-mis small { font-size: 11px; color: var(--text-3); } .gv-mis .btn { min-height: 26px; padding: 3px 10px; white-space: nowrap; } .gv-mis .btn[disabled] { opacity: 0.45; }
   @media (max-width: 900px) { .gv-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(120px, 44%); } .gv-info { border-left: 0; border-top: 1px solid var(--rule); } .gv-ecols { grid-template-columns: minmax(0, 1fr); } .gv-row { grid-template-columns: minmax(0, 1fr); gap: 6px; } .gv-now { flex-wrap: wrap; gap: 6px 14px; padding: 6px 14px; } .gv-demand { margin-left: 0; white-space: normal; flex-wrap: wrap; } }
 
+  /* ----- the culture screen (works.js) ----- */
+  #cult .modal { width: min(1320px, calc(100vw - 32px)); height: calc(100vh - 64px); }
+  #cult .linkish { appearance: none; background: none; border: 0; padding: 0; font: inherit; font-size: var(--fs-cap); color: var(--gold-2); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-align: left; align-self: flex-start; }
+  #cu-ren .cu-chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; margin-right: 6px; font-size: var(--fs-cap); color: var(--text-2); font-variant-numeric: tabular-nums lining-nums; } #cu-ren svg { width: 16px; height: 16px; color: var(--art); } #cu-ren b { font-size: var(--fs-body); font-weight: 600; color: var(--text); } #cult .gold, #left .gold { color: var(--art); font-weight: 600; }
+  .cu-pane { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.15) transparent; padding-bottom: 24px; }
+  .cu-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px; padding: 16px 20px 0; }
+  .cu-stat { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px 13px; border: 1px solid var(--rule); border-top-color: var(--edge-hi); border-radius: var(--radius); background: rgb(18 24 34); min-width: 0; }
+  .cu-stat small { font-size: 12.5px; color: var(--text-2); line-height: 1.45; } .cu-stat .cu-parts { font-size: 11.5px; color: var(--text-3); } .cu-x { display: block; color: var(--text-3); opacity: 0.9; }
+  .cu-stat > b { font-family: var(--display); font-size: calc(30px * var(--ui-scale)); font-weight: 600; letter-spacing: 0.04em; line-height: 1; color: var(--art); font-variant-numeric: lining-nums; }
+  .cu-stat .kn-prog { width: 100%; height: 7px; border-radius: 4px; } .cu-stat .kn-prog i { background: linear-gradient(90deg, #A88A4F, var(--art)); }
+  .cu-scale { position: relative; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #39404E, #6B6A72 35%, #9C8B6E 50%, #D2A24C 70%, #F6D58A); margin: 2px 0 3px; }
+  .cu-scale i { position: absolute; top: -4px; width: 10px; height: 14px; margin-left: -5px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px rgb(18 24 34), 0 1px 4px rgb(0 0 0 / 0.6); }
+  .cu-scale u { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: rgb(255 255 255 / 0.55); text-decoration: none; }
+  .cu-stat.gold { border-color: rgb(231 201 138 / 0.55); background: radial-gradient(120% 140% at 0% 0%, rgb(231 201 138 / 0.18), rgb(231 201 138 / 0.03) 60%), rgb(22 26 34); } .cu-stat.gold .micro { color: var(--art); }
+  .cu-pips { display: flex; gap: 7px; padding: 2px 0; } .cu-pips i { width: 11px; height: 11px; transform: rotate(45deg); border: 1.5px solid rgb(231 201 138 / 0.5); border-radius: 1px; } .cu-pips i.on { background: var(--art); border-color: var(--art); box-shadow: 0 0 8px rgb(231 201 138 / 0.45); }
+  .cu-patron { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 14px 20px 4px; } .cu-patron .micro { margin-right: 6px; } .cu-patron .btn { min-height: 28px; padding: 3px 14px; } .cu-patron .btn.on { border-color: var(--art); color: var(--art); background: rgb(231 201 138 / 0.1); } .cu-patron small { font-size: 12.5px; color: var(--text-2); margin-left: 8px; }
+  .cu-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 32px; padding: 14px 20px 0; align-items: start; }
+  .cu-sect { display: flex; flex-direction: column; gap: 5px; min-width: 0; } .cu-sect > .micro { margin-bottom: 3px; } .cu-sub { margin-top: 14px; }
+  .cu-great, .cu-work { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 9px; border: 1px solid transparent; border-radius: var(--radius); background: rgb(255 255 255 / 0.025); }
+  .cu-work { grid-template-columns: 32px minmax(0, 1fr) auto 30px; }
+  .cu-great .ic, .cu-work .ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--art); background: rgb(231 201 138 / 0.08); box-shadow: inset 0 0 0 1px rgb(231 201 138 / 0.25); } .cu-great .ic svg, .cu-work .ic svg { width: 18px; height: 18px; }
+  .cu-great .nm, .cu-work .nm { display: flex; flex-direction: column; min-width: 0; } .cu-great b, .cu-work b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cu-great small, .cu-work small { font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .cu-st { color: var(--art); letter-spacing: 0.06em; }
+  .cu-great .btn { min-height: 26px; padding: 3px 10px; white-space: nowrap; } #cult .btn[disabled] { opacity: 0.45; cursor: default; }
+  .cu-great.dead { background: none; } .cu-great.dead .ic { color: var(--text-3); background: rgb(255 255 255 / 0.04); box-shadow: inset 0 0 0 1px var(--rule); } .cu-great.dead b { font-weight: 500; color: var(--text-2); }
+  .cu-work em { font-style: normal; font-size: 12.5px; color: var(--text-2); text-align: right; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; } .cu-work em i { font-style: normal; color: var(--art); margin-right: 5px; }
+  .cu-work.master { background: linear-gradient(90deg, rgb(231 201 138 / 0.09), rgb(231 201 138 / 0.015)); } .cu-work.master .ic { color: #1b1a17; background: var(--art); box-shadow: 0 0 10px rgb(231 201 138 / 0.35); } .cu-work.master em { color: var(--art); font-weight: 600; }
+  .cu-work.lost { opacity: 0.6; } .cu-work .btn.icon { width: 28px; height: 28px; min-height: 0; padding: 0; }
+  .cu-realm { display: grid; grid-template-columns: 12px minmax(0, 1fr) minmax(60px, 150px) 44px; gap: 10px; align-items: center; padding: 5px 9px; border-radius: var(--radius); font-size: 13px; } .cu-realm > span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cu-realm .gv-bar { height: 5px; } .cu-realm .gv-bar i { background: var(--art); } .cu-realm em { font-style: normal; text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums lining-nums; } .cu-realm.me { background: rgb(231 201 138 / 0.07); box-shadow: inset 0 0 0 1px rgb(231 201 138 / 0.3); }
+  .cu-gold { display: flex; flex-wrap: wrap; gap: 6px; } .cu-gold span { display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px 3px 8px; border-radius: 12px; border: 1px solid rgb(231 201 138 / 0.35); background: rgb(231 201 138 / 0.06); font-size: 12px; }
+  .cu-key { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 12px; line-height: 1.5; color: var(--text-3); max-width: 62ch; }
+  @media (max-width: 1000px) { .cu-head { grid-template-columns: minmax(0, 1fr); } .cu-cols { grid-template-columns: minmax(0, 1fr); gap: 20px; } .cu-patron small { flex: 1 1 100%; margin-left: 0; } }
+
   /* ----- the knowledge screen (tree.js) ----- */
   #know .modal { width: min(1480px, calc(100vw - 32px)); height: calc(100vh - 64px); }
   .b-land { --bc: var(--food); } .b-craft { --bc: var(--prod); } .b-trade { --bc: var(--coin); } .b-war { --bc: var(--mil); } .b-state { --bc: var(--cul); } .b-mind { --bc: var(--sci); }
@@ -861,7 +895,7 @@
     #economy .eco .d { display: none; }
     #left { width: 320px; }
   }
-  @media (max-width: 1140px) {      /* (a narrow window has room for the signs, not for their names: the tooltip still says what each is) */
+  @media (max-width: 1240px) {      /* (a narrow window has room for the signs, not for their names: the tooltip still says what each is) */
     :root { --bar: calc(40px * var(--ui-scale)); }
     #bl .btn { font-size: 0; gap: 0; padding: 0 11px; min-width: 0; min-height: 36px; flex-direction: row; } #bl .btn svg { width: 19px; height: 19px; }
   }
@@ -951,6 +985,7 @@
     <button class="btn ghost" id="l-know" title="What your people know and what they study (K)"><svg viewBox="0 0 24 24"><path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/></svg>Knowledge</button>
     <button class="btn ghost" id="l-gov" title="Laws, government and the estates of the realm (V)"><svg viewBox="0 0 24 24"><path d="M4 20h16M5 9h14M12 4l8 5H4zM7 9v11M12 9v11M17 9v11"/></svg>Laws</button>
     <button class="btn ghost" id="l-dip" title="Other realms: what they think of you, treaties, war and peace (F)"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>Diplomacy</button>
+    <button class="btn ghost" id="l-cult" title="Great people, their works, renown and golden ages (Z)"><svg viewBox="0 0 24 24"><path d="M7 4c-2 3-2 9 0 13M17 4c2 3 2 9 0 13M7 17h10M9 7v10M12 6v11M15 7v10"/></svg>Culture</button>
     <button class="btn ghost" id="l-expand" title="Settle new land touching your border"><svg viewBox="0 0 24 24"><path d="M6 21V4h10l-2 3 2 3H6"/></svg>Expand</button>
     <button class="btn ghost" id="l-chronicle" title="World history, powers and graphs (C)"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>Chronicle</button>
     <button class="btn ghost" id="l-build" title="God powers (G)"><svg viewBox="0 0 24 24"><path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/></svg>Powers</button>
@@ -983,6 +1018,7 @@
           <button class="btn" id="v-rel" title="How each realm stands with you (X)">Relations</button>
           <button class="btn" id="v-ppl" title="Who lives where, and in what tongue (I)">Peoples</button>
           <button class="btn" id="v-fth" title="Who believes what, and where the holy cities are (J)">Faiths</button>
+          <button class="btn" id="v-ren" title="How renowned each realm is for its age, and who is in a golden age (Shift+Z)">Renown</button>
         </div>
       </div>
     </div>
@@ -1070,6 +1106,15 @@
   </div>
 </div></dialog>
 
+<dialog id="cult"><div class="modal panel" tabindex="-1">
+  <div class="phead"><h2 class="display">Culture</h2><span class="micro" id="cu-sub"></span><span id="cu-ren"></span><button class="btn icon ghost" id="cu-close" title="Close (Esc)">✕</button></div>
+  <div class="tabs" id="cu-tabs"><button class="on" data-utab="mine">Your realm</button><button data-utab="world">The world</button></div>
+  <div class="gv-body">
+    <section data-upane="mine" id="cu-mine" class="cu-pane" tabindex="-1"></section>
+    <section data-upane="world" id="cu-world" class="cu-pane" tabindex="-1" hidden></section>
+  </div>
+</div></dialog>
+
 <dialog id="menu"><div class="modal panel">
   <div class="phead"><h2 class="display" id="m-title">Menu</h2><button class="btn icon ghost" id="m-close">✕</button></div>
   <div class="pbody">
@@ -1146,6 +1191,7 @@
 <script src="army.js"></script>
 <script src="people.js"></script>
 <script src="faith.js"></script>
+<script src="culture.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -1164,5 +1210,6 @@
 <script src="tree.js"></script>
 <script src="gov.js"></script>
 <script src="envoys.js"></script>
+<script src="works.js"></script>
 <script src="troops.js"></script>
 <script src="main.js"></script>
