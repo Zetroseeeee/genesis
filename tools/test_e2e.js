@@ -847,6 +847,33 @@ server.listen(0, async () => {
     q = await ev(() => ({ on: __G.sim.storiesOn, why: __G.sim.storyTell('omen') })); check(!q.on && !!q.why, `with stories switched off, none is told (${q.why})`);
     await ev(() => { const el = document.getElementById('opt-stories'); el.checked = true; el.dispatchEvent(new Event('change')); __T.quiet(); });
   });
+  await scenario('legacy: the ambitions of the age and how far each has come, one fulfilled and told, the tracker opens the Legacy tab; a new age asks what the last one leaves', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    // the Legacy tab: six ambitions of the realm's age, how far each has come, what the realm is remembered for in each path
+    await ev(() => __G.openChronicle('legacy')); await frames(2);
+    let q = await ev(() => ({ open: document.getElementById('chron').open, cards: document.querySelectorAll('#legacy .lg-card').length, paths: document.querySelectorAll('#legacy .lg-path').length, score: (document.querySelector('#legacy .lg-score b') || {}).textContent, h: (document.querySelector('#legacy h3') || {}).textContent }));
+    check(q.open && q.cards === 6 && q.paths === 6 && q.score !== undefined, `the Legacy tab: ${q.cards} ambitions, ${q.paths} paths, ${q.score} remembered (${q.h})`);
+    // an ambition fulfilled: told, remembered on its card, and in the chronicle
+    q = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = LEGACY.OF[c.era].find((x) => !(c.legacy.got || {})[x.key]); const t0 = S.legacy.total(c); S.legacy.fulfil(c, a, S.year); window.__toasts.length = 0; __G.run(0); return { key: a.key, name: a.name, gained: S.legacy.total(c) - t0 }; });
+    await frames(2);
+    const r2 = await ev((key) => ({ got: document.querySelectorAll('#legacy .lg-card.got').length, toasts: (window.__toasts || []).join(' | '), log: __G.sim.playerCiv().events.slice(-3).map((e) => e.text).join(' | ') }), q.key);
+    check(q.gained > 0 && r2.got >= 1 && /Remembered/.test(r2.toasts) && /remembered for/.test(r2.log), `an ambition fulfilled (${q.name}, +${q.gained}): told (${r2.toasts}), on its card, in the chronicle`);
+    await ev(() => document.getElementById('chron').close());
+    // the tracker names the ambitions of the age and opens the tab
+    q = await ev(() => { __G.run(0); const b = [...document.querySelectorAll('#tk-body .trk')].find((x) => /Ambitions of the/.test(x.textContent)); if (b) b.click(); return { row: b ? b.textContent : '', open: document.getElementById('chron').open, tab: (document.querySelector('#chron .tabs button.on') || {}).textContent }; });
+    check(/Ambitions of the/.test(q.row) && q.open && q.tab === 'Legacy', `the tracker's line opens the Legacy tab (${q.row})`);
+    await ev(() => document.getElementById('chron').close());
+    // a new age: the court is asked what the last one leaves, and what it chose is carried
+    await ev(() => { const S = __G.sim, c = S.playerCiv(); S.setStories(true); if (c.story) c.story.q = null; const e = Math.min(8, c.era + 1); c.tech = Math.max(c.tech, S.ERAS[e][1] + 0.01); c.era = S.eraOf(c.tech); __T.teach(c); __G.run(1); });
+    await frames(2); await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    q = await ev(() => ({ open: TALES.isOpen(), title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | ') }));
+    check(q.open && /leaves?$/.test(q.title) && q.n === 3 && /until the next age/.test(q.chips), `a new age asks what the last one leaves: "${q.title}" (${q.chips.slice(0, 120)})`);
+    await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2);
+    await ev(() => __G.openChronicle('legacy')); await frames(2);
+    q = await ev(() => ({ her: document.querySelector('#legacy .lg-her').textContent, carried: (__G.sim.playerCiv().legacy.her || []).length }));
+    check(q.carried >= 1 && /Into the/.test(q.her), `what the realm carries is shown (${q.her.slice(0, 90)})`);
+    await ev(() => { document.getElementById('chron').close(); __T.quiet(); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);

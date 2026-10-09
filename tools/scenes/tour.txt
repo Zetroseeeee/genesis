@@ -129,6 +129,7 @@ hud          | tools/scenes/dip.js tools/scenes/hud.js | {lens:true} | | 26
 hud_laws     | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,screen:'gov'} | | 28
 hud_copper   | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:6,screen:'market'} | | 28
 hud_glass    | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:8} | | 26
+legacy       | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,screen:'legacy'} | | 28
 # --- light and air: the sky and the haze from the ground, the sun in the picture, dusk and the stars, the country from high up, the planet ---
 horizon      | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('town', 1.2, 1.4, 0.3), 7000); | 32
 sun_high     | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,sun:[0.22,0.3]} | setTimeout(() => __sceneLook('town', 1.2, 1.5, 0.3), 7000); | 32
@@ -364,3 +365,4 @@ court_regency | tools/scenes/court.js | {years:11250,lon:2.35,lat:48.85,regency:
 tale          | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'heir_cruel'} | | 170
 tale_fever    | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'heir_sickly',choose:0} | | 172
 tale_raid     | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'raid'} | | 170
+heritage      | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'heritage',d:{from:3,to:4,paths:[4,5,0],did:[1,1,0]}} | | 170

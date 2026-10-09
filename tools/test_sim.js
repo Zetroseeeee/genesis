@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -1152,7 +1152,7 @@ log('18. stories');
 {
   const ST = window.STORY; const art = JSON.parse(fs.readFileSync('data/tex/atlas.json', 'utf8')).ui;
   check(ST.LIST.length >= 36, `there are stories (${ST.LIST.length})`);
-  for (const st of ST.LIST) check(!!art[st.art] && st.opts.length >= 2 && st.opts.length <= 3 && (st.lapse || 0) < st.opts.length, `${st.k}: a painting (${st.art}), two or three choices and one taken when nobody answers`);
+  for (const st of ST.LIST) check((typeof st.art === 'function' || !!art[st.art]) && st.opts.length >= 2 && st.opts.length <= 3 && (st.lapse || 0) < st.opts.length, `${st.k}: a painting (${st.art}), two or three choices and one taken when nobody answers`);
   // a player's kingdom of the Middle Ages, with towns, a temple, an academy, a market, a harbour, a family and neighbours
   const sim = createSim(wd, 103), D = sim.dynasty, RF = window.RULE.FORM; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
   const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
@@ -1215,6 +1215,64 @@ log('18. stories');
   check(lines > 0, 'the great realms\' choices are written into their chronicles');
   check(ms / 100 < 0.6, `stories are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
   const size = JSON.stringify(sim.civs.filter(Boolean).map(c => c.story)).length / 1024; check(size < 120, `what the realms' stories keep is saved in ${size.toFixed(0)} KB`);
+}
+}
+if (want(19)) {
+log('19. legacies');
+{
+  const LG = window.LEGACY, art = JSON.parse(fs.readFileSync('data/tex/atlas.json', 'utf8')).ui;
+  check(LG.AMB.length === 54 && LG.OF.every((l) => l.length === 6 && new Set(l.map((a) => a.path)).size === 6), `six ambitions an age, one in each path (${LG.AMB.length})`);
+  check(new Set(LG.AMB.map((a) => a.key)).size === LG.AMB.length && new Set(LG.FIRSTS.map((f) => f.key)).size === LG.FIRSTS.length, 'every ambition and every first has a key of its own');
+  for (const f of LG.FIRSTS) if (f.know) check(window.KNOW.ID[f.know] !== undefined, `the first "${f.name}" is a discovery there is (${f.know})`);
+  // a player's kingdom of the Iron Age, with a neighbour that keeps still
+  const sim = createSim(wd, 103), RF = window.RULE.FORM, L = sim.legacy; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
+  const iron = sim.ERAS[2][1] + 0.01; sim.setPlayer(k0, 'Legendland'); const P = sim.playerCiv(); P.tech = iron; P.era = sim.eraOf(iron); teach(sim, P, 2); sim.rule.setForm(P.id, P, RF.kingdom, 'reform');
+  for (let d = 1; d <= 6; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); sim.pop[i] = 30; }
+  sim.touchAll(); sim.recount(); for (let y = 0; y < 3; y++) sim.tick(); sim.recount();
+  const g = P.legacy; check(!!g && g.age === P.era, `the realm keeps what it is remembered for, from the age it is in (${g ? g.age : '-'})`);
+  let v = sim.legacyView(); check(!!v && v.now.length === 6 && v.now.every((a) => a.p >= 0 && a.p <= 1 && a.name && a.ask), `the ambitions of the ${v ? v.age : '?'}: six, each with how far the realm has come (${v ? v.now.map((a) => a.key + ' ' + Math.round(a.p * 100) + '%').join(', ') : ''})`);
+  // an ambition fulfilled: remembered in its path, worth more in later ages, a little authority
+  { const a = LG.AK.vassal, before = g.pts[a.path], auth0 = sim.rule.ruleOf(P).auth; L.fulfil(P, a, sim.year); check(g.pts[a.path] === before + LG.worth(2) && g.got.vassal === sim.year && sim.rule.ruleOf(P).auth > auth0, `an ambition fulfilled is remembered in its path (+${g.pts[a.path] - before}) and gives authority`);
+    L.fulfil(P, a, sim.year); check(g.pts[a.path] === before + LG.worth(2), 'and only once'); }
+  // the frontier: an ambition the yearly round finds fulfilled by itself
+  { const cells0 = sim.cellsOf[P.id]; const a = LG.AK.frontier; let x = L.ctx(P); const p0 = L.progressOf(a, x); sim.cellsOf[P.id] = 61; x = L.ctx(P); check(L.progressOf(a, x) === 1 && p0 < 1, `how far the realm has come toward an ambition follows what it has (${Math.round(p0 * 100)}% -> 100%)`); sim.cellsOf[P.id] = cells0; }
+  // a race: among the first ten realms to write, or not at all
+  { const others = []; for (let k = 0; k < 10; k++) others.push({ id: -1, era: 1, stability: 0.5 });      // (ten realms of nowhere, that learn to write before the player)
+    const raced0 = L.raced.writing; delete (P.legacy.at || {}).writing; for (const o of others) L.learned(o, 'writing'); L.learned(P, 'writing');
+    const late = L.progressOf(LG.AK.writing, L.ctx(P)), first = L.progressOf(LG.AK.writing, L.ctx(others[0]));
+    check(first === 1 && late === 0 && L.raced.writing === raced0 + 11, `among the first ten to write, or not at all (the first ${first}, the eleventh ${late})`); }
+  // a new age: the player is asked what the last one leaves, and what he chooses lasts until the next
+  { sim.setStories(true); if (P.story) P.story.q = null; P.tech = sim.ERAS[3][1] + 0.01; P.era = sim.eraOf(P.tech); sim.tick();
+    const sv = sim.storyView(); check(!!sv && sv.k === 'heritage' && sv.opts.length === 3 && /leaves?$/.test(sv.title) && sv.opts.every((o) => o.chips.length && /until the next age/.test(o.chips.map((q) => q.t).join(' '))), `a new age asks what the last one leaves: "${sv ? sv.title : 'nothing'}" (${sv ? sv.opts.map((o) => o.t).join(', ') : ''})`);
+    check(!!sv && !!art[sv.art], `its painting is one there is (${sv ? sv.art : ''})`);
+    const f0 = sim.story.strF(P.id) * sim.story.incF(P.id) * sim.story.insF(P.id); const res = sim.storyChoose(0);
+    const f1 = sim.story.strF(P.id) * sim.story.incF(P.id) * sim.story.insF(P.id) + sim.story.unrest(P) + sim.story.renOf(P.id);
+    check(typeof res === 'object' && g.her.length === 1 && g.her[0][0] === 3 && P.story.m.some((m) => m[0] === 'heritage') && f1 > f0, `what the court chose lasts (${JSON.stringify(g.her)}, ${P.story.m.find((m) => m[0] === 'heritage')})`);
+    check(g.age === 3 && g.winsA === 0, 'the new age begins with nothing of it done'); }
+  // with stories off, the court decides what an age leaves
+  { sim.setStories(false); P.tech = sim.ERAS[4][1] + 0.01; P.era = sim.eraOf(P.tech); sim.tick(); check(!P.story.q && g.her.length === 2 && g.her[1][0] === 4, `with stories off, the court chooses what the age leaves (${JSON.stringify(g.her)})`); sim.setStories(true); }
+  // the world's firsts: the first realm into an age, once
+  { const k = LG.FK.age5; const was = L.firsts[k.id]; check(!was, 'nobody is in the Renaissance yet'); P.tech = sim.ERAS[5][1] + 0.01; P.era = sim.eraOf(P.tech); if (P.story) P.story.q = null;
+    for (let y = 0; y < 6; y++) sim.tick(); check(!!L.firsts[k.id] && L.firsts[k.id][1] === P.id, `the first into the Renaissance is remembered (${JSON.stringify(L.firsts[k.id])})`);
+    check(P.events.some((e) => e.type === 'legacy' && /Renaissance/.test(e.text)), 'and the chronicle says so'); }
+  // saved with the world: the firsts, the race, and what each realm is remembered for
+  { if (P.story) P.story.q = null; const saved = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(saved); const P2 = s2.playerCiv();
+    check(JSON.stringify(s2.legacy.firsts) === JSON.stringify(L.firsts) && s2.legacy.raced.writing === L.raced.writing && JSON.stringify(P2.legacy) === JSON.stringify(P.legacy) && s2.legacy.total(P2) === L.total(P), `legacies are saved with the world (${L.total(P)} remembered)`);
+    const old = JSON.parse(JSON.stringify(saved)); delete old.legacy; for (const c of old.civs) if (c) delete c.legacy; const s3 = createSim(wd, 1); s3.load(old); for (let y = 0; y < 3; y++) s3.tick();
+    const P3 = s3.playerCiv(); check(!!P3.legacy && P3.legacy.age === P3.era && s3.legacy.total(P3) >= 0, 'a world from before legacies begins with nothing remembered'); }
+  // a realm that is gone leaves a great legacy to the hall
+  { const o = sim.civs.find((c) => c && !c.player); if (o) { o.legacy = o.legacy || { pts: [0, 0, 0, 0, 0, 0], got: {}, age: o.era, from: sim.year, wins: 0, winsA: 0, col: 0, colA: 0, fA: 0, gold: 0, her: [] }; o.legacy.pts[0] += 200; const name = sim.fullName(o); L.gone(o); check(L.hall.some((q) => q[0] === name && q[1] >= 200), `a great legacy outlives its realm (${name})`); } }
+}
+// the autopilot's realms are remembered too, quickly enough
+{
+  const sim = createSim(wd, 12345); let ms = 0; for (let y = 0; y < 11000; y++) { sim.tick(); if (y >= 10900) ms += sim.legacy.stats.ms; } const L = sim.legacy;
+  const realms = sim.civs.filter(Boolean), best = realms.map((c) => L.total(c)).sort((a, b) => b - a);
+  log(`   ${sim.fmtYear(sim.year)}: ${L.stats.got} ambitions fulfilled, ${L.stats.firsts} firsts, ${L.stats.heritages} heritages; the most remembered ${best.slice(0, 3).join(', ')}; ${(ms / 100).toFixed(3)} ms a year`);
+  check(L.stats.got > 1500 && L.stats.firsts >= 15 && L.stats.heritages > 300, `the world's realms fulfil ambitions, take firsts and choose heritages (${L.stats.got}, ${L.stats.firsts}, ${L.stats.heritages})`);
+  check(best[0] > best[Math.min(20, best.length - 1)] * 1.5, 'some realms are remembered far more than others');
+  check(ms / 100 < 0.6, `legacies are quick enough (${(ms / 100).toFixed(3)} ms a year)`);
+  const size = JSON.stringify(realms.map(c => c.legacy)).length / 1024; check(size < 120, `what the realms are remembered for is saved in ${size.toFixed(0)} KB`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

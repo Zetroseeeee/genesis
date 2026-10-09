@@ -548,6 +548,44 @@
   #update .row { margin-top: 2px; }
   #upd-chip { display: flex; align-items: center; gap: 7px; align-self: center; margin: 0 2px 0 10px; min-height: 28px; padding: 3px 9px; text-transform: none; letter-spacing: 0.02em; font-size: var(--fs-cap); }
   /* what's new */
+  /* ---------- the Legacy tab of the Chronicle: what the realm will be remembered for (legacy.js) ---------- */
+  #chron .modal:has([data-cpane="legacy"]:not([hidden])) { width: min(1180px, calc(100vw - 32px)); }
+  .lg { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px 26px; }
+  .lg-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 22px; padding: 4px 2px 12px; border-bottom: 1px solid color-mix(in srgb, var(--m) 28%, transparent); flex-wrap: wrap; }
+  .lg-score { display: flex; flex-direction: column; gap: 2px; min-width: 150px; }
+  .lg-score b { font-family: var(--display); font-size: 34px; font-weight: 600; line-height: 1; color: #F5EDDA; font-variant-numeric: tabular-nums; }
+  .lg-score span { font-size: 12.5px; color: var(--text-2); }
+  .lg-paths { display: grid; grid-template-columns: repeat(6, minmax(76px, 1fr)); gap: 10px; flex: 1; min-width: 420px; }
+  .lg-path { display: flex; flex-direction: column; gap: 5px; }
+  .lg-path .top { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+  .lg-path .top svg, .lg-ic svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .lg-path .top b { margin-left: auto; color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .lg-path .bar { height: 4px; border-radius: 2px; background: rgb(255 255 255 / 0.08); overflow: hidden; } .lg-path .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--m), var(--m-hi)); }
+  .lg h3 { font-family: var(--display); font-size: 15px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--m-hi); margin: 2px 0 10px; }
+  .lg h3 small { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--text-3); font-weight: 400; margin-left: 8px; }
+  .lg-amb { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .lg-card { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 4px 11px; padding: 10px 12px; border-radius: 5px; background: rgb(255 255 255 / 0.035); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06); }
+  .lg-card.got { background: linear-gradient(180deg, color-mix(in srgb, var(--m) 16%, transparent), color-mix(in srgb, var(--m) 6%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--m) 55%, transparent); }
+  .lg-ic { grid-row: 1 / 4; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--m-hi); background: radial-gradient(circle at 50% 32%, rgb(255 255 255 / 0.1), rgb(0 0 0 / 0.35) 75%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--m) 50%, transparent); }
+  .lg-card.got .lg-ic { background: radial-gradient(circle at 50% 32%, var(--m-hi), var(--m) 70%); color: #1A1307; }
+  .lg-card .nm { font-weight: 600; font-size: 13.5px; line-height: 1.2; }
+  .lg-card .ask { font-size: 12px; color: var(--text-2); line-height: 1.3; }
+  .lg-card .pr { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .lg-card .pr .bar { flex: 1; height: 3px; border-radius: 2px; background: rgb(255 255 255 / 0.1); overflow: hidden; } .lg-card .pr .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--m), var(--m-hi)); }
+  .lg-card.got .pr { color: var(--m-hi); }
+  .lg-her { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-2); }
+  .lg-her div b { color: var(--text); font-weight: 600; }
+  .lg-ages { display: grid; grid-template-columns: auto repeat(6, 18px) auto; gap: 5px 8px; align-items: center; font-size: 12.5px; color: var(--text-2); }
+  .lg-ages .dot { width: 12px; height: 12px; border-radius: 50%; background: rgb(255 255 255 / 0.08); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12); justify-self: center; }
+  .lg-ages .dot.on { background: radial-gradient(circle at 50% 35%, var(--m-hi), var(--m)); box-shadow: 0 0 6px color-mix(in srgb, var(--m) 50%, transparent); }
+  .lg-ages .n { text-align: right; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .lg-list { display: flex; flex-direction: column; }
+  .lg-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 6px 4px; border-bottom: 1px solid rgb(255 255 255 / 0.05); font-size: 13px; }
+  .lg-row .w { color: var(--text-3); font-size: 12px; } .lg-row .v { font-variant-numeric: tabular-nums; color: var(--text-2); text-align: right; }
+  .lg-row.mine { color: var(--m-hi); } .lg-row.mine .v { color: var(--m-hi); font-weight: 600; }
+  .lg-row.gone { color: var(--text-3); font-style: italic; }
+  .lg-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  @media (max-width: 900px) { .lg { grid-template-columns: 1fr; } .lg-amb { grid-template-columns: 1fr; } .lg-paths { grid-template-columns: repeat(3, 1fr); min-width: 0; } }
   #news .modal { width: min(640px, calc(100vw - 32px)); }
   /* ----- a story before the court (tales.js): the painting, the story in the chronicle's voice, the choices and what they bring ----- */
   #tale .modal { width: min(780px, calc(100vw - 32px)); overflow-y: auto; position: relative; }
@@ -1223,12 +1261,13 @@
 
 <dialog id="chron"><div class="modal panel">
   <div class="phead"><h2 class="display">Chronicle</h2><span class="micro" id="chron-sub"></span><button class="btn icon ghost" id="chron-close">✕</button></div>
-  <div class="tabs"><button class="on" data-ctab="log">Log</button><button data-ctab="powers">Powers</button><button data-ctab="graphs">Graphs</button><button data-ctab="stats">Statistics</button></div>
+  <div class="tabs"><button class="on" data-ctab="log">Log</button><button data-ctab="legacy">Legacy</button><button data-ctab="powers">Powers</button><button data-ctab="graphs">Graphs</button><button data-ctab="stats">Statistics</button></div>
   <div class="pbody">
     <div data-cpane="log" class="sect" style="gap:10px"><div class="filters" id="logfilters"></div><div class="log" id="log"></div></div>
     <div data-cpane="powers" class="powers" hidden id="powers"></div>
     <div data-cpane="graphs" class="sect" hidden><div class="micro">People on Earth · states</div><canvas class="graph" id="g-world"></canvas><div class="micro">Great powers by population</div><canvas class="graph" id="g-civs"></canvas></div>
     <div data-cpane="stats" class="stats" hidden id="stats"></div>
+    <div data-cpane="legacy" class="lg" hidden id="legacy"></div>
   </div>
 </div></dialog>
 
@@ -1382,6 +1421,7 @@
 <script src="finance.js"></script>
 <script src="dynasty.js"></script>
 <script src="story.js"></script>
+<script src="legacy.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
