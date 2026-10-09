@@ -23,7 +23,7 @@
   const seen = { wars: new Set(), era: -1, ack: new Set(), turns: 0 };
   const view = { political: true, soil: false, clouds: true, labels: true, trade: false, gov: false, rel: false, ppl: false, fth: false, ren: false };
   const settings = { uiScale: 1, tipDelay: 300, glass: false, autoTilt: true, quality: 'high', continuous: false, textures: true, stories: true };
-  const worldData = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
+  const worldData = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N), soil: null };
   const TURN_YEARS = RULE.PACE;      // a turn, by age (200 years in the Stone Age down to 5): about a discovery, or a reform, to a turn at history's pace; a hundred and seventy turns from the first fields to the present
   const speed = () => settings.continuous ? (paused ? 0 : SPEEDS[speedIdx]) : (turnRun.active ? 600 : 0);
   // The home screen: the Earth stands large and runs off the right and the bottom of the picture, the edge of night
@@ -162,6 +162,8 @@
       const wd = await loadImageData('data/world.png');
       loadImageData('data/noise.png').then((nd) => { if (terrain) terrain.noiseData = nd; }).catch(() => {});
       for (let i = 0; i < N; i++) { worldData.elev[i] = wd.data[i * 4]; worldData.fert[i] = wd.data[i * 4 + 1] / 255; worldData.flags[i] = wd.data[i * 4 + 2]; worldData.land[i] = wd.data[i * 4 + 2] & 1; }
+      // (what the land feeds, by its kind: land.js; without it a world feeds by the old map)
+      try { const sd = await loadImageData('data/soil.png'); const so = new Uint8Array(N * 3); for (let i = 0; i < N; i++) { so[i * 3] = sd.data[i * 4]; so[i * 3 + 1] = sd.data[i * 4 + 1]; so[i * 3 + 2] = sd.data[i * 4 + 2]; } worldData.soil = so; } catch (e) { console.warn('soil', e); }
       setLoad(50, 'peoples');
       world = new WORLD.World({ scene, terrain: { exag: 2.0, heightAt: () => 0 } });
       SKY.load({ soft: softGL && !window.GENESIS_SKY });      // the stars, the Milky Way, the Moon, the clouds (sky.js): each put to use as it comes; a software renderer takes the lighter half unless asked
@@ -209,7 +211,7 @@
   function seedOtherTribes(n, avoid) {
     const LI = sim.LI; let placed = 0, tries = 0; const homes = [avoid];
     while (placed < n && tries < 20000) {
-      tries++; const i = LI[Math.floor(sim.rnd() * LI.length)]; const f = sim.fert[i]; if (f < 0.45 || sim.owner[i] >= 0) continue;
+      tries++; const i = LI[Math.floor(sim.rnd() * LI.length)]; const f = sim.homeOf(i); if (f < 0.45 || sim.owner[i] >= 0) continue;
       if (sim.rnd() > f * f * ((sim.flags[i] & 2) ? 1.6 : 1)) continue;
       let ok = true; for (const h of homes) { const dy = Math.abs(((i / W) | 0) - ((h / W) | 0)); let dx = Math.abs((i % W) - (h % W)); if (dx > W / 2) dx = W - dx; if (dx * dx + dy * dy < 22 * 22) { ok = false; break; } }
       if (!ok) continue;
@@ -228,7 +230,7 @@
   }
   function randomStart() {
     freshWorld(); const LI = sim.LI; let best = -1, bs = -1;
-    for (let t = 0; t < 6000; t++) { const i = LI[Math.floor(sim.rnd() * LI.length)]; const s = sim.fert[i] * (1 + ((sim.flags[i] & 2) ? 0.8 : 0)) * (1 + ((sim.flags[i] & 4) ? 0.15 : 0)) * sim.rnd(); if (s > bs) { bs = s; best = i; } }
+    for (let t = 0; t < 6000; t++) { const i = LI[Math.floor(sim.rnd() * LI.length)]; const s = sim.homeOf(i) * (1 + ((sim.flags[i] & 2) ? 0.8 : 0)) * (1 + ((sim.flags[i] & 4) ? 0.15 : 0)) * sim.rnd(); if (s > bs) { bs = s; best = i; } }
     startPlayer(best, '', null, false);
   }
   function chooseMode() { freshWorld(); setMode('choose'); $('intro').hidden = true; mapcam.locked = false; mapcam.idleSpin = false; mapcam.flyTo(mapcam.lon, mapcam.lat, 2.4, { duration: 1.8, tilt: 0, heading: 0 }); banner('Fly anywhere. Click the ground where your people begin.', true); setSoil(true); }
@@ -662,13 +664,17 @@
     if (!sim || selected < 0) return;
     const i = selected; const o = sim.owner[i]; const c = o >= 0 ? sim.civs[o] : null; const name = sim.cellName.get(i);
     const lvl = ['Wild', 'Village', 'Town', 'City', 'Metropolis'][sim.level[i]]; const f = sim.flags[i];
-    const terrainTxt = !sim.land[i] ? 'Open water' : (f & 8) ? 'Ice' : (sim.fert[i] < 0.12 ? 'Desert or barren' : sim.fert[i] < 0.35 ? 'Marginal land' : sim.fert[i] < 0.6 ? 'Good land' : 'Rich land') + ((f & 2) ? ', river' : '') + ((f & 4) ? ', coast' : '');
+    const lk = sim.landClass ? sim.landClass(i) : -1, fl = sim.farmland ? sim.farmland(i) : sim.fert[i];
+    // (a realm of the Americas or Australia farms without the old world's beasts and crops until its people have met the old world)
+    const apart = lk > 0 && c && c.capital >= 0 && window.LAND && sim.disease && !sim.disease.met(c.id) && LAND.worldAt(...cellCenter(c.capital)) > 0;
+    const terrainTxt = !sim.land[i] ? 'Open water' : (f & 8) ? 'Ice' : (lk > 0 && window.LAND ? `${LAND.CLASSES[lk].name}${fl > 0.04 ? `, ${Math.round(Math.min(1, fl) * 100)}% farmland` : ''}` : (sim.fert[i] < 0.12 ? 'Desert or barren' : sim.fert[i] < 0.35 ? 'Marginal land' : sim.fert[i] < 0.6 ? 'Good land' : 'Rich land')) + ((f & 2) ? ', river' : '') + ((f & 4) ? ', coast' : '') + (apart ? ' · no beast of the plough yet' : '');
     const hCell = terrain.heightAt(...placeOf(i)); const isSea = !sim.land[i];
     const works = [sim.infra[i] ? 'developed ' + sim.infra[i] : '', sim.walls[i] ? 'walls ' + sim.walls[i] : '', sim.special[i] & 1 ? 'port' : '', sim.special[i] & 2 ? 'academy' : '', sim.special[i] & 4 ? 'temple' : '', sim.special[i] & 8 ? 'market' : '', sim.special[i] & 16 ? 'wonder' : '', sim.special[i] & 512 ? sim.workName(i).toLowerCase() : '', ...indNames(i)].filter(Boolean).join(', ');
     // header: the place is the title; who holds it is the subtitle
     $('sel-title').textContent = name || (isSea ? 'Open sea' : c ? 'Land of the ' + c.name : 'Unclaimed land'); $('sel-sw').style.background = c ? c.color : '#5b6779';
     $('sel-sub').textContent = c ? `${sim.level[i] ? lvl : 'Territory'}${c.capital === i ? ' · capital' : ''} of ${sim.fullName(c)}` : (isSea ? '' : 'Nobody lives here yet');
-    $('sel-cell').innerHTML = `<span class="micro">Land</span><span>${terrainTxt}</span><span class="micro">Elevation</span><span class="num">${Math.round(hCell)} m</span>${isSea ? '' : `<span class="micro">People</span><span class="num">${fmtPop(sim.pop[i])} / ${fmtPop(sim.capacity(i, c))} fed</span>`}${(() => { const P = sim.people, p = P && P.ppl[i] && P.list[P.ppl[i]]; if (!p || isSea) return ''; const fam = P.list[p.fam]; return `<span class="micro">Who</span><span>the ${esc(p.name)}${fam && fam !== p ? `, of the ${esc(fam.name)} family` : ''}</span>`; })()}${(() => { const F = sim.faith; if (!F || isSea || !(sim.pop[i] > 0.02)) return ''; const f = F.fth[i], h = F.holyAt.get(i); return `<span class="micro">Faith</span><span>${f ? `<button class="linkish" data-faith="${f}">${esc(F.nameOf(f))}</button>` : 'the old ways'}${h ? ` · <b class="holy">holy city</b>${h !== f ? ` of <button class="linkish" data-faith="${h}">${esc(F.nameOf(h))}</button>` : ''}` : ''}</span>`; })()}${knowsCell(i) ? `<span class="micro">Yields</span><span><span class="goodchips">${goodChip(sim.GOODS[sim.goods[i]])}</span></span>` : ''}${works ? `<span class="micro">Works</span><span>${works}</span>` : ''}`;
+    const landTip = lk > 0 && window.LAND ? LAND.CLASSES[lk].text + (apart ? ' Its people farm without the beasts of the plough and the crops of the old world until they have met it.' : '') : '';
+    $('sel-cell').innerHTML = `<span class="micro">Land</span><span${landTip ? ` title="${esc(landTip)}"` : ''}>${terrainTxt}</span><span class="micro">Elevation</span><span class="num">${Math.round(hCell)} m</span>${isSea ? '' : `<span class="micro">People</span><span class="num">${fmtPop(sim.pop[i])} / ${fmtPop(sim.capacity(i, c))} fed</span>`}${(() => { const P = sim.people, p = P && P.ppl[i] && P.list[P.ppl[i]]; if (!p || isSea) return ''; const fam = P.list[p.fam]; return `<span class="micro">Who</span><span>the ${esc(p.name)}${fam && fam !== p ? `, of the ${esc(fam.name)} family` : ''}</span>`; })()}${(() => { const F = sim.faith; if (!F || isSea || !(sim.pop[i] > 0.02)) return ''; const f = F.fth[i], h = F.holyAt.get(i); return `<span class="micro">Faith</span><span>${f ? `<button class="linkish" data-faith="${f}">${esc(F.nameOf(f))}</button>` : 'the old ways'}${h ? ` · <b class="holy">holy city</b>${h !== f ? ` of <button class="linkish" data-faith="${h}">${esc(F.nameOf(h))}</button>` : ''}` : ''}</span>`; })()}${knowsCell(i) ? `<span class="micro">Yields</span><span><span class="goodchips">${goodChip(sim.GOODS[sim.goods[i]])}</span></span>` : ''}${works ? `<span class="micro">Works</span><span>${works}</span>` : ''}`;
     renderBuild(i);
     if (!c) { $('sel-civ').hidden = true; scrollHint(); return; }
     $('sel-civ').hidden = false; $('sc-name').textContent = sim.fullName(c);

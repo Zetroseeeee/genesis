@@ -4,12 +4,13 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
 for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.data[i * 4 + 1] / 255; wd.flags[i] = png.data[i * 4 + 2]; wd.land[i] = png.data[i * 4 + 2] & 1; }
+{ const sp = PNG.sync.read(fs.readFileSync('data/soil.png')); wd.soil = new Uint8Array(N * 3); for (let i = 0; i < N; i++) { wd.soil[i * 3] = sp.data[i * 4]; wd.soil[i * 3 + 1] = sp.data[i * 4 + 1]; wd.soil[i * 3 + 2] = sp.data[i * 4 + 2]; } }      // (what the land feeds: land.js)
 
 const fails = []; let checks = 0; const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null; const want = (n) => !ONLY || ONLY.includes(String(n));
 function check(cond, msg) { checks++; if (!cond) { fails.push(msg); console.log('  FAIL', msg); } }
@@ -1408,6 +1409,60 @@ log('21. pestilence');
   check(am.length > 10 && amHad <= am.length * 0.1, `the Americas have met none of them before the ships (${amHad} of ${am.length} realms)`);
   check(ms / 100 < 0.15, `sickness is quick enough (${(ms / 100).toFixed(4)} ms in the middle year)`);
   const size = JSON.stringify(sim.save().disease).length / 1024; check(size < 60, `what sickness keeps is saved in ${size.toFixed(0)} KB`);
+}
+}
+if (want(22)) {
+log('22. the land');
+{
+  const L = window.LAND; const at = (lon, lat) => Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
+  check(L.CLASSES.length === 16 && L.CLASSES.every((K) => K.name && L.CURVES[K.curve] && K.text !== undefined) && L.TAB.length === 16 * 9, 'sixteen kinds of land, each with its course through the ages');
+  const sim = createSim(wd, 104); check(sim.landOn === true, 'a new world is fed by its land');
+  const ganges = at(85, 25.5), kansas = at(-98, 38.5), nile = at(31.0, 30.8), sahara = at(10, 24), mexico = at(-99.1, 19.4);
+  const K = (i) => sim.landClass(i); check(L.CLASSES[K(ganges)].key === 'monsoon' && L.CLASSES[K(kansas)].key === 'grass' && L.CLASSES[K(nile)].key === 'desert' && L.CLASSES[K(mexico)].key === 'high', `the Ganges is monsoon farmland, Kansas grassland, the Nile's delta desert, the valley of Mexico a tropical highland (${[ganges, kansas, nile, mexico].map((i) => L.CLASSES[K(i)].name).join(', ')})`);
+  check(sim.farmland(nile) > 0.5 && sim.farmland(sahara) < 0.02, `the Nile's delta is farmland (${(sim.farmland(nile) * 100).toFixed(0)}%), the Sahara none`);
+  // what a unit of farmland feeds through the ages, the prairie against the paddies
+  const setAge = (c, e) => { c.tech = sim.ERAS[e][1] + 0.01; c.era = e; };
+  const P = sim.spawnTribe(ganges, {}); P.aggression = 0; if (P.dip) P.dip.think = 1e12;
+  const per = (i) => sim.capacity(i, P) / Math.max(0.01, sim.farmland(i));
+  setAge(P, 2); sim.tick(); const iron = per(kansas) / per(ganges);
+  setAge(P, 7); sim.tick(); const modern = per(kansas) / per(ganges);
+  check(iron < 0.3 && modern > iron * 2.5, `the prairie feeds ${(iron * 100).toFixed(0)}% of what the paddies do in the Iron Age, ${(modern * 100).toFixed(0)}% once the steel plough has broken it`);
+  setAge(P, 2); sim.tick(); check(sim.capacity(nile, P) > 2 * sim.capacity(kansas, P), 'the irrigated valley feeds more than the open grass');
+  // the Americas farm with fewer until they have met the old world
+  const A = sim.spawnTribe(mexico, {}); A.aggression = 0; if (A.dip) A.dip.think = 1e12; setAge(A, 3); sim.tick(); const before = sim.capacity(mexico, A) / sim.foodMult(A.tech);
+  sim.disease.had[A.id * window.DISEASE.NK] = 1; sim.tick(); const after = sim.capacity(mexico, A) / sim.foodMult(A.tech);
+  check(after / before > 1.4, `the valley of Mexico feeds ${(after / before).toFixed(2)} times as many once its people have met the old world's beasts and crops`);
+  // saved and loaded; a world saved before the land had kinds feeds as it did
+  { const saved = JSON.parse(JSON.stringify(sim.save())); check(saved.land === 1, 'a world says in its save that its land has kinds');
+    const s2 = createSim(wd, 1); s2.load(saved); check(s2.landOn === true && Math.abs(s2.capacity(nile, s2.civs[P.id]) - sim.capacity(nile, P)) < 1e-3 * sim.capacity(nile, P) + 1e-6, 'and is fed by it again when loaded');
+    const old = JSON.parse(JSON.stringify(saved)); delete old.land; const s3 = createSim(wd, 1); s3.load(old); check(s3.landOn === false && s3.homeOf(nile) === wd.fert[nile], 'a world saved before the land had kinds is fed by the old map, as it was'); }
+}
+// settlers: a realm two ages ahead takes thinly peopled land of its neighbour's without a war, never the player's
+{
+  const ok = (sim, i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.2;
+  const setup = (playerT) => {
+    const sim = createSim(wd, 105);
+    const k0 = sim.LI.find((i) => ok(sim, i) && sim.owner[i] < 0 && sim.landClass(i) === 7 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].every((d) => ok(sim, i + d) && sim.owner[i + d] < 0 && ok(sim, i + d + W) && ok(sim, i + d - W) && sim.owner[i + d + W] < 0 && sim.owner[i + d - W] < 0));
+    let T; if (playerT) { sim.setPlayer(k0 + 9, 'Woodland'); T = sim.playerCiv(); } else T = sim.spawnTribe(k0 + 9, {});
+    const S = sim.spawnTribe(k0, {});
+    for (const c of [S, T]) { c.aggression = 0; if (c.dip) c.dip.think = 1e12; }
+    S.tech = sim.ERAS[5][1] + 0.02; S.era = 5; teach(sim, S, 5); T.tech = sim.ERAS[2][1] + 0.01; T.era = 2; teach(sim, T, 2);
+    for (let d = 1; d <= 5; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, S, k0); sim.pop[i] = 40; }
+    for (let d = 6; d <= 11; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, T, k0 + 9); if (i !== T.capital) sim.pop[i] = 0.02; }
+    sim.touchAll(); sim.recount(); const had = sim.cellsOf[T.id]; for (let y = 0; y < 40; y++) { sim.tick(); if (T.player && T.story) T.story.q = null; }
+    sim.recount(); return { sim, S, T, had, now: sim.cellsOf[T.id], war: !!(S.wars && S.wars[T.id] !== undefined) };
+  };
+  const a = setup(false); check(a.now < a.had && !a.war, `settlers of a realm in the Renaissance take ${a.had - a.now} of the ${a.had} regions of an Iron Age neighbour where few live, without a war`);
+  const b = setup(true); check(b.now >= b.had, `but not the player's (${b.had} regions, ${b.now} after forty years)`);
+}
+// where the world's people live: the old world, as history had it
+{
+  const sim = createSim(wd, 12345); { let placed = 0, tries = 0; const homes = []; while (placed < 25 && tries < 20000) { tries++; const i = sim.LI[Math.floor(sim.rnd() * sim.LI.length)]; const f = sim.homeOf(i); if (f < 0.45 || sim.owner[i] >= 0) continue; if (sim.rnd() > f * f * ((sim.flags[i] & 2) ? 1.6 : 1)) continue; let ok = true; for (const h of homes) { const dy = Math.abs(((i / W) | 0) - ((h / W) | 0)); let dx = Math.abs((i % W) - (h % W)); if (dx > W / 2) dx = W - dx; if (dx * dx + dy * dy < 22 * 22) { ok = false; break; } } if (!ok) continue; if (sim.spawnTribe(i, { tech: 0.018 + sim.rnd() * 0.017 })) { homes.push(i); placed++; } } sim.recount(); }
+  while (sim.year < 1000) sim.tick();
+  let world = 0, am = 0, monsoon = 0; for (const i of sim.LI) { const p = sim.pop[i]; world += p; const lon = ((i % W) + 0.5) / W * 360 - 180; if (lon < -30 && lon > -170) am += p; const k = sim.landClass(i); if (k === 9 || k === 15) monsoon += p; }
+  const top = sim.civs.filter(Boolean).sort((x, y) => sim.popOf[y.id] - sim.popOf[x.id]).slice(0, 5).map((c) => ((c.capital % W) + 0.5) / W * 360 - 180);
+  log(`   ${sim.fmtYear(sim.year)}: ${(world / 1000).toFixed(0)} million people, ${(100 * am / world).toFixed(0)}% in the Americas, ${(100 * monsoon / world).toFixed(0)}% on the monsoon's farmland; the five greatest realms at ${top.map((x) => x.toFixed(0)).join(', ')} degrees of longitude`);
+  check(am / world < 0.15 && monsoon / world > 0.25 && top.every((x) => !(x < -30 && x > -170)), 'by AD 1000 the old world holds the world\'s people, monsoon Asia the most of them, and the greatest realms');
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

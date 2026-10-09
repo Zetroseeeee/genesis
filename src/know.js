@@ -32,7 +32,7 @@
   };
   // the works a discovery can open (the simulation's BUILD kinds), and the plain abilities
   const WORKS = ['farm', 'walls', 'port', 'market', 'temple', 'academy', 'workshop', 'weaver', 'smithy', 'brewery', 'granary', 'warehouse', 'shipyard', 'factory', 'refinery', 'lab', 'wonder', 'levy', 'fleet'];
-  const CANS = ['quarry', 'ores', 'colonies', 'faith'];
+  const CANS = ['quarry', 'ores', 'colonies', 'faith', 'oceans'];
 
   // ---------- the discoveries ----------
   // [key, name, age, branch, weight, stands on, what it gives, a line about it, marks]   marks: c = an age cannot do without it (the
@@ -145,7 +145,7 @@
     ['bastions', 'Star forts', 5, 'war', 0.9, 'castles mathematics', { defence: 0.25 }, 'Low, thick, angled walls of earth and brick, laid out so that every face is covered by guns.', ''],
     ['pikeshot', 'Pike and shot', 5, 'war', 0.9, 'firearms drill', { strength: 0.12 }, 'Blocks of pikemen shelter the musketeers while they reload. Drill becomes a science.', ''],
     ['rigging', 'Full-rigged ships', 5, 'trade', 1.0, 'shipbuilding compass', { sea: 0.4, c_ship: 0.2 }, 'Three masts, square and lateen sails, a sternpost rudder. Ships that can stay at sea for months.', ''],
-    ['navigation', 'Ocean navigation', 5, 'trade', 1.1, 'compass astronomy', { sea: 0.5, trade: 0.1 }, 'Charts, the quadrant and tables of the sun. Oceans are crossed on purpose, and crossed back.', 'f'],
+    ['navigation', 'Ocean navigation', 5, 'trade', 1.1, 'compass astronomy', { sea: 0.5, trade: 0.1, can: ['oceans'] }, 'Charts, the quadrant and tables of the sun. Oceans are crossed on purpose, and crossed back: colonies are planted on any shore across them.', 'f'],
     ['newcrops', 'Crops from afar', 5, 'land', 0.9, 'navigation', { food: 0.12, grow: 0.03 }, 'Potatoes, maize and cassava cross the oceans one way; wheat, sugar and horses the other.', ''],
     ['plantations', 'Plantations', 5, 'land', 0.9, 'navigation', { y_crop: 0.2, income: 0.04 }, 'Sugar, tobacco and coffee grown for sale across the sea on great estates.', ''],
     ['companies', 'Chartered companies', 5, 'trade', 1.0, 'banking navigation', { trade: 0.3, income: 0.08 }, 'Hundreds of investors share the cost of a voyage and its profit. The company outlives them all.', ''],

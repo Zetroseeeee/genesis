@@ -165,6 +165,8 @@ window.DISEASE = (function () {
     // the lens: for each realm, how fierce the worst outbreak in it is (0..1); whether it is spared some kind just now
     function lens(into) { into.fill(0); for (const o of out) for (let c = 0; c < MAXC; c++) if (o.inf[c] > into[c]) into[c] = o.inf[c]; return into; }
     function spared(c) { const yr = year(); for (let k = 0; k < NK; k++) if (imm[c * NK + k] > yr) return true; return false; }
+    // whether a realm's people have met any of the old world's sicknesses (land.js: the Americas farm with the old world's beasts and crops from then)
+    function met(c) { for (let k = 0; k < NK; k++) if (had[c * NK + k]) return true; return false; }
     const bandOf = (f, c) => (f > 0.6 ? 3 : f > 0 ? 2 : spared(c) ? 1 : 0);
     function save() {
       const pack = (o) => { const l = []; for (let c = 0; c < MAXC; c++) if (o.inf[c] > 0) l.push(c, Math.round(o.inf[c] * 1000), o.since[c], Math.round(o.cure[c] * 1000)); return l; };
@@ -179,7 +181,7 @@ window.DISEASE = (function () {
       for (const p of s.past || []) past.push(p); for (let i = 0; i < (s.im || []).length; i += 2) imm[s.im[i]] = s.im[i + 1]; for (let i = 0; i < (s.hd || []).length; i += 2) had[s.hd[i]] = s.hd[i + 1];
       if (s.stats) Object.assign(stats, s.stats); return true;
     }
-    return { step, seed, born, gone, view, lens, spared, bandOf, incF, setQ, quarantine, cure, unrest, save, load, stats, news, out, past, imm, had, deadly, KINDS, killF, dying: () => anyKill };
+    return { step, seed, born, gone, view, lens, spared, bandOf, incF, setQ, quarantine, cure, unrest, save, load, stats, news, out, past, imm, had, deadly, KINDS, killF, dying: () => anyKill, met };
   }
   return { create, KINDS, KK, NK, AGE, PASS, BANDS };
 })();
