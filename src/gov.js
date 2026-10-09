@@ -257,7 +257,7 @@ window.GOV = (function () {
   function tile() {
     const s = S(), c = me(); if (!s || !c) return null; const R = RL(), k = RU(), Q = k.ruleOf(c); const p = c.id * R.NE;
     const x = Q.reform ? (R.LAW[Q.reform.key] || R.FORM[Q.reform.key]) : null; let worst = -1, ws = 0; for (let e = 0; e < R.NE; e++) { const v = k.power[p + e] * Math.max(0, 0.45 - Q.mood[e]); if (v > ws) { ws = v; worst = e; } }
-    return { auth: Q.auth, max: R.AUTH_MAX, perTurn: k.gainOf(c.id, c) * R.PACE[c.era], form: R.FORM[Q.gov], reform: x ? { x, left: Math.max(1, Q.reform.start + Q.reform.dur - s.year) } : null,
+    return { auth: Q.auth, max: R.AUTH_MAX, perTurn: k.gainOf(c.id, c) * R.PACE[c.era], form: R.FORM[Q.gov], reform: x ? { x, left: Math.max(1, Q.reform.start + Q.reform.dur - s.year), prog: Math.max(0, Math.min(1, (s.year - Q.reform.start) / Math.max(1, Q.reform.dur))) } : null,
       demand: Q.demand && R.LAW[Q.demand.key] ? { e: Q.demand.e, who: R.estateName(Q.demand.e, c.era), law: R.LAW[Q.demand.key], since: Q.demand.since, left: Math.max(1, Q.demand.until - s.year) } : null,
       angry: worst >= 0 && Q.mood[worst] < 0.35 && k.power[p + worst] >= 0.08 ? { who: R.estateName(worst, c.era), mood: Q.mood[worst] } : null, rose: Q.rose,
       // (where a realm is coming apart, someone marches on the capital: rule.js)
