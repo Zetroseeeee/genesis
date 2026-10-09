@@ -348,3 +348,7 @@ faiths_late  | tools/scenes/peoples.js | {years:11500,lon:40,lat:35,alt:7500,len
 faiths_near  | tools/scenes/peoples.js | {years:11000,lon:35,lat:38,alt:2200,tilt:0.3,lens:'fth'} | | 160
 faith_found  | tools/scenes/faithpage.js | {years:9800,lon:35.2,lat:31.8,page:'new'} | | 150
 faith_page   | tools/scenes/faithpage.js | {years:11200,lon:12.5,lat:41.9,page:'mine'} | | 170
+# --- culture: the Culture screen in AD 300 (the realm's great people and works, a golden age; the world's renowned realms and greatest works); the lens of renown over the Old World in AD 1000 ---
+culture_mine  | tools/scenes/culture.js | {years:10300,lon:23,lat:38.5,tab:'mine'} | | 170
+culture_world | tools/scenes/culture.js | {years:10300,lon:23,lat:38.5,tab:'world'} | | 170
+culture_lens  | tools/scenes/peoples.js | {years:11000,lon:40,lat:35,alt:7500,lens:'ren'} | | 170

@@ -280,12 +280,12 @@
 
   // the lens of renown (world.js paints realms by these, main.js keys them): a golden age first, then renown against the usual for the age
   const BANDS = [
-    { key: 'gold', name: 'In a golden age', css: '#FFF0C2' },
-    { key: 'famed', name: 'Famed: four times the usual and more', css: '#F0C25E', at: 4 },
-    { key: 'renowned', name: 'Renowned', css: '#C4924A', at: 1.5 },
-    { key: 'usual', name: 'About the usual for the age', css: '#8B7D6C', at: 1 / 1.5 },
-    { key: 'less', name: 'Less known', css: '#5D6070', at: 0.25 },
-    { key: 'little', name: 'Little known', css: '#363C4A', at: 0 },
+    { key: 'gold', name: 'In a golden age', css: '#FFE14D' },
+    { key: 'famed', name: 'Famed: four times the usual and more', css: '#F0A030', at: 4 },
+    { key: 'renowned', name: 'Renowned', css: '#C9853A', at: 1.5 },
+    { key: 'usual', name: 'About the usual for the age', css: '#8F8A9A', at: 1 / 1.5 },
+    { key: 'less', name: 'Less known', css: '#5B5F8F', at: 0.25 },
+    { key: 'little', name: 'Little known', css: '#33355C', at: 0 },
   ];
   BANDS.forEach((B) => { B.rgb = [parseInt(B.css.slice(1, 3), 16) / 255, parseInt(B.css.slice(3, 5), 16) / 255, parseInt(B.css.slice(5, 7), 16) / 255]; });
   const BAND = {}; BANDS.forEach((B) => { BAND[B.key] = B; });

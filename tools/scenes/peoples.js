@@ -2,7 +2,7 @@
 // forward (default 8,000: to 2000 BC), a few hundred years at a time so that the page keeps drawing, and its peoples are
 // painted on the map (the lens, I; lens: 'fth' paints its faiths, J); the camera looks down from window.__scene.alt
 // kilometres over lon, lat. Options: years, lon, lat, alt, tilt, heading, clouds (false: none, so that the map can be
-// read), lens ('ppl' or 'fth').
+// read), lens ('ppl', 'fth', or 'ren': the lens of renown).
 (() => {
   const G = window.__G; if (!G) return 'no game';
   const P = Object.assign({ years: 8000, lon: 35, lat: 38, alt: 7000, tilt: 0, heading: 0, clouds: false, lens: 'ppl' }, window.__scene || {});

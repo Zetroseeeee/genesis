@@ -21,7 +21,7 @@ window.WORKS = (function () {
   const LYRE = 'M7 4c-2 3-2 9 0 13M17 4c2 3 2 9 0 13M7 17h10M9 7v10M12 6v11M15 7v10';
   const PATRON = [['Neglect', 'The court pays for nothing: great people come less often'], ['Custom', 'What a court of your age gives as a matter of course'], ['Generous', 'Commissions and pensions: half again as often, for a twelfth of your income'], ['Lavish', 'Academies, theatres and prizes: more than twice as often, for a fifth of your income']];
   // what a kind's works bring the realm (culture.js: boon)
-  const BRINGS = { insight: 'its works bring insight', auth: 'its works bring authority', build: 'makes your works cheaper while living' };
+  const BRINGS = { insight: ['insight', 'His works bring your scholars insight'], auth: ['authority', 'His works bring the crown authority: a realm\'s glory sung is its ruler\'s free hand'], build: ['cheaper works', 'While he lives your works cost less'] };
   const stars = (fame) => '★'.repeat(Math.max(1, Math.min(5, Math.round(fame * 1.8))));
 
   let ctx = null, tab = 'mine', lastSig = '';
@@ -86,11 +86,11 @@ window.WORKS = (function () {
     const head = `<div class="cu-head">
       <div class="cu-stat"><span class="micro">Renown</span><b>${Math.round(ren)}</b><span class="cu-scale" title="Halvings and doublings of the usual renown of your age"><i style="left:${(at * 100).toFixed(1)}%"></i><u></u></span><small>${relTxt}. ${pride >= 0.004 ? `Pride steadies the realm (+${Math.round(pride * 100)})` : pride <= -0.004 ? `Its want of renown unsettles it (${Math.round(pride * 100)})` : 'Neither pride nor shame moves it'}.</small><button class="linkish" data-uact="lens">See every realm's on the map</button></div>
       <div class="cu-stat"><span class="micro">The next great person</span><span class="kn-prog"><i style="width:${(100 * Math.min(1, K.prog[c.id] / T)).toFixed(1)}%"></i></span><small>${left < 0 ? `Not before your people know ${esc(window.KNOW.LIST[window.KNOW.ID.masonry].name.toLowerCase())}` : left > 2000 ? 'Not in living memory, as things are' : `In about ${yrs(left)}${turn > 1 ? ` (${Math.max(1, Math.round(left / turn))} turn${Math.round(left / turn) > 1 ? 's' : ''})` : ''}, as things are`}</small><small class="cu-parts">${parts(s, K, c)}</small></div>
-      <div class="cu-stat${gold ? ' gold' : ''}"><span class="micro">${gold ? 'A golden age' : 'No golden age'}</span>${gold ? '' : `<span class="cu-pips" title="Great people born within ${yrs(G.win)}">${pips}</span>`}<small>${goldTxt}</small></div></div>
+      <div class="cu-stat${gold ? ' gold' : ''}"><span class="micro">${gold ? 'A golden age' : 'No golden age'}</span>${gold ? `<span class="kn-prog" title="How much of it is left"><i style="width:${(100 * Math.max(0, Math.min(1, (G.until - s.year) / G.len))).toFixed(1)}%"></i></span>` : ''}<small>${goldTxt}</small><span class="cu-pips" title="Great people born within ${yrs(G.win)}">${pips}<em>${G.have} born within ${yrs(G.win)}</em></span></div></div>
       <div class="cu-patron"><span class="micro">Patronage</span>${PATRON.map(([n, t], k) => `<button class="btn${k === lvl ? ' on' : ''}" data-uact="patron" data-k="${k}" title="${esc(t)}">${n}</button>`).join('')}<small>${esc(PATRON[lvl][1])}</small></div>`;
     const living = K.livingOf(c.id).sort((a, b) => b.fame - a.fame); const cost = K.commissionCost(c); const wait = Math.max(5, turn);
     const people = living.length ? living.map((g) => { const why = g.made >= 3 ? `${g.name} has made all there is in him` : g.asked && s.year - g.asked < wait ? 'Asked lately: give it a turn' : c.wealth < cost ? `Needs ${cost} coin` : ''; const b = K.KINDS[g.kind].boon;
-      return `<div class="cu-great"><span class="ic">${kindIcon(K, g.kind)}</span><span class="nm"><b>${esc(g.name)}</b><small>${esc(K.kindName(g))} · <span class="cu-st">${stars(g.fame)}</span> · born ${s.fmtYear(g.born)} in ${esc(s.cellName.get(g.at) || '?')} · ${g.made} of 3 works · ${BRINGS[b] || ''}</small></span><button class="btn" data-uact="commission" data-k="${g.id}" ${why ? 'disabled' : ''} title="${why ? esc(why) : 'Ask for a work now'}">Commission · ${cost}</button></div>`; }).join('')
+      return `<div class="cu-great live"><span class="ic">${kindIcon(K, g.kind)}</span><span class="nm"><b>${esc(g.name)}</b><small>${esc(K.kindName(g))} · <span class="cu-st">${stars(g.fame)}</span> · ${g.made} of 3 works · of ${esc(s.cellName.get(g.at) || '?')}, born ${s.fmtYear(g.born)}</small></span><span class="cu-boon ${b}" title="${esc((BRINGS[b] || ['', ''])[1])}">${(BRINGS[b] || [''])[0]}</span><button class="btn" data-uact="commission" data-k="${g.id}" ${why ? 'disabled' : ''} title="${why ? esc(why) : `Ask for a work now, for ${cost} coin`}">Commission · ${cost}</button></div>`; }).join('')
       : '<div class="hint">Nobody of note lives in your realm now. Towns, temples, academies, markets and wonders bring great people forth, and laws that let people learn and speak.</div>';
     const before = K.greatsOf(c.id).filter((g) => g.dies < s.year).sort((a, b) => b.dies - a.dies).slice(0, 6);
     const held = K.heldBy(c.id).sort((a, b) => b.value - a.value); const gone = K.madeBy(c.id).filter((w) => w.lost || (w.held >= 0 && w.held !== c.id)).sort((a, b) => b.year - a.year).slice(0, 8);
@@ -116,13 +116,13 @@ window.WORKS = (function () {
       ${lost.length ? `<div class="micro cu-sub">Lost for ever</div>${lost.map((w) => workRow(s, K, w, c)).join('')}` : ''}</div></div>`;
   }
   function render() {
-    const s = S(); if (!s || !isOpen()) return; const c = me(); if (!c) return;
+    if (!ctx || !isOpen()) return; const s = S(); if (!s) return; const c = me(); if (!c) return;
     $('cu-sub').textContent = `${s.fullName(c)} · ${s.fmtYear(s.year)}`;
     const K = C(); $('cu-ren').innerHTML = `<span class="cu-chip" title="Renown: the works your realm holds, and its wonders">${svg(LYRE)}<b>${Math.round(K.renown[c.id])}</b> renown${K.isGolden(c.id) ? ' · <span class="gold">a golden age</span>' : ''}</span>`;
     if (tab === 'world') renderWorld(); else renderMine();
     lastSig = sig();
   }
   const sig = () => { const s = S(), c = me(), K = C(); if (!c || !K) return String(s.year); return `${s.year}:${K.stats.born}:${K.stats.works}:${K.stats.lost}:${c.patron}:${Math.floor(c.wealth / 20)}:${Math.round(c.stability * 50)}`; };
-  function refresh() { const s = S(); if (!s || !isOpen()) return; if (sig() !== lastSig) render(); }
+  function refresh() { if (!ctx || !isOpen()) return; const s = S(); if (!s) return; if (sig() !== lastSig) render(); }
   return { init, open, close, isOpen, refresh, render, ICON, LYRE };
 })();

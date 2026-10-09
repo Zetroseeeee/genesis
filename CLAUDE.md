@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~26 min for all 35).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~30 min for all 41).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
@@ -110,6 +110,14 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   ways, what was founded, taken up, forsaken and broken away, how many regions the state, the preachers and the
   merchants carried over, what share of other faiths realms hold; `--write` puts each age's mean into `src/faith.js`
   (its NORM marks). Run it twice over two seeds after touching how faiths spread, split or are taken up.
+- `node tools/culture/probe.js [seed,seed] [last year] [--write]` — the world's culture through the ages: great people
+  born (of each kind) and living, works made, forgotten, lost and kept, golden ages, what the works brought (insight,
+  authority), what the realms that make great people have and how many a turn the great ones (the tenth from the top)
+  and the middle ones bring forth, the most renowned realms and the greatest works, the size of culture in a save;
+  `--write` puts each age's usual renown (the mean of the logarithm) into `src/culture.js` (its NORM marks). Hold it to
+  its header: the great realms about one great person a turn from the Iron Age on, half that in the Bronze Age, the
+  middle ones a third to a half of that; a golden age for a few realms in a hundred at a time. Run it twice over two
+  seeds after touching how great people come, what their works are worth or bring, or what renown is.
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -196,6 +204,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/army.js` | `ARMY` | Hosts and fleets: the autopilot's host on every front, the player's levy that marches where he sends it (by road over land, by fleet over the sea), battles, assaults and sieges; pure data |
 | `src/people.js` | `PEOPLE` | The peoples of the world: who lives in every region, each people's tongue and family, how peoples are taken into those who rule them and drift apart, what ruling others costs a realm; pure data |
 | `src/faith.js` | `FAITH` | The faiths of the world: what every region keeps, the holy cities, faiths founded, carried by the state, preached and taken up, churches that break away, what other faiths cost a realm; the player's faith (founding with tenets, taking up another, missionaries); pure data |
+| `src/culture.js` | `CULTURE` | Great people (nine kinds), their works, renown and golden ages: who is born where, what they make, where it is kept and who holds it, what it brings the realm, what is forgotten; the player's patronage and commissions; pure data |
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
@@ -212,6 +221,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand |
 | `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
+| `src/works.js` | `WORKS` | The culture screen: renown against the age, the next great person, the golden age, patronage, the living great people (commissions), the works held and lost; the world's renowned realms, golden ages, great people of late and greatest works |
 | `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
 | `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
@@ -499,6 +509,36 @@ Conventions that matter:
   city the first realm's capital, and every realm's land of its realm's faith (`settle`). The module throws its own
   dice. After touching it run `tools/faith/probe.js` over 12345 and 777 (twice with `--write`) and the war-and-peace
   probe.
+- **Culture** (`culture.js`; `sim.culture`). **Everything in it is paced by the turn** (`RULE.PACE`), so that what a
+  realm sees of it in a turn is alike in every age. Every realm that knows masonry works towards its next great person
+  (`prog`): its towns, academies (three), temples and markets (two), wonders (five), times its laws of learning, speech
+  and faith (`LAW`), its steadiness, its patronage (`PATRON`: none, the common, generous, lavish; the player chooses and
+  pays a share of his income, a ruler of the autopilot gives by his leaning) and a golden age (`GOLD.boost`), at each
+  age's pace (`PACE`, fitted by `tools/culture/probe.js` so that the great realms bring forth about one a turn); one is
+  born when the work reaches a threshold that rises with the great people the realm has had lately (`had`, halving in
+  four turns). The kind (artist, master builder, poet, sage, playwright, historian, composer, novelist, filmmaker:
+  `KINDS`) stands on a discovery and leans to what the realm has; he is born in its capital or a town (`townPick` in
+  `sim.js`, a hash of the place and the year), named in his people's tongue, lives some decades and makes up to three
+  works (named by `KINDS[].works`), each worth its kind's value times his fame. A work stays in the city where it was
+  made: whoever holds the city holds it (a conqueror carries renown off), a sacked city may lose it for ever, and a
+  lesser work is forgotten six turns after it was made (`FORGET`; a masterpiece, worth `MASTER` and more, never is:
+  that is what keeps the lists and the save small). What a work brings (`boon`): a sage's insight (so many years of the
+  realm's learning, through `tech` as a neighbour's teaching), the arts' authority (so many turns of what the realm
+  gathers: `BOON`); a master builder living makes the realm's works cheaper (`buildF`, in `buildCost`). A realm's
+  renown is what it holds and its wonders (four each), counted every five years; four great people born within two
+  turns to a realm at least 0.6 steady begin a golden age (three turns; none again within four of its end; unrest
+  ends it). **Renown is measured against the age**: `rel` is renown over the usual realm's of its age (`NORM`, the
+  mean of the logarithm, so that as many realms are above it as below); pride (`unrest`) is ±0.03 stability over three
+  halvings or doublings, a golden age 0.02 more; the realm's own people take others in by `pull` (people.js); a realm
+  of little renown admires one of great renown (diplomacy: 'They admire your works'). The player: the Culture screen
+  (`works.js`, Z): patronage, commissions (a work at once, for coin, once a turn of a master), the living and the
+  remembered, the works held and lost; the world's most renowned realms, its golden ages, its greatest works. The
+  lens of renown (Shift+Z; `world.palMode = 'renown'`) paints realms by bands of `rel` (`CULTURE.BANDS`), a golden
+  age apart; the realm's panel and the stability tooltip say where it stands. The chronicle tells of great people of
+  note, masterpieces, golden ages and works lost (`cultureNews`); the world hears of the greatest only. Saved packed
+  (`save().culture`; a great person's works are found again from the works); a world saved before culture has had no
+  great people yet. The module throws its own dice; a year of it is a tenth of a millisecond. After touching it run
+  `tools/culture/probe.js` over 12345 and 777 (twice with `--write`) and the war-and-peace probe.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by
