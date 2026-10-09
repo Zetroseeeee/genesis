@@ -281,7 +281,7 @@ window.ENVOYS = (function () {
     const s = S(), IN = window.INTRIGUE; const V = s.intrigueView ? s.intrigueView() : null; if (!V || !IN) { $('dp-intrigue').innerHTML = ''; return; }
     const y = s.year, d = DK(); const kn = s.know, writes = !!kn.has[c.id * kn.ND + window.KNOW.ID.writing];
     let L = `<div class="dp-stat"><span class="ic">${svg(ICON.spy)}</span><div><span class="micro">Your network</span><b>${V.net >= 6 ? 'formidable' : V.net >= 4 ? 'strong' : V.net >= 2 ? 'able' : V.net >= 1 ? 'young' : 'none'} <span class="num">${V.net.toFixed(1).replace(/\.0$/, '')}</span></b><span class="gv-bar"><i style="width:${Math.max(2, Math.min(100, V.net * 10)).toFixed(0)}%"></i></span>`;
-    L += V.parts.length ? `<div class="dp-parts">${V.parts.map(([t, v]) => `<span>${esc(t)}<em>+${String(v).replace(/^0\./, '.')}</em></span>`).join('')}</div>` : '';
+    L += V.parts.length ? `<div class="dp-parts">${V.parts.map(([t, v]) => `<span>${esc(t)}<em>+${v}</em></span>`).join('')}</div>` : '';
     L += `<p class="gv-note">Each point of yours over theirs makes a scheme likelier to work and less likely to be found out, and theirs over yours the other way; a shared border helps your agents. Writing, envoys, letters, embassies, the telegraph, the wireless and the machines that listen each add one; so do some laws (police, intendants, the censor) and a ruler who trusts nobody.</p></div></div>`;
     L += `<div class="micro dp-h">Your agents</div>`;
     if (!writes) L += `<div class="gv-note">A realm keeps agents abroad once its people can write: <button class="linkish" data-kgo="writing">Writing</button>.</div>`;
