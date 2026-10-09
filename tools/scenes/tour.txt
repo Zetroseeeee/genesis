@@ -125,6 +125,10 @@ dip_envoys   | tools/scenes/dip.js | {tab:'envoys'} | | 16
 dip_wars     | tools/scenes/dip.js | {tab:'wars'} | | 16
 dip_standing | tools/scenes/dip.js | {tab:'standing'} | | 16
 dip_lens     | tools/scenes/dip.js | {lens:true} | | 22
+hud          | tools/scenes/dip.js tools/scenes/hud.js | {lens:true} | | 26
+hud_laws     | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,screen:'gov'} | | 28
+hud_copper   | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:6,screen:'market'} | | 28
+hud_glass    | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:8} | | 26
 # --- light and air: the sky and the haze from the ground, the sun in the picture, dusk and the stars, the country from high up, the planet ---
 horizon      | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('town', 1.2, 1.4, 0.3), 7000); | 32
 sun_high     | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14,sun:[0.22,0.3]} | setTimeout(() => __sceneLook('town', 1.2, 1.5, 0.3), 7000); | 32
