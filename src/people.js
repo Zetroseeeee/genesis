@@ -130,7 +130,7 @@
       // a fifth of the land each year: who has been taken into their rulers' people
       const k5 = ((yr % 5) + 5) % 5, era = [];
       for (let c = 0; c < MAXC; c++) era[c] = civs[c] ? Math.min(8, Math.max(0, civs[c].era | 0)) : 0;
-      const af = new Float32Array(MAXC); for (let c = 0; c < MAXC; c++) if (civs[c]) af[c] = ASSIM[era[c]] * lawF(c, 'assim') * 5;
+      const af = new Float32Array(MAXC); for (let c = 0; c < MAXC; c++) if (civs[c]) af[c] = ASSIM[era[c]] * lawF(c, 'assim') * 5 * (h.pull ? h.pull(c) : 1);      // (a realm of renown takes others in faster: culture.js)
       for (let k = k5; k < LI.length; k += 5) {
         const i = LI[k], o = owner[i]; if (o < 0) continue; const p = ppl[i], r = ruling[o]; if (!p || !r || p === r || !af[o]) continue;
         let near = 0; for (let q = 0; q < 8; q++) { const n = h.nbOf(i, q); if (n >= 0 && ppl[n] === r && owner[n] === o) near++; }

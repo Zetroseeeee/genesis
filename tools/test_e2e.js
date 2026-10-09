@@ -334,7 +334,7 @@ server.listen(0, async () => {
   await scenario('chronicle modal: tabs, filters, click-to-fly, close', async (check) => {
     await page.keyboard.press('c'); await frames(2);
     let r = await ev(() => ({ open: document.getElementById('chron').open, log: document.querySelectorAll('#log .fe').length, filters: document.querySelectorAll('#logfilters .btn').length }));
-    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 11, 'eleven filters');
+    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 12, 'twelve filters');
     await ev(() => document.querySelector('#logfilters [data-f="mine"]').click()); const mine = await ev(() => [...document.querySelectorAll('#log .fe')].every(e => e.classList.contains('mine'))); check(mine, 'Mine filter shows only own events');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="powers"]').click()); check((await ev(() => document.querySelectorAll('#powers .pw').length)) > 3, 'powers list');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="graphs"]').click()); await frames(2); check((await ev(() => { const c = document.getElementById('g-world'); return c.width > 0 && c.height > 0; })), 'graphs drawn');
@@ -704,6 +704,39 @@ server.listen(0, async () => {
     await page.keyboard.press('j'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, key: document.getElementById('govkey').hidden })); check(r.mode === 'realm' && r.key, 'and off again');
     await ev(() => { __G.select(__G.sim.playerCiv().capital); });
   });
+  await scenario('culture: great people and their works, the Culture screen, patronage, a commission, a golden age, the lens of renown', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); if (TREE.isOpen()) TREE.close(); if (GOV.isOpen()) GOV.close(); if (ENVOYS.isOpen()) ENVOYS.close(); });
+    // a realm of the Classical age: great people are born to it and make their works, in its towns
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), K = S.culture; const cl = S.ERAS[3][1] + 0.01; if (c.tech < cl) { c.tech = cl; c.era = S.eraOf(cl); } __T.teach(c); c.stability = 0.9; K.golden[c.id] = -1e9;
+      const g = []; for (let k = 0; k < 3; k++) { const x = K.bear(c.id); if (x) { g.push(x); K.make(x); } } K.tally(S.year); S.cultureNews(); return { n: g.length, works: K.heldBy(c.id).length, ren: K.renown[c.id], told: c.events.slice(-8).filter((e) => e.type === 'culture').length }; });
+    check(r.n === 3 && r.works >= 3 && r.ren > 0, `great people are born to the realm and make works (${r.works} held, renown ${Math.round(r.ren)})`); check(r.told > 0, `and the realm's chronicle tells of them (${r.told})`);
+    // Z opens the Culture screen: renown against the age, the next great person, the golden age, patronage, the living, the works held
+    await page.keyboard.press('z'); await frames(2);
+    r = await ev(() => ({ open: WORKS.isOpen(), tab: (document.querySelector('#cu-tabs button.on') || {}).dataset?.utab, people: document.querySelectorAll('#cu-mine .cu-great:not(.dead)').length, works: document.querySelectorAll('#cu-mine .cu-work').length, chip: document.getElementById('cu-ren').textContent, head: (document.querySelector('#cu-mine .cu-head') || {}).textContent || '' }));
+    check(r.open && r.tab === 'mine' && r.people >= 3 && r.works >= 3, `Z opens the Culture screen: ${r.people} great people living, ${r.works} works held`);
+    check(/renown/i.test(r.chip) && /usual realm of your age/.test(r.head) && /next great person/i.test(r.head) && /golden age/i.test(r.head), 'its head: renown against the age, the next great person, the golden age');
+    await page.click('#cu-mine [data-uact="patron"][data-k="3"]'); await frames(1);
+    r = await ev(() => ({ patron: __G.sim.playerCiv().patron, on: (document.querySelector('#cu-mine .cu-patron .btn.on') || {}).textContent || '' })); check(r.patron === 3 && /Lavish/.test(r.on), 'patronage set to lavish');
+    await ev(() => { __G.sim.playerCiv().wealth = 99999; WORKS.render(); }); await frames(1); const n0 = await ev(() => __G.sim.culture.works.length);
+    await page.click('#cu-mine [data-uact="commission"]:not([disabled])'); await frames(2);
+    r = await ev(() => ({ n: __G.sim.culture.works.length, wealth: __G.sim.playerCiv().wealth, toast: ([...document.querySelectorAll('.toast')].pop() || {}).textContent || '' })); check(r.n === n0 + 1 && r.wealth < 99999, `a commission: a work at once, for coin (${r.toast.slice(0, 70)})`);
+    // a fourth great person within two turns: a golden age, on the screen and in the chronicle
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), K = S.culture; c.stability = 0.9; K.bear(c.id); K.tally(S.year); S.cultureNews(); WORKS.render(); return { gold: K.isGolden(c.id), card: !!document.querySelector('#cu-mine .cu-stat.gold'), told: c.events.slice(-8).some((e) => /golden age/.test(e.text)) }; });
+    check(r.gold && r.card && r.told, 'four great people within two turns: a golden age, on the screen and in the chronicle');
+    await page.click('#cu-tabs button[data-utab="world"]'); await frames(1);
+    r = await ev(() => ({ realms: document.querySelectorAll('#cu-world .cu-realm').length, me: !!document.querySelector('#cu-world .cu-realm.me'), works: document.querySelectorAll('#cu-world .cu-work').length, gold: (document.querySelector('#cu-world .cu-gold') || {}).textContent || '' }));
+    check(r.realms >= 2 && r.me && r.works >= 3 && r.gold.length > 0, `the world: the most renowned realms (${r.realms}, yours among them), the greatest works (${r.works}), the golden ages`);
+    await page.keyboard.press('z'); await frames(1); check(!(await ev(() => WORKS.isOpen())), 'Z closes it again');
+    r = await ev(() => { const S = __G.sim; __G.select(S.playerCiv().capital); return document.getElementById('sc-kv').textContent; }); check(/Renown/.test(r) && /golden age/.test(r), 'the realm\'s panel: ' + (r.match(/Renown(.{0,60})/) || ['', ''])[1]);
+    // Shift+Z: the lens of renown, with its key; the realm in its golden age painted so
+    await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.55, 0, 0); }); await wait(300); await frames(3);
+    await page.keyboard.press('Shift+Z'); await frames(4);
+    r = await ev(() => { const k = document.getElementById('govkey'), W = __G.world, c = __G.sim.playerCiv(); return { on: document.getElementById('v-ren').classList.contains('on'), mode: W.palMode, key: !k.hidden, text: k.textContent, pal: [0, 1, 2].map((j) => W.palData[c.id * 4 + j]), gold: CULTURE.BAND.gold.rgb.map((v) => Math.floor(v * 255)) }; });
+    check(r.on && r.mode === 'renown' && r.key && /Renown, against the usual/.test(r.text) && /golden age · you/.test(r.text), `Shift+Z turns on the lens of renown, with its key (${r.text.slice(0, 80)})`);
+    check(r.pal.every((v, j) => Math.abs(v - r.gold[j]) <= 1), `and paints the realm in its golden age so (${r.pal.join(',')})`);
+    await page.keyboard.press('Shift+Z'); await frames(3); r = await ev(() => ({ mode: __G.world.palMode, key: document.getElementById('govkey').hidden })); check(r.mode === 'realm' && r.key, 'and off again');
+    await ev(() => { const S = __G.sim, c = S.playerCiv(); c.patron = 1; __G.select(c.capital); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);
@@ -712,14 +745,14 @@ server.listen(0, async () => {
 
   // ---------- layouts ----------
   await scenario('layout: from 800x500 to 1920x1080 the HUD stays inside the viewport and the launchers clear of the minimap', async (check) => {
-    for (const vp of [{ width: 800, height: 500 }, { width: 1160, height: 700 }, { width: 1920, height: 1080 }]) {      // (1160: just wide enough for the launchers' names, where they come nearest the minimap)
+    for (const vp of [{ width: 800, height: 500 }, { width: 1260, height: 700 }, { width: 1920, height: 1080 }]) {      // (1260: just wide enough for the launchers' names, where they come nearest the minimap)
       await page.setViewportSize(vp); await wait(300); await frames(3); await ev(() => { document.getElementById('l-build').click(); __G.select(__G.sim.playerCiv().capital); }); await frames(2);
       const r = await ev(() => { const ids = ['tl', 'tr', 'left', 'bl', 'bc', 'br', 'turn', 'minimapbox']; const out = []; for (const id of ids) { const el = document.getElementById(id); if (!el || getComputedStyle(el).display === 'none') continue; const b = el.getBoundingClientRect(); if (b.width === 0) continue; if (b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1) out.push(`${id} ${Math.round(b.left)},${Math.round(b.top)}-${Math.round(b.right)},${Math.round(b.bottom)}`); } const a = document.getElementById('left').getBoundingClientRect(), d = document.getElementById('bc').getBoundingClientRect(); const overlap = a.left < d.right && d.left < a.right && a.top < d.bottom && d.top < a.bottom;
         // (the bar of launchers stops short of the minimap and the turn button, and none of its names is cut off)
         const bar = document.getElementById('bl').getBoundingClientRect(); let meets = ''; for (const id of ['minimapbox', 'turn']) { const el = document.getElementById(id); if (!el || getComputedStyle(el).display === 'none') continue; const b = el.getBoundingClientRect(); if (b.width && bar.right > b.left - 4 && bar.bottom > b.top && bar.top < b.bottom) meets += `${id} at ${Math.round(b.left)}, the bar to ${Math.round(bar.right)}; `; }
         const cut = [...document.querySelectorAll('#bl .btn')].filter((b) => b.scrollWidth > b.clientWidth + 1).length, n = document.querySelectorAll('#bl .btn').length;
         return { out, overlap, meets, cut, n, w: innerWidth }; });
-      check(r.out.length === 0, `${vp.width}px: elements outside viewport: ${r.out.join('; ')}`); check(!r.overlap, `${vp.width}px: inspector overlaps the dock`); check(!r.meets && !r.cut && r.n >= 9, `${vp.width}px: the ${r.n} launchers stop short of the minimap, none cut off (${r.meets || 'clear'}${r.cut ? r.cut + ' cut' : ''})`);
+      check(r.out.length === 0, `${vp.width}px: elements outside viewport: ${r.out.join('; ')}`); check(!r.overlap, `${vp.width}px: inspector overlaps the dock`); check(!r.meets && !r.cut && r.n >= 10, `${vp.width}px: the ${r.n} launchers stop short of the minimap, none cut off (${r.meets || 'clear'}${r.cut ? r.cut + ' cut' : ''})`);
       await ev(() => document.getElementById('l-build').click());
     }
     await page.setViewportSize({ width: 1024, height: 640 }); await wait(300);
