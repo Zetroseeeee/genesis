@@ -739,7 +739,7 @@ Conventions that matter:
   is (`cosLat`), times how intensely its kind is farmed (`I`) on that kind's course through the ages (`CURVES`, against the
   first farmland's: the table of food is how farming as a whole grows, these say only how each kind keeps pace - the wooded
   north waits for iron axes and the heavy plough, the grass for the steel plough, the tropics of Africa and the Americas for
-  fertiliser), times what its continent farms with (`WORLDS`: the Americas 0.6, Australia 0.4, until its people have met the
+  fertiliser), times what its continent farms with (`WORLDS`: the Americas 0.5, Australia 0.4, until its people have met the
   old world's sicknesses, `disease.met`: its beasts and crops come with its ships), times the table of food; never less than
   the land feeds people who do not farm (`forage`, by kind, more along rivers and coasts). A realm's row of this is made once a
   year (`landRow`, `landK`); the pass over the land reads it flat. The scale is the old map's (`LSCALE`, `WSCALE`: the world's

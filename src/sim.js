@@ -450,7 +450,7 @@ function createSim(world, seed) {
     // (the arts: so many turns of the authority the realm gathers, at once)
     acclaim: (c, turns) => { const cv = civs[c]; if (!cv || !(turns > 0)) return 0; const R = rule.ruleOf(cv); const g = Math.min(RULE.AUTH_MAX - R.auth, rule.gainOf(c, cv) * RULE.PACE[cv.era] * turns); if (!(g > 0)) return 0; R.auth = Math.round((R.auth + g) * 1000) / 1000; return g; } });
   // (the realms a realm trades with by the market's links; its share of the world's trade, reckoned once a year)
-  const partnersOf = (c) => { const out = []; for (const L of market.links) { if (L.a === c) out.push(L.b); else if (L.b === c) out.push(L.a); } return out; };
+  const partnersOf = (c) => { if (diplo && diplo.linked() === market.links) return diplo.partnersOf(c); const out = []; for (const L of market.links) { if (L.a === c) out.push(L.b); else if (L.b === c) out.push(L.a); } return out; };      // (diplomacy keeps the market's links indexed by realm: the same list, in the same order, without going through them all)
   let tradeYear = -1e9, tradeAll = 1; const tradeShare = (c) => { if (tradeYear !== year) { tradeYear = year; let t = 0; for (let k = 0; k < MAXC; k++) if (civs[k]) t += market.expV[k] + market.impV[k]; tradeAll = Math.max(1e-6, t); } return (market.expV[c] + market.impV[c]) / tradeAll; };
   finance = FINANCE.create({ civs, MAXC, owner, STYLES, cellName, people, year: () => year, seed, townsOf, markets, ports,
     knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1, warsN: (cv) => warsOf(cv), trait: (cv) => (cv.ruler ? cv.ruler.trait : ''), nameOf: (cv) => fullName(cv),

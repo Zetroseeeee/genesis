@@ -591,7 +591,7 @@ window.DIPLO = (function () {
     }
     return { stats, D, tick, step, born, died, wake, heir, reach, opinion, reasons, judge, cannot, propose, answer, breakPact, release, rebel, annex, cannotJoin, gift, giftWorth, claim, claimCost, embargo, causes, warCost, cannotFight, declare,
       abandon, score, termsFor, wouldEnd, cannotSue, sue, conclude, fell, warsEnd, warWith, think, has, pactOf, anyPact, bound, friends, lordOf, vassalsOf, threatTo, standing, memOf, remember, tradeShare, trIn, trOut, touches, ratio, seal, subject,
-      union, join, closed, agreed, termOf, ver, partnersOf, pN, pAt, claimUntil, holds, askedAt, grantClaim, CLAIMS };
+      union, join, closed, agreed, termOf, ver, partnersOf, pN, pAt, linked: () => linkList, claimUntil, holds, askedAt, grantClaim, CLAIMS };
   }
   return { PACE, PACTS, PACT, VASSAL, OPENS, CAUSES, TERMS, TERM_TEXT, RANK, MOODS, moodOf, STAND, TRIBUTE, REPARATION, REPARATION_TURNS, CLAIM_TURNS, UNION_TURNS, UNJUST_STAB, UNJUST_REP, creedGap, create };
 })();
