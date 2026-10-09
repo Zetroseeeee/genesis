@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -985,6 +985,72 @@ log('15. culture');
   check(!bad, `every realm's renown, pride and pull are within bounds (${bad} not)`);
   check(ms / 100 < 0.5, `culture is quick enough (${(ms / 100).toFixed(3)} ms a year)`);
   function CU_MASTER() { return window.CULTURE.MASTER; }
+}
+}
+// ---------- 16. finance: credit and its lenders, interest, defaults, the coin, banking houses, companies, panics, the player, saved ----------
+if (want(16)) {
+log('16. finance');
+{
+  const sim = createSim(wd, 83); const W2 = sim.W, F = sim.finance; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  const med = sim.ERAS[4][1] + 0.01;
+  const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
+  for (const x of [A, B]) { x.tech = med; x.era = sim.eraOf(med); x.aggression = 0; x.dip.think = 1e12; }
+  for (let d = 1; d <= 4; d++) for (const e of [-W2, 0, W2]) { const i = i0 + d + e; if (sim.owner[i] < 0) sim.claim(i, A, i0); sim.pop[i] = 30; }
+  for (let d = 6; d <= 12; d++) for (const e of [-W2, 0, W2]) { const i = i0 + d + e; if (sim.owner[i] < 0) sim.claim(i, B, i0 + 8); sim.pop[i] = 30; }
+  for (let y = 0; y < 3; y++) sim.tick();
+  check(!F.canBorrow(A.id) && F.room(A.id) === 0, 'nobody lends before there are tribute lists');
+  teach(sim, A, 4); teach(sim, B, 4); sim.touchAll(); for (let y = 0; y < 12; y++) sim.tick();      // (a few years, for them to know one another as neighbours)
+  check(F.canBorrow(A.id) && F.room(A.id) > 0 && F.coin(A.id).length >= 3, `a realm of the tribute lists and coinage can borrow (up to ${F.room(A.id).toFixed(0)}) and strikes a coin: the ${F.coin(A.id)}`);
+  // a banking house in B lends to A, its neighbour; interest is paid every year and the house and its realm gain by it
+  const H = F.found(B.id, B.capital, { cap: 2000 }); const r0 = F.rate(A.id);
+  const w0 = A.wealth, got = F.borrow(A.id, Math.min(1500, F.room(A.id) * 0.8)); const by = F.owesOf(A.id);
+  check(got > 0 && F.debt[A.id] === got && Math.abs(A.wealth - w0 - got) < 1e-6 && by.some(o => o.house && o.house.id === H.id), `a realm borrows ${got.toFixed(0)} at ${(100 * r0).toFixed(1)}%: from ${by.map(o => o.house ? o.house.name : 'its own lenders').join(', ')}`);
+  { A.aggression = 0; const capB = H.cap, wA = A.wealth, wB = B.wealth; F.step(); check(F.paid[A.id] > 0 && H.cap > capB * 0.9 && F.got[B.id] > 0, `interest is paid (${F.paid[A.id].toFixed(1)} a year): the house keeps half, its realm a share (${F.got[B.id].toFixed(1)})`); void wA; void wB; }
+  { const lent0 = H.lent; A.wealth += 5000; const half = F.debt[A.id] / 2, d0 = F.debt[A.id]; const back = F.repay(A.id, half); check(Math.abs(back - half) < 1e-6 && Math.abs(F.debt[A.id] - (d0 - half)) < 1e-6 && H.lent <= lent0, 'and repays what it can'); }
+  // a default: the debts wiped, the house's money lost, the realm's standing gone, its lender remembering
+  { const cap0 = H.cap, mem0 = sim.diplo.memOf(B, A.id); F.defaultOn(A.id, 'a test'); check(F.debt[A.id] === 0 && !F.owes[A.id] && H.cap < cap0 && F.stand[A.id] < 0.2 && sim.diplo.memOf(B, A.id) < mem0 && F.panic[A.id] > 0, `a default: debts wiped, the house loses (${cap0.toFixed(0)} -> ${H.cap.toFixed(0)}), standing gone, the lender remembers (${mem0} -> ${sim.diplo.memOf(B, A.id)})`);
+    check(F.rate(A.id) > r0 * 1.5 && F.room(A.id) < 1000 * 0.5, `and lenders ask more of it, and lend it less (${(100 * F.rate(A.id)).toFixed(1)}%, room ${F.room(A.id).toFixed(0)})`);
+    const sp = sim.stabilityParts(A); check(sp.finance < 0, `a default unsettles the realm (${(sp.finance * 100).toFixed(1)})`); }
+  // the coin: debased for a windfall; then dearer prices, taxes worth less, unrest; restored for coin
+  { const w = A.wealth, g = F.debase(A.id); check(g > 0 && Math.abs(A.wealth - w - g) < 1e-6 && F.fine[A.id] < 1 && F.dear[A.id] > 0 && F.taxF(A.id) < 1 && F.unrest(A) < 0, `a debasement: ${g.toFixed(0)} coin now, the coin at ${(100 * F.fine[A.id]).toFixed(0)}%, prices ${(100 * F.dear[A.id]).toFixed(0)}% ahead, taxes worth ${(100 * F.taxF(A.id)).toFixed(0)}%`);
+    A.wealth += 1e6; const why = F.restore(A.id); check(!why && F.fine[A.id] === 1, 'and the coin restored'); }
+  // a house that has lost more than it has fails: its borrowers find other lenders, and a panic runs through its markets
+  { const C = sim.spawnTribe(sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.cellDist(i, i0) > 30), {}); C.tech = med; C.era = sim.eraOf(med); teach(sim, C, 4); C.aggression = 0; C.dip.think = 1e12;
+    const H2 = F.found(B.id, B.capital, { cap: 500 }); F.owes[C.id] = [[H2.id, 300]]; F.debt[C.id] = 300; H2.lent = 300; H2.cap = -200; F.step();
+    check(H2.fail && F.owesOf(C.id).every(o => !o.house) && F.debt[C.id] === 300 && F.panic[B.id] > 0.2, `a house that lost more than it had fails (${H2.name}); what it lent is owed to others now, and its realm panics`); }
+  // panics pass
+  { const p0 = F.panic[B.id]; for (let y = 0; y < 8; y++) F.step(); check(F.panic[B.id] < p0 * 0.3, `a panic passes in a few years (${p0.toFixed(2)} -> ${F.panic[B.id].toFixed(2)})`); }
+  // a company: it pays its holders; a mania runs its shares up, and the bubble bursts
+  { teach(sim, B, 5); sim.ports[B.id] = Math.max(1, sim.ports[B.id]); const co = F.charter(B.id, { at: B.capital, cap: 1000 }); F.step(); check(!!co && co.ret > 0 && F.got[B.id] > 0, `a company is chartered (${co.name}) and pays its realm (${F.got[B.id].toFixed(1)})`);
+    co.heat = 0.99; const v0 = co.val; F.step(); check(co.crash === sim.year && co.heat === 0 && F.panic[B.id] > 0.2, `a mania ends in a crash (${v0.toFixed(2)} -> ${co.val.toFixed(2)}), and a panic`); }
+  // the player: borrow, repay, debase, restore, a house, a company, shares bought and sold, a default; saved and loaded
+  { const s4 = createSim(wd, 89), F4 = s4.finance; const k0 = s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.fert[i] > 0.5 && [1, 2, 3, 4].every(d => ok(i + d) && s4.owner[i + d] < 0) && (s4.flags[i] & 4));
+    s4.setPlayer(k0, 'Testland'); const P = s4.playerCiv(); s4.special[k0] |= 1; /* (a harbour at its seat) */ const ren = s4.ERAS[5][1] + 0.01; P.tech = ren; P.era = s4.eraOf(ren); teach(s4, P, 5); for (let d = 1; d <= 4; d++) { if (s4.owner[k0 + d] < 0) s4.claim(k0 + d, P, k0); s4.pop[k0 + d] = 30; } for (let y = 0; y < 3; y++) s4.tick();
+    P.wealth = 100; const room = F4.room(P.id); const why1 = s4.financeAct('borrow', Math.floor(room / 2)); check(!why1 && F4.debt[P.id] > 0 && P.wealth > 100, `the player borrows ${F4.debt[P.id].toFixed(0)} of ${room.toFixed(0)} (${why1 || 'done'})`);
+    const why2 = s4.financeAct('repay', 50); check(!why2 && P.events.slice(-3).some(e => /repays/.test(e.text)), 'repays, and the chronicle says so');
+    P.wealth = 1e5; check(!s4.financeAct('house') && F4.housesOf(P.id).length === 1, 'charters a banking house'); check(!s4.financeAct('company') && F4.companiesOf(P.id).length === 1, 'charters a company in a harbour');
+    const co = F4.companiesOf(P.id)[0]; const B4 = s4.spawnTribe(s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.cellDist(i, k0) > 30), {}); const o = F4.charter(B4.id, { at: B4.capital, cap: 800 }); void co;
+    const wb = P.wealth; check(!s4.financeAct('buy', o.id, 500) && P.wealth === wb - 500 && F4.sharesOf(o, P.id) > 0, 'buys shares of another realm\'s company'); check(!s4.financeAct('sell', o.id, 1) && !F4.sharesOf(o, P.id), 'and sells them');
+    check(!s4.financeAct('debase') && F4.fine[P.id] < 1, 'debases the coin'); 
+    const saved = JSON.parse(JSON.stringify(s4.save())); const s5 = createSim(wd, 1); s5.load(saved); const F5 = s5.finance;
+    check(Math.abs(F5.debt[P.id] - F4.debt[P.id]) < 1e-2 && Math.abs(F5.fine[P.id] - F4.fine[P.id]) < 1e-3 && F5.houses.length === F4.houses.length && F5.companies.length === F4.companies.length && F5.coin(P.id) === F4.coin(P.id) && JSON.stringify(F5.owesOf(P.id).map(x => Math.round(x.amt))) === JSON.stringify(F4.owesOf(P.id).map(x => Math.round(x.amt))), `saved and loaded: debts ${F4.debt[P.id].toFixed(0)}, the coin, ${F4.houses.length} houses, ${F4.companies.length} companies`);
+    const why3 = s4.financeAct('default'); check(!why3 && F4.debt[P.id] === 0 && F4.lastDef[P.id] === s4.year, 'and repudiates the rest');
+    const old = JSON.parse(JSON.stringify(s4.save())); delete old.finance; const s6 = createSim(wd, 1); s6.load(old); check(s6.finance.debt[P.id] === 0 && s6.finance.houses.length === 0, 'a world saved before finance owes nothing and has no houses'); }
+  invariants(sim, 'the world of money in ' + sim.fmtYear(sim.year));
+}
+// the money of a whole world: debtors, houses and companies once they are known; within bounds; quick enough
+{
+  const sim = createSim(wd, 12345); const F = sim.finance; for (let y = 0; y < 3000; y++) sim.tick();
+  const ren = sim.ERAS[5][1] + 0.02; for (const cv of sim.civs) if (cv) { cv.tech = Math.max(cv.tech, ren); cv.era = sim.eraOf(cv.tech); teach(sim, cv, 5); }
+  for (let y = 0; y < 300; y++) sim.tick();
+  let ms = 0; for (let y = 0; y < 100; y++) { sim.tick(); ms += F.stats.ms; }
+  let bad = 0, owing = 0, n = 0; for (const cv of sim.civs) { if (!cv) continue; n++; const c = cv.id; if (F.debt[c] > 0) owing++; if (!(F.debt[c] >= 0 && isFinite(F.debt[c]) && F.fine[c] >= 0.25 && F.fine[c] <= 1 && F.panic[c] >= 0 && F.panic[c] <= 1 && F.stand[c] >= 0 && F.stand[c] <= 1 && isFinite(cv.wealth))) bad++; }
+  const hs = F.houses.filter(x => !x.fail).length, cos = F.companies.filter(y => !y.gone).length;
+  log(`   ${sim.fmtYear(sim.year)}: ${owing} of ${n} realms owe; ${hs} houses (${F.stats.failed} failed), ${cos} companies (${F.stats.crashes} crashed); ${F.stats.defaults} defaults, ${F.stats.debased} debasements, ${F.stats.panics} panics; a year of finance takes ${(ms / 100).toFixed(3)} ms; saved ${(JSON.stringify(F.save()).length / 1024).toFixed(0)} KB`);
+  check(hs > 3 && cos > 0 && owing > 0, `a world of money once banking and companies are known (${hs} houses, ${cos} companies, ${owing} realms owing)`);
+  check(!bad, `every realm's debts, coin, panic and standing are within bounds (${bad} not)`);
+  check(ms / 100 < 0.5, `finance is quick enough (${(ms / 100).toFixed(3)} ms a year)`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);
