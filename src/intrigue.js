@@ -153,7 +153,7 @@ window.INTRIGUE = (function () {
       const a = civs[c]; if (!a) return null; const g = I(a), b = bid >= 0 ? civs[bid] : null, yr = year();
       const s = g.s && civs[g.s.on] ? Object.assign({}, g.s, { key: g.s.k, scheme: SK[g.s.k].name, p: clamp((yr - g.s.from) / Math.max(1, g.s.until - g.s.from), 0, 1), left: Math.max(0, g.s.until - yr), realm: h.name(civs[g.s.on]) }) : null;
       return { net: netOf(a), parts: partsOf(a), s,
-        found: g.found.slice().reverse().map(([y, o, k]) => ({ year: y, by: o, name: civs[o] ? h.name(civs[o]) : 'a realm that is gone', scheme: SK[k] ? SK[k].name : k, war: !!(SK[k] && SK[k].war), open: civs[o] && SK[k] && SK[k].war && yr - y <= WAR_TURNS * turnOf(a) ? y + WAR_TURNS * turnOf(a) : 0 })),
+        found: g.found.slice().reverse().map(([y, o, k]) => ({ year: y, by: o, name: civs[o] ? h.name(civs[o]) : 'a realm that is gone', scheme: SK[k] ? SK[k].name : k, at: SK[k] ? SK[k].at.replace(/\bits\b/g, 'your') : '', war: !!(SK[k] && SK[k].war), open: civs[o] && SK[k] && SK[k].war && yr - y <= WAR_TURNS * turnOf(a) ? y + WAR_TURNS * turnOf(a) : 0 })),
         schemes: b ? SCHEMES.map((S) => Object.assign({ key: S.key, name: S.name, text: S.text, need: S.need, why: cannot(a, b, S.key), war: S.war, mind: S.mind }, oddsOf(a, b, S.key))) : [],
         theirs: b ? netOf(b) : 0 };
     }

@@ -910,7 +910,7 @@ server.listen(0, async () => {
     check(r.open && /^Spies of /.test(r.title) && r.n === 3 && /authority/.test(r.chips) && /coin/.test(r.chips), `the court is asked: "${r.title}" (${r.chips.slice(0, 120)})`);
     await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2); await ev(() => { if (TALES.isOpen()) TALES.close(); });
     await ev(() => ENVOYS.open('intrigue')); await frames(2);
-    r = await ev(() => document.getElementById('dp-intrigue').textContent); check(/a reason for war until/.test(r) && /sow discord/i.test(r), 'the agents caught are kept, with a reason for war against those who sent them');
+    r = await ev(() => document.getElementById('dp-intrigue').textContent); check(/a reason for war until/.test(r) && /carrying gold to your great families/.test(r), 'the agents caught are kept, with a reason for war against those who sent them');
     await ev(() => ENVOYS.close());
     // the chronicle keeps it under Intrigue
     await ev(() => __G.openChronicle('log')); await frames(1); await ev(() => document.querySelector('#logfilters [data-f="intrigue"]').click()); await frames(1);
