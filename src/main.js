@@ -449,6 +449,7 @@
     if (works.length > 3) rows.push({ k: 'work', t: `${works.length - 3} more works under way`, n: '', s: 'Your settlements, in the realm\'s panel', act: 'realm', small: true });
     for (const a of sim.army.of(c.id).slice(0, 2)) rows.push({ k: 'host', t: a.name, n: sim.army.fmtMen(a.men), s: (HOST_ST[a.state] || 'In the field') + (a.state === 'siege' ? ' · ' + Math.round(a.siege * 100) + '%' : ''), act: 'host', id: a.id });
     for (const k of Object.keys(c.wars)) { const b = sim.civs[+k]; if (!b) continue; const sc = sim.diplo ? sim.diplo.score(c, b) : 0; rows.push({ k: 'war', cls: 'war', t: sim.fullName(b), n: Math.abs(sc) < 0.005 ? 'even' : (sc > 0 ? '+' : '−') + Math.round(Math.abs(sc) * 100), s: `At war since ${sim.fmtYear(c.wars[k])}`, act: 'war', id: b.id, tip: 'How the war stands: the share of its land the other side has lost since it began, less yours' }); }
+    { const v = sim.legacyView ? sim.legacyView() : null; if (v && v.now.length) { const n = v.now.filter((a) => a.got).length, next = v.now.filter((a) => !a.got).sort((a, b) => b.p - a.p)[0]; rows.push({ k: 'gold', icon: TK_ICON.gold, t: 'Ambitions of the age', n: `${n} of ${v.now.length}`, s: next ? `Nearest: ${next.name}, ${next.p >= 0.995 ? 'all but done' : Math.round(next.p * 100) + '%'}` : 'All fulfilled', act: 'legacy', tip: `The ambitions of the ${v.age}: fulfilled in their age, remembered for ever` }); } }
     const K = sim.culture; if (K && K.isGolden(c.id)) rows.push({ k: 'gold', cls: 'good', t: 'A golden age', n: '', s: 'Until ' + sim.fmtYear(K.goldenNeed(c.id).until), act: 'cult' });
     const F = sim.finance; if (F && F.debt[c.id] > 0.5) rows.push({ k: 'debt', cls: c.wealth < 0 ? 'warn' : '', t: 'Debts of ' + fmtInt(F.debt[c.id]), n: (100 * F.rateOf[c.id]).toFixed(1) + '%', s: 'Interest ' + fmtInt(F.debt[c.id] * F.rateOf[c.id]) + ' a year', act: 'fin' });
     const key = rows.map((r) => [r.k, r.cls, r.t, r.n, r.s, r.bar === undefined ? '' : Math.round(r.bar * 40)].join('|')).join('/') + ':' + (settings.trackerFolded ? 1 : 0);
@@ -468,6 +469,7 @@
       case 'war': ENVOYS.open(null, r.id); break;
       case 'cult': WORKS.open(); break;
       case 'fin': MARKET.open('fin'); break;
+      case 'legacy': openChronicle('legacy'); break;
     }
     updateTurnButton();
   }
@@ -723,7 +725,7 @@
     host.innerHTML = html;
     host.querySelectorAll('.ol').forEach(el => el.addEventListener('click', () => { const i = +el.dataset.cell; if (i >= 0) { const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, Math.min(mapcam.dist, viewDist(i))); select(i); } }));
   }
-  const FEED_ICON = { story: '<path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 1-2-2zM6 18a2 2 0 0 1 2-2h11M10 8h6M10 11h5"/>', culture: '<path d="M7 4c-2 3-2 9 0 13M17 4c2 3 2 9 0 13M7 17h10M9 7v10M12 6v11M15 7v10"/>', law: '<path d="M4 20h16M5 9h14M12 4l8 5H4zM7 9v11M12 9v11M17 9v11"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', ruler: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', faith: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', state: '<path d="M4 20h16M6 20V9l6-5 6 5v11"/>', city: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', know: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>', pact: '<path d="M4 6h16v12H4zM4 7l8 6 8-6"/>' };
+  const FEED_ICON = { legacy: '<path d="M7 20c-3.5-3-4.500-8.500-2-13M17 20c3.5-3 4.500-8.500 2-13M5.5 11.5c1.5 0 2.500 1 3 2.500M18.5 11.5c-1.5 0-2.500 1-3 2.500M6 7.500c1.200.300 2 1.200 2.300 2.300M18 7.500c-1.200.300-2 1.200-2.300 2.300"/>', story: '<path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 1-2-2zM6 18a2 2 0 0 1 2-2h11M10 8h6M10 11h5"/>', culture: '<path d="M7 4c-2 3-2 9 0 13M17 4c2 3 2 9 0 13M7 17h10M9 7v10M12 6v11M15 7v10"/>', law: '<path d="M4 20h16M5 9h14M12 4l8 5H4zM7 9v11M12 9v11M17 9v11"/>', war: '<path d="M4 4l16 16M20 4L4 20"/>', ruler: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', disaster: '<path d="M12 3l9 16H3z M12 9v5M12 16v1"/>', era: '<path d="M12 3l2.4 5.4 5.6.6-4.2 3.8 1.2 5.6L12 15.6 7 18.4l1.2-5.6L4 9l5.6-.6z"/>', faith: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', state: '<path d="M4 20h16M6 20V9l6-5 6 5v11"/>', city: '<path d="M4 20h16M7 20V8h4v12M13 20v-7h4v7"/>', know: '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>', pact: '<path d="M4 6h16v12H4zM4 7l8 6 8-6"/>' };
   function scoreEvent(e) { const base = (e.type === 'culture' && /golden age/.test(e.text) ? 2.4 : 0) || { war: 3, era: 3, state: 2.2, pact: 2, disaster: 2, law: 1.8, know: 1.6, culture: 1.4, faith: 1.2, city: 1, ruler: 0.4 }[e.type] || 1; const c = e.civ >= 0 ? sim.civs[e.civ] : null; const size = c ? Math.min(2, sim.cellsOf[c.id] / 150) : 1; let near = 0; if (e.loc >= 0) { const [lon, lat] = cellCenter(e.loc); near = 1 - clamp(GEO.distKm(lon, lat, mapcam.lon, mapcam.lat) / 6000, 0, 1); } return base + size + near + (e.mine ? 10 : 0); }
   // continuous mode keeps a light live wire of the biggest events as toasts
   let feedIdx = 0, lastFeedAt = 0;
@@ -1010,7 +1012,7 @@
   function lighten(rgb) { const m = rgb.match(/\d+/g); if (!m) return '#fff'; const [r, g, b] = m.map(Number); return `rgb(${Math.round(r * 0.5 + 255 * 0.5)},${Math.round(g * 0.5 + 255 * 0.5)},${Math.round(b * 0.5 + 255 * 0.5)})`; }
 
   // ---------- chronicle screen ----------
-  const LOGF = [['all', 'All'], ['mine', 'Mine'], ['war', 'Wars'], ['pact', 'Treaties'], ['state', 'States'], ['law', 'Laws'], ['era', 'Eras'], ['know', 'Knowledge'], ['faith', 'Faith'], ['culture', 'Culture'], ['disaster', 'Disasters'], ['ruler', 'Rulers']];
+  const LOGF = [['all', 'All'], ['mine', 'Mine'], ['war', 'Wars'], ['pact', 'Treaties'], ['state', 'States'], ['law', 'Laws'], ['era', 'Eras'], ['know', 'Knowledge'], ['faith', 'Faith'], ['culture', 'Culture'], ['legacy', 'Legacy'], ['disaster', 'Disasters'], ['ruler', 'Rulers']];
   let logFilter = 'all';
   function openChronicle(tab) {
     const dlg = $('chron'); if (!dlg.open) dlg.showModal();
@@ -1033,7 +1035,26 @@
     const st = [['World age', fmtInt(sim.year + 10000) + ' years'], ['People on Earth', last ? fmtPop(last.pop + last.wild) : '—'], ['Living states', sim.st.civCount], ['World product', MARKET.fc(sim.market.worldGdp) + ' a year'], ['Crossing borders', sim.market.worldGdp > 0 ? Math.round(100 * sim.market.worldTrade / sim.market.worldGdp) + '% of it' : '—'], ['Wars under way', wars], ['Frontier', sim.ERAS[sim.eraOf(best)][0]], ['Largest state', living[0] ? sim.fullName(living[0]) : '—'], ['Largest city', biggest !== null ? `${sim.cellName.get(biggest)} · ${fmtPop(bp)}` : '—'], ['Your rank', rank ? `${rank} of ${living.length}` : '—']];
     $('stats').innerHTML = st.map(([k, v]) => `<div class="tile"><span class="micro">${k}</span><span class="k" style="font-size:var(--fs-body)">${esc(String(v))}</span></div>`).join('');
   }
-  function setCTab(t) { document.querySelectorAll('#chron .tabs button').forEach(b => b.classList.toggle('on', b.dataset.ctab === t)); document.querySelectorAll('#chron [data-cpane]').forEach(p => { p.hidden = p.dataset.cpane !== t; }); if (t === 'graphs') requestAnimationFrame(drawGraphs); }
+  function setCTab(t) { document.querySelectorAll('#chron .tabs button').forEach(b => b.classList.toggle('on', b.dataset.ctab === t)); document.querySelectorAll('#chron [data-cpane]').forEach(p => { p.hidden = p.dataset.cpane !== t; }); if (t === 'graphs') requestAnimationFrame(drawGraphs); if (t === 'legacy') renderLegacy(); }
+  // ---------- the Legacy tab: this age's ambitions and how far each has come, what the realm carries from its past ages, the paths it
+  // is remembered in, the world's firsts and its greatest legacies, living and fallen (legacy.js) ----------
+  const PATH_ICON = ['<path d="M4 4l11 11M15.5 4L4.5 15M3 21l3.5-3.5M21 21l-3.5-3.5M14 14l7 7M10 14l-7 7"/>', '<circle cx="12" cy="12" r="8"/><path d="M12 7v10M9.5 9.5h4a1.75 1.75 0 0 1 0 3.5h-3a1.75 1.75 0 0 0 0 3.5h4"/>', '<path d="M4 20h16M6 20V9M10 20V9M14 20V9M18 20V9M3 9h18M12 3l9 6H3z"/>', '<path d="M12 6c-2-1.500-5-2-8-2v14c3 0 6 .500 8 2 2-1.500 5-2 8-2V4c-3 0-6 .500-8 2zM12 6v14"/>', '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', '<circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>'];
+  function renderLegacy() {
+    const box = $('legacy'); const v = sim && sim.legacyView ? sim.legacyView() : null; const LG = window.LEGACY;
+    if (!v || !LG) { box.innerHTML = '<div class="hint">A realm is remembered for what it does. Found your people first.</div>'; return; }
+    const P = LG.PATHS, most = Math.max(1, ...v.pts);
+    const head = `<div class="lg-head"><div class="lg-score"><b>${fmtInt(v.total)}</b><span>remembered · ${v.place ? ordinal(v.place) + ' of ' + v.of + ' realms' : ''}</span></div><div class="lg-paths">${P.map((p, i) => `<div class="lg-path" title="${esc(p.name)}: ${esc(p.heir)}"><div class="top"><svg viewBox="0 0 24 24">${PATH_ICON[i]}</svg>${esc(p.name)}<b>${fmtInt(v.pts[i])}</b></div><div class="bar"><i style="width:${Math.round(100 * v.pts[i] / most)}%"></i></div></div>`).join('')}</div></div>`;
+    const cards = v.now.map((a) => `<div class="lg-card${a.got ? ' got' : ''}"><span class="lg-ic"><svg viewBox="0 0 24 24">${PATH_ICON[a.path]}</svg></span><span class="nm">${esc(a.name)}</span><span class="ask">${esc(a.ask)}</span><span class="pr">${a.got ? `Remembered since ${sim.fmtYear(a.got)} · ${a.worth}` : `<span class="bar"><i style="width:${Math.round(a.p * 100)}%"></i></span>${Math.round(a.p * 100)}% · ${a.worth}`}</span></div>`).join('');
+    const her = v.her.length ? v.her.map(([e, p, y]) => `<div>Into the <b>${esc(LG.AGES[e])}</b>, ${sim.fmtYear(y)}: ${esc(P[p].what)}</div>`).join('') : '<div>Nothing yet: what an age leaves is chosen as the next begins.</div>';
+    const ages = []; for (let e = 0; e < v.era; e++) { const row = v.past.filter((a) => a.era === e); ages.push(`<span>${esc(LG.AGES[e])}</span>${P.map((p, i) => { const a = row.find((q) => q.path === i); return `<i class="dot${a && a.got ? ' on' : ''}" title="${a ? esc(a.name) + (a.got ? ', ' + sim.fmtYear(a.got) : ': left undone') : ''}"></i>`; }).join('')}<span class="n">${row.filter((a) => a.got).reduce((t, a) => t + a.worth, 0)}</span>`); }
+    const firsts = v.firsts.length ? v.firsts.sort((a, b) => a.at[0] - b.at[0]).map((f) => `<div class="lg-row${sim.civs[f.at[1]] && sim.civs[f.at[1]].player ? ' mine' : ''}"><span>${esc(f.name)}<br><span class="w">${esc(f.at[2])}</span></span><span class="v">${sim.fmtYear(f.at[0])}</span></div>`).join('') : '<div class="hint">Nobody has done anything first yet.</div>';
+    const great = v.great.map((g, k) => `<div class="lg-row${g.mine ? ' mine' : ''}"><span>${k + 1}. ${esc(g.name)}${g.pts > 0 ? ` <span class="w">· ${esc(P[g.best].what)}</span>` : ''}</span><span class="v">${fmtInt(g.pts)}</span></div>`).join('') + v.hall.map((q) => `<div class="lg-row gone"><span>${esc(q[0])} <span class="w">· gone ${sim.fmtYear(q[3])}</span></span><span class="v">${fmtInt(q[1])}</span></div>`).join('');
+    box.innerHTML = head + `<div><h3>The ambitions of the ${esc(v.age)}<small>fulfilled in their age, remembered for ever</small></h3><div class="lg-amb">${cards}</div>`
+      + `<h3 style="margin-top:18px">What your people carry</h3><div class="lg-her">${her}</div>`
+      + (ages.length ? `<h3 style="margin-top:18px">The ages behind you</h3><div class="lg-ages">${ages.join('')}</div>` : '') + `</div>`
+      + `<div class="lg-side"><div><h3>The world's firsts</h3><div class="lg-list">${firsts}</div></div><div><h3>The great legacies</h3><div class="lg-list">${great}</div></div></div>`;
+  }
+  const ordinal = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
   function drawGraphs() {
     const hist = sim.history; if (!hist.length) return;
     const setup = (cv) => { const r = cv.getBoundingClientRect(); const dpr = Math.min(2, devicePixelRatio || 1); if (!r.width) return null; cv.width = r.width * dpr; cv.height = r.height * dpr; const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, r.width, r.height); return { ctx, w: r.width, h: r.height }; };
@@ -1212,7 +1233,9 @@
     const n = {}, pp = {}; let pop = 0; for (const c of sim.civs) { if (!c) continue; const k = RULE.FORM[sim.rule.ruleOf(c).gov].kind; n[k] = (n[k] || 0) + 1; pp[k] = (pp[k] || 0) + sim.popOf[c.id]; pop += sim.popOf[c.id]; }
     el.innerHTML = '<span class="micro">How the world is governed</span>' + Object.keys(RULE.KINDS).map((k) => `<i class="${n[k] ? '' : 'off'}" style="background:${RULE.KINDS[k][1]}"></i><span class="${n[k] ? '' : 'none'}">${RULE.KINDS[k][0]}</span><b>${n[k] ? Math.round(100 * pp[k] / Math.max(1e-9, pop)) + '%' : ''}</b>`).join('');
   }
-  function refreshAll(force) { updateEconomy(); updateTurnButton(); updateClock(); updateDock(); updateTracker(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); ENVOYS.refresh(); WORKS.refresh(); if (view.gov || view.rel || view.ppl || view.fth || view.ren) renderGovKey(); }
+  // what the player's people will be remembered for, as it happens (legacy.js: an ambition fulfilled, a first, an age's ambitions lost)
+  function legacyNews() { const L = sim && sim.legacy; if (!L || !L.news.length) return; const N = L.news.splice(0, L.news.length); for (const n of N.slice(-3)) toast(n.kind === 'first' ? `A first for your people: ${n.text}` : n.kind === 'lost' ? n.text : `Remembered: ${n.text}`); if (N.length && $('chron').open) renderLegacy(); }
+  function refreshAll(force) { legacyNews(); updateEconomy(); updateTurnButton(); updateClock(); updateDock(); updateTracker(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); ENVOYS.refresh(); WORKS.refresh(); if (view.gov || view.rel || view.ppl || view.fth || view.ren) renderGovKey(); }
 
   // ---------- home screen, version, updates ----------
   // version.json is written by the build: what this game is and what changed lately. window.desktop is the app's

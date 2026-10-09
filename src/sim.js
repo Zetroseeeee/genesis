@@ -18,6 +18,7 @@ function createSim(world, seed) {
   const FINANCE = window.FINANCE;      // coin, credit, banking houses, companies, panics (finance.js, loaded before this file)
   const DYNASTY = window.DYNASTY;      // the people who rule, their families and houses (dynasty.js, loaded before this file)
   const STORY = window.STORY;      // the stories that come before a realm's court (story.js; a tool that does not load it runs without them)
+  const LEGACY = window.LEGACY;      // what a people is remembered for: the ambitions of every age, the world's firsts (legacy.js; likewise)
   const { land, fert, elev, flags } = world;   // land Uint8, fert Float32 0..1, elev Uint8, flags Uint8 (1 land,2 river,4 coast,8 ice)
 
   // ---------- RNG ----------
@@ -174,6 +175,7 @@ function createSim(world, seed) {
   let finance = null;   // (coin, debts, banking houses, companies and panics: finance.js)
   let dynasty = null;   // (the people who rule, their houses, and who comes after them: dynasty.js)
   let story = null;     // (what comes before a realm's court, and what its ruler chooses: story.js)
+  let legacy = null;    // (what each realm will be remembered for: legacy.js)
   let storiesOn = true;      // (the player's: the page's setting)
   function fullName(c) { return rule ? rule.fullName(c) : c.name; }
   function religionName(st) {
@@ -312,6 +314,7 @@ function createSim(world, seed) {
   const spanOf = (cv) => (40 + cv.tech * 3000) * KF[cv.id * NKF + KK.reach] * RF[cv.id * NRF + RK.reach];      // how many regions a realm holds without strain
   const fmNow = (cv) => foodMult(cv.tech) * KF[cv.id * NKF + KK.food] * RF[cv.id * NRF + RK.food];      // how many a unit of land feeds: the age's table, what the realm knows of farming against its age, and its laws
   function onLearn(cv, D, isFirst, beyond) {
+    if (legacy && D) legacy.learned(cv, D.key);      // (the order in which realms learn what the ambitions race for)
     if (!D) { if (cv.player) logEvent(cv, `Your scholars go beyond what any age knew (${beyond})`, false, 'know'); return; }
     if (cv.player) logEvent(cv, isFirst && D.first ? `Your people are the first in the world to learn ${D.name}` : `Your people learn ${D.name}`, isFirst && D.first, 'know');
     else if (isFirst && D.first) pushWorld({ year, text: `${cap(fullName(cv))} ${cv.gov === 'band' ? 'are' : 'is'} the first to learn ${D.name}`, civ: cv.id, type: 'know', loc: cv.capital, seq: ++evSeq });
@@ -364,7 +367,7 @@ function createSim(world, seed) {
   diplo = DIPLO.create({ MAXC, civs, year: () => year, rnd, knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1, discovery: (key) => KNOW.LIST[KNOW.ID[key]].name, popOf, cellsOf, strengthOf, mightOf,
     nbOf: (c) => nearNb[c] || lastNb[c], warsN: warsOf, links: () => market.links, gdp: (c) => market.gdp[c], atWar: (a, bid) => a.wars[bid] !== undefined, truce: (a, bid) => a.truce[bid] || -1e9, declareWar, makePeace,
     // (a war won lifts those who fought it and the crown they fought for; a war lost does the opposite)
-    won: (w, l) => { w.lastWin = [year, l.id, fullName(l)]; const Wn = rule.ruleOf(w), Ls = rule.ruleOf(l); Wn.bump[RULE.EK.soldiers] += 0.1; Wn.bump[RULE.EK.nobles] += 0.06; Wn.auth = Math.min(RULE.AUTH_MAX, Wn.auth + 10); Ls.bump[RULE.EK.soldiers] -= 0.1; Ls.bump[RULE.EK.nobles] -= 0.08; Ls.auth = Math.max(0, Ls.auth - 10); },
+    won: (w, l) => { w.lastWin = [year, l.id, fullName(l)]; if (legacy) legacy.won(w); const Wn = rule.ruleOf(w), Ls = rule.ruleOf(l); Wn.bump[RULE.EK.soldiers] += 0.1; Wn.bump[RULE.EK.nobles] += 0.06; Wn.auth = Math.min(RULE.AUTH_MAX, Wn.auth + 10); Ls.bump[RULE.EK.soldiers] -= 0.1; Ls.bump[RULE.EK.nobles] -= 0.08; Ls.auth = Math.max(0, Ls.auth - 10); },
     // (told in both realms' chronicles; the player's side of it is his own news)
     event: (cv, text, important, other) => { const mine = !!(other && other.player && !cv.player); const a = mine ? other : cv, b = mine ? cv : other; logEvent(a, text, important, 'pact'); if (b) pushOwn(b, { year, text, type: 'pact', loc: b.capital, civ: b.id }); },
     shake: (cv, by) => { cv.stability = Math.max(0, cv.stability - by); },
@@ -467,7 +470,7 @@ function createSim(world, seed) {
     for (let t = 0; t < 600; t++) { const i = from[t % from.length]; const y = (i / W) | 0, x = i - y * W; const dy = Math.round((rnd() * 2 - 1) * R), dx = Math.round((rnd() * 2 - 1) * R / cosLat[y]); const yy = y + dy; if (yy < 0 || yy >= H) continue;
       const n2 = yy * W + ((x + dx + W) % W); if (!land[n2] || !(flags[n2] & 4) || owner[n2] >= 0 || fert[n2] <= 0.1 || (flags[n2] & 8) || cellDist(n2, i) < 12) continue;
       claim(n2, cv, -1); pop[n2] = Math.max(pop[n2], 0.8); if (!cellName.has(n2)) cellName.set(n2, (people && people.nameAt(n2, cv)) || makeName(cv.style, 2, 3)); recount();
-      logEvent(cv, `Ships of ${fullName(cv)} found ${cellName.get(n2)} across the sea`, true, 'state', n2); return n2; }
+      logEvent(cv, `Ships of ${fullName(cv)} found ${cellName.get(n2)} across the sea`, true, 'state', n2); if (legacy) legacy.colony(cv); return n2; }
     return -1;
   }
   // a faith other than the realm's that a preacher might bring: the largest of its own people's after the state's, else a neighbour's
@@ -497,7 +500,31 @@ function createSim(world, seed) {
     auth: (cv) => rule.ruleOf(cv).auth, addAuth: (cv, by) => { const R = rule.ruleOf(cv); R.auth = Math.round(Math.max(0, Math.min(RULE.AUTH_MAX, R.auth + by)) * 1000) / 1000; }, bump: (cv, key, by) => { rule.ruleOf(cv).bump[RULE.EK[key]] += by; },
     inspire: inspireYears, insightOf: (cv) => insight(cv), renownNorm: (cv) => (culture ? culture.NORM[Math.min(8, cv.era)] : 0),
     popScale, canBorrow: (cv) => !!finance && finance.canBorrow(cv.id) && finance.room(cv.id) > 1, borrow: (cv, amt) => { if (finance) finance.borrow(cv.id, Math.min(amt, finance.room(cv.id))); },
-    colony: colonyFor, abdicate: (cv) => newRuler(cv, false, 'abdicate'), murder: (cv) => { murdered = true; rulerDies(cv); murdered = false; }, log: (cv, text, important) => logEvent(cv, text, important, 'story'), quiet: () => !storiesOn }) : null;
+    colony: colonyFor, heritage: (cv, era, path) => { if (cv.legacy) { cv.legacy.her.push([era, path, year]); if (cv.legacy.her.length > 9) cv.legacy.her.shift(); } }, abdicate: (cv) => newRuler(cv, false, 'abdicate'), murder: (cv) => { murdered = true; rulerDies(cv); murdered = false; }, log: (cv, text, important) => logEvent(cv, text, important, 'story'), quiet: () => !storiesOn }) : null;
+  // what each realm will be remembered for (legacy.js): what a realm has, as its ambitions ask it; what costs a pass over a long
+  // list (the workshops, the market's links, the faiths kept, great people and masterpieces) is counted for every realm at once,
+  // once in five years when asked (a realm's ambitions are looked at once in five)
+  let shopsY = -1e9; const shopsN = new Int16Array(MAXC);
+  const shopsOf = (c) => { if (year - shopsY >= 5 || year < shopsY) { shopsY = year; shopsN.fill(0); for (const [i, a] of ind) { const o = owner[i]; if (o < 0) continue; for (let k = 0; k < a.length; k++) if (a[k]) shopsN[o]++; } } return shopsN[c]; };
+  let tradeY = -1e9; const tradeN = new Int16Array(MAXC); let faithY = -1e9; const faithN = new Map();
+  const tradersOf = (c) => { if (year - tradeY >= 5 || year < tradeY) { tradeY = year; tradeN.fill(0); for (const L of market.links) { tradeN[L.a]++; tradeN[L.b]++; } } return tradeN[c]; };      // (the market's links, counted)
+  const keptBy = (f) => { if (year - faithY >= 5 || year < faithY) { faithY = year; faithN.clear(); for (let k = 0; k < MAXC; k++) { const g = civs[k] && faith.state[k]; if (g) faithN.set(g, (faithN.get(g) || 0) + 1); } } return faithN.get(f) || 0; };
+  let cultY = -1e9; const greatN = new Int16Array(MAXC), masterN = new Int16Array(MAXC);
+  const cultCount = () => { if ((year - cultY < 5 && year >= cultY) || !culture) return; cultY = year; greatN.fill(0); masterN.fill(0); for (const g of culture.greats) if (g.c >= 0 && g.c < MAXC) greatN[g.c]++; for (const w of culture.works) if (!w.lost && w.held >= 0 && w.held < MAXC && w.value >= culture.MASTER) masterN[w.held]++; };      // (the great people each realm brought forth and the masterpieces it holds, in one pass: the lists run to thousands)
+  const pactsOf = (cv, kinds) => { const P = cv.dip && cv.dip.pact; if (!P) return 0; let n = 0; for (const k in P) { if (!civs[+k]) continue; if (kinds ? kinds.some((q) => diplo.has(cv, +k, q)) : diplo.anyPact(cv, +k)) n++; } return n; };
+  legacy = LEGACY ? LEGACY.create({ civs, MAXC, year: () => year, name: (cv) => fullName(cv),
+    cells: (c) => cellsOf[c], pop: (c) => popOf[c], towns: (c) => townsOf[c], temples: (c) => temples[c], markets: (c) => markets[c], ports: (c) => ports[c], acad: (c) => acad[c], wonders: (c) => wonders[c],
+    knows: (c, key) => KNOW.ID[key] !== undefined && know.has[c * know.ND + KNOW.ID[key]] === 1, firstOf: (key) => (KNOW.ID[key] !== undefined ? know.first[KNOW.ID[key]] : null),
+    greats: (c) => { cultCount(); return greatN[c]; }, masters: (c) => { cultCount(); return masterN[c]; }, rel: (c) => (culture ? culture.rel(c) : 0),
+    golden: (c) => !!culture && culture.isGolden(c), renown: (c) => (culture ? culture.renown[c] : 0),
+    founded: (c) => !!faith && faith.list.some((f) => f && f.founder === c && !f.gone), holy: (c) => { if (!faith) return false; const f = faith.state[c], F = f ? faith.list[f] : null; return !!F && F.home >= 0 && owner[F.home] === c; },
+    faithRealms: (c) => { if (!faith) return 0; const f = faith.state[c]; return f ? keptBy(f) : 0; },
+    vassals: (cv) => diplo.vassalsOf(cv.id).length, pacts: (cv) => pactsOf(cv), marriage: (cv) => pactsOf(cv, ['marriage']) > 0, alliances: (cv) => pactsOf(cv, ['alliance', 'defence']),
+    houses: (c) => (finance ? finance.housesOf(c).length : 0), workshops: shopsOf, trade: tradersOf, ls: (c) => market.LS[c], gdp: (c) => market.gdp[c] || 0, might: (c) => mightOf[c],
+    addAuth: (cv, by) => { const R = rule.ruleOf(cv); R.auth = Math.round(Math.max(0, Math.min(RULE.AUTH_MAX, R.auth + by)) * 1000) / 1000; },
+    log: (cv, text, important) => logEvent(cv, text, important, 'legacy'),
+    // what an age leaves is a story of the realm's own (story.js: ageTold)
+    tellAge: (cv, d) => (story ? story.ageTold(cv, d) : 'No stories') }) : null;
   // a story of the player's family, told when it happens if no other waits and none of its kind was told lately (a birth, a wedding)
   function storyTell(cv, key, d) { if (!story || !cv || !cv.player || !storiesOn) return; const S = cv.story; if (S && (S.q || year - (S.s[key] || -1e9) < 1.5 * RULE.PACE[cv.era])) return; story.tell(cv, key, d); }
   // how a new ruler is told: who died and at what age, whose child the heir is and how old, who rules for a child, the line that
@@ -519,7 +546,7 @@ function createSim(world, seed) {
     for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c.id && level[i] >= 2) markRuin(i, c.era, c.culture); }
     // (its enemies' wars with it are over now: left on their lists until they next looked, they passed to whoever was born under its number)
     for (const k in c.wars) { const e = civs[+k]; if (e && e.wars[c.id] !== undefined) { delete e.wars[c.id]; warCnt[e.id] = -1; } }
-    c.alive = false; civCount--; st.civCount = civCount; civs[c.id] = null; freeIds.push(c.id); mightOf[c.id] = 0; diplo.died(c.id); army.died(c.id); if (faith) faith.gone(c.id); if (culture) culture.gone(c.id); if (finance) finance.gone(c.id); if (dynasty) dynasty.gone(c.id);
+    if (legacy) legacy.gone(c); c.alive = false; civCount--; st.civCount = civCount; civs[c.id] = null; freeIds.push(c.id); mightOf[c.id] = 0; diplo.died(c.id); army.died(c.id); if (faith) faith.gone(c.id); if (culture) culture.gone(c.id); if (finance) finance.gone(c.id); if (dynasty) dynasty.gone(c.id);
     pushWorld({ year, text: `${fullName(c)} is no more${why ? ' — ' + why : ''}.`, civ: c.id, type: 'state', loc: c.capital, dead: true });
   }
 
@@ -547,7 +574,7 @@ function createSim(world, seed) {
   //     what the player is told ("far weaker than you").
   function strength(c, people, pits) {
     const strat = (c.era >= 1 ? 4 * satOf(c.id, 'arms') : 0) + Math.min(3, pits) * 0.5; // an army with all the arms, horses and guns it wants is two fifths stronger than one with none; mines dig deeper
-    const s = (people + 2) * (0.25 + c.tech * 1.6) * c.policy.military * (year < c.army ? 1.6 : 1) * (0.6 + c.stability * 0.5) * (1 + 0.1 * strat) * KF[c.id * NKF + KK.strength] * RF[c.id * NRF + RK.strength];
+    const s = (people + 2) * (0.25 + c.tech * 1.6) * c.policy.military * (year < c.army ? 1.6 : 1) * (0.6 + c.stability * 0.5) * (1 + 0.1 * strat) * KF[c.id * NKF + KK.strength] * RF[c.id * NRF + RK.strength] * (story ? story.strF(c.id) : 1);
     return s;
   }
   // what a cell brings its realm's market: its own good, if the realm's age can work it (a mine digs more than twice as
@@ -880,7 +907,7 @@ function createSim(world, seed) {
           const n2 = yy * W + ((x + dx + W) % W);
           if (land[n2] && (flags[n2] & 4) && owner[n2] < 0 && fert[n2] > 0.1 && !(flags[n2] & 8) && cellDist(n2, i) < R) {
             budget[o] -= 1; claim(n2, c, i); if (!cellName.has(n2)) cellName.set(n2, people.nameAt(n2, c) || makeName(c.style, 2, 3));
-            if (cellDist(n2, i) > 12) logEvent(c, `Ships of ${fullName(c)} found ${cellName.get(n2)} across the sea`, cellDist(n2, i) > 30 || c.player);
+            if (cellDist(n2, i) > 12) { logEvent(c, `Ships of ${fullName(c)} found ${cellName.get(n2)} across the sea`, cellDist(n2, i) > 30 || c.player); if (legacy) legacy.colony(c); }
           }
         }
       }
@@ -911,6 +938,7 @@ function createSim(world, seed) {
     dynasty.step(); dynastyNews();
     // what comes before the courts: the player's waits for his answer, the autopilot's are answered (story.js)
     if (story) { story.step(); story.news.length = 0; dynastyNews(); financeNews(); cultureNews(); }
+    if (legacy) legacy.step();
     // diplomacy every 10 ticks (staggered)
     for (let c = 0; c < MAXC; c++) {
       const a = civs[c]; if (!a || tickCount % 10 !== c % 10) continue;
@@ -1268,7 +1296,7 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(c.player ? -30 : cellsOf[c.id] > 20 ? -15 : -6), rulers: c.rulers.slice(-3) } : null), /* (the reigns of a realm are its houses' lines now: dynasty.js; a save is better small) */ worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
-      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : undefined,
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : undefined,
     };
   }
   function load(s) {
@@ -1311,7 +1339,8 @@ function createSim(world, seed) {
     culture.load(s.culture);      // (a world saved before culture has had no great people yet)
     finance.load(s.finance);      // (a world saved before finance owes nothing, and has no houses yet)
     if (!dynasty.load(s.dynasty)) dynasty.settle();      // (a world saved before dynasties: its rulers become people, of houses of their names where they rule by blood)
-    if (story) story.load(s.story);      // (what each realm's stories left behind is on the realm: civ.story; a world saved before stories begins without)
+    if (story) story.load(s.story);
+    if (legacy) { legacy.load(s.legacy); if (!s.legacy) legacy.settle(); }      // (a world from before legacies: each realm begins in its own age with nothing remembered)      // (what each realm's stories left behind is on the realm: civ.story; a world saved before stories begins without)
   }
   // who touches whom by land, read off the map (the tick keeps it up from border contacts afterwards)
   function touchAll() {
@@ -1366,7 +1395,7 @@ function createSim(world, seed) {
     // the discovery the player's realm lacks to raise this work here (null: none, whatever else may stand in the way)
     needFor(kind, i) { const c = playerCiv(); if (!c) return null; if (kind === 'farm') return i >= 0 && infra[i] < 5 ? know.lacks(c.id, 'farm', infra[i] + 1) : null; if (kind === 'walls') return i >= 0 && walls[i] < 3 ? know.lacks(c.id, 'walls', walls[i] + 1) : null; if (kind === 'mine') return i >= 0 && goods[i] ? know.estate(c.id, goods[i]) : null; return know.lacks(c.id, kind); },
     tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, faithCosts, faithAct, faithNews, cultureNews, financeNews, financeAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = finance.act(c.id, what, a, b); financeNews(); return r; }, dynastyNews, rulerDies, courtAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = dynasty.act(c.id, what, a, b); dynastyNews(); return r; },
-    get story() { return story; }, storyView: () => { const c = playerCiv(); return c && story ? story.view(c.id) : null; }, storyTell: (key, d) => { const c = playerCiv(); return c && story ? story.tell(c, key, d) : 'No realm'; },
+    get story() { return story; }, get legacy() { return legacy; }, legacyView: () => { const c = playerCiv(); return c && legacy ? legacy.view(c.id) : null; }, storyView: () => { const c = playerCiv(); return c && story ? story.view(c.id) : null; }, storyTell: (key, d) => { const c = playerCiv(); return c && story ? story.tell(c, key, d) : 'No realm'; },
     storyChoose: (i) => { const c = playerCiv(); if (!c || !story) return 'No realm'; const r = story.choose(c.id, i); dynastyNews(); financeNews(); cultureNews(); return r; }, setStories: (on) => { storiesOn = !!on; }, get storiesOn() { return storiesOn; }, plague, meteor, bounty,
     TRAITS, traitOf, fullName, fmtYear, describeCell, isAtWar, capacity, eraOf, strength, save, load, recount, rnd, religionName, makeName, logEvent, evolveGovAll,
     settlementsOf(id) { const out = []; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === id && level[i]) out.push(i); } out.sort((a, b) => pop[b] - pop[a]); return out; },

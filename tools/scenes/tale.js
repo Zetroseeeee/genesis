@@ -3,7 +3,8 @@
 // down at lon, lat (on a region given up for it), given the Middle Ages, the regions round it, a temple, an academy and a
 // market, made a feudal monarchy, and given a family (a consort, a grown heir, a daughter, a small son); then the story k is
 // told (default 'heir_cruel') and its page opened. With choose: n the court answers with choice n, and the page shows what came
-// of it. Options in window.__scene: years, lon, lat, land, k, choose (-1). Answers in window.__tale.
+// of it. Options in window.__scene: years, lon, lat, land, k, d (what the story is told with: for 'heritage', { from, to, paths,
+// did }), choose (-1). Answers in window.__tale.
 (() => {
   const G = window.__G; if (!G) return 'no game';
   const P = Object.assign({ years: 11250, lon: 2.35, lat: 48.85, land: 26, k: 'heir_cruel', choose: -1 }, window.__scene || {});
@@ -34,7 +35,7 @@
     kid('Louis', false, 19, 'tyrant'); kid('Agnes', true, 17, 'merchant'); kid('Robert', false, 6, 'conqueror');
     c.wealth = Math.max(c.wealth, 4000); S.rule.ruleOf(c).auth = 90; if (c.story) c.story.q = null;
     const M = G.mapcam; M.fly = null; M.lon = M.tLon = lon; M.lat = M.tLat = lat;
-    const why = S.storyTell(P.k);
+    const why = S.storyTell(P.k, P.d);
     const v = S.storyView(); window.__tale = { year: S.year, realm: S.fullName(c), k: P.k, why: why || '', title: v ? v.title : '', opts: v ? v.opts.map((o) => o.t) : [] };
     if (v) { TALES.open(); if (P.choose >= 0) setTimeout(() => { const b = document.querySelector(`#tl-choices [data-tl="${P.choose}"]`); if (b) b.click(); window.__tale.out = document.getElementById('tl-outtext').textContent; }, 1500); }
   };

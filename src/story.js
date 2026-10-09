@@ -461,6 +461,28 @@
       { t: (x, d) => (d.ok ? 'Sell the right to build it abroad' : 'Have him locked up for the roof'), hint: (x, d) => (d.ok ? 'Coin now.' : 'The neighbours want their roof paid for.'), fx: (x, d) => (d.ok ? { coin: 1 } : { auth: 2, est: { artisans: -0.02 } }), log: () => '' },
     ], lapse: 2 });
 
+  // ----- a new age: what the realm carries into it from the last (legacy.js tells it, with the three paths it did most in) -----
+  const AGE_N = ['Stone Age', 'Bronze Age', 'Iron Age', 'Classical Age', 'Middle Ages', 'Renaissance', 'Industrial Age', 'Modern Age', 'Information Age'];
+  const HER = [      // a path's choice: its name, what it is remembered by, the painting, the lasting effect (full when the realm did something in it)
+    { t: 'Its arms', by: 'the wars it won and the land it held', art: 'st_triumph', fx: { str: 0.06 } },
+    { t: 'Its wealth', by: 'its markets, its coin and its trade', art: 'st_fair', fx: { inc: 0.05 } },
+    { t: 'Its splendour', by: 'its great works and its renown', art: 'st_monument', fx: { ren: 0.06 } },
+    { t: 'Its learning', by: 'its scholars and what they found', art: 'st_scholars', fx: { ins: 0.05 } },
+    { t: 'Its faith', by: 'its temples and its faith', art: 'st_pilgrims', fx: { stab: 0.04 } },
+    { t: 'Its reach', by: 'its envoys, its oaths and its ships', art: 'st_envoys', fx: { inc: 0.025, stab: 0.02 }, auth: 30 },
+  ];
+  const forOf = (a) => (a.length < 2 ? a.join('') : a.slice(0, -1).join(', for ') + ', and for ' + a[a.length - 1]);      // (each is itself a list: 'its temples and its faith')
+  const pl = (age) => /Ages$/.test(age);      // (the Middle Ages are behind a realm; the Bronze Age is)
+  const herFx = (d, i) => { const p = d.paths[i], H = HER[p]; if (!H) return {}; const k = d.did[i] > 0 ? 1 : 0.6; const m = { k: 'heritage', y: 5000, age: true }; for (const key in H.fx) m[key] = Math.round(H.fx[key] * k * 1000) / 1000;
+    return { mod: m, auth: H.auth ? Math.round(H.auth * k) : 0, her: [d.to, p] }; };
+  S({ k: 'heritage', art: (x, d) => (HER[d.paths[0]] || HER[2]).art, follow: true, w: () => 1,
+    make: (x, d) => (d && d.paths && d.paths.length === 3 ? d : null),
+    title: (x, d) => `What the ${AGE_N[d.from]} ${pl(AGE_N[d.from]) ? 'leave' : 'leaves'}`,
+    text: (x, d) => { const did = d.paths.filter((p, i) => d.did[i] > 0).map((p) => HER[p].by); return `The ${AGE_N[d.from]} ${pl(AGE_N[d.from]) ? 'are' : 'is'} behind ${x.realm}. ${did.length ? `It will be remembered for ${forOf(did)}. ` : 'It did little that will be remembered. '}Of all it was, what will its people carry into the ${AGE_N[d.to]}? What they choose will mark them until the next age begins.`; },
+    opts: [0, 1, 2].map((i) => ({ t: (x, d) => HER[d.paths[i]].t, hint: (x, d) => (d.did[i] > 0 ? `Remembered for ${HER[d.paths[i]].by}.` : `Little to remember it by: half as much.`), fx: (x, d) => herFx(d, i),
+      log: (x, d) => `${cap(x.realm)} enters the ${AGE_N[d.to]} remembering ${HER[d.paths[i]].t.toLowerCase()}` })),
+    lapse: 0 });
+
   const BY = {}; LIST.forEach((s, i) => { s.id = i; BY[s.k] = s; });
 
   // ---------- one world's stories ----------
@@ -531,7 +553,7 @@
       if (fx.est) for (const k of EST()) { const v = fx.est[k]; if (v) add(`${window.RULE.estateName(window.RULE.EK[k], x.era)} ${moodWord(v)}`, v > 0 ? 'pos' : 'neg'); }
       if (fx.op) for (const [o, by] of fx.op) { const ov = civs[o]; if (ov && by) add(`${h.name(ov)} ${by > 0 ? '+' : '−'}${Math.abs(by)} opinion`, by > 0 ? 'pos' : 'neg'); }
       if (fx.claim !== undefined && fx.claim !== null && civs[fx.claim]) add(`A claim on ${h.name(civs[fx.claim])}`, 'warn');
-      if (fx.mod) { const m = fx.mod, y = Math.round(m.y); if (m.stab) add(`${pct(m.stab)} stability for ${y} years`, m.stab > 0 ? 'pos' : 'neg'); if (m.inc) add(`${pct(m.inc)}% income for ${y} years`, m.inc > 0 ? 'pos' : 'neg'); if (m.ins) add(`${pct(m.ins)}% insight for ${y} years`, m.ins > 0 ? 'pos' : 'neg'); }
+      if (fx.mod) { const m = fx.mod, y = Math.round(m.y), f = m.age ? ' until the next age' : ` for ${y} years`; if (m.stab) add(`${pct(m.stab)} stability${f}`, m.stab > 0 ? 'pos' : 'neg'); if (m.inc) add(`${pct(m.inc)}% income${f}`, m.inc > 0 ? 'pos' : 'neg'); if (m.ins) add(`${pct(m.ins)}% insight${f}`, m.ins > 0 ? 'pos' : 'neg'); if (m.str) add(`${pct(m.str)}% strength in arms${f}`, m.str > 0 ? 'pos' : 'neg'); if (m.ren) add(`More renown${f}`, 'pos'); }
       if (fx.raise) add(`Raised as ${TRAIT_A[fx.raise[1]] || fx.raise[1]}`, '');
       if (fx.pass) add('Passed over', 'warn'); if (fx.unpass) add('Back in the line', '');
       if (fx.abdicate) add('A new ruler', 'warn'); if (fx.endRegency) add('The regency ends', '');
@@ -555,7 +577,8 @@
       if (fx.popAdd) h.popScale(cv, fx.popAdd);
       if (fx.op) for (const [o, by] of fx.op) if (civs[o] && by) h.remember(civs[o], c, by);
       if (fx.claim !== undefined && fx.claim !== null && civs[fx.claim]) h.claim(cv, fx.claim);
-      if (fx.mod) { const m = fx.mod; S.m = S.m.filter((q) => q[0] !== m.k); S.m.push([m.k, x.yr + Math.round(m.y), m.stab || 0, m.inc || 0, m.ins || 0, 0]); }
+      if (fx.mod) { const m = fx.mod; S.m = S.m.filter((q) => q[0] !== m.k); S.m.push([m.k, x.yr + Math.round(m.y), m.stab || 0, m.inc || 0, m.ins || 0, m.ren ? Math.round(m.ren * h.renownNorm(cv) * 10) / 10 : 0, m.str || 0]); }      // ([key, until, stability, income, insight, renown, strength])
+      if (fx.her && h.heritage) h.heritage(cv, fx.her[0], fx.her[1]);
       const D = h.dynasty;
       if (fx.raise && D) { const p = D.of(fx.raise[0]); if (p && D.alive(p, x.yr) && ago(x, p) < 16) { p.t = fx.raise[1]; p.rz = 1; } }
       if (fx.pass && D) { const C = D.court[c]; if (C && !C.passed.includes(fx.pass)) C.passed.push(fx.pass); }
@@ -593,7 +616,7 @@
       if (fx.est) for (const k in fx.est) s += fx.est[k] * 22 * (0.5 + h.power(x.c, k) * 2);
       s += (fx.ins || 0) * 5 + (fx.ren || 0) * 40 - (fx.pop || 0) * 140 + (fx.popAdd || 0) * 70;
       if (fx.op) for (const [, by] of fx.op) s += by * 0.05;
-      if (fx.mod) s += ((fx.mod.stab || 0) * 40 + (fx.mod.inc || 0) * 70 + (fx.mod.ins || 0) * 40) * Math.min(3, fx.mod.y / x.turn);
+      if (fx.mod) s += ((fx.mod.stab || 0) * 40 + (fx.mod.inc || 0) * 70 + (fx.mod.ins || 0) * 40 + (fx.mod.str || 0) * 55 + (fx.mod.ren || 0) * 35) * Math.min(3, fx.mod.y / x.turn);
       if (fx.claim !== undefined && fx.claim !== null) s += (t === 'conqueror' || t === 'tyrant' ? 3 : -1.5);
       if (t === 'pious' && fx.est) s += (fx.est.priests || 0) * 40; if (t === 'merchant') s += (fx.coin || 0) * 3 + (fx.mod && fx.mod.inc ? fx.mod.inc * 60 : 0); if (t === 'builder') s += (fx.ren || 0) * 60;
       if (t === 'scholar') s += (fx.ins || 0) * 6 + (fx.est ? (fx.est.scholars || 0) * 30 : 0); if (t === 'conqueror' && fx.est) s += (fx.est.soldiers || 0) * 30; if (t === 'steward') s += (fx.stab || 0) * 30;
@@ -619,11 +642,18 @@
     }
 
     // ---------- a year ----------
+    // what the ages leave is measured against the age, as every edge is: a realm's heritage gives it what it gives over what the
+    // realms of its age have on the whole from theirs (taken once a year), so that the world's numbers stay where they were
+    // whatever realms choose, and a choice is what to be better at than one's age, not more of everything
+    const herSum = new Float64Array(9 * 6), herMean = new Float64Array(9 * 5);
+    const herOf = (cv, k) => herMean[eraOf(cv) * 5 + k];
     function step() {
       const t0 = performance.now(), yr = year();
+      herSum.fill(0);
       for (let c = 0; c < MAXC; c++) {
         const cv = civs[c]; if (!cv) continue; const S = ST(cv);
-        if (S.m.length && S.m.some((m) => m[1] <= yr)) S.m = S.m.filter((m) => m[1] > yr);
+        { const e = eraOf(cv) * 6; herSum[e + 5]++; const M = S.m;      // (one pass: what has run out, and what the realm's heritage gives)
+          if (M.length) { let out = false; for (let k = 0; k < M.length; k++) { const m = M[k]; if (m[1] <= yr) out = true; else if (m[0] === 'heritage') { herSum[e] += m[2]; herSum[e + 1] += m[3]; herSum[e + 2] += m[4]; herSum[e + 3] += m[5] || 0; herSum[e + 4] += m[6] || 0; } } if (out) S.m = M.filter((m) => m[1] > yr); } }
         if (cv.player && h.quiet()) { if (S.q) S.q = null; continue; }      // (the player has asked for no stories)
         if (S.q) { if (yr >= S.q.u) lapse(cv); continue; }
         // a story that comes after another
@@ -633,7 +663,22 @@
         const got = draw(cv); S.n = yr + Math.round(turnOf(cv) * (cv.player ? 0.55 + rnd() * 0.75 : 2 + rnd() * 3));
         if (got) begin(cv, got.st, got.x, got.d);
       }
+      for (let e = 0; e < 9; e++) { const n = herSum[e * 6 + 5]; for (let k = 0; k < 5; k++) herMean[e * 5 + k] = n > 0 ? herSum[e * 6 + k] / n : 0; }
       stats.ms = performance.now() - t0;
+    }
+    // what an age leaves (legacy.js asks it when a realm enters a new age): the player is told it as a story, or the court decides it
+    // when he has asked for none (and when another story waits, it follows that one); the autopilot chooses at once, without the
+    // page (a realm crosses an age every few centuries, and hundreds of realms do: the story's whole reckoning cost two milliseconds)
+    function ageTold(cv, d) {
+      if (cv.player) { const why = tell(cv, 'heritage', d, true); if (why === 'Another story waits') { ST(cv).f.push(['heritage', year() + 1, d]); return null; } return why; }
+      if (!d || !d.paths || d.paths.length !== 3) return 'Nothing to choose';
+      const S = ST(cv); let best = 0, bs = -1e9;
+      for (let i = 0; i < 3; i++) { const fx = herFx(d, i), m = fx.mod; const sc = (m.stab || 0) * (cv.stability < 0.45 ? 70 : 40) + (m.inc || 0) * 70 + (m.ins || 0) * 40 + (m.str || 0) * 55 + (m.ren || 0) * 35 + (fx.auth || 0) * 0.12 + (2 - i) * 0.6 + rnd() * 1.5; if (sc > bs) { bs = sc; best = i; } }
+      const fx = herFx(d, best), m = fx.mod, yr = year(); S.m = S.m.filter((q) => q[0] !== 'heritage'); S.m.push(['heritage', yr + 5000, m.stab || 0, m.inc || 0, m.ins || 0, m.ren ? Math.round(m.ren * h.renownNorm(cv) * 10) / 10 : 0, m.str || 0]);
+      if (fx.auth) h.addAuth(cv, fx.auth); if (h.heritage) h.heritage(cv, fx.her[0], fx.her[1]);
+      stats.told++; stats.ai++; stats.by.heritage = (stats.by.heritage || 0) + 1; const pk = stats.pick.heritage || (stats.pick.heritage = [0, 0, 0]); pk[best]++;
+      if (h.cells(cv.id) > 120) h.log(cv, `${cap(h.name(cv))} enters the ${AGE_N[d.to]} remembering ${HER[d.paths[best]].t.toLowerCase()}`, false);
+      return null;
     }
     function lapse(cv) {
       const S = ST(cv), q = S.q; S.q = null; const st = BY[q.k]; if (!st) return; const x = ctx(cv); x.U = q.U || x.U;
@@ -641,8 +686,8 @@
       S.n = Math.max(S.n, x.yr + Math.round(x.turn * (0.4 + rnd() * 0.5))); const i = st.lapse || 0; resolve(cv, st, x, q.d, i, 'lapse');
     }
     // a story the player is told now, if it can be (a birth, a wedding: dynasty.js's news; scenes and tests)
-    function tell(cv, key, d) {
-      const st = BY[key]; if (!cv || !st) return 'No such story'; if (cv.player && h.quiet()) return 'Stories are off'; const S = ST(cv); if (S.q) return 'Another story waits';
+    function tell(cv, key, d, auto) {      // (auto: told even when the player has asked for no stories, and then the court decides it)
+      const st = BY[key]; if (!cv || !st) return 'No such story'; const quiet = cv.player && h.quiet(); if (quiet && !auto) return 'Stories are off'; const S = ST(cv); if (S.q && !quiet) return 'Another story waits';
       const x = ctx(cv); let dd = null; try { dd = st.make(x, d || {}); } catch (e) { dd = null; } if (!dd) return 'It cannot happen now'; begin(cv, st, x, dd); return null;
     }
     // what the player sees of the story that waits for him
@@ -653,7 +698,7 @@
       const opts = st.opts.map((o, i) => { let fx = {}; try { fx = o.fx(x, d) || {}; } catch (e) { fx = {}; }
         const why = (o.need && o.need(x, d)) || (!o.debt && fx.coin < 0 && cv.wealth < -fx.coin * x.U ? `Needs ${Math.round(-fx.coin * x.U)} coin` : null);
         return { i, t: o.t(x, d), hint: o.hint ? o.hint(x, d) : '', chips: chips(x, fx), why, odds: !!o.odds }; });
-      return { k: st.k, art: st.art, title: st.title(x, d), text: st.text(x, d), year: q.y, until: q.u, lapse: st.lapse || 0, opts, realm: x.realm };
+      return { k: st.k, art: typeof st.art === 'function' ? st.art(x, d) : st.art, title: st.title(x, d), text: st.text(x, d), year: q.y, until: q.u, lapse: st.lapse || 0, opts, realm: x.realm };
     }
     function choose(c, i) {
       const cv = civs[c]; if (!cv || !cv.story || !cv.story.q) return 'Nothing waits'; const q = cv.story.q, st = BY[q.k]; if (!st) { cv.story.q = null; return 'Nothing waits'; }
@@ -664,16 +709,18 @@
       return resolve(cv, st, x, q.d, i, 'chose');
     }
     // what lasts: the realm's stability, income and learning while it lasts
-    function unrest(cv) { const S = cv.story; if (!S || !S.m.length) return 0; let s = 0; for (const m of S.m) s += m[2]; return s; }
-    function incF(c) { const cv = civs[c], S = cv && cv.story; if (!S || !S.m.length) return 1; let f = 1; for (const m of S.m) f *= 1 + m[3]; return f; }
-    function insF(c) { const cv = civs[c], S = cv && cv.story; if (!S || !S.m.length) return 1; let f = 1; for (const m of S.m) f *= 1 + m[4]; return f; }
-    function renOf(c) { const cv = civs[c], S = cv && cv.story; if (!S || !S.m.length) return 0; let r = 0; for (const m of S.m) r += m[5] || 0; return r; }
-    const MOD_NAME = { old: 'An old ruler who will not let go', feast: 'The festival remembered', monument: 'The monument', hostels: 'The pilgrims\' road', templetax: 'The temples taxed', tolls: 'Tolls given up to the moneylenders', charter: 'The moneylenders\' charter', falsecoin: 'False coin in the markets', silver: 'The crown\'s silver mine', fair: 'The great fair', quarantine: 'The plague gates shut', dykes: 'The dykes', roads: 'Brigands on the roads', newtrade: 'Trade across the sea', learning: 'The new learning', machine: 'The machine at work' };
-    const modsOf = (c) => { const cv = civs[c], S = cv && cv.story; return S ? S.m.map((m) => ({ k: m[0], name: MOD_NAME[m[0]] || (m[0].startsWith('ren_') ? 'Renown from ' + (REN_NAME[m[0].slice(4)] || 'the realm\'s deeds') : m[0]), until: m[1], stab: m[2], inc: m[3], ins: m[4], ren: m[5] || 0 })) : []; };
+    // (a heritage is measured against its age: herOf; every other lasting effect is the realm's own)
+    function unrest(cv) { const S = cv.story; let s = -herOf(cv, 0); if (!S || !S.m.length) return s; for (const m of S.m) s += m[2]; return s; }
+    function incF(c) { const cv = civs[c], S = cv && cv.story; if (!cv) return 1; let f = 1 / (1 + herOf(cv, 1)); if (!S || !S.m.length) return f; for (const m of S.m) f *= 1 + m[3]; return f; }
+    function insF(c) { const cv = civs[c], S = cv && cv.story; if (!cv) return 1; let f = 1 / (1 + herOf(cv, 2)); if (!S || !S.m.length) return f; for (const m of S.m) f *= 1 + m[4]; return f; }
+    function renOf(c) { const cv = civs[c], S = cv && cv.story; if (!cv) return 0; let r = -herOf(cv, 3); if (!S || !S.m.length) return r; for (const m of S.m) r += m[5] || 0; return r; }
+    function strF(c) { const cv = civs[c], S = cv && cv.story; if (!cv) return 1; let f = 1 / (1 + herOf(cv, 4)); if (!S || !S.m.length) return f; for (const m of S.m) f *= 1 + (m[6] || 0); return f; }
+    const MOD_NAME = { old: 'An old ruler who will not let go', feast: 'The festival remembered', monument: 'The monument', hostels: 'The pilgrims\' road', templetax: 'The temples taxed', tolls: 'Tolls given up to the moneylenders', charter: 'The moneylenders\' charter', falsecoin: 'False coin in the markets', silver: 'The crown\'s silver mine', fair: 'The great fair', quarantine: 'The plague gates shut', dykes: 'The dykes', roads: 'Brigands on the roads', newtrade: 'Trade across the sea', learning: 'The new learning', machine: 'The machine at work', heritage: 'What the last age left' };
+    const modsOf = (c) => { const cv = civs[c], S = cv && cv.story; return S ? S.m.map((m) => ({ k: m[0], name: MOD_NAME[m[0]] || (m[0].startsWith('ren_') ? 'Renown from ' + (REN_NAME[m[0].slice(4)] || 'the realm\'s deeds') : m[0]), until: m[1], stab: m[2], inc: m[3], ins: m[4], ren: m[5] || 0, str: m[6] || 0 })) : []; };
     const REN_NAME = { wedding: 'a royal wedding', monument: 'the monument', library: 'the new library', triumph: 'a triumph', voyage: 'a voyage of discovery', memorial: 'a memorial', patron: 'a master\'s pension', tale: 'the realm\'s deeds' };
     function save() { return { v: 1, rs, st: stats }; }
     function load(s) { if (!s || s.v !== 1) return false; if (s.rs !== undefined) rs = s.rs >>> 0; if (s.st) Object.assign(stats, s.st); return true; }
-    return { stats, news, step, view, choose, tell, unrest, incF, insF, renOf, modsOf, ctx, chips, save, load, unitOf };
+    return { stats, news, step, view, choose, tell, ageTold, unrest, incF, insF, renOf, strF, modsOf, ctx, chips, save, load, unitOf };
   }
 
   window.STORY = { create, LIST, BY, PACE };

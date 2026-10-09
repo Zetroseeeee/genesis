@@ -4,7 +4,7 @@
 // lens: true there, so that dip.js opens no screen). Options in window.__scene (beside dip.js's own):
 //   hudAlt: metres above the capital (900,000)     hudTilt: how far the view leans (0.42)
 //   age: an age to dress the interface in, for its metal (the realm is taught up to it; -1: the Iron Age dip.js gives)
-//   screen: a screen to open over it: '' (none), 'gov', 'market', 'know', 'dip', 'cult', 'chron'
+//   screen: a screen to open over it: '' (none), 'gov', 'market', 'know', 'dip', 'cult', 'chron', 'legacy' (the Chronicle's Legacy tab)
 // Answers in window.__hud: what is under way and what needs the player, as the interface lists them.
 (() => {
   const P = Object.assign({ hudAlt: 900000, hudTilt: 0.42, age: -1, screen: '' }, window.__scene || {});
@@ -23,7 +23,7 @@
     for (const key of Object.keys(RULE.LAW)) { const x = RULE.LAW[key]; if (S.rule.lacks(c.id, c, x)) continue; const why = S.rule.begin(c.id, c, key); if (!why && Q.reform) { got.reform = key; break; } }
     G.run(1);
     const M = G.mapcam; M.fly = null; const [lon, lat] = G.world.siteOf(c.capital); M.autoTilt = false; M.lon = M.tLon = lon; M.lat = M.tLat = lat - 2.2; M.dist = M.tDist = P.hudAlt / 6371000; M.tilt = M.tTilt = P.hudTilt; M.heading = M.tHeading = 0;
-    const open = { gov: () => GOV.open(), market: () => MARKET.open(), know: () => TREE.open(), dip: () => ENVOYS.open('realms'), cult: () => WORKS.open(), chron: () => G.openChronicle('log') }[P.screen];
+    const open = { gov: () => GOV.open(), market: () => MARKET.open(), know: () => TREE.open(), dip: () => ENVOYS.open('realms'), cult: () => WORKS.open(), chron: () => G.openChronicle('log'), legacy: () => G.openChronicle('legacy') }[P.screen];
     if (open) setTimeout(open, 1500);
     window.__hud = Object.assign(got, { age: document.body.dataset.age, under: [...document.querySelectorAll('#tk-body .trk .t')].map((e) => e.textContent), needs: [...document.querySelectorAll('#notes .note')].map((n) => n.getAttribute('aria-label')) });
   };

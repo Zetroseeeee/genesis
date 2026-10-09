@@ -133,6 +133,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `node tools/story/probe.js [seed,seed] [last year]` — the stories of a world through the ages: how many the autopilot's
   realms are told and of which kinds, which choice of each they take, what lasts on them, how long a year of stories
   takes. Run it after touching `story.js`, then the war-and-peace probe over 12345 and 777.
+- `node tools/legacy/probe.js [seed,seed] [last year]` — what the world's realms are remembered for through the ages: ambitions
+  fulfilled and left undone, the firsts and when they were taken, the heritages chosen, the most remembered realms against the
+  middle one, which ambitions are common and which rare, how long a year of legacies takes. Run it after touching `legacy.js`
+  or what it asks of a realm; the header says what to hold it to.
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -239,6 +243,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand; the faith; the court (`court.js`) |
 | `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
 | `src/bank.js` | `BANK` | The Treasury, the market screen's last tab: debts and who holds them, borrowing and repaying, repudiation, the coin, the price of money, banking houses and companies (shares bought and sold), panics of late |
+| `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
 | `src/court.js` | `COURT` | The Court, the laws screen's last tab: the ruling family as a tree of faces (parents, the throne and consort, brothers and sisters, children, grandchildren), the line of succession, a regency, the house and its reigns; a person's page (raise as, pass over, marry) |
@@ -655,6 +660,28 @@ Conventions that matter:
   places stories happen in come from a list of each realm's settlements made once a decade (`townsOf_` in `sim.js`; a pass
   over the land is a millisecond). The module throws its own dice; a year of it is under half a millisecond. After
   touching it run `tools/story/probe.js` (which choices are taken: none always, none never) and the war-and-peace probe.
+- **Legacies** (`legacy.js`; `sim.legacy`; the Legacy tab of the Chronicle in `main.js`). Every age sets every realm six
+  ambitions, one in each path (arms, wealth, splendour, learning, faith, reach: `LEGACY.OF[era]`); each is a test on what the
+  realm has (`x`: the host's answers, on a prototype made once a world, what costs a search counted once in five years: workshops, trade,
+  the faiths, great people, masterpieces) that says how far it has come (0 to 1). One fulfilled in its age is remembered for ever
+  (`worth(era)`: 10 to 50 points in its path, and a little authority); one left undone when the age ends is lost with it. A
+  realm of the autopilot is looked at once in ten years (the player every year), so a year costs a tenth of the realms; what costs
+  a pass over a long list is counted for all realms at once, once in five years. Some are races: among
+  the first ten realms to write, to learn the alphabet, to build railways, to fly, the first five into space (`RACE`: the order in which realms learn,
+  from the simulation's `onLearn`; once others were first it cannot be done). The world's firsts (`FIRSTS`: the first into each
+  age, the first faith, wonder, great person, golden age, realm of a hundred regions and of a million people, colony across the
+  sea, banking house, and the first to learn fourteen discoveries, from `know.first`) are remembered once, by whoever came first.
+  **What an age leaves** is a story (`heritage` in `story.js`, its painting by the path): when a realm enters a new age it
+  chooses one of the three paths it did most in, and what that gives (strength, income, renown, insight, stability, or for reach
+  authority, income and stability; half when it did nothing in the path) lasts until the next age (a lasting effect of the
+  story kind, `[key, until, stability, income, insight, renown, strength]`: strength is the seventh, `story.strF`), **measured
+  against the age** as every edge is (`herMean` in `story.js`: what the realms of its age have from theirs, taken once a year), so
+  the world's numbers stay where they were and a choice is what to be better at than one's age, not more of everything. The player
+  is asked like any story (it stops the turn; with stories off the court decides, `tell(..., auto)`; when another story waits it
+  follows that one); the autopilot chooses by its scores. The great legacies of realms that are gone are kept (`hall`).
+  Points are only what a realm is remembered for: nothing in the world's balance hangs on them. The numbers to hold it to are in
+  the header of `tools/legacy/probe.js`. Saved with the realm (`civ.legacy`) and the world (`save().legacy`: the firsts, the
+  hall, the races); a world saved before legacies begins with nothing remembered, each realm in its own age.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by
