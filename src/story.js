@@ -467,7 +467,7 @@
   function create(h) {
     const { civs, MAXC } = h;
     const year = () => h.year();
-    const stats = { told: 0, chosen: 0, lapsed: 0, ai: 0, by: {}, ms: 0 };
+    const stats = { told: 0, chosen: 0, lapsed: 0, ai: 0, by: {}, pick: {}, ms: 0 };
     const news = [];
     let rs = ((h.seed || 1) ^ 0x2c1b3c6d) >>> 0;
     const rnd = () => { rs += 0x6D2B79F5; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -611,7 +611,7 @@
     function resolve(cv, st, x, d, i, how) {
       const o = st.opts[i]; const fx = o.fx(x, d); const done = chips(x, fx); apply(x, fx, d);
       let outText = ''; if (o.odds) { const L = o.odds(x, d); let r = rnd(), out = L[L.length - 1][1]; for (const [p, q] of L) { if (r < p) { out = q; break; } r -= p; } outText = out.text || ''; if (out.fx) { done.push(...chips(x, out.fx)); apply(x, out.fx, d); } }
-      if (how === 'ai') stats.ai++; else if (how === 'lapse') stats.lapsed++; else stats.chosen++;
+      if (how === 'ai') stats.ai++; else if (how === 'lapse') stats.lapsed++; else stats.chosen++; const pk = stats.pick[st.k] || (stats.pick[st.k] = [0, 0, 0]); pk[i]++;
       const line = o.log ? o.log(x, d) : '';
       if (line && (cv.player || h.cells(cv.id) > 120)) h.log(cv, line, false);
       else if (cv.player && outText) h.log(cv, outText.split('. ')[0].replace(/\.$/, ''), false);
