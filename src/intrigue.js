@@ -47,6 +47,10 @@ window.INTRIGUE = (function () {
     const turnOf = (cv) => PACE[Math.max(0, Math.min(8, cv.era | 0))];
     // a realm's own record: the scheme its agents are on (s), when it next thinks of one (the autopilot), the foreign agents it caught
     const I = (cv) => cv.intrigue || (cv.intrigue = { s: null, next: year() + Math.round(turnOf(cv) * (2 + rnd() * 4)), found: [] });
+    // (the year's round touches a realm only when its agents are at work or it is due to think of a scheme: what is on the realm is
+    // kept in two flat arrays too, as a filter; the realm's own record is what counts, and is looked at again whenever the filter lets it through)
+    const nextT = new Float64Array(MAXC), busy = new Uint8Array(MAXC);
+    function sync() { for (let c = 0; c < MAXC; c++) { const g = civs[c] && civs[c].intrigue; nextT[c] = g ? g.next : 0; busy[c] = g && g.s ? 1 : 0; } }
     const count = (key, k) => { const o = stats.out[key] || (stats.out[key] = [0, 0, 0]); o[k]++; };
     // how good a realm's network is: what it knows of letters, envoys and the post, its laws, its ruler
     function partsOf(cv) {
@@ -55,40 +59,40 @@ window.INTRIGUE = (function () {
       for (const p of h.netLaws(cv)) out.push(p);
       return out;
     }
-    function netOf(cv) { let n = 0; for (const p of partsOf(cv)) n += p[1]; return n; }
+    function netOf(cv) { let n = 0; for (let k = 0; k < NET.length; k++) if (h.knows(cv.id, NET[k])) n++; const t = cv.ruler && TRAIT_NET[cv.ruler.trait]; if (t) n += t[0]; for (const p of h.netLaws(cv)) n += p[1]; return n; }      // (partsOf, summed, without the list)
     const costOf = (a, key) => Math.round(SK[key].cost * h.unitOf(a));
-    // why a scheme cannot be begun against a realm, or nothing
-    function cannot(a, b, key) {
+    // why a scheme cannot be begun against a realm, or nothing (pre: what the autopilot has looked up already: { behind, works })
+    function cannot(a, b, key, pre) {
       const S = SK[key]; if (!S) return 'No such scheme'; if (!a || !b || a === b) return 'Nobody to scheme against';
       if (!h.knows(a.id, S.need)) return `Needs ${h.knowName(S.need)}`;
       if (I(a).s) return I(a).s.on === b.id ? 'Your agents are at work there already' : 'Your agents are busy elsewhere';
       if (!h.reach(a, b)) return 'Beyond the reach of your agents';
       if (key === 'murder' && !h.heirOf(b)) return 'No heir of theirs to strike at';
-      if (key === 'sabotage' && !h.worksOf(b).length) return 'They are building nothing';
-      if (key === 'learn' && !h.knowsMore(b, a)) return 'They know nothing your people could learn';
+      if (key === 'sabotage' && !(pre ? pre.works : h.worksOf(b).length)) return 'They are building nothing';
+      if (key === 'learn' && !(pre ? pre.behind : h.knowsMore(b, a))) return 'They know nothing your people could learn';
       if (key === 'rising' && h.angriest(b) < 0) return 'Nobody there is angry enough';
       if (key === 'claim' && !h.touches(a, b)) return 'You share no border';
       if (a.wealth < costOf(a, key)) return `Needs ${costOf(a, key)} coin`;
       return null;
     }
     // how likely to succeed and to be found out: the scheme's own, then the two networks against each other, a shared border
-    function oddsOf(a, b, key) {
-      const S = SK[key], d = netOf(a) - netOf(b), near = h.touches(a, b) ? 1 : 0;
+    function oddsOf(a, b, key, dn) {
+      const S = SK[key], d = dn === undefined ? netOf(a) - netOf(b) : dn, near = h.touches(a, b) ? 1 : 0;
       const odds = clamp(S.odds * (1 + 0.18 * d) + 0.06 * near, 0.05, 0.9), risk = clamp(S.risk * (1 - 0.15 * d) - 0.04 * near, 0.04, 0.9);
       return { odds, risk, years: Math.max(2, Math.round(S.turns * turnOf(a))), cost: costOf(a, key) };
     }
     // a scheme begun: paid at once, under way for its years; every year a chance that it is found out
-    function begin(a, b, key) {
-      const why = cannot(a, b, key); if (why) return why;
-      const o = oddsOf(a, b, key), yr = year(); a.wealth -= o.cost;
-      I(a).s = { k: key, on: b.id, from: yr, until: yr + o.years, odds: o.odds, risk: o.risk, cost: o.cost, name: h.name(b) };
+    function begin(a, b, key, pre, dn) {
+      const why = cannot(a, b, key, pre); if (why) return why;
+      const o = oddsOf(a, b, key, dn), yr = year(); a.wealth -= o.cost;
+      I(a).s = { k: key, on: b.id, from: yr, until: yr + o.years, odds: o.odds, risk: o.risk, cost: o.cost, name: h.name(b) }; busy[a.id] = 1;
       stats.begun++; stats.by[key] = (stats.by[key] || 0) + 1;
       return null;
     }
-    function cancel(a) { const g = I(a); if (!g.s) return 'Nothing under way'; g.s = null; return null; }
+    function cancel(a) { const g = I(a); if (!g.s) return 'Nothing under way'; g.s = null; busy[a.id] = 0; return null; }
     // found out: the victim remembers it, the schemer's word is worth less; the victim keeps the record (a reason for war, if it was an act of one)
     function caught(a, b, s, yr) {
-      const S = SK[s.k]; stats.caught++; count(s.k, 2); I(a).s = null;
+      const S = SK[s.k]; stats.caught++; count(s.k, 2); I(a).s = null; busy[a.id] = 0;
       h.remember(b, a.id, -S.mind); h.word(a, -Math.round(S.mind / 6));
       const F = I(b).found; F.push([yr, a.id, s.k]); if (F.length > 8) F.shift();
       if (b.player || a.player || h.cells(a.id) + h.cells(b.id) > 160) h.log(b, `Agents of ${h.name(a)} are caught in ${h.name(b)} ${S.at}`, b.player || a.player);
@@ -97,7 +101,7 @@ window.INTRIGUE = (function () {
     }
     // the scheme comes to its end: it worked or it did not
     function resolve(a, b, s, yr) {
-      I(a).s = null; const S = SK[s.k];
+      I(a).s = null; busy[a.id] = 0; const S = SK[s.k];
       if (rnd() >= s.odds) { stats.failed++; count(s.k, 1); if (a.player) news.push({ kind: 'failed', key: s.k, on: b.id, year: yr, text: `${S.name}: it came to nothing in ${h.name(b)}` }); return; }
       stats.done++; count(s.k, 0); let what = '', felt = '';
       switch (s.k) {
@@ -118,25 +122,29 @@ window.INTRIGUE = (function () {
       if (h.cells(cv.id) < 20 || !h.knows(cv.id, 'writing')) return;
       const t = cv.ruler ? cv.ruler.trait : ''; if (rnd() > (t === 'tyrant' ? 0.9 : t === 'conqueror' ? 0.6 : t === 'pious' ? 0.25 : 0.45)) return;
       const rivals = h.rivals(cv); if (!rivals.length) return; const b = rivals[Math.floor(rnd() * rivals.length)];
-      const atWar = h.atWar(cv, b), behind = h.knowsMore(b, cv);
+      const atWar = h.atWar(cv, b), pre = { behind: h.knowsMore(b, cv), works: h.worksOf(b).length > 0 }, dn = netOf(cv) - netOf(b);
       const wants = [];
-      if (behind) wants.push('learn', 'learn'); if (atWar) wants.push('discord', 'sabotage', 'rising'); else wants.push('claim', 'discord');
-      if (t === 'tyrant' || t === 'conqueror') wants.push('murder'); if (h.worksOf(b).length) wants.push('sabotage');
-      for (let k = 0; k < 4 && wants.length; k++) { const i = Math.floor(rnd() * wants.length), key = wants[i]; if (!cannot(cv, b, key) && oddsOf(cv, b, key).odds >= 0.3) { begin(cv, b, key); return; } wants.splice(i, 1); }
+      if (pre.behind) wants.push('learn', 'learn'); if (atWar) wants.push('discord', 'sabotage', 'rising'); else wants.push('claim', 'discord');
+      if (t === 'tyrant' || t === 'conqueror') wants.push('murder'); if (pre.works) wants.push('sabotage');
+      for (let k = 0; k < 4 && wants.length; k++) { const i = Math.floor(rnd() * wants.length), key = wants[i]; if (!cannot(cv, b, key, pre) && oddsOf(cv, b, key, dn).odds >= 0.3) { begin(cv, b, key, pre, dn); return; } wants.splice(i, 1); }
     }
     // ----- a year -----
     function step() {
       const t0 = performance.now(), yr = year();
       for (let c = 0; c < MAXC; c++) {
-        const cv = civs[c]; if (!cv) continue; const g = I(cv);
+        if (!busy[c] && yr < nextT[c]) continue;
+        const cv = civs[c]; if (!cv) { busy[c] = 0; nextT[c] = 0; continue; } const g = I(cv);
         if (g.s) {
-          const s = g.s, b = civs[s.on]; if (!b) { g.s = null; continue; }
+          const s = g.s, b = civs[s.on]; if (!b) { g.s = null; busy[c] = 0; continue; }
           const years = Math.max(1, s.until - s.from); const pYear = 1 - Math.pow(1 - s.risk, 1 / years);      // (found out within its years as often as its risk says)
           if (rnd() < pYear) { caught(cv, b, s, yr); continue; }
           if (yr >= s.until) resolve(cv, b, s, yr);
           continue;
         }
-        if (!cv.player && yr >= g.next) think(cv, yr);
+        busy[c] = 0;
+        if (cv.player) { nextT[c] = yr + 20; continue; }      // (the player's agents go where he sends them; looked at again now and then, in case the realm is his no longer)
+        if (yr < g.next) { nextT[c] = g.next; continue; }
+        think(cv, yr); nextT[c] = g.next;
       }
       stats.ms = performance.now() - t0;
     }
@@ -158,8 +166,8 @@ window.INTRIGUE = (function () {
         theirs: b ? netOf(b) : 0 };
     }
     function save() { return { v: 1, rs, stats: { begun: stats.begun, done: stats.done, failed: stats.failed, caught: stats.caught, by: stats.by, out: stats.out } }; }
-    function load(s) { if (!s || s.v !== 1) return false; if (s.rs !== undefined) rs = s.rs >>> 0; if (s.stats) Object.assign(stats, s.stats); return true; }
-    return { step, begin, cancel, cannot, oddsOf, costOf, netOf, partsOf, view, gone, caughtFrom, save, load, news, stats, I };
+    function load(s) { sync(); if (!s || s.v !== 1) return false; if (s.rs !== undefined) rs = s.rs >>> 0; if (s.stats) Object.assign(stats, s.stats); return true; }
+    return { step, begin, cancel, cannot, oddsOf, costOf, netOf, partsOf, view, gone, caughtFrom, save, load, news, stats, I, sync };      // (sync: after a test or a scene sets a realm's record by hand)
   }
   return { create, SCHEMES, SK, NET, WAR_TURNS };
 })();

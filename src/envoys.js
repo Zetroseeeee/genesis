@@ -146,6 +146,10 @@ window.ENVOYS = (function () {
     { const u = d.claimUntil(c, b.id, 'refused'); if (u > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>They refused you tribute: a reason for war ${upto(u, c)}</span></div>`); }
     { const u = d.claimUntil(c, b.id, 'rebel'); if (u > y) lines.push(`<div class="dp-line">${svg(ICON.claim)}<span>A rebel vassal: yours to bring to heel ${upto(u, c)}</span></div>`); }
     { const u = d.holds(b, c.id); if (u > y) lines.push(`<div class="dp-line warn">${svg(ICON.claim)}<span>They hold a reason for war against you ${upto(u, c)}</span></div>`); }
+    // (agents caught at an act of war: a reason for war for three turns, either way)
+    { const X = s.intrigue, IN = window.INTRIGUE; if (X && IN) { const T = (cv) => IN.WAR_TURNS * pace(cv); const a1 = X.caughtFrom(c, b), a2 = X.caughtFrom(b, c);
+      if (a1 > -Infinity) lines.push(`<div class="dp-line">${svg(ICON.spy)}<span>You caught their agents in ${s.fmtYear(a1)}: a reason for war ${upto(a1 + T(c), c)}</span></div>`);
+      if (a2 > -Infinity) lines.push(`<div class="dp-line warn">${svg(ICON.spy)}<span>They caught your agents in ${s.fmtYear(a2)}: a reason for war against you ${upto(a2 + T(b), c)}</span></div>`); } }
     if (db.owes[c.id] > y) lines.push(`<div class="dp-line">${svg(ICON.owes)}<span>They pay you reparations ${upto(db.owes[c.id], c)}</span></div>`);
     if (dc.owes[b.id] > y) lines.push(`<div class="dp-line warn">${svg(ICON.owes)}<span>You pay them reparations ${upto(dc.owes[b.id], c)}</span></div>`);
     h += `<div class="gv-sect"><span class="micro">Between you</span>${lines.join('') || '<div class="gv-note">Nothing is sworn between you, and nothing is owed.</div>'}</div>`;
@@ -267,7 +271,10 @@ window.ENVOYS = (function () {
     r += sect('What you have sworn', pacts.length ? pacts.map(([u, b, p]) => `<div class="dp-line">${svg(ICON[p.key])}<span>${esc(p.name)} with ${link(b)} ${upto(u, c)}</span></div>`).join('') : '<div class="gv-note">Nothing yet.</div>');
     const WHAT = { claim: 'a claim on their borderland', land: 'land that was yours', refused: 'tribute refused', rebel: 'a rebel vassal' };
     const claims = [], against = []; for (const b of s.civs) { if (!b || b === c || !b.dip) continue; for (const what in WHAT) { const u = d.claimUntil(c, b.id, what); if (u > y) claims.push(`<div class="dp-line">${svg(ICON.claim)}<span>Against ${link(b)}: ${WHAT[what]} ${upto(u, c)}</span></div>`); }
-      const u = d.holds(b, c.id); if (u > y) against.push(`<div class="dp-line warn">${svg(ICON.claim)}<span>${link(b)} holds one against you ${upto(u, c)}</span></div>`); }
+      const u = d.holds(b, c.id); if (u > y) against.push(`<div class="dp-line warn">${svg(ICON.claim)}<span>${link(b)} holds one against you ${upto(u, c)}</span></div>`);
+      const X = s.intrigue, IN = window.INTRIGUE; if (X && IN) { const a1 = X.caughtFrom(c, b), a2 = X.caughtFrom(b, c);
+        if (a1 > -Infinity) claims.push(`<div class="dp-line">${svg(ICON.spy)}<span>Against ${link(b)}: their agents caught ${upto(a1 + IN.WAR_TURNS * pace(c), c)}</span></div>`);
+        if (a2 > -Infinity) against.push(`<div class="dp-line warn">${svg(ICON.spy)}<span>${link(b)} caught your agents: a reason for war against you ${upto(a2 + IN.WAR_TURNS * pace(b), c)}</span></div>`); } }
     r += sect('Reasons for war', (claims.join('') + against.join('')) || '<div class="gv-note">You hold none, and nobody holds one against you.</div>');
     const bans = []; for (const k in dc.ban) { const b = s.civs[+k]; if (b) bans.push(`<div class="dp-line">${svg(ICON.ban)}<span>Yours to ${link(b)} since ${s.fmtYear(dc.ban[k])}</span></div>`); } for (const b of s.civs) if (b && b !== c && b.dip && b.dip.ban[c.id]) bans.push(`<div class="dp-line warn">${svg(ICON.ban)}<span>${link(b)}'s to you</span></div>`);
     if (bans.length) r += sect('Markets closed', bans.join(''));

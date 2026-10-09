@@ -540,11 +540,11 @@ function createSim(world, seed) {
   // (laws that make a realm's agents better, and catch more of another's: police, an intendant in every province, the censor)
   const NETLAW = { justice: { police: 1, watched: 2 }, admin: { intendants: 0.5, digital: 1 }, speech: { censor: 0.5, line: 1, wallednet: 1 } };
   const netLaws = (cv) => { const L = rule.ruleOf(cv).laws, out = []; for (const cat in NETLAW) { const v = NETLAW[cat][L[cat]]; if (v) out.push([RULE.LAW[L[cat]].name, v]); } return out; };
-  function rivalsOf(cv) {      // (at war with it, claimed by it, remembered with hatred, or a neighbour it cannot abide)
+  function rivalsOf(cv) {      // (at war with it, claimed by it, remembered with hatred, or a neighbour it cannot abide: what it thinks of a neighbour is a sum of many reasons, so only one, met at random, is asked)
     const out = [], d = cv.dip; const add = (o) => { if (o && o !== cv && out.indexOf(o) < 0 && !diplo.bound(cv, o)) out.push(o); };
     for (const k in cv.wars) add(civs[+k]);
     if (d) { for (const k in d.claim) if (d.claim[k] > year) add(civs[Math.floor(+k / 4)]); for (const k in d.mem) if (d.mem[k][0] < -20 && diplo.memOf(cv, +k) < -20) add(civs[+k]); }
-    const nb = nearNb[cv.id] || lastNb[cv.id]; if (nb) for (const b of nb) { const o = civs[b]; if (o && out.indexOf(o) < 0 && diplo.opinion(cv, o) < -25) add(o); }
+    const nb = nearNb[cv.id] || lastNb[cv.id]; if (nb && nb.length) { const o = civs[nb[Math.floor(rnd() * nb.length)]]; if (o && out.indexOf(o) < 0 && diplo.opinion(cv, o) < -25) add(o); }
     return out;
   }
   intrigue = INTRIGUE ? INTRIGUE.create({ civs, MAXC, seed, year: () => year, name: (cv) => fullName(cv), cells: (c) => cellsOf[c],
