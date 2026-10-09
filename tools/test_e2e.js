@@ -334,7 +334,7 @@ server.listen(0, async () => {
   await scenario('chronicle modal: tabs, filters, click-to-fly, close', async (check) => {
     await page.keyboard.press('c'); await frames(2);
     let r = await ev(() => ({ open: document.getElementById('chron').open, log: document.querySelectorAll('#log .fe').length, filters: document.querySelectorAll('#logfilters .btn').length }));
-    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 12, 'twelve filters');
+    check(r.open, 'chronicle opens with C'); check(r.log > 0, 'log has entries'); check(r.filters === 13, `thirteen filters (${r.filters})`);
     await ev(() => document.querySelector('#logfilters [data-f="mine"]').click()); const mine = await ev(() => [...document.querySelectorAll('#log .fe')].every(e => e.classList.contains('mine'))); check(mine, 'Mine filter shows only own events');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="powers"]').click()); check((await ev(() => document.querySelectorAll('#powers .pw').length)) > 3, 'powers list');
     await ev(() => document.querySelector('#chron .tabs [data-ctab="graphs"]').click()); await frames(2); check((await ev(() => { const c = document.getElementById('g-world'); return c.width > 0 && c.height > 0; })), 'graphs drawn');
