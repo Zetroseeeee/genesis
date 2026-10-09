@@ -75,9 +75,9 @@ window.DISEASE = (function () {
     // how fierce it is now, by how long it has burned: up in its first year, the height, then down to nothing
     const curve = (t, b) => (t < 1 ? 0.5 + 0.5 * t : t < b * 0.45 ? 1 : t < b ? 1 - (t - b * 0.45) / (b * 0.55) : 0);
     // the share of a realm's people it takes in a year at full height (what the realm's medicine, its towns and its past make of it)
-    function deadly(o, cv) {
+    function deadly(o, cv, b) {
       const K = KINDS[o.k], c = cv.id; const towns = 1 + (K.towns - 1) * h.urban(c); const w = had[c * NK + o.k]; const seen = w >= 3 ? K.endemic : K.virgin * Math.pow(K.endemic / K.virgin, w / 3);
-      return clamp(K.dead * K.attack * towns * seen * AGE[clamp(cv.era | 0, 0, 8)] / h.health(c), 0, 0.85) * o.cure[c] / burnOf(o, cv);
+      return clamp(K.dead * K.attack * towns * seen * AGE[clamp(cv.era | 0, 0, 8)] / h.health(c), 0, 0.85) * o.cure[c] / (b || burnOf(o, cv));
     }
     // ----- a year -----
     function step() {
@@ -97,11 +97,11 @@ window.DISEASE = (function () {
       // over a border or along the market's roads and sea lanes, outbreak or none (a tenth of the realms looked at each year)
       for (let c = 0; c < MAXC; c++) {
         const cv = civs[c]; if (!cv || rnd() > 0.1) continue; const o0 = c * NK; let virgin = false; for (let k = 0; k < NK; k++) if (!had[o0 + k] && imm[o0 + k] <= yr) { virgin = true; break; } if (!virgin) continue;
-        const nb = h.nb(c), tp = h.partners(c), q = h.shut(cv);
+        const nb = h.nb(c), np = h.pn(c), q = h.shut(cv);
         for (let k = 0; k < NK; k++) {
           if (had[o0 + k] || imm[o0 + k] > yr) continue; let by = -1;
           if (nb) for (const d of nb) if (civs[d] && had[d * NK + k] >= 3) { by = d; break; }
-          if (by < 0) for (const d of tp) if (civs[d] && had[d * NK + k] >= 3) { by = d; break; }
+          if (by < 0) for (let j = 0; j < np; j++) { const d = h.pa(c, j); if (civs[d] && had[d * NK + k] >= 3) { by = d; break; } }
           if (by < 0 || rnd() > 0.25 * KINDS[k].spread * (1 - q)) continue;
           const o = out.find((x) => x.k === k); if (o) infect(o, c); else if (out.length < MAXO + 2) begin(k, c, -1);
         }
@@ -117,28 +117,30 @@ window.DISEASE = (function () {
           // (burned out: those who lived through it are spared it for some turns; a people new to it, only until a generation has been born since)
           if (f <= 0) { o.inf[c] = 0; o.n--; const w = had[c * NK + o.k]; imm[c * NK + o.k] = yr + (w >= 2 ? K.keep * turnOf(cv) : 40); if (w < 3) had[c * NK + o.k] = w + 1; if (cv.player) news.push({ kind: 'over', o: o.id, year: yr, text: `${cap(o.name)} has burned itself out in your realm` }); continue; }
           o.inf[c] = f;
-          const share = deadly(o, cv) * f, lost = share * h.pop(c); killF[c] = 1 - (1 - killF[c]) * (1 - share); anyKill = true; o.dead += lost; stats.dead += lost;
+          const share = deadly(o, cv, b) * f, lost = share * h.pop(c); killF[c] = 1 - (1 - killF[c]) * (1 - share); anyKill = true; o.dead += lost; stats.dead += lost;
           // where it goes: over the borders, along the market's roads and sea lanes, with armies; a realm shut against it is passed by
-          const go = (d, p) => { if (d === c || o.inf[d] > 0) return; const dv = civs[d]; if (!dv || imm[d * NK + o.k] > yr) return; const q = h.shut(dv), qs = h.shut(cv); if (rnd() < p * f * K.spread * (1 - q) * (1 - 0.5 * qs)) infect(o, d); };
-          const nb = h.nb(c); if (nb) for (const d of nb) go(d, 0.15);
-          const tp = h.partners(c); for (const d of tp) go(d, 0.08 * K.ships);
-          for (const k2 in cv.wars) go(+k2, 0.15 * K.war);
+          const pf = f * K.spread * (1 - 0.5 * h.shut(cv));
+          const nb = h.nb(c); if (nb) for (const d of nb) go(o, c, d, 0.15 * pf, yr);
+          for (let j = 0, np = h.pn(c); j < np; j++) go(o, c, h.pa(c, j), 0.08 * K.ships * pf, yr);
+          if (h.wars(cv)) for (const k2 in cv.wars) go(o, c, +k2, 0.15 * K.war * pf, yr);
         }
         if (o.n <= 0) { out.splice(n, 1); past.push({ id: o.id, k: o.k, name: o.name, at: o.at, from: o.from, fromName: o.fromName, year: o.year, end: yr, dead: Math.round(o.dead), realms: o.realms }); if (past.length > 24) past.shift(); }
       }
-      if (anyKill) h.killAll(killF);      // (the year's dead, every realm's share taken from all its land in one pass)
+      // (the year's dead are taken by the simulation's next pass over the land, every realm's share of all its land: `dying`, `killF`)
       stats.ms = performance.now() - t0;
     }
+    // it goes from realm c to realm d with chance p, unless d has it, is spared it, or is shut against it
+    function go(o, c, d, p, yr) { if (d === c || o.inf[d] > 0) return; const dv = civs[d]; if (!dv || imm[d * NK + o.k] > yr) return; if (rnd() < p * (1 - h.shut(dv))) infect(o, d); }
     // ----- the player's hand, and the god's -----
     function seed(cell, kind) { const o0 = h.ownerOf(cell); if (o0 < 0 || !civs[o0]) return 'Nobody lives there'; const k = kind !== undefined ? (typeof kind === 'string' ? KK[kind].id : kind) : (KK.plague.id); if (out.length >= MAXO + 2) return 'The world has sickness enough'; const o = begin(k, o0, cell); return o ? null : 'Nothing happened'; }
     // a new realm: what its people have had is what the realm it came from had, or the land about it
     function born(c, from, around) {
-      for (let k = 0; k < NK; k++) { imm[c * NK + k] = NEVER; had[c * NK + k] = 0; }
+      killF[c] = 0; for (let k = 0; k < NK; k++) { imm[c * NK + k] = NEVER; had[c * NK + k] = 0; }
       if (from >= 0) for (let k = 0; k < NK; k++) { imm[c * NK + k] = imm[from * NK + k]; had[c * NK + k] = had[from * NK + k]; }
       else if (around) for (const d of around) for (let k = 0; k < NK; k++) if (had[d * NK + k] > had[c * NK + k]) had[c * NK + k] = had[d * NK + k];
       for (const o of out) { o.inf[c] = 0; o.since[c] = 0; }
     }
-    function gone(c) { for (const o of out) if (o.inf[c] > 0) { o.inf[c] = 0; o.n--; } for (let k = 0; k < NK; k++) { imm[c * NK + k] = NEVER; had[c * NK + k] = 0; } }
+    function gone(c) { killF[c] = 0; for (const o of out) if (o.inf[c] > 0) { o.inf[c] = 0; o.n--; } for (let k = 0; k < NK; k++) { imm[c * NK + k] = NEVER; had[c * NK + k] = 0; } }
     // what it costs a realm to shut itself (the market's links are not cut: what comes over them is less)
     const incF = (c) => { const cv = civs[c]; const q = cv && cv.sick ? cv.sick.q : 0; return q === 2 ? 0.88 : q === 1 ? 0.95 : 1; };
     const shutL = [];      // (the realms shut against the sick just now)
@@ -174,7 +176,7 @@ window.DISEASE = (function () {
       for (const p of s.past || []) past.push(p); for (let i = 0; i < (s.im || []).length; i += 2) imm[s.im[i]] = s.im[i + 1]; for (let i = 0; i < (s.hd || []).length; i += 2) had[s.hd[i]] = s.hd[i + 1];
       if (s.stats) Object.assign(stats, s.stats); return true;
     }
-    return { step, seed, born, gone, view, lens, spared, bandOf, incF, setQ, quarantine, cure, unrest, save, load, stats, news, out, past, imm, had, deadly, KINDS };
+    return { step, seed, born, gone, view, lens, spared, bandOf, incF, setQ, quarantine, cure, unrest, save, load, stats, news, out, past, imm, had, deadly, KINDS, killF, dying: () => anyKill };
   }
   return { create, KINDS, KK, NK, AGE, BANDS };
 })();

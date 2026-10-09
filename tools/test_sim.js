@@ -1369,13 +1369,13 @@ log('21. pestilence');
   // an outbreak begun in the neighbour: it burns there, kills, and goes over the border
   { const why = X.seed(B.capital, 'pox'); let o = X.out.find((q) => q.k === DS.KK.pox.id);
     check(why === null && !!o && o.inf[B.id] > 0 && o.n === 1, `an outbreak of smallpox begins in the neighbour (${o ? o.name : why})`);
-    let reached = -1; const first = o;
-    for (let n = 0; n < 5 && reached < 0; n++) {      // (it crosses a border as often as its spread says: tried with up to five outbreaks)
+    let reached = null; const first = o;      // (a year: BC is negative)
+    for (let n = 0; n < 5 && reached === null; n++) {      // (it crosses a border as often as its spread says: tried with up to five outbreaks)
       if (n) { for (let k = 0; k < DS.NK; k++) { X.imm[B.id * DS.NK + k] = -1e9; X.imm[P.id * DS.NK + k] = -1e9; } X.seed(B.capital, 'pox'); o = X.out.find((q) => q.k === DS.KK.pox.id && q !== first) || o; }
-      for (let y = 0; y < 40 && X.out.indexOf(o) >= 0; y++) { sim.tick(); if (reached < 0 && o.inf[P.id] > 0) reached = sim.year; if (P.story) P.story.q = null; } }
+      for (let y = 0; y < 40 && X.out.indexOf(o) >= 0; y++) { sim.tick(); if (reached === null && o.inf[P.id] > 0) reached = sim.year; if (P.story) P.story.q = null; } }
     o = first;
     check(o.dead > 0 && o.realms >= 2, `it kills (${o.dead.toFixed(1)}) and goes on to other realms (${o.realms})`);
-    check(reached > 0, `it crosses the border into the player's realm (${reached > 0 ? sim.fmtYear(reached) : 'never'})`);
+    check(reached !== null, `it crosses the border into the player's realm (${reached !== null ? sim.fmtYear(reached) : 'never'})`);
     const yr = sim.year; check(X.imm[B.id * DS.NK + DS.KK.pox.id] > yr - 30 && X.had[B.id * DS.NK + DS.KK.pox.id] >= 1, 'burned out, it leaves those who lived through it spared, and remembered'); }
   // what makes it deadlier or milder: a people that never had it, the age's medicine
   { X.seed(B.capital, 'measles'); const o = X.out.find((q) => q.k === DS.KK.measles.id); const kb = B.id * DS.NK + DS.KK.measles.id;
@@ -1400,12 +1400,13 @@ log('21. pestilence');
 }
 // the world's sicknesses: arising where people live crowded in the old world, and reaching the Americas only with the ships
 {
-  const sim = createSim(wd, 12345); let ms = 0; for (let y = 0; y < 11500; y++) { sim.tick(); if (y >= 11400) ms += sim.disease.stats.ms; } const X = sim.disease, DS = window.DISEASE;
+  const sim = createSim(wd, 12345); const each = []; for (let y = 0; y < 11500; y++) { sim.tick(); if (y >= 11400) each.push(sim.disease.stats.ms); } const X = sim.disease, DS = window.DISEASE;
+  const ms = each.sort((a, b) => a - b)[50] * 100;      // (the middle year of the century: a pause of the collector falls in whichever step is running)
   const am = sim.civs.filter((c) => c && c.capital >= 0 && (() => { const lon = ((c.capital % W) + 0.5) / W * 360 - 180; return lon < -30 && lon > -170; })()); const amHad = am.filter((c) => DS.KINDS.some((K) => X.had[c.id * DS.NK + K.id])).length;
   log(`   ${sim.fmtYear(sim.year)}: ${X.stats.begun} outbreaks (${Object.keys(X.stats.by).map((k) => k + ' ' + X.stats.by[k]).join(', ')}), ${X.stats.reached} realms reached, ${Math.round(X.stats.dead)} dead; ${amHad} of ${am.length} realms of the Americas have had any; ${(ms / 100).toFixed(4)} ms a year`);
   check(X.stats.begun > 60 && Object.keys(X.stats.by).length >= 4 && X.stats.dead > 0, `sicknesses arise and travel (${X.stats.begun} outbreaks, ${Object.keys(X.stats.by).length} kinds)`);
   check(am.length > 10 && amHad <= am.length * 0.1, `the Americas have met none of them before the ships (${amHad} of ${am.length} realms)`);
-  check(ms / 100 < 0.15, `sickness is quick enough (${(ms / 100).toFixed(4)} ms a year)`);
+  check(ms / 100 < 0.15, `sickness is quick enough (${(ms / 100).toFixed(4)} ms in the middle year)`);
   const size = JSON.stringify(sim.save().disease).length / 1024; check(size < 60, `what sickness keeps is saved in ${size.toFixed(0)} KB`);
 }
 }

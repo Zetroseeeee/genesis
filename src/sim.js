@@ -575,11 +575,11 @@ function createSim(world, seed) {
     rivals: rivalsOf, atWar: (a, b) => !!a.wars && a.wars[b.id] !== undefined }) : null;
   // sickness (disease.js): how crowded a realm is and how many of its people live in towns, what medicine it has against its age,
   // the roads a sickness travels; the dead are taken from its settlements
-  const urbanOf = (c) => { if (!civs[c] || !(popOf[c] > 0)) return 0; let t = 0; for (const i of townsOf_(c)) t += pop[i]; return Math.min(1, t / popOf[c]); };
+  const urbanOf = (c) => (civs[c] && popOf[c] > 0 ? Math.min(1, urban[c] / popOf[c]) : 0);      // (the share of its people in towns, as the year's pass counted them)
   disease = DISEASE ? DISEASE.create({ civs, MAXC, seed, year: () => year, name: (cv) => fullName(cv), cellName: (i) => cellName.get(i) || '', cells: (c) => cellsOf[c], ownerOf: (i) => owner[i],
     urban: urbanOf, health: (c) => Math.max(0.3, KF[c * NKF + KK.health] * RF[c * NRF + RK.health]),
-    pop: (c) => popOf[c], killAll: (f) => { for (let k = 0; k < LI.length; k++) { const i = LI[k], o = owner[i]; if (o >= 0) { const q = f[o]; if (q > 0) pop[i] *= 1 - q; } } },
-    crowd: (c) => townsOf[c] + 2 * markets[c] + 3 * ports[c], nb: (c) => nearNb[c] || lastNb[c], partners: (c) => diplo.partnersOf(c),
+    pop: (c) => popOf[c],
+    crowd: (c) => townsOf[c] + 2 * markets[c] + 3 * ports[c], nb: (c) => nearNb[c] || lastNb[c], pn: diplo.pN, pa: diplo.pAt, wars: warsOf,
     cradle: (c) => { const cv = civs[c]; if (!cv || cv.capital < 0) return false; const lon = ((cv.capital % W) + 0.5) / W * 360 - 180, lat = 90 - (((cv.capital / W) | 0) + 0.5) / H * 180; return !(lon < -30 && lon > -170) && !(lat < -10 && lon > 110); },
     shut: (cv) => (cv.sick ? (cv.sick.q === 2 ? 0.85 : cv.sick.q === 1 ? 0.5 : 0) : 0),
     reached: (cv, o) => { if (cv.player || cellsOf[cv.id] > 150) logEvent(cv, `${o.name.charAt(0).toUpperCase() + o.name.slice(1)} reaches ${fullName(cv)}`, cv.player, 'disaster'); if (cv.player) storyTell(cv, 'plague', { o: o.id }); } }) : null;
@@ -826,10 +826,11 @@ function createSim(world, seed) {
     frontTech = 0;
     for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; strengthOf[c] = strength(cv, 0, 0); fmOf[c] = fmNow(cv); growR[c] = growOf(cv.tech) * (1 - (cv.policy.tax - 1) * 0.15) * (0.7 + cv.stability * 0.3) * KF[c * NKF + KK.grow] * RF[c * NRF + RK.grow]; techSum += cv.tech; techN++; if (cv.tech > frontTech) frontTech = cv.tech; }
     meanTech = techN ? techSum / techN : 0.02;
-    // pass 1: growth + accumulate (order-independent)
+    // pass 1: growth + accumulate (order-independent); the dead of last year's sickness are taken first (disease.js: a share of each realm)
+    const sick = disease && disease.dying() ? disease.killF : null;
     for (let k = 0; k < LI.length; k++) {
       const i = LI[k]; const o = owner[i]; const c = o >= 0 ? civs[o] : null;
-      let p = pop[i];
+      let p = pop[i]; if (sick !== null && o >= 0) { const q = sick[o]; if (q > 0) p *= 1 - q; }
       if (p > 0 || c) {
         const K = capacity(i, c);
         const r = c ? growR[o] : 0.006;

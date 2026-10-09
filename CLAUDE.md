@@ -725,8 +725,10 @@ Conventions that matter:
   once in eighty years or so for each kind, in the most crowded realm of an age that breeds it **in the old world** (`cradle` in
   `sim.js`: not the Americas, not Australia), and goes realm to realm: over borders, along the market's links (harbours and
   caravans: `ships`), with armies at war, less into a realm shut against it. In each realm it reaches it rises, burns and dies
-  away (`curve`, `burn` longer in a large realm), taking each year a share of its people from all its land at once (`killF`,
-  one pass at the end of the year: the host's `killAll`); the share is the kind's, times its towns, times how many waves of
+  away (`curve`, `burn` longer in a large realm), taking each year a share of its people from all its land at once (`killF`:
+  the simulation's next pass over the land takes it, so sickness has no pass of its own - it must stay a tenth of a millisecond
+  a year, and asks for partners by index, `pN` and `pAt` in `diplo.js`, and for the share in towns the year's pass counted,
+  `urban`); the share is the kind's, times its towns, times how many waves of
   it the realm's people have lived through (`had`, 0 to 3: virgin at none, endemic at three, between by steps), times the age's
   medicine (`AGE`, from 1 in the Stone Age to 0.05 now), over the realm's own medicine against its age (`health`, as every edge),
   times what the realm did about it (`cure`). Burned out, it leaves the realm spared (`imm`: for its turns once it is at home, for
