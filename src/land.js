@@ -21,7 +21,7 @@ window.LAND = (() => {
   // people who do not farm. Measured, not chosen: tools/people/landfit.js runs the world and moves these until each of history's
   // regions holds its share of the world's people (Maddison's census, AD 1 to 1820), and writes them here.
   /* LAND:BEGIN */
-  const FIT = { worlds: [0.6, 0.4], tundra: [0.3, 0.22], boreal: [0.6, 0.38], desert: [3, 0.09], steppe: [0.4, 0.5], grass: [0.4, 0.75], ocwood: [2.3, 0.7], medit: [2.2, 0.65], monsoon: [5, 0.65], savanna: [0.8, 0.8], rain: [0.7, 0.5], high: [2, 0.45], plateau: [0.8, 0.18], cowood: [0.6, 0.5], tasia: [2.5, 0.65] };
+  const FIT = { worlds: [0.5, 0.4], tundra: [0.3, 0.22], boreal: [0.6, 0.25], desert: [1.7, 0.09], steppe: [0.22, 0.3], grass: [0.45, 0.63], ocwood: [3.4, 0.55], medit: [3.8, 0.61], monsoon: [7, 0.65], savanna: [2.5, 0.9], rain: [0.8, 0.83], high: [1.4, 0.46], plateau: [0.81, 0.18], cowood: [0.3, 0.35], tasia: [1.65, 0.65] };
   /* LAND:END */
   // the kinds of land (data/soil.png red, its low four bits); past: how much of its pasture counts as farmland
   const K = (key, name, past, curve, text) => ({ key, name, I: FIT[key] ? FIT[key][0] : 0, past, forage: FIT[key] ? FIT[key][1] : 0, curve, text });

@@ -105,7 +105,7 @@ function createSim(world, seed) {
       oldK += fert[i] * ((flags[i] & 2) ? 4 : (flags[i] & 4) ? 1.3 : 1); newK += farmA[i] * LAND.TAB[k * NLA + 4] * RCF[flags[i] & 6];
       oldW += fert[i] * ((flags[i] & 2) ? 1.6 : (flags[i] & 4) ? 1.3 : 1); newW += forA[i];
       const lon = ((i % W) + 0.5) / W * 360 - 180, lat = 90 - (y + 0.5) / H * 180;
-      homeW[i] = farmA[i] * LAND.TAB[k * NLA + 1] * RCF[flags[i] & 6] * LAND.WORLDS[LAND.worldAt(lon, lat)].f; if (fert[i] > 0.05) pot.push(homeW[i]);
+      const wf = LAND.WORLDS[LAND.worldAt(lon, lat)].f; homeW[i] = farmA[i] * LAND.TAB[k * NLA + 1] * RCF[flags[i] & 6] * wf * wf; if (fert[i] > 0.05) pot.push(homeW[i]);      // (the first farmers of the Americas came late: maize took millennia)
     }
     LSCALE = newK > 0 ? oldK / newK : 1; WSCALE = newW > 0 ? oldW / newW : 1;
     // (where bands settle down as a people: as many places as the old map had good land, the best for the first farmers of the Bronze Age)
@@ -1005,7 +1005,8 @@ function createSim(world, seed) {
             // settlers: a realm two ages ahead takes thinly peopled land of its neighbour's without a war (the steppe ploughed, the
             // forest cleared, the colonies of the new world pushing inland), and the neighbour does not forget it
             budget[o] -= 1; claim(n, c, i); diplo.remember(civs[on], o, -4);
-            const key = o * MAXC + on; if (!(year - (frontierLog.get(key) || -1e9) < 30)) { frontierLog.set(key, year); logEvent(civs[on], `Settlers of ${fullName(c)} take land of ${fullName(civs[on])}${cellName.get(n) ? ' about ' + cellName.get(n) : ''}`, civs[on].player || c.player || cellsOf[on] > 60, 'state', n); }
+            const key = o * MAXC + on; if (!(year - (frontierLog.get(key) || -1e9) < 30)) { frontierLog.set(key, year); const where = cellName.get(n) ? ' about ' + cellName.get(n) : '';
+              if (c.player) logEvent(c, `Our settlers take land of ${fullName(civs[on])}${where}`, true, 'state', n); else logEvent(civs[on], `Settlers of ${fullName(c)} take land of ${fullName(civs[on])}${where}`, cellsOf[on] > 60, 'state', n); }
           } else if (on !== o && isAtWar(c, on)) {
             const e = civs[on];
             const sa = strengthOf[o], sb = strengthOf[on];
@@ -1509,7 +1510,8 @@ function createSim(world, seed) {
     know, insightParts, reachFor, townsOf, rule, diplo, get army() { return army; }, get people() { return people; }, get faith() { return faith; }, get culture() { return culture; }, get finance() { return finance; }, get dynasty() { return dynasty; }, succKind, covetOf, spanOf, levyYears, stabilityParts: stabParts, govName: (c) => RULE.FORM[rule.ruleOf(c).gov].name,
     // the year in which history's first realm had come to know this much (for the page: how far ahead of its time a realm is)
     // the year in which the first peoples knew this much, by this world's calendar (history's own, unless the world came from before the calendar)
-    homeOf, get landOn() { return landOn; }, forageCap: (i) => (landOn ? forA[i] * WSCALE * 30 * FM0 * RCF[flags[i] & 6] * (1 + bonusFert[i] * 2) : 0), apart: (c) => landOn && wfOf[c] < 1, landClass: (i) => (landOn ? kcls[i] : -1), farmland: (i) => (landOn ? farmA[i] / Math.max(0.08, cosLat[(i / W) | 0]) : fert[i]),
+    homeOf, get landOn() { return landOn; }, forageCap: (i) => (landOn ? forA[i] * WSCALE * 30 * FM0 * RCF[flags[i] & 6] * (1 + bonusFert[i] * 2) : 0), apart: (c) => landOn && wfOf[c] < 1,
+    landOf: (c) => { if (!landOn) return []; const n = new Uint32Array(NLC); for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c) n[kcls[i]]++; } return Array.from(n).map((v, k) => [k, v]).filter((x) => x[1] > 0).sort((x, y) => y[1] - x[1]); }, landClass: (i) => (landOn ? kcls[i] : -1), farmland: (i) => (landOn ? farmA[i] / Math.max(0.08, cosLat[(i / W) | 0]) : fert[i]),
     histYear(t) { return histYearOf(t) - calShift; }, get calShift() { return calShift; }, foodMult, get foodOld() { return foodTab === FOOD_015; },
     cellDist, claim, splitCiv,      // (a region changing hands, a province breaking away: for the tests)
     // where a realm's yearly income comes from (the same sum the tick makes), for the ledger
