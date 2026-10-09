@@ -6,7 +6,8 @@
 //   age: an age to dress the interface in, for its metal (the realm is taught up to it; -1: the Iron Age dip.js gives)
 //   screen: a screen to open over it: '' (none), 'gov', 'market', 'know', 'dip', 'cult', 'chron', 'legacy' (the Chronicle's Legacy tab),
 //           'schemes' (a neighbour's page, at what the realm's agents could do there), 'intrigue' (Diplomacy's Intrigue tab: the realm's agents at
-//           work against its enemy, foreign agents caught twice)
+//           work against its enemy, foreign agents caught twice), 'sick' (the lens of sickness: plague begun in the enemy's capital and
+//           smallpox in the realm's own, some years on)
 // Answers in window.__hud: what is under way and what needs the player, as the interface lists them.
 (() => {
   const P = Object.assign({ hudAlt: 900000, hudTilt: 0.42, age: -1, screen: '' }, window.__scene || {});
@@ -33,8 +34,10 @@
       const F = X.I(c).found, nm = (b) => S.fullName(b); F.length = 0; F.push([S.year - 3 * RULE.PACE[c.era], calm.id, 'learn'], [S.year - 4, foe.id, 'discord']);
       c.events.push({ year: S.year - 3 * RULE.PACE[c.era], text: `Agents of ${nm(calm)} are caught in ${nm(c)} copying the letters of its scholars`, type: 'intrigue', loc: c.capital, civ: c.id }, { year: S.year - 4, text: `Agents of ${nm(foe)} are caught in ${nm(c)} carrying gold to its great families`, type: 'intrigue', loc: c.capital, civ: c.id });
     }
+    // (pestilence: plague in the enemy's capital, smallpox in the realm's own, a few years on; the court's story put by)
+    if (S.disease && foe && P.screen === 'sick') { const X = S.disease; X.out.length = 0; X.seed(foe.capital, 'plague'); X.seed(calm.capital, 'measles'); X.seed(c.capital, 'pox'); for (let y = 0; y < 3; y++) { if (c.story) c.story.q = null; G.run(1); } if (c.story) c.story.q = null; got.sick = X.out.map((o) => o.name + ' ' + o.n); }
     const open = { gov: () => GOV.open(), market: () => MARKET.open(), know: () => TREE.open(), dip: () => ENVOYS.open('realms'), cult: () => WORKS.open(), chron: () => G.openChronicle('log'), legacy: () => G.openChronicle('legacy'),
-      intrigue: () => ENVOYS.open('intrigue'), schemes: () => { if (!calm) return; ENVOYS.open(null, calm.id); setTimeout(() => { const el = document.querySelector('#dp-info .dp-spyhead'); if (el) el.closest('.gv-sect').scrollIntoView({ block: 'start' }); }, 400); } }[P.screen];
+      intrigue: () => ENVOYS.open('intrigue'), sick: () => { const b = document.getElementById('v-sick'); if (b && !b.classList.contains('on')) b.click(); }, schemes: () => { if (!calm) return; ENVOYS.open(null, calm.id); setTimeout(() => { const el = document.querySelector('#dp-info .dp-spyhead'); if (el) el.closest('.gv-sect').scrollIntoView({ block: 'start' }); }, 400); } }[P.screen];
     if (open) setTimeout(open, 1500);
     window.__hud = Object.assign(got, { age: document.body.dataset.age, under: [...document.querySelectorAll('#tk-body .trk .t')].map((e) => e.textContent), needs: [...document.querySelectorAll('#notes .note')].map((n) => n.getAttribute('aria-label')) });
   };

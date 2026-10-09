@@ -141,6 +141,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   begin and of which kind, how many succeed, fail and are found out, how many wars are fought over agents caught, how strong the
   networks are age by age, how long a year of it takes. Run it after touching `intrigue.js` or the deeds in `sim.js`, then the
   war-and-peace probe over 12345 and 777.
+- `node tools/disease/probe.js [seed,seed] [last year]` — sickness through the ages: outbreaks by kind, how far they go and how
+  many they kill, the world's people, the Americas' share of them and which sicknesses their realms have met, the worst outbreaks,
+  how long a year of it takes. Run it after touching `disease.js`, then `tools/know/people.js` (the world's people against
+  history: refit FOOD if they fall away) and the war-and-peace probe.
 - `node tools/rule/probe.js [seed] [last year]` — how the world is governed through the ages: which forms of
   government and which laws its people live under, how much power each estate holds and how content it is, how many
   laws are passed, demands made and risings break out. `node tools/rule/norm.js [seed,seed] --write` measures what
@@ -248,6 +252,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
 | `src/bank.js` | `BANK` | The Treasury, the market screen's last tab: debts and who holds them, borrowing and repaying, repudiation, the coin, the price of money, banking houses and companies (shares bought and sold), panics of late |
 | `src/intrigue.js` | `INTRIGUE` | Spies and schemes: six schemes (steal learning, sow discord, forge a claim, set back works, stir a rising, murder an heir) and what a network is made of; one world's intrigue: each realm's agents and the scheme they are on, the foreign agents it caught, the autopilot's schemes; pure data (the deeds are the host's) |
+| `src/disease.js` | `DISEASE` | Pestilence that travels: six kinds (smallpox, measles, plague, typhus, influenza, cholera), the age that breeds each, how readily it passes and kills; one world's sickness: outbreaks and where they burn, what every people has lived through, who is spared, quarantines; pure data (the dead are taken by the host) |
 | `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
@@ -712,6 +717,35 @@ Conventions that matter:
   are due to think (two flat arrays, a filter on what is on the realms: after setting a realm's record by hand, `sync()`).
   Saved with the realm (`civ.intrigue`) and the world (`save().intrigue`: its dice and counts); a world saved before intrigue
   has no agents abroad.
+- **Pestilence** (`disease.js`; `sim.disease`; the lens of sickness, Shift+P, in `main.js` and `world.js`). Six kinds (`KINDS`:
+  smallpox, measles, plague, typhus, influenza, cholera), each with the age that breeds it, how readily it passes, how many of
+  those who catch it it kills before medicine, how many catch it, how many years it burns in a realm, how many turns those who
+  lived through it are spared, how much worse among a people new to it (`virgin`) and how much milder where it is at home
+  (`endemic`), in towns, on ships, with armies. **An outbreak** (named: "the Great Pestilence", "the Speckled Monster"...) arises
+  once in eighty years or so for each kind, in the most crowded realm of an age that breeds it **in the old world** (`cradle` in
+  `sim.js`: not the Americas, not Australia), and goes realm to realm: over borders, along the market's links (harbours and
+  caravans: `ships`), with armies at war, less into a realm shut against it and less as the realm it would go to has learned
+  public health (`PASS`: the ports' quarantines from the Renaissance, sanitation, vaccines; without it a modern pestilence
+  lingered for decades in a hundred realms at once). In each realm it reaches it rises, burns and dies
+  away (`curve`, `burn` longer in a large realm), taking each year a share of its people from all its land at once (`killF`:
+  the simulation's next pass over the land takes it, so sickness has no pass of its own - it must stay a tenth of a millisecond
+  a year, and asks for partners by index, `pN` and `pAt` in `diplo.js`, and for the share in towns the year's pass counted,
+  `urban`); the share is the kind's, times its towns, times how many waves of
+  it the realm's people have lived through (`had`, 0 to 3: virgin at none, endemic at three, between by steps), times the age's
+  medicine (`AGE`, from 1 in the Stone Age to 0.05 now), over the realm's own medicine against its age (`health`, as every edge),
+  times what the realm did about it (`cure`). Burned out, it leaves the realm spared (`imm`: for its turns once it is at home, for
+  forty years while it is new). **Carriers**: a people that lives with a kind (three waves) carries it to a neighbour or partner
+  that never had it, outbreak or none: so the Americas meet the crowd sicknesses of the old world when the ships come, all of
+  them within a century or two, as history did. A realm may shut its harbours (`q` 1: half the chance of catching it, 5% less
+  income) or everything (2: a seventh, 12% less); the autopilot's neighbours that know hospitals shut their harbours to an
+  outbreak next door for a turn, now and then. While a pestilence burns, a realm is less stable (`unrest`: up to 0.05, times the
+  age's `AGE`: the fear follows the dying). The god's
+  plague is an outbreak that travels. The player hears of it as a story (`plague` in `story.js`, told from the outbreak: the gates
+  shut for some years, physicians sent, or let it run), news, a line on what is under way and on a realm's panel. The world's
+  people stay near history's count with it (`tools/know/people.js`; it takes them early, they grow back). Saved with the world
+  (`save().disease`: the outbreaks under way and the realms they burn in, what every people has had, who is spared, the
+  quarantines) and the realm (`civ.sick`); a world saved before sickness travelled has none under way, and its peoples have had
+  nothing yet. The old disk of death from nowhere (`plague(center, radius, natural)`) is not used while this is loaded.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

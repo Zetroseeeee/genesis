@@ -292,13 +292,20 @@
       { t: () => 'The people must endure', hint: () => 'Some will not.', fx: () => ({ pop: 0.02, stab: -0.04, est: { farmers: -0.05 } }), log: (x) => `Famine in ${x.realm}` },
     ], lapse: 2 });
 
-  S({ k: 'plague', art: 'ev_plague', w: (x) => (x.era >= 1 && x.era <= 7 && x.towns() >= 2 ? (x.ports() ? 0.55 : 0.35) : 0),
-    make: (x) => ({ i: x.town('port') }), title: (x, d) => `Sickness in ${x.cell(d.i)}`,
-    text: (x, d) => (x.era >= 6 ? `A fever no doctor knows has come to ${x.cell(d.i)}. The hospitals are full, the schools are closed, and those who can are leaving the city.` : `A sickness has come to ${x.cell(d.i)} with the ${x.ports() ? 'ships' : 'caravans'}: fever, black swellings, death in three days. The dead are buried at night, and those who can are leaving.`),
+  // (a pestilence that has reached the realm: disease.js tells it, with the outbreak's number)
+  const SYMPTOM = { pox: 'fever, then the pustules, and the children die first', measles: 'a rash and a cough that go from room to room', plague: 'fever, black swellings, death in three days', typhus: 'the fever of camps and gaols, and the spotted rash', flu: 'a fever that fills every bed in a week', cholera: 'the flux, and death within a day' };
+  S({ k: 'plague', art: 'ev_plague', follow: true, w: (x, d) => (d && x.outbreak(d.o) ? 1 : 0),
+    make: (x, d) => (d && x.outbreak(d.o) ? { o: d.o, i: x.town('port') } : null), still: (x, d) => !!x.outbreak(d.o),
+    title: (x, d) => `${cap(x.outbreak(d.o).name)} in ${x.cell(d.i)}`,
+    text: (x, d) => { const o = x.outbreak(d.o), by = x.ports() ? 'ships' : 'caravans';
+      // (begun in the realm itself, it has not come from anywhere)
+      const came = o.fromId === x.c ? `${cap(o.name)} has broken out in ${x.cell(d.i)}` : x.era >= 6 ? `${cap(o.name)} has come to ${x.cell(d.i)} from ${o.from}` : `${cap(o.name)} has come to ${x.cell(d.i)} with the ${by} from ${o.from}`;
+      return x.era >= 6 ? `${came}: ${SYMPTOM[o.k] || 'a fever no doctor knows'}. The hospitals are full, the schools are closed, and those who can are leaving the city.`
+        : `${came}: ${SYMPTOM[o.k] || 'fever, and death'}. The dead are buried at night, and those who can are leaving.`; },
     opts: [
-      { t: () => 'Close the gates and the harbours', hint: () => 'Fewer will die; trade stops for a while.', fx: (x) => ({ pop: 0.01, est: { merchants: -0.05 }, mod: { k: 'quarantine', inc: -0.08, y: Math.max(3, x.turn / 2) } }), log: (x, d) => `${cap(x.cell(d.i))} is shut against the plague` },
-      { t: (x) => (x.era >= 3 ? `Send the ${healers(x)}, and burn the bedding` : `Pray, and let the ${est(x, 'priests')} lead processions`), hint: (x) => (x.era >= 3 ? 'Costly, and it helps.' : 'The gods may hear.'), fx: (x) => (x.era >= 3 ? { coin: -0.7, pop: 0.02 } : { pop: 0.035, est: { priests: 0.05 } }), log: () => '' },
-      { t: () => 'Let it run its course', hint: () => 'It will burn itself out.', fx: () => ({ pop: 0.05, stab: -0.03 }), log: (x, d) => `Plague in ${x.cell(d.i)}` },
+      { t: () => 'Close the gates and the harbours', hint: () => 'Fewer will catch it; trade stops for a while.', fx: (x) => ({ q: [2, Math.max(3, Math.round(x.turn / 2))], cure: 0.8, est: { merchants: -0.05 } }), log: (x, d) => `${cap(x.cell(d.i))} is shut against ${x.outbreak(d.o).name}` },
+      { t: (x) => (x.era >= 3 ? `Send the ${healers(x)}, and burn the bedding` : `Pray, and let the ${est(x, 'priests')} lead processions`), hint: (x) => (x.era >= 3 ? 'Costly, and it helps.' : 'The gods may hear.'), fx: (x) => (x.era >= 3 ? { coin: -0.7, cure: 0.6 } : { est: { priests: 0.05 }, stab: 0.02, cure: 0.95 }), log: () => '' },
+      { t: () => 'Let it run its course', hint: () => 'It will burn itself out.', fx: () => ({ stab: -0.03 }), log: (x, d) => `${cap(x.outbreak(d.o).name)} in ${x.cell(d.i)}` },
     ], lapse: 2 });
 
   S({ k: 'flood', art: 'ev_flood', w: (x) => (x.river() >= 0 ? 0.45 : 0),
@@ -561,7 +568,7 @@
         cannotMarry: (o) => h.cannotMarry(civs[o], cv), giftOf: (o) => h.giftOf(o),
         stateFaith: () => h.faithOf(cv), faithName: (f) => h.faithName(f), preached: () => once('preached', () => h.otherFaith(cv)), holy: () => once('holy', () => h.holyFor(cv)),
         master: () => once('master', () => h.master(c)), great: (id) => h.great(id), kindName: (g) => h.kindName(g), cannotCommission: (id) => h.cannotCommission(c, id),
-        murder: () => h.murder(cv),
+        murder: () => h.murder(cv), outbreak: (id) => (h.outbreak ? h.outbreak(id) : null),
       });
       return x;
     }
@@ -590,6 +597,8 @@
       if (fx.abdicate) add('A new ruler', 'warn'); if (fx.endRegency) add('The regency ends', '');
       if (fx.marry !== undefined && civs[fx.marry]) add(`Royal marriage with ${h.name(civs[fx.marry])}`, 'pos');
       if (fx.colony) add('A colony across the sea', 'pos');
+      if (fx.q) add(`Gates and harbours shut for ${Math.round(fx.q[1])} years: −${fx.q[0] === 2 ? 12 : 5}% income`, 'warn');
+      if (fx.cure && fx.cure < 1) add(`${Math.round((1 - fx.cure) * 100)}% fewer of the sick die`, 'pos');
       if (fx.commission) add(`−${h.commissionCost(cv)} coin`, 'neg');
       if (fx.then) add('Something will come of it', '');
       return out;
@@ -620,6 +629,8 @@
       if (fx.endRegency && D) D.endRegency(c);
       if (fx.marry !== undefined && civs[fx.marry]) h.marry(civs[fx.marry], cv);
       if (fx.colony) h.colony(cv);
+      if (fx.q && h.quarantine) h.quarantine(cv, fx.q[0], fx.q[1]);
+      if (fx.cure && h.cure && d && d.o) h.cure(cv, d.o, fx.cure);
       if (fx.teach && civs[fx.teach[0]]) h.inspire(fx.teach[0], fx.teach[1]);
       if (fx.commission) h.commission(c, fx.commission);
       if (fx.then) { const [k, a, b, p, extra] = fx.then; if (rnd() < (p === undefined ? 1 : p)) { const dd = Object.assign({}, extra || {}); if (made) dd.p = made.id; if (d && d.p && !dd.p && k !== 'plot') dd.p = d.p; S.f.push([k, x.yr + a + Math.floor(rnd() * (b - a + 1)), dd]); } }

@@ -88,6 +88,7 @@ window.DIPLO = (function () {
       for (let i = 0; i < n; i++) { const L = links[i]; let k = pFill[L.a]++; pIds[k] = L.b; pIdx[k] = i; k = pFill[L.b]++; pIds[k] = L.a; pIdx[k] = i; }
     }
     const partnersOf = (c) => Array.from(pIds.subarray(pStart[c], pStart[c + 1]));
+    const pN = (c) => pStart[c + 1] - pStart[c], pAt = (c, j) => pIds[pStart[c] + j];      // (the same without a list: how many, and the j-th)
     // how often what each realm has sworn or shut has changed (the market looks again at a link only when either end's number has moved)
     const ver = new Uint32Array(MAXC);
     // how many vassals each realm has (counted again whenever anybody's lord changes: `stale`)
@@ -590,7 +591,7 @@ window.DIPLO = (function () {
     }
     return { stats, D, tick, step, born, died, wake, heir, reach, opinion, reasons, judge, cannot, propose, answer, breakPact, release, rebel, annex, cannotJoin, gift, giftWorth, claim, claimCost, embargo, causes, warCost, cannotFight, declare,
       abandon, score, termsFor, wouldEnd, cannotSue, sue, conclude, fell, warsEnd, warWith, think, has, pactOf, anyPact, bound, friends, lordOf, vassalsOf, threatTo, standing, memOf, remember, tradeShare, trIn, trOut, touches, ratio, seal, subject,
-      union, join, closed, agreed, termOf, ver, partnersOf, claimUntil, holds, askedAt, grantClaim, CLAIMS };
+      union, join, closed, agreed, termOf, ver, partnersOf, pN, pAt, claimUntil, holds, askedAt, grantClaim, CLAIMS };
   }
   return { PACE, PACTS, PACT, VASSAL, OPENS, CAUSES, TERMS, TERM_TEXT, RANK, MOODS, moodOf, STAND, TRIBUTE, REPARATION, REPARATION_TURNS, CLAIM_TURNS, UNION_TURNS, UNJUST_STAB, UNJUST_REP, creedGap, create };
 })();
