@@ -153,6 +153,12 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   how many starved since the date before and the worst famine, the great droughts and colds that began, how long a year of it takes.
   Hold it to its header; run it after touching `climate.js` or the famine in `sim.js`, then `tools/know/people.js` and the
   war-and-peace probe over 12345 and 777.
+- `node tools/climate/domefit.js map | fit [passes] [--write]` — the domes of ice against where history has the margins
+  (`tools/climate/iceref.json`): `map` draws the ice at 10,000, 9000, 8000, 7000, 6300, 6000 and 5000 BC over North America and
+  Scandinavia with the margins of those years as red points (`shots/climate/icemap.png`, seconds); `fit` moves every dome but the few
+  nothing holds (the high Arctic, Baffin, Iceland) until the years the ice leaves the points are as near history's as it can make them
+  (some minutes; it prints the worst points), and `--write` puts the table into `src/climate.js` between its DOMES marks. Run it after
+  touching the domes or the lobes, then test_sim 23 and the climate probe.
 - `node tools/disease/probe.js [seed,seed] [last year]` — sickness through the ages: outbreaks by kind, how far they go and how
   many they kill, the world's people, the Americas' share of them and which sicknesses their realms have met, the worst outbreaks,
   how long a year of it takes. Run it after touching `disease.js`, then `tools/know/people.js` (the world's people against
@@ -764,42 +770,60 @@ Conventions that matter:
   its share of farmland.
 - **The weather** (`climate.js`; `sim.climate`; the lens of the harvest, Shift+H, in `main.js` and `world.js`; the ground's shader
   and the trees draw it). Three things, all of them the Earth's own. *The ice*: in 10,000 BC the last of the great ice sheets lay over
-  Canada and Scandinavia. `DOMES` are domes of ice, each with its radius in 10,050 BC (twelve thousand years before the radiocarbon's
-  present), the year it was gone, how it went (`p`: slowly and then fast - the ice over Hudson Bay went within a lifetime once the
-  lake behind it broke through - and `hold`: the Scandinavian ice stood at its moraines until the cold ended); a dome's edge runs out
-  in lobes (`lobe`: a noise of the place made of integer hashes, `hash3` and `vnoise`, **the very same sum in the ground's vertex
-  shader**, so that the ice the simulation knows and the ice the picture shows are one). Where one still lies nothing lives, nobody
-  settles (`sim.iced`: the wild bands, expansion, colonies, tribes, the player's first land), no tree stands, and the ground's shader
-  covers land, lakes and sea alike (`sheet`, lit as snow; the dirt of the moraines along its edge). *The green Sahara*: the African
-  humid period (`GREEN`: the western and eastern Sahara, Arabia, the Thar, on from 9,700 BC and off over some centuries, the east and
-  Arabia first, the Thar last; the northern edge wanders by some degrees and the wet years were wetter in patches: `greenJit`,
-  `greenPatch`, in the shader too). The dry lands feed herdsmen as a savanna would (`forA` gains `greenAdd` while it lasts: they do
-  not farm there), the ground's shader gives them the colours of a savanna in its long dry season, keeping the photograph's light and
-  dark as a share (the dunes, the wadis and the massifs still show), paints Mega-Chad under its old shore (325 m, while the western
-  Sahara is green), and lowers the dryness the materials go by; trees.js plants savanna and steppe trees there (the Köppen classes Aw
-  and BSh). *Droughts and good years*: the great ones history remembers (`EVENTS`: where, in circles; when; how deep at the worst;
-  drought, cold, warm or volcanic - the cold of 6200 BC, the Drying of 3900 BC that ended the green Sahara, the Great Drought of 2200 BC
-  that broke the kingdoms of the river plains, the Long Drought of the Bronze Age's end, the warm centuries, the Dark Sun of 536, the
-  drought of the Maya, the warm years of the north, the Great Famine, the Little Ice Age, the drought of the late Ming, the Haze of
-  Laki, the Year Without a Summer, the monsoon's great famine of 1876, the Dust Bowl, the Sahel), and the weather of every year
-  (`SPELL`: about 1.6 droughts and 0.8 runs of good harvests begin in the world a year, a few hundred kilometres across, one to seven
-  years long, the more often in the steppe, the savanna and the monsoon's lands: `VAR`). **What it gives**: every cell's harvest this
-  year against an ordinary year's (`hv`; 0 under the ice), by which the land's capacity is multiplied; a famine takes a quarter a
-  year of those the land no longer feeds (`FAMINE`), less by what softens it (`relief`: granaries, what the market brings in, the
-  court's bread - the drought story's `relief: [years, share]`); crops at the market are as good as the harvest (`CROP`: grain all of
-  it, fish half, cattle some). A spell is laid on its cells when it begins and taken off when it ends; an event's places are found
-  once and its share changes in fifths: a year of it is about a tenth of a millisecond. The age's chill (`EPOCHS`, `chillOf`: the last
-  cold, the great thaw, the Holocene warmth, the drying, the warm centuries, the cold of the dark centuries, the warm years of the
-  north, the Little Ice Age, the thaw of the machine age, the warming) keeps the snow some weeks longer in a cold age, on the ground
-  and on the boughs. The ground's shader is told once a year of the world (`view`, `climateUniforms` in `main.js`): the domes as
-  they stand, how green each region is, the deepest twelve droughts (`MAXV`), the chill; it works the ice, the green and the
-  drought out at the corners of its mesh (`vClim`), which costs nothing that can be measured. The player: the inspector's "This year"
-  line (the ice, a drought and its year, a great event, a good year, the green lands, each with what it means), the realm's harvest
-  and who starved, a line in what is under way, the stories of drought and of the great colds, the lens of the harvest, the date's
-  page names the climate of the age, the founding card the weather of the place; the chronicle tells of droughts, the rains coming
-  back and famines in the player's realm and of the great ones in the world. A world saved before the weather begins with the
-  weather of its year (what had begun is not news); one saved before the land had kinds has none. Look at the Mac's `holo_*` after
-  touching any of it.
+  Canada and Scandinavia. `DOMES` are domes of ice, each an ellipse (`ax`: as long again as it is wide; `az`: its long way, degrees
+  from north; its area that of the circle of `r0`, in 10,050 BC: twelve thousand years before the radiocarbon's present) that shrinks
+  to nothing by its year (`p`: slowly and then fast - the ice over Hudson Bay went within a lifetime once the lake behind it broke
+  through - and `hold`: the Scandinavian ice stood at its moraines until the cold ended) while its middle moves toward where its last
+  ice lay (`to`). They are **fitted to where the margins stood** (`tools/climate/domefit.js` against `tools/climate/iceref.json`: a
+  margin every thousand years after Dyke 2004, Hughes et al. 2016 and Stroeven et al. 2016, the years the ice left some forty places,
+  thirty places it never reached; `domefit.js map` draws them over each other: `shots/climate/icemap.png`). Their edge runs out in
+  lobes (`lobe`: four sizes of a noise of the place made of integer hashes, `hash3` and `vnoise`, **the very same sum in the ground's
+  vertex shader**, so that the ice the simulation knows and the ice the picture shows are one); the ice of mountains (`mtn`: the
+  Cordillera, the mountains of Norway, the Highlands) is drawn as the ranges hold it, white above a line that rises toward its edge.
+  Where one still lies nothing lives, nobody settles (`sim.iced`: the wild bands, expansion, colonies, tribes, the player's first
+  land), nothing is yielded, no tree stands, and the land it has just left is bare (`iceQ`: the trees stand back from it). **The
+  ground's shader finds the ice at the pixel** (drawn between the corners of the mesh, a dome of a hundred kilometres was a polygon of
+  its quads): the domes by a soft minimum (by the hard one each ellipse's outline was a crease across the sheet), its edge a line a
+  pixel wide, the high ground holding it longest; over land, lakes and sea alike (no surf, no coast under it); snow at its heart,
+  within some tens of kilometres of its edge the summer's bare ice (half the light of snow, further in on a warm southern edge than a
+  cold northern one, in patches by the lobes' noise), its last kilometres dirty, pools of meltwater, the moraine's gravel beyond; lit
+  by its own surface (a dome some 3,000 m high, steeper toward its edge; no shadows of the hills it buries), the snow's own grain close
+  to; off its edge over the sea, floes in winter. *The green Sahara*: the African humid period (`GREEN`: the western and eastern
+  Sahara, Arabia, the Thar, on from 9,700 BC and off over some centuries, the east and Arabia first, the Thar last; the northern edge
+  wanders by some degrees and the wet years were wetter in patches: `greenJit`, `greenPatch`, in the shader too). The dry lands feed
+  herdsmen as a savanna would (`forA` gains `greenAdd` while it lasts: they do not farm there); the ground's shader gives them the
+  colours of the Sahel as the Blue Marble has it in July (straw-grey steppe at the dry edge, olive grassland, the darker woodland where
+  it was wettest), keeping the photograph's light and dark as a share, with a ragged edge of a few degrees (the massifs greener, the
+  sand seas last), no closed wood (savW: an olive photograph read as wood was a jungle's canopy from 40 km) and the dryness the
+  materials go by the less; trees.js plants savanna and steppe trees there (the Köppen classes Aw and BSh). *Mega-Chad*, as large as the
+  Caspian, is a lake of the water's own (`chadLevel`: 336 m as the heights have it, falling to the deepest of the basin as the western
+  Sahara dries), found by the heights at the pixel: its shallows kilometres wide, the sky in it, no trees in it. *Droughts and good
+  years*: the great ones history remembers (`EVENTS`: where, in circles; when; how deep at the worst; drought, cold, warm or volcanic -
+  the cold of 6200 BC, the Drying of 3900 BC that ended the green Sahara, the Great Drought of 2200 BC that broke the kingdoms of the
+  river plains, the Long Drought of the Bronze Age's end, the warm centuries, the Dark Sun of 536, the drought of the Maya, the warm
+  years of the north, the Great Famine, the Little Ice Age, the drought of the late Ming, the Haze of Laki, the Year Without a Summer,
+  the monsoon's great famine of 1876, the Dust Bowl, the Sahel), and the weather of every year (`SPELL`: about 1.6 droughts and 0.8
+  runs of good harvests begin in the world a year, a few hundred kilometres across, one to seven years long, the more often in the
+  steppe, the savanna and the monsoon's lands: `VAR`; `force` lays one by hand, for the god's drought, the scenes and the tests).
+  **What it gives**: every cell's harvest this year against an ordinary year's (`hv`; 0 under the ice), by which the land's capacity
+  is multiplied; a famine takes a quarter a year of those the land no longer feeds (`FAMINE`), less by what softens it (`relief`:
+  granaries, what the market brings in, the court's bread - the drought story's `relief: [years, share]`); crops at the market are as
+  good as the harvest (`CROP`: grain all of it, fish half, cattle some). A spell is laid on its cells when it begins and taken off when
+  it ends; an event's places are found once and its share changes in fifths: a year of it is a fifth of a millisecond. The age's chill
+  (`EPOCHS`, `chillOf`: the last cold, the great thaw, the Holocene warmth, the drying, the warm centuries, the cold of the dark
+  centuries, the warm years of the north, the Little Ice Age, the thaw of the machine age, the warming) keeps the snow some weeks
+  longer in a cold age, on the ground and on the boughs. (Lakes freeze on the sea's slow clock and thaw on a quicker one, from their
+  shores, the middle of a great lake last: `uIceCold.zw`; on the sea's clock both ways the lakes of northern Ontario were ice into
+  July.) The ground's shader is told once a year of the world (`view`, `climateUniforms` in `main.js`): the domes as they stand (the
+  middle and the square of the radius, the long way and how long: `uDome`, `uDomeA`), how green each region is, the deepest twelve
+  droughts (`MAXV`), the chill; the lobes, the green and the droughts it works out at the corners of its mesh (`vClim`). COSTK The
+  player: the inspector's "This year" line (the ice, a drought and its year, a great event, a good year, the green lands, each with
+  what it means), the realm's harvest and who starved, a line in what is under way, the stories of drought and of the great colds,
+  the lens of the harvest, the date's page names the climate of the age, the founding card the weather of the place, the god's
+  drought; the chronicle tells of droughts, the rains coming back and famines in the player's realm and of the great ones in the
+  world. A world saved before the weather begins with the weather of its year (what had begun is not news) and without the ice sheets
+  (`bare`: its people may live where they would have lain); one saved before the land had kinds has none. Look at the Mac's `holo_*`
+  after touching any of it.
 - **Pestilence** (`disease.js`; `sim.disease`; the lens of sickness, Shift+P, in `main.js` and `world.js`). Six kinds (`KINDS`:
   smallpox, measles, plague, typhus, influenza, cholera), each with the age that breeds it, how readily it passes, how many of
   those who catch it it kills before medicine, how many catch it, how many years it burns in a realm, how many turns those who

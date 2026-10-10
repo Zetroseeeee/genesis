@@ -825,7 +825,7 @@
   function setTool(t) {
     tool = (tool === t) ? null : t;
     document.querySelectorAll('.dg').forEach(b => b.classList.toggle('on', b.dataset.tool === tool));
-    const names = { settle: 'Settle: click land touching your border', develop: 'Develop: click one of your cells', fortify: 'Fortify: click one of your cells', port: 'Port: click one of your coastal cells', academy: 'Academy: click one of your towns', temple: 'Temple: click one of your settlements', capital: 'Move capital: click one of your towns', market: 'Market: click one of your settlements', wonder: 'Wonder: click your capital', spawn: 'Spawn: click empty land', plague: 'Plague: click anywhere', meteor: 'Meteor: click anywhere', bounty: 'Bounty: click land', prophet: 'Prophet: click a state', enlighten: 'Enlighten: click a state' };
+    const names = { settle: 'Settle: click land touching your border', develop: 'Develop: click one of your cells', fortify: 'Fortify: click one of your cells', port: 'Port: click one of your coastal cells', academy: 'Academy: click one of your towns', temple: 'Temple: click one of your settlements', capital: 'Move capital: click one of your towns', market: 'Market: click one of your settlements', wonder: 'Wonder: click your capital', spawn: 'Spawn: click empty land', plague: 'Plague: click anywhere', drought: 'Drought: click land', meteor: 'Meteor: click anywhere', bounty: 'Bounty: click land', prophet: 'Prophet: click a state', enlighten: 'Enlighten: click a state' };
     if (tool) cancelPlacing();
     banner(tool ? names[tool] : null, !!tool); renderer.domElement.style.cursor = tool ? 'crosshair' : 'grab';
     $('l-expand').classList.toggle('on', tool === 'settle');

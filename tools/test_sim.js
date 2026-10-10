@@ -224,7 +224,7 @@ log('5. edge cases');
   check(sim2.act('develop', i0) === 'No state', 'actions refused after death');
   // ruins get cleared when resettled
   { // a town rebuilt over old ruins clears them; a hamlet among them does not
-    const sim3 = createSim(wd, 5); let j = -1, bf = 0; for (const i of sim3.LI) if ((sim3.flags[i] & 2) && sim3.owner[i] < 0 && sim3.homeOf(i) > bf) { bf = sim3.homeOf(i); j = i; }
+    const sim3 = createSim(wd, 5); let j = -1, bd = 1e9; for (const i of sim3.LI) { if (!(sim3.flags[i] & 2) || sim3.landClass(i) !== 4 || sim3.owner[i] >= 0) continue; const d = Math.hypot(i % sim3.W - 422.5, Math.floor(i / sim3.W) - 120.2); if (d < bd) { bd = d; j = i; } }      // (the Nile at Memphis, as in section 7: the best homeOf is shared by many places, and the first of them lay in the north, where a town of 10,000 BC is a village)
     sim3.ruins.set(j, { year: sim3.year - 100, era: 2, culture: 0, R: 300, wonder: 0, name: 'Old' }); const c3 = sim3.setPlayer(j, 'New', null); c3.tech = 0.3; c3.era = sim3.eraOf(c3.tech);
     sim3.tick(); const K3 = sim3.capacity(j, c3); sim3.pop[j] = K3 * 0.9; for (let y = 0; y < 12; y++) sim3.tick();
     check(sim3.level[j] >= 2, `rebuilt town reaches level 2+ on the best river land (level ${sim3.level[j]}, K ${K3.toFixed(1)})`); check(!sim3.ruins.has(j), 'ruin cleared when a town is rebuilt over it');

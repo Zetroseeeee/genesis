@@ -3,7 +3,7 @@
 // starved since the date before (and how many realms, and the worst), the great droughts and colds that began and whom they struck,
 // the world's people, and how long a year of it takes.
 //   node tools/climate/probe.js [seed[,seed...]] [last year]
-// What to hold it to: ice over Canada and Scandinavia at the start, gone from Scandinavia by 7600 BC and from Labrador by 4800 BC;
+// What to hold it to: ice over Canada and Scandinavia at the start, gone from Scandinavia by about 7100 BC and from Labrador by about 4900 BC (the domes are fitted to history's margins: tools/climate/domefit.js);
 // the Sahara green from 9000 to 4000 BC and desert by 2500 BC; a few per cent of the land in a bad year at any time, the world's
 // harvest within a hundredth or two of an ordinary year's; famine dead a few per cent of the world in a century, far more where a
 // great drought falls (the lands between the rivers about 2200 BC); the world's people near history's (tools/know/people.js: refit

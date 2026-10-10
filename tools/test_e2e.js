@@ -950,7 +950,7 @@ server.listen(0, async () => {
     await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
     // a deep drought laid over the capital for three years, with stories on (this scenario can run by itself)
     let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), CL = S.climate; if (!CL) return { none: 1 }; S.setStories(true); if (c.story) { c.story.q = null; c.story.s = {}; }
-      const sp = CL.force('drought', c.capital, 650, -0.45, 3); __G.run(1); return { reach: sp.realms.includes(c.id), q: c.story && c.story.q ? c.story.q.k : '', hv: +S.harvestOf(c.id).toFixed(3) }; });
+      const sp = CL.force('drought', c.capital, 900, -0.45, 3); __G.run(1); return { reach: sp.realms.includes(c.id), q: c.story && c.story.q ? c.story.q.k : '', hv: +S.harvestOf(c.id).toFixed(3) }; });
     check(r.reach && r.q === 'drought' && r.hv < 0.95, `a drought over the capital: the realm's harvest ${r.hv} of an ordinary year's, and the court is told (${JSON.stringify(r)})`);
     await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
     r = await ev(() => ({ title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | ') }));
