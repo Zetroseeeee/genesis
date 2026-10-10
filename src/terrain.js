@@ -536,7 +536,7 @@
       // climate.js makes: each dome an ellipse whose middle and reach the year has (uDome: the middle and the square of the radius;
       // uDomeA: its long way and how long), lobed as climate.js's lobe() has it (vClim.x, from the corners); its edge ragged by the
       // noise of the place. (Drawn between the corners of the mesh, a dome of a hundred kilometres was a polygon of its quads.)
-      float sheet = 0.0, rm = 9.0, wIce = 0.0; vec2 iceG = vec2(0.0); vec3 gB = vec3(0.0);      // (rm: how far toward the nearest dome's edge - the square of the distance over the square of the reach, 1 at the edge; wIce: its square radius; iceG: the way out and down the ice, east and north, per radian)
+      float sheet = 0.0, rm = 9.0, rmSh = 9.0, wIce = 0.0; vec2 iceG = vec2(0.0); vec3 gB = vec3(0.0);      // (rm: how far toward the nearest dome's edge - the square of the distance over the square of the reach, 1 at the edge; rmSh: the same of the sheets alone; wIce: its square radius; iceG: the way out and down the ice, east and north, per radian)
       if (vClim.w > 0.002) {
         // (where two domes meet, the nearer by a soft minimum, and the way down weighed between them: by the hard one the ice had
         //  a crease along every line where one dome gave way to the next, the outline of each ellipse drawn across the sheet)
@@ -544,7 +544,7 @@
         for (int k = 0; k < ${NDOME}; k++) { vec4 d = uDome[k], A = uDomeA[k]; float ax = abs(A.w); if (d.w <= 0.0 || 2.0 * (1.0 - dot(u, d.xyz)) > d.w * ax * 5.7) continue; vec3 w = cross(d.xyz, A.xyz); float s = dot(u, A.xyz), t = dot(u, w), r = (s * s / ax + t * t * ax) / (d.w * vClim.x);
           float e = exp(-12.0 * min(r, 6.0)); vec3 g = e * 2.0 * (s * A.xyz / ax + t * w * ax) / (d.w * vClim.x);
           if (A.w > 0.0) { eS += e; gS += g; wS += e * d.w; } else { eM += e; gM += g; wM += e * d.w; } }
-        float rmS = eS > 1e-30 ? -log(eS) / 12.0 : 9.0, rmM = eM > 1e-30 ? -log(eM) / 12.0 : 9.0;
+        float rmS = eS > 1e-30 ? -log(eS) / 12.0 : 9.0, rmM = eM > 1e-30 ? -log(eM) / 12.0 : 9.0; rmSh = rmS;
         if (eS + eM > 1e-30) { rm = -log(eS + eM) / 12.0; gB = (gS + gM) / (eS + eM); wIce = (wS + wM) / (eS + eM); }      // (for its colours and its slopes the nearer of all of them, softly: where the ice of a range meets a sheet there is no seam)
         // (and the ground under it counts near its edge: the high ground holds the ice longest, it draws back from the valleys - by the
         //  heights at the pixel. The ice of mountains (rmM: the domes so marked) is the ranges' own: white above a line that lies at
@@ -676,9 +676,16 @@
       //  lake like any other: its shallows and its deep water, the sky in it. Its shore is a line a pixel wide, by how fast the
       //  depth changes across one, and wanders by the noise of the place at the sizes the eye can make out: the basin is so flat
       //  that a metre is kilometres of shore, and wandered by grain a pixel across the shore was a stipple of pools on dry land.)
+      //  (On ground that flat every hollow between the dunes a metre under the water's level is a pool, and a drowned dune an islet:
+      //  close to, an archipelago, as the Kanem's is; from where they are a pixel or two across, a stipple of dots beyond the shore. So
+      //  the shore is found on the heights weighed over a ring about the pixel as wide as some three pixels: what is smaller than
+      //  that goes to the mean, and comes back as the eye comes near.)
       float chadW = 0.0, chadD = 0.0;
-      if (uGreenS.x > 0.05) { float la = vLat * 57.29578, lo = vLon * 57.29578;
-        chadD = mix(285.0, 336.0, smoothstep(0.3, 0.9, uGreenS.x)) - 0.25 * (hE + hW + hS + hN);
+      if (uGreenS.x > 0.05) { float la = vLat * 57.29578, lo = vLon * 57.29578, hC = 0.25 * (hE + hW + hS + hN);
+        vec2 eTx = fwidth(vUV * uElevRect.zw * vec2(textureSize(uElev, 0))); float ringT = max(2.0, 3.0 * max(eTx.x, eTx.y));      // (the ring's radius, in texels of the heights)
+        if (la > 9.5 && la < 20.5 && lo > 11.0 && lo < 21.5) { vec2 r = tuv / 1.6 * ringT, d = r * 0.7071;
+          hC = 0.4 * hC + 0.075 * (hAt(vUV + vec2(r.x, 0.0)) + hAt(vUV - vec2(r.x, 0.0)) + hAt(vUV + vec2(0.0, r.y)) + hAt(vUV - vec2(0.0, r.y)) + hAt(vUV + d) + hAt(vUV - d) + hAt(vUV + vec2(d.x, -d.y)) + hAt(vUV + vec2(-d.x, d.y))); }
+        chadD = mix(285.0, 336.0, smoothstep(0.3, 0.9, uGreenS.x)) - hC;
         float v = chadD + (nMac.g - 0.512) * 2.0 + (nMid.r - 0.5) * 1.5 * (1.0 - smoothstep(0.0, 1.5, noiseL + 10.23)), k = clamp(fwidth(v) * 0.75, 0.05, 3.0);
         chadW = smoothstep(-k, k, v) * min(smoothstep(11.5, 13.0, lo), 1.0 - smoothstep(19.5, 21.0, lo)) * min(smoothstep(10.0, 11.0, la), 1.0 - smoothstep(19.0, 20.0, la)); }
       lakeW = max(lakeW, chadW);
@@ -775,7 +782,7 @@
         } }
       // (the land the ice has just left, and the land along its edge: stone, gravel, meltwater and the first moss and sedge - no wood
       //  yet. The photograph has today's taiga there, which stood dark up to the ice's edge)
-      float bareIce = (1.0 - smoothstep(0.98, 1.3, rm + (nMac.g - 0.5) * 0.3 + (vClim.x - 1.0) * 0.6)) * (1.0 - sheet);      // (not a ring of one width: more of it in places, less in others)
+      float bareIce = (1.0 - smoothstep(0.98, 1.3, rmSh + (nMac.g - 0.5) * 0.3 + (vClim.x - 1.0) * 0.6)) * (1.0 - sheet);      // (not a ring of one width: more of it in places, less in others. Of the sheets only: the ice of mountains lies on the heights well inside its dome, and a ring along the dome's edge stood off from it as a halo)
       if (bareIce > 0.003) { float l0 = dot(base, vec3(0.299, 0.587, 0.114));
         base = mix(base, mix(vec3(0.47, 0.45, 0.39), vec3(0.39, 0.41, 0.32), smoothstep(0.3, 0.7, nMid.g * 0.6 + nMac.b * 0.4)) * clamp(l0 / 0.3, 0.75, 1.3), bareIce * 0.5);
         base = mix(base, vec3(0.52, 0.49, 0.44) * (0.8 + 0.4 * nMic.b), (1.0 - smoothstep(0.93, 0.99, rm + (nMid.b - 0.5) * 0.04)) * bareIce * 0.45); }      // (and along the ice's edge the gravel of its moraines and outwash, pale)

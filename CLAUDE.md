@@ -799,7 +799,8 @@ Conventions that matter:
   materials go by the less; trees.js plants savanna and steppe trees there (the Köppen classes Aw and BSh). *Mega-Chad*, as large as the
   Caspian, is a lake of the water's own (`chadLevel`: 336 m as the heights have it, falling to the deepest of the basin as the western
   Sahara dries), found by the heights at the pixel: its shallows kilometres wide, the sky in it, no trees in it, its shore a line a
-  pixel wide that wanders by the noise of the place at the sizes the eye can make out (by grain a pixel across, a stipple of pools).
+  pixel wide on the heights weighed over a ring some three pixels across (the hollows between the dunes are pools: close to, an
+  archipelago as the Kanem's is; weighed only over the pixel's own texels, from where they were a pixel across, a stipple of dots).
   The simulation knows it too (`CHAD`: the hundred and twelve regions half of which lie under its highest shore, measured from the
   heights by `tools/climate/chad.py`): a region under it is lake (`ICE` 2, `sim.lakeAt`; `sim.iced` answers for both), nobody lives
   on it and nothing grows, the people of a place it rises over go to the nearest dry land of their realm (`drown` in `sim.js`), and the

@@ -389,7 +389,7 @@ holo_lens    | tools/scenes/holocene.js | {years:8000,lon:20,lat:40,alt:9000000,
 holo_42      | tools/scenes/holocene.js | {years:7850,lon:45,lat:32,alt:2200000,player:[44.4,32.5]} | | 220
 holo_iceland | tools/scenes/holocene.js | {lon:-18.6,lat:64.9,alt:900000} | | 45
 holo_cordillera | tools/scenes/holocene.js | {lon:-127,lat:55,alt:1300000} | | 45
-holo_chad_low | tools/scenes/holocene.js | {years:3000,lon:13.4,lat:13.2,alt:110000,tilt:0.85,heading:0.3} | | 170
+holo_chad_low | tools/scenes/holocene.js | {years:3000,lon:14.7,lat:15.5,alt:90000,tilt:0.8,heading:1.4} | | 170
 costk_ice    | tools/scenes/holocene.js | {lon:-80,lat:49.5,alt:260000,tilt:0.9,heading:0,years:400} | setTimeout(() => __T.costsClimate(), 90000); | 140
 costk_green  | tools/scenes/holocene.js | {years:3000,lon:9,lat:19,alt:40000,tilt:1.0,heading:0.4} | setTimeout(() => __T.costsClimate(), 120000); | 170
 costk_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsClimate(); }, 9000); | 60

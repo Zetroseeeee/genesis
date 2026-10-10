@@ -20,6 +20,11 @@
 // ones closer, and the appetite of each age is set to keep the rhythm of wars above (WAR_AGE in sim.js). Measured then over 12345
 // and 777: wars begun in a whole history 4,500 and 4,500 (5,200 and 4,500 before); realms in AD 2000 225-240 (some forty more peoples
 // are swallowed over the ages, by settlers and by lords who join their vassals to the crown); vassals 40-55; the five greatest 14-18 %.
+// Since 0.39 the world has weather (climate.js): its famines empty land, and more peoples rise on it (realms born by AD 1 in seed
+// 777: 320, against 286 in 0.38, and 291 with the famine's dead taken out). Measured then over 12345 and 777 (0.38 in brackets):
+// wars begun in a whole history 4,800 and 5,400 (4,500 and 4,500); realms in AD 2000 247 and 288 (228 and 237); wars a realm
+// begins in a century at the dates above 0.19 0.31 0.29 0.43 0.49 0.52 and 0.09 0.34 0.34 0.44 0.54 0.41 (0.19 0.29 0.35 0.36
+// 0.45 0.41 and 0.16 0.29 0.36 0.38 0.49 0.39); a harder appetite in the Bronze Age (WAR_AGE 2.2) did not raise its rate.
 // If wars fall off, look at the line "appetite": pacts and fear should leave a realm somebody to fight about half the time.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;

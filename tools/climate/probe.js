@@ -4,7 +4,7 @@
 // the world's people, and how long a year of it takes.
 //   node tools/climate/probe.js [seed[,seed...]] [last year]
 // What to hold it to: ice over Canada and Scandinavia at the start, gone from Scandinavia by about 7100 BC and from Labrador by about 4900 BC (the domes are fitted to history's margins: tools/climate/domefit.js);
-// the Sahara green from 9000 to 4000 BC and desert by 2500 BC; a few per cent of the land in a bad year at any time, the world's
+// the Sahara green from 9000 to 4000 BC and desert by 2500 BC, Mega-Chad over a hundred and twelve regions in its wet centuries; a few per cent of the land in a bad year at any time, the world's
 // harvest within a hundredth or two of an ordinary year's; famine dead a few per cent of the world in a century, far more where a
 // great drought falls (the lands between the rivers about 2200 BC); the world's people near history's (tools/know/people.js: refit
 // FOOD if they fall away); a year about a tenth of a millisecond. Then the war-and-peace probe over 12345 and 777.
@@ -28,10 +28,10 @@ for (const seed of seeds) {
     sim.tick(); ms += C.stats.ms; n++;
     for (const cv of sim.civs) { if (!cv) continue; const d = sim.starvedOf(cv.id); if (d > 0) { dead += d; if (!worst || d > worst.d) worst = { d, name: sim.fullName(cv), year: sim.year, share: d / Math.max(1e-6, sim.popOf[cv.id] + d) }; } }
     if (sim.year < DATES[k]) continue; k++;
-    let world = 0, ice = 0, wet = 0, bad = 0, land = 0, hv = 0; for (const i of sim.LI) { const p = sim.pop[i]; world += p; hv += p * C.hv[i]; ice += C.ice[i]; wet += C.wet[i]; if (!C.ice[i]) { land++; if (C.hv[i] < 0.9) bad++; } }
+    let world = 0, ice = 0, lake = 0, wet = 0, bad = 0, land = 0, hv = 0; for (const i of sim.LI) { const p = sim.pop[i]; world += p; hv += p * C.hv[i]; if (C.ice[i] === 1) ice++; else if (C.ice[i] === 2) lake++; wet += C.wet[i]; if (!C.ice[i]) { land++; if (C.hv[i] < 0.9) bad++; } }      // (ice 2 is Mega-Chad's water)
     let realmsBad = 0, realms = 0; for (const cv of sim.civs) if (cv) { realms++; if (sim.harvestOf(cv.id) < 0.9) realmsBad++; }
     const evs = CL_.EVENTS.filter((e) => e.y0 <= sim.year && !seen.has(e.key)); for (const e of evs) seen.add(e.key);
-    console.log(`${sim.fmtYear(sim.year).padStart(9)}: people ${(world / 1000).toFixed(1)} m in ${realms} realms; ice ${ice} regions, green ${Math.round(wet)}; a bad year on ${(100 * bad / land).toFixed(1)}% of the land, ${realmsBad} realms; the world's harvest ${(hv / world).toFixed(3)}; ${C.spells.length} spells; starved since ${(dead / 1000).toFixed(2)} m (${(100 * dead / world).toFixed(2)}% of the world)${worst ? `, the worst ${worst.name} in ${sim.fmtYear(worst.year)} (${(100 * worst.share).toFixed(1)}%)` : ''} | ${(ms / n).toFixed(3)} ms a year (${C.epoch().name})`);
+    console.log(`${sim.fmtYear(sim.year).padStart(9)}: people ${(world / 1000).toFixed(1)} m in ${realms} realms; ice ${ice} regions, Mega-Chad ${lake}, green ${Math.round(wet)}; a bad year on ${(100 * bad / land).toFixed(1)}% of the land, ${realmsBad} realms; the world's harvest ${(hv / world).toFixed(3)}; ${C.spells.length} spells; starved since ${(dead / 1000).toFixed(2)} m (${(100 * dead / world).toFixed(2)}% of the world)${worst ? `, the worst ${worst.name} in ${sim.fmtYear(worst.year)} (${(100 * worst.share).toFixed(1)}%)` : ''} | ${(ms / n).toFixed(3)} ms a year (${C.epoch().name})`);
     if (evs.length) console.log(`           begun: ${evs.map((e) => e.name).join('; ')}`);
     ms = 0; n = 0; dead = 0; worst = null;
   }
