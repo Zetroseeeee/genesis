@@ -940,6 +940,12 @@ server.listen(0, async () => {
     await page.keyboard.press('Shift+P'); await frames(3); r = await ev(() => ({ on: document.getElementById('v-sick').classList.contains('on'), mode: __G.world.palMode })); check(!r.on && r.mode === 'realm', 'Shift+P turns the lens off');
     await ev(() => { __G.sim.disease.out.length = 0; __T.quiet(); });
   });
+  await scenario('the land: a world fed by its land; the inspector names the kind of land and its farmland, the realm its land by kind', async (check) => {
+    const r = await ev(() => { const S = __G.sim, c = S.playerCiv(); __G.select(c.capital); const land = document.getElementById('sel-cell').textContent, tip = (document.querySelector('#sel-cell span[title]') || {}).title || '';
+      return { on: S.landOn, kind: LAND.CLASSES[S.landClass(c.capital)].name, land, tip, realm: document.getElementById('sc-kv').textContent }; });
+    check(r.on && r.land.includes(r.kind) && /farmland/.test(r.land) && r.tip.length > 20, `the capital's land: ${r.land.slice(0, 80)} (${r.tip.slice(0, 60)})`);
+    check(/Land/.test(r.realm) && /%/.test(r.realm), 'the realm\'s panel names its land by kind');
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);

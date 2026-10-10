@@ -25,7 +25,7 @@ window.TREE = (function () {
   const EDGE = { food: 'food from the land', grow: 'growth of your people', income: 'taxes', research: 'insight', strength: 'strength in arms', stab: 'stability', build: 'cheaper works', health: 'health: fewer die in a plague', trade: 'goods your merchants carry', reach: 'reach of the capital', sea: 'range of your ships', siege: 'against walls', defence: 'strength of your walls' };
   const edgeName = (k) => EDGE[k] || (CRAFT[k] ? 'work of ' + CRAFT[k] : YIELD[k] ? 'yield of ' + YIELD[k] : k);
   const edgeLine = (k, v) => k === 'build' ? `Works cost ${Math.round(v * 100)}% less` : `${pc(v)} ${edgeName(k)}`;
-  const CAN = { quarry: 'Quarries, saltworks and flint mines can be opened', ores: 'Mines can be sunk for ores', colonies: 'Your ships can plant colonies across the sea', faith: 'A faith of your own can arise' };
+  const CAN = { quarry: 'Quarries, saltworks and flint mines can be opened', ores: 'Mines can be sunk for ores', colonies: 'Your ships can plant colonies across the sea', oceans: 'Your colonies can be planted on any shore across the ocean, where few live or nobody holds it', faith: 'A faith of your own can arise' };
 
   let ctx = null, tab = 'tree', sel = null, built = false, lastSig = '', pos = null, fitH = 0;
   const S = () => ctx.sim(); const KN = () => window.KNOW; const K = () => S().know;

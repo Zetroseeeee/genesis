@@ -1,0 +1,38 @@
+{
+ "regions": [
+  "Western Europe",
+  "Eastern Europe",
+  "Former USSR",
+  "Western Offshoots",
+  "Latin America",
+  "Japan",
+  "China",
+  "India",
+  "Other Asia",
+  "Africa"
+ ],
+ "subregions": [
+  "Antarctica",
+  "Australia and New Zealand",
+  "Caribbean",
+  "Central America",
+  "Central Asia",
+  "Eastern Africa",
+  "Eastern Asia",
+  "Eastern Europe",
+  "Melanesia",
+  "Middle Africa",
+  "Northern Africa",
+  "Northern America",
+  "Northern Europe",
+  "Seven seas (open ocean)",
+  "South America",
+  "South-Eastern Asia",
+  "Southern Africa",
+  "Southern Asia",
+  "Southern Europe",
+  "Western Africa",
+  "Western Asia",
+  "Western Europe"
+ ]
+}

@@ -141,6 +141,13 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   begin and of which kind, how many succeed, fail and are found out, how many wars are fought over agents caught, how strong the
   networks are age by age, how long a year of it takes. Run it after touching `intrigue.js` or the deeds in `sim.js`, then the
   war-and-peace probe over 12345 and 777.
+- `node tools/people/regions.js [seed,seed] [last year]` — where the world's people live, against history: the simulation's
+  share of the world in each of Maddison's ten regions (Western and Eastern Europe, the former USSR, the Western Offshoots, Latin
+  America, Japan, China, India, the rest of Asia, Africa) over his, at AD 1, 1000, 1500, 1600, 1700, 1820, 1870, 1913, 1950 and
+  1998 (`tools/people/regions.png`, made by `regions_map.py` from Natural Earth's borders). `node tools/people/landfit.js
+  [seed,seed] --fit N [--write]` moves how intensely each kind of land is farmed (`FIT` in `src/land.js`, between its marks)
+  until every region holds its share from AD 1 to 1820, the worlds side by side, one process a seed (some three and a half
+  minutes a round). Fit the land before the pace, the norms of rule, the people and the market: each stands on it.
 - `node tools/disease/probe.js [seed,seed] [last year]` — sickness through the ages: outbreaks by kind, how far they go and how
   many they kill, the world's people, the Americas' share of them and which sicknesses their realms have met, the worst outbreaks,
   how long a year of it takes. Run it after touching `disease.js`, then `tools/know/people.js` (the world's people against
@@ -253,6 +260,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/bank.js` | `BANK` | The Treasury, the market screen's last tab: debts and who holds them, borrowing and repaying, repudiation, the coin, the price of money, banking houses and companies (shares bought and sold), panics of late |
 | `src/intrigue.js` | `INTRIGUE` | Spies and schemes: six schemes (steal learning, sow discord, forge a claim, set back works, stir a rising, murder an heir) and what a network is made of; one world's intrigue: each realm's agents and the scheme they are on, the foreign agents it caught, the autopilot's schemes; pure data (the deeds are the host's) |
 | `src/disease.js` | `DISEASE` | Pestilence that travels: six kinds (smallpox, measles, plague, typhus, influenza, cholera), the age that breeds each, how readily it passes and kills; one world's sickness: outbreaks and where they burn, what every people has lived through, who is spared, quarantines; pure data (the dead are taken by the host) |
+| `src/land.js` | `LAND` | What the land feeds: sixteen kinds of land (`data/soil.png`), how intensely each kind's farmland is farmed in each age (`FIT`, measured by `tools/people/landfit.js`), what it gives people who do not farm, the continents' crops and beasts; pure data |
 | `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
@@ -717,6 +725,37 @@ Conventions that matter:
   are due to think (two flat arrays, a filter on what is on the realms: after setting a realm's record by hand, `sync()`).
   Saved with the realm (`civ.intrigue`) and the world (`save().intrigue`: its dice and counts); a world saved before intrigue
   has no agents abroad.
+- **The land** (`land.js`; `data/soil.png`, made by `tools/climate/soil.py`; the simulation's `capacity`). Every cell of the
+  grid is one of sixteen kinds of land, from the climate's class (Koppen-Geiger, `data/climate.png`), where woods would stand by
+  nature (`data/veg.jpg`) and the heights: ice, tundra, boreal forest, desert, steppe, grassland (open grass in a climate that could
+  farm it: the prairie, the pampas, the black earth), the temperate woods (oceanic and continental), the Mediterranean, the
+  farmland of monsoon Asia and of tropical Asia, the savanna, the rainforest, the tropical highlands and the high plateaus. What
+  covers it today is ESA WorldCover's (`tools/climate/cover_a.png`, `cover_b.png`: the share of each half-degree that is cropland,
+  grass, shrubs, trees, bare, built over, marsh and water, tallied on GitHub by `tools/planet/cover.py`, `MODE=cover
+  tools/planet/pack.sh`; CC BY 4.0, in the game's menu already): the farmland of our own day is where the land can be farmed at
+  all. `soil.png` holds the kind (red, low four bits) and how wooded the cell is (high four bits), the share that is farmland
+  (green: cropland, the towns on it, and in the wet tropics of Asia a share of the trees: gardens and paddies under palms) and
+  the share that is pasture (blue). A realm's cell feeds its farmland and a share of its pasture (`past`), as large as the cell
+  is (`cosLat`), times how intensely its kind is farmed (`I`) on that kind's course through the ages (`CURVES`, against the
+  first farmland's: the table of food is how farming as a whole grows, these say only how each kind keeps pace - the wooded
+  north waits for iron axes and the heavy plough, the grass for the steel plough, the tropics of Africa and the Americas for
+  fertiliser), times what its continent farms with (`WORLDS`: the Americas 0.5, Australia 0.4, until its people have met the
+  old world's sicknesses, `disease.met`: its beasts and crops come with its ships), times the table of food; never less than
+  the land feeds people who do not farm (`forage`, by kind, more along rivers and coasts). A realm's row of this is made once a
+  year (`landRow`, `landK`); the pass over the land reads it flat. The scale is the old map's (`LSCALE`, `WSCALE`: the world's
+  capacity at the Middle Ages and of its bands as the old greenness gave them), so the table of food stays near true until it
+  is fitted again. Where bands settle down as a people, and where the first peoples are placed, follows what the land gives the
+  first farmers (`homeOf`). **Settlers**: a realm two ages ahead takes land of its neighbour's where few live (a fifth of what
+  its own ways would feed there; no town, no capital, never the player's) without a war, and the neighbour remembers it
+  (`frontier`); ocean navigation (`oceans`) plants colonies on any shore across the ocean where nobody holds it or few live.
+  **Emigrants**: from a realm's crowded land (above 85 % of what it feeds) a few cells a year send people to the realm's far
+  land with room (a cell twenty and more from the capital, under a third full: one a year, chosen as by lot, `roomCell`) -
+  colonies across the sea, a frontier far off. Look at the Mac's `peopled`, `peopled_west` and `land_panel` after touching it.
+  In such a world the early realms lie further apart, among foragers and herders, and the late ones crowd together: the appetite
+  for war of each age (`WAR_AGE` in `sim.js`) keeps the rhythm of wars the world had (the war-and-peace probe's header).
+  A world saved before the land had kinds (no `land` in its save) is fed by the old map and the table of food of 0.37
+  (`FOOD_037`) and has no settlers: an update must not starve anyone's people. The inspector names a cell's kind of land and
+  its share of farmland.
 - **Pestilence** (`disease.js`; `sim.disease`; the lens of sickness, Shift+P, in `main.js` and `world.js`). Six kinds (`KINDS`:
   smallpox, measles, plague, typhus, influenza, cholera), each with the age that breeds it, how readily it passes, how many of
   those who catch it it kills before medicine, how many catch it, how many years it burns in a realm, how many turns those who

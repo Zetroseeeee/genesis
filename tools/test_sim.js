@@ -4,12 +4,13 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
 for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.data[i * 4 + 1] / 255; wd.flags[i] = png.data[i * 4 + 2]; wd.land[i] = png.data[i * 4 + 2] & 1; }
+{ const sp = PNG.sync.read(fs.readFileSync('data/soil.png')); wd.soil = new Uint8Array(N * 3); for (let i = 0; i < N; i++) { wd.soil[i * 3] = sp.data[i * 4]; wd.soil[i * 3 + 1] = sp.data[i * 4 + 1]; wd.soil[i * 3 + 2] = sp.data[i * 4 + 2]; } }      // (what the land feeds: land.js)
 
 const fails = []; let checks = 0; const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null; const want = (n) => !ONLY || ONLY.includes(String(n));
 function check(cond, msg) { checks++; if (!cond) { fails.push(msg); console.log('  FAIL', msg); } }
@@ -98,7 +99,7 @@ if (want(2)) {
 log('2. player actions and god powers');
 {
   const sim = createSim(wd, 42);
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI[1000];
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI[1000];      // (rich land on a river and a coast: what the first farmers would choose)
   const c = sim.setPlayer(i0, 'Testers', [0.5, 0.5]);
   check(!!c && c.player, 'setPlayer returns a player civ');
   check(sim.playerCiv() === c, 'playerCiv() is the player');
@@ -154,7 +155,7 @@ log('2. player actions and god powers');
   const bonusBefore = sim.bonusFert[eCap]; sim.bounty(eCap); check(sim.bonusFert[eCap] > bonusBefore + 0.2 && sim.bonusFert[eCap] <= 0.7, `bounty raises fertility (bonus ${bonusBefore.toFixed(2)} -> ${sim.bonusFert[eCap].toFixed(2)})`);
   const pr = sim.prophet(eCap); check(!!e.religion && /faith|religion|prophet/i.test(pr) || e.religion, `prophet founds a faith: "${pr}" (${e.religion})`);
   const techBefore = e.tech; const en = sim.enlighten(eCap); check(e.tech > techBefore && e.era === sim.eraOf(e.tech), `enlighten: "${en}" tech ${techBefore.toFixed(3)} -> ${e.tech.toFixed(3)} era ${e.era}`);
-  const spawned = sim.spawnTribe(sim.LI.find(j => sim.owner[j] < 0 && sim.fert[j] > 0.5), {}); check(!!spawned && spawned.capital >= 0, 'spawn tribe on empty land');
+  const spawned = sim.spawnTribe(sim.LI.find(j => sim.owner[j] < 0 && sim.homeOf(j) > 0.5), {}); check(!!spawned && spawned.capital >= 0, 'spawn tribe on empty land');
   check(sim.spawnTribe(i0, {}) === null, 'spawn on owned land refused');
   check(sim.st.civCount === sim.civs.filter(Boolean).length, `civ count in st is live between ticks (${sim.st.civCount} vs ${sim.civs.filter(Boolean).length})`);
   const target = e.capital; sim.meteor(target); check(sim.owner[target] === -1 && sim.pop[target] === 0, 'meteor clears the cell'); check(sim.ruins.size >= 0, 'ruins map intact after meteor');
@@ -223,7 +224,7 @@ log('5. edge cases');
   check(sim2.act('develop', i0) === 'No state', 'actions refused after death');
   // ruins get cleared when resettled
   { // a town rebuilt over old ruins clears them; a hamlet among them does not
-    const sim3 = createSim(wd, 5); let j = -1, bf = 0; for (const i of sim3.LI) if ((sim3.flags[i] & 2) && sim3.owner[i] < 0 && sim3.fert[i] > bf) { bf = sim3.fert[i]; j = i; }
+    const sim3 = createSim(wd, 5); let j = -1, bf = 0; for (const i of sim3.LI) if ((sim3.flags[i] & 2) && sim3.owner[i] < 0 && sim3.homeOf(i) > bf) { bf = sim3.homeOf(i); j = i; }
     sim3.ruins.set(j, { year: sim3.year - 100, era: 2, culture: 0, R: 300, wonder: 0, name: 'Old' }); const c3 = sim3.setPlayer(j, 'New', null); c3.tech = 0.3; c3.era = sim3.eraOf(c3.tech);
     sim3.tick(); const K3 = sim3.capacity(j, c3); sim3.pop[j] = K3 * 0.9; for (let y = 0; y < 12; y++) sim3.tick();
     check(sim3.level[j] >= 2, `rebuilt town reaches level 2+ on the best river land (level ${sim3.level[j]}, K ${K3.toFixed(1)})`); check(!sim3.ruins.has(j), 'ruin cleared when a town is rebuilt over it');
@@ -242,7 +243,7 @@ log('6. rulers and trade goods');
   let same = true; for (let i = 0; i < N; i++) if (sim.goods[i] !== simB.goods[i]) { same = false; break; } check(same, 'goods placement is fixed by the land, not the seed');
   let withGoods = 0, onIce = 0; const used = new Set(); for (const i of sim.LI) { const g = sim.goods[i]; if (g) { withGoods++; used.add(g); if (sim.flags[i] & 8) onIce++; } }
   const frac = withGoods / sim.LI.length; check(frac > 0.15 && frac < 0.4, `goods cover a sensible share of the land (${(frac * 100).toFixed(0)}%)`); check(onIce === 0, 'no goods on the ice'); { const raws = sim.GOODS.filter(g => g && g.raw).length; check(used.size === raws, `every raw good occurs somewhere (${used.size}/${raws})`); }
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Traders', null); for (let k = 0; k < 24; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Traders', null); for (let k = 0; k < 24; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
   for (const cv of sim.civs) if (cv) { cv.tech = 0.12; cv.era = sim.eraOf(cv.tech); } // the Bronze Age: copper, tin and horses start to matter
   for (let y = 0; y < 3000; y++) sim.tick();
   check(!!c.trade && c.trade.living >= 0 && c.trade.living <= 1 && typeof c.trade.imp === 'number', 'player realm has a trade record');
@@ -262,7 +263,7 @@ if (want(7)) {
 log('7. construction, growth and the planner');
 {
   const T = window.TOWN; const sim = createSim(wd, 77);
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Builders', null); for (let k = 0; k < 24; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
+  const i0 = (() => { let best = -1, bd = 1e9; for (const i of sim.LI) { if (!(sim.flags[i] & 2) || sim.landClass(i) !== 4) continue; const d = Math.hypot(i % sim.W - 422.5, Math.floor(i / sim.W) - 120.2); if (d < bd) { bd = d; best = i; } } return best; })(); const c = sim.setPlayer(i0, 'Builders', null);      // (the Nile at Memphis: river land that feeds a town in the Bronze Age) for (let k = 0; k < 24; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
   for (const cv of sim.civs) if (cv) { cv.tech = 0.1; cv.era = sim.eraOf(cv.tech); cv.eraSince = sim.year - 300; cv.wealth = 400; }
   teach(sim, c, 1);
   // the AI builds through the same sites the player uses
@@ -308,7 +309,7 @@ log('8. the market');
   { const missing = E.GOODS.filter(g => g && g.raw && !(E.CAL[g.key] > 0)).map(g => g.key); check(missing.length === 0, `every raw good has a measured yield (missing: ${missing.join(', ') || 'none'}; run tools/econ/calibrate.js --write)`); }
   { const made = E.GOODS.filter(g => g && !g.raw); check(made.every(g => E.MAKES[g.id].length > 0), 'every made good has a recipe'); }
   // a world of traders
-  const sim = createSim(wd, 77); const M = sim.market; const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2));
+  const sim = createSim(wd, 77); const M = sim.market; const i0 = sim.LI.find(i => sim.homeOf(i) > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI.find(i => sim.homeOf(i) > 0.6 && (sim.flags[i] & 2));
   const c = sim.setPlayer(i0, 'Merchants', null); for (let k = 0; k < 30; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
   for (const cv of sim.civs) if (cv) { cv.tech = 0.2; cv.era = sim.eraOf(cv.tech); }
   teach(sim, c, 2);
@@ -389,7 +390,7 @@ log('9. knowledge');
     check(['grain', 'fish', 'cattle', 'timber', 'stone', 'salt'].every(key => !k.goodGate(E.ID[key])), 'what every people lives on waits on nothing');
     for (const w of KN.WORKS) check(KN.WORK_BY[w] !== undefined || w === 'farm' || w === 'walls', `the ${w} is opened by a discovery`); check(KN.FARM.length === 4 && KN.WALLS.length === 3, 'farms have four discoveries to their five levels, walls three'); }
   // a people begins with nothing but a little to spend
-  const sim = createSim(wd, 91); const k = sim.know; const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2));
+  const sim = createSim(wd, 91); const k = sim.know; const i0 = sim.LI.find(i => sim.homeOf(i) > 0.6 && (sim.flags[i] & 2) && (sim.flags[i] & 4)) || sim.LI.find(i => sim.homeOf(i) > 0.6 && (sim.flags[i] & 2));
   const c = sim.setPlayer(i0, 'Scholars', null); for (let n = 0; n < 30; n++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], { tech: 0.018 + sim.rnd() * 0.017 });
   check(k.count[c.id] === 0 && Math.abs(k.pool[c.id] * U - 1000) < 1 && k.cur[c.id] === -1, `the player's people know nothing yet and hold ${Math.round(k.pool[c.id] * U)} insight`);
   { const others = sim.civs.filter(x => x && x !== c); const known = others.map(x => k.count[x.id]); check(Math.max(...known) > 0 && Math.max(...known) <= 6 && others.every(x => k.pool[x.id] < 0.004), `other peoples begin with what their knowledge was worth (${Math.min(...known)} to ${Math.max(...known)} discoveries)`); check(k.first.every(f => !f || f.name === ''), 'and nobody is remembered as first to what was known at the dawn'); }
@@ -461,7 +462,7 @@ log('10. laws and government');
     check(R.NORM && R.KEYS.every(key => R.NORM[key] && R.NORM[key].length === 9 && R.NORM[key].every(v => isFinite(v))), 'what each age expects of rule has been measured for every key');
     const st = KN.LIST.filter(D => KN.BRANCHES[D.branch].key === 'state' && !R.opens(D.key).length).map(D => D.key); log(`   discoveries of the state that open no form or law yet: ${st.join(', ') || 'none'}`); check(st.length <= 2, 'nearly every discovery of the state opens a form or a law'); }
   // a new people
-  const sim = createSim(wd, 11); const i0 = sim.LI.find(i => sim.fert[i] > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Lawgivers', null); for (let n = 0; n < 25; n++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {}); sim.recount();
+  const sim = createSim(wd, 11); const i0 = sim.LI.find(i => sim.homeOf(i) > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Lawgivers', null); for (let n = 0; n < 25; n++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {}); sim.recount();
   const k = sim.rule, Q = k.ruleOf(c), NE = R.NE;
   check(Q.gov === 'band' && c.gov === 'band' && R.CATS.every(C => Q.laws[C.key] === C.laws[0].key) && Q.auth === 20 && Q.mood.length === NE && !Q.reform && !Q.demand, 'a new people is a band of kin under its first laws, with a little authority');
   check(sim.fullName(c) === 'the Lawgivers people' && c.ruler.title === 'Elder', `it is called ${sim.fullName(c)}, under ${c.ruler.title} ${c.ruler.name}`);
@@ -534,16 +535,18 @@ log('10. laws and government');
   // save and load
   { for (const cv of sim.civs) if (cv) { k.powers(cv.id, cv, k.ruleOf(cv)); k.refresh(cv.id, cv); }      // (as a loaded world reckons them: from the realm as it stands, not as it stood when its year was stepped)
     const s = JSON.parse(JSON.stringify(sim.save())); const sim2 = createSim(wd, s.seed || 1); sim2.load(s); const k2 = sim2.rule; let diff = 0, df = 0, dfAll = 0, same = 0, all = 0;
-    // (a save keeps each region's people to a part in a hundred, and a loaded world counts its towns afresh from them: a town here and there has crossed a line. Where the towns are the same, so must the factors be, to that grain)
+    // (a save keeps each region's people to a part in a hundred, and a loaded world counts its towns afresh from them: a town here and there has crossed a line, and a hamlet with
+    //  a workshop in it. Where the towns and the workshops counted are the same, so must the factors be, to that grain)
+    const wk = (s, c) => { let n = 0; for (let j = 0; j < s.IND.length; j++) n += s.indN[c * s.IND.length + j]; return n; };
     for (const cv of sim.civs) { if (!cv) continue; const c = cv.id, a = k.ruleOf(cv), b = k2.ruleOf(sim2.civs[c]); if (a.gov !== b.gov || JSON.stringify(a.laws) !== JSON.stringify(b.laws) || Math.abs(a.auth - b.auth) > 1e-9 || JSON.stringify(a.mood) !== JSON.stringify(b.mood) || JSON.stringify(a.reform) !== JSON.stringify(b.reform) || JSON.stringify(a.demand) !== JSON.stringify(b.demand)) diff++;
-      let d = 0; for (let q = 0; q < R.NK; q++) d = Math.max(d, Math.abs(k.f[c * R.NK + q] - k2.f[c * R.NK + q])); all++; dfAll = Math.max(dfAll, d); if (sim.townsOf[c] === sim2.townsOf[c]) { same++; df = Math.max(df, d); } }
+      let d = 0; for (let q = 0; q < R.NK; q++) d = Math.max(d, Math.abs(k.f[c * R.NK + q] - k2.f[c * R.NK + q])); all++; dfAll = Math.max(dfAll, d); if (sim.townsOf[c] === sim2.townsOf[c] && wk(sim, c) === wk(sim2, c)) { same++; df = Math.max(df, d); } }
     check(diff === 0, `every realm's form, laws, authority, estates and reform survive save and load (${diff} differ)`); check(same > all * 0.4 && df < 3e-3 && dfAll < 0.03, `and the factors come out the same (${df.toExponential(1)} apart at most in the ${same} of ${all} realms whose towns are counted the same, ${dfAll.toExponential(1)} in the rest)`);
     check(sim2.fullName(sim2.playerCiv()) === sim.fullName(c), 'and what the realm is called');
     // a world saved before there were laws
     for (const cv of s.civs) if (cv) { delete cv.rule; cv.gov = cv.tech < 0.08 ? 'tribe' : 'kingdom'; } const sim3 = createSim(wd, 1); sim3.load(s); const k3 = sim3.rule; let n3 = 0, with3 = 0, bands = 0; for (const cv of sim3.civs) { if (!cv) continue; n3++; const q = k3.ruleOf(cv); if (R.CATS.some(C => q.laws[C.key] !== C.laws[0].key)) with3++; if (!R.FORM[q.gov]) bands++; }
     check(with3 > n3 * 0.5 && bands === 0, `a world from before laws is given the laws of its age (${with3} of ${n3} realms have some)`);
     // (such a world was fed by the table of its day, and keeps it: the first load after the update must not starve its people)
-    { const old = JSON.parse(JSON.stringify(s)); delete old.heard; delete old.food; const sim4 = createSim(wd, 1); sim4.load(old); const kept = JSON.parse(JSON.stringify(sim4.save())); const sim5 = createSim(wd, 1); sim5.load(kept);
+    { const old = JSON.parse(JSON.stringify(s)); delete old.heard; delete old.food; delete old.land; const sim4 = createSim(wd, 1); sim4.load(old); const kept = JSON.parse(JSON.stringify(sim4.save())); const sim5 = createSim(wd, 1); sim5.load(kept);
       check(!sim.foodOld && !sim2.foodOld && sim4.foodOld && sim5.foodOld && kept.food === 15 && sim4.foodMult(0.6) > sim.foodMult(0.6) * 1.15, `and keeps the yield of the land it was saved under (${sim4.foodMult(0.6).toFixed(3)} at the Renaissance, not ${sim.foodMult(0.6).toFixed(3)}), through further saves`); } for (let y = 0; y < 50; y++) sim3.tick(); invariants(sim3, 'an old world with new laws, 50 years on'); }
   // speed
   { const st0 = k.step; let tk = 0; k.step = (a, b) => { const t = process.hrtime.bigint(); st0(a, b); tk += Number(process.hrtime.bigint() - t) / 1e6; }; for (let y = 0; y < 200; y++) sim.tick(); k.step = st0;
@@ -565,7 +568,7 @@ log('11. diplomacy');
 
   // a small world made by hand: the player in the middle, a realm two regions off on every side (so that each touches the player's land)
   const sim = createSim(wd, 21); const W2 = sim.W; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [i - 3, i + 3, i - 3 * W2, i + 3 * W2, i - 3 * W2 - 3, i + 3 * W2 + 3, i - 3 * W2 + 3, i + 3 * W2 - 3].every(ok) && [-2, -1, 1, 2].every(d => ok(i + d) && ok(i + d * W2)));
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [i - 3, i + 3, i - 3 * W2, i + 3 * W2, i - 3 * W2 - 3, i + 3 * W2 + 3, i - 3 * W2 + 3, i + 3 * W2 - 3].every(ok) && [-2, -1, 1, 2].every(d => ok(i + d) && ok(i + d * W2)));
   const c = sim.setPlayer(i0, 'Envoys', null); const mk = (off) => { const t = sim.spawnTribe(i0 + off, {}); for (const d of [-1, 1, -W2, W2]) { const j = i0 + off + d; if (sim.owner[j] < 0 && ok(j)) { sim.owner[j] = t.id; sim.pop[j] = 0.5; } } return t; };
   const A = mk(3), B = mk(-3), E = mk(3 * W2), F = mk(-3 * W2), G = mk(3 * W2 + 3), H = mk(-3 * W2 - 3), J = mk(-3 * W2 + 3), K2 = mk(3 * W2 - 3);
   // (their borders are made to meet the player's: one region of each lies against his)
@@ -681,7 +684,7 @@ log('11. diplomacy');
 // a world left to itself: by the Iron Age it has sworn, married, knelt and fought for reasons
 {
   const sim = createSim(wd, 31); for (let n = 0; n < 40; n++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {}); sim.recount(); const dp = sim.diplo; const t0w = Date.now();
-  while (sim.year < -800) sim.tick(); const S = dp.stats; let bound = 0, n = 0, vass = 0; for (const x of sim.civs) { if (!x) continue; n++; if (x.dip.lord >= 0) vass++; if (x.dip.lord >= 0 || Object.keys(x.dip.pact).length || dp.vassalsOf(x.id).length) bound++; }
+  while (sim.year < -300) sim.tick(); /* (in a world whose land has kinds, envoys travel later: realms lie further apart) */ const S = dp.stats; let bound = 0, n = 0, vass = 0; for (const x of sim.civs) { if (!x) continue; n++; if (x.dip.lord >= 0) vass++; if (x.dip.lord >= 0 || Object.keys(x.dip.pact).length || dp.vassalsOf(x.id).length) bound++; }
   log(`   by ${sim.fmtYear(sim.year)}: ${n} realms, ${bound} bound to somebody, ${vass} vassals; sworn ${JSON.stringify(S.pacts)}; wars ${JSON.stringify(S.wars)}; peace ${JSON.stringify(S.peace)}; ${S.broken} oaths broken, ${S.unions} unions (${((Date.now() - t0w) / 1000).toFixed(0)} s)`);
   check(['nap', 'trade', 'marriage'].every(k => S.pacts[k] > 5) && (S.pacts.defence || 0) + (S.pacts.alliance || 0) > 0, 'realms that rule themselves swear peace, open their markets, marry and stand together');
   check(S.vassals > 3 && S.vassals < 60, `some kneel, and not everyone (${S.vassals} made: ${Object.entries(S.how).map(([k, v]) => k + ' ' + v).join(', ')}; ${S.freed} up again - in a world this young few have had the time; the hand-made one above shows how)`); check((S.wars.none || 0) > 50 && (S.wars.covet || 0) + (S.wars.claim || 0) + (S.wars.reconquest || 0) > 10 && (S.wars.ally || 0) > 0, 'wars are fought for nothing, for goods, for claims and beside friends');
@@ -699,7 +702,7 @@ log('12. armies');
 {
   const sim = createSim(wd, 33); const W2 = sim.W; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
   // a strip of land: the player at one end, an enemy beside him, a neutral realm beyond
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
   const c = sim.setPlayer(i0, 'Hosts', null); const A = sim.spawnTribe(i0 + 4, {}), B = sim.spawnTribe(i0 + 9, {});
   for (let d = 2; d <= 6; d++) for (const e of [-W2, 0, W2]) { sim.owner[i0 + d + e] = A.id; sim.pop[i0 + d + e] = 1.2; }
   for (let d = 7; d <= 10; d++) for (const e of [-W2, 0, W2]) { sim.owner[i0 + d + e] = B.id; sim.pop[i0 + d + e] = 1.2; }
@@ -753,7 +756,7 @@ if (want(13)) {
 log('13. peoples');
 {
   const sim = createSim(wd, 41); const W2 = sim.W, PP = sim.people; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
   // a tribe on empty land is a new people, named as it is; another settling near it is of its kin; one far off a new family
   const A = sim.spawnTribe(i0, {}); const pA = PP.ruling[A.id];
   check(pA > 0 && PP.ppl[i0] === pA && PP.list[pA].name === A.name && PP.list[pA].fam === pA, `a tribe on empty land is a new people: the ${PP.list[pA] && PP.list[pA].name}`);
@@ -820,7 +823,7 @@ if (want(14)) {
 log('14. faiths');
 {
   const sim = createSim(wd, 53); const W2 = sim.W, F = sim.faith; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && ok(i + d - 2 * W2) && ok(i + d + 2 * W2)));
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && ok(i + d - 2 * W2) && ok(i + d + 2 * W2)));
   const bronze = sim.ERAS[1][1] + 0.01, classic = sim.ERAS[3][1] + 0.01;
   const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
   for (const x of [A, B]) { x.tech = bronze; x.era = sim.eraOf(bronze); teach(sim, x, x === A ? 1 : 0); x.aggression = 0; x.dip.think = 1e12; }      // (B has no priests of its own: no prophet will arise there)
@@ -911,7 +914,7 @@ if (want(15)) {
 log('15. culture');
 {
   const sim = createSim(wd, 71); const W2 = sim.W, K = sim.culture, CU = window.CULTURE; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && ok(i + d - 2 * W2) && ok(i + d + 2 * W2)));
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && ok(i + d - 2 * W2) && ok(i + d + 2 * W2)));
   const classic = sim.ERAS[3][1] + 0.01;
   const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
   for (const x of [A, B]) { x.tech = classic; x.era = sim.eraOf(classic); x.aggression = 0; x.dip.think = 1e12; } teach(sim, A, 3); teach(sim, B, 0);      // (B knows no masonry: no great people come there)
@@ -994,7 +997,7 @@ if (want(16)) {
 log('16. finance');
 {
   const sim = createSim(wd, 83); const W2 = sim.W, F = sim.finance; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
   const med = sim.ERAS[4][1] + 0.01;
   const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
   for (const x of [A, B]) { x.tech = med; x.era = sim.eraOf(med); x.aggression = 0; x.dip.think = 1e12; }
@@ -1030,14 +1033,14 @@ log('16. finance');
   { const s4 = createSim(wd, 89), F4 = s4.finance; const k0 = s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.fert[i] > 0.5 && [1, 2, 3, 4].every(d => ok(i + d) && s4.owner[i + d] < 0) && (s4.flags[i] & 4));
     s4.setPlayer(k0, 'Testland'); const P = s4.playerCiv(); s4.special[k0] |= 1; /* (a harbour at its seat) */ const ren = s4.ERAS[5][1] + 0.01; P.tech = ren; P.era = s4.eraOf(ren); teach(s4, P, 5); for (let d = 1; d <= 4; d++) { if (s4.owner[k0 + d] < 0) s4.claim(k0 + d, P, k0); s4.pop[k0 + d] = 30; } for (let y = 0; y < 3; y++) s4.tick();
     P.wealth = 100; const room = F4.room(P.id); const why1 = s4.financeAct('borrow', Math.floor(room / 2)); check(!why1 && F4.debt[P.id] > 0 && P.wealth > 100, `the player borrows ${F4.debt[P.id].toFixed(0)} of ${room.toFixed(0)} (${why1 || 'done'})`);
-    const why2 = s4.financeAct('repay', 50); check(!why2 && P.events.slice(-3).some(e => /repays/.test(e.text)), 'repays, and the chronicle says so');
+    const why2 = s4.financeAct('repay', Math.min(50, F4.debt[P.id] / 2)); check(!why2 && P.events.slice(-3).some(e => /repays/.test(e.text)), 'repays, and the chronicle says so');
     P.wealth = 1e5; check(!s4.financeAct('house') && F4.housesOf(P.id).length === 1, 'charters a banking house'); check(!s4.financeAct('company') && F4.companiesOf(P.id).length === 1, 'charters a company in a harbour');
     const co = F4.companiesOf(P.id)[0]; const B4 = s4.spawnTribe(s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.cellDist(i, k0) > 30), {}); const o = F4.charter(B4.id, { at: B4.capital, cap: 800 }); void co;
     const wb = P.wealth; check(!s4.financeAct('buy', o.id, 500) && P.wealth === wb - 500 && F4.sharesOf(o, P.id) > 0, 'buys shares of another realm\'s company'); check(!s4.financeAct('sell', o.id, 1) && !F4.sharesOf(o, P.id), 'and sells them');
     check(!s4.financeAct('debase') && F4.fine[P.id] < 1, 'debases the coin'); 
     const saved = JSON.parse(JSON.stringify(s4.save())); const s5 = createSim(wd, 1); s5.load(saved); const F5 = s5.finance;
     check(Math.abs(F5.debt[P.id] - F4.debt[P.id]) < 1e-2 && Math.abs(F5.fine[P.id] - F4.fine[P.id]) < 1e-3 && F5.houses.length === F4.houses.length && F5.companies.length === F4.companies.length && F5.coin(P.id) === F4.coin(P.id) && JSON.stringify(F5.owesOf(P.id).map(x => Math.round(x.amt))) === JSON.stringify(F4.owesOf(P.id).map(x => Math.round(x.amt))), `saved and loaded: debts ${F4.debt[P.id].toFixed(0)}, the coin, ${F4.houses.length} houses, ${F4.companies.length} companies`);
-    const why3 = s4.financeAct('default'); check(!why3 && F4.debt[P.id] === 0 && F4.lastDef[P.id] === s4.year, 'and repudiates the rest');
+    const why3 = s4.financeAct('default'); check(!why3 && F4.debt[P.id] === 0 && F4.lastDef[P.id] === s4.year, `and repudiates the rest (${why3 || 'done'})`);
     const old = JSON.parse(JSON.stringify(s4.save())); delete old.finance; const s6 = createSim(wd, 1); s6.load(old); check(s6.finance.debt[P.id] === 0 && s6.finance.houses.length === 0, 'a world saved before finance owes nothing and has no houses'); }
   invariants(sim, 'the world of money in ' + sim.fmtYear(sim.year));
 }
@@ -1060,7 +1063,7 @@ if (want(17)) {
 log('17. dynasties');
 {
   const sim = createSim(wd, 97); const W2 = sim.W, D = sim.dynasty; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
-  const i0 = sim.LI.find(i => sim.fert[i] > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
+  const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
   const med = sim.ERAS[4][1] + 0.01; const RF = window.RULE.FORM;
   const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
   for (const x of [A, B]) { x.tech = med; x.era = sim.eraOf(med); x.aggression = 0; x.dip.think = 1e12; teach(sim, x, 4); }
@@ -1408,6 +1411,60 @@ log('21. pestilence');
   check(am.length > 10 && amHad <= am.length * 0.1, `the Americas have met none of them before the ships (${amHad} of ${am.length} realms)`);
   check(ms / 100 < 0.15, `sickness is quick enough (${(ms / 100).toFixed(4)} ms in the middle year)`);
   const size = JSON.stringify(sim.save().disease).length / 1024; check(size < 60, `what sickness keeps is saved in ${size.toFixed(0)} KB`);
+}
+}
+if (want(22)) {
+log('22. the land');
+{
+  const L = window.LAND; const at = (lon, lat) => Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
+  check(L.CLASSES.length === 16 && L.CLASSES.every((K) => K.name && L.CURVES[K.curve] && K.text !== undefined) && L.TAB.length === 16 * 9, 'sixteen kinds of land, each with its course through the ages');
+  const sim = createSim(wd, 104); check(sim.landOn === true, 'a new world is fed by its land');
+  const ganges = at(85, 25.5), kansas = at(-98, 38.5), nile = at(31.0, 30.8), sahara = at(10, 24), mexico = at(-99.1, 19.4);
+  const K = (i) => sim.landClass(i); check(L.CLASSES[K(ganges)].key === 'monsoon' && L.CLASSES[K(kansas)].key === 'grass' && L.CLASSES[K(nile)].key === 'desert' && L.CLASSES[K(mexico)].key === 'high', `the Ganges is monsoon farmland, Kansas grassland, the Nile's delta desert, the valley of Mexico a tropical highland (${[ganges, kansas, nile, mexico].map((i) => L.CLASSES[K(i)].name).join(', ')})`);
+  check(sim.farmland(nile) > 0.5 && sim.farmland(sahara) < 0.02, `the Nile's delta is farmland (${(sim.farmland(nile) * 100).toFixed(0)}%), the Sahara none`);
+  // what a unit of farmland feeds through the ages, the prairie against the paddies
+  const setAge = (c, e) => { c.tech = sim.ERAS[e][1] + 0.01; c.era = e; };
+  const P = sim.spawnTribe(ganges, {}); P.aggression = 0; if (P.dip) P.dip.think = 1e12;
+  const per = (i) => sim.capacity(i, P) / Math.max(0.01, sim.farmland(i));
+  setAge(P, 2); sim.tick(); const iron = per(kansas) / per(ganges);
+  setAge(P, 7); sim.tick(); const modern = per(kansas) / per(ganges);
+  check(iron < 0.3 && modern > iron * 2.5, `the prairie feeds ${(iron * 100).toFixed(0)}% of what the paddies do in the Iron Age, ${(modern * 100).toFixed(0)}% once the steel plough has broken it`);
+  setAge(P, 2); sim.tick(); check(sim.capacity(nile, P) > 2 * sim.capacity(kansas, P), 'the irrigated valley feeds more than the open grass');
+  // the Americas farm with fewer until they have met the old world
+  const A = sim.spawnTribe(mexico, {}); A.aggression = 0; if (A.dip) A.dip.think = 1e12; setAge(A, 3); sim.tick(); const before = sim.capacity(mexico, A) / sim.foodMult(A.tech);
+  sim.disease.had[A.id * window.DISEASE.NK] = 1; sim.tick(); const after = sim.capacity(mexico, A) / sim.foodMult(A.tech);
+  check(after / before > 1.2, `the valley of Mexico feeds ${(after / before).toFixed(2)} times as many once its people have met the old world's beasts and crops`);
+  // saved and loaded; a world saved before the land had kinds feeds as it did
+  { sim.recount(); const saved = JSON.parse(JSON.stringify(sim.save())); check(saved.land === 1, 'a world says in its save that its land has kinds');      // (recount: what a realm's land feeds is reckoned from what it knows now, as a loaded world reckons it)
+    const s2 = createSim(wd, 1); s2.load(saved); check(s2.landOn === true && Math.abs(s2.capacity(nile, s2.civs[P.id]) - sim.capacity(nile, P)) < 1e-3 * sim.capacity(nile, P) + 1e-6, 'and is fed by it again when loaded');
+    const old = JSON.parse(JSON.stringify(saved)); delete old.land; const s3 = createSim(wd, 1); s3.load(old); check(s3.landOn === false && s3.homeOf(nile) === wd.fert[nile], 'a world saved before the land had kinds is fed by the old map, as it was'); }
+}
+// settlers: a realm two ages ahead takes thinly peopled land of its neighbour's without a war, never the player's
+{
+  const ok = (sim, i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.2;
+  const setup = (playerT) => {
+    const sim = createSim(wd, 105);
+    const k0 = sim.LI.find((i) => ok(sim, i) && sim.owner[i] < 0 && sim.landClass(i) === 7 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].every((d) => ok(sim, i + d) && sim.owner[i + d] < 0 && ok(sim, i + d + W) && ok(sim, i + d - W) && sim.owner[i + d + W] < 0 && sim.owner[i + d - W] < 0));
+    let T; if (playerT) { sim.setPlayer(k0 + 9, 'Woodland'); T = sim.playerCiv(); } else T = sim.spawnTribe(k0 + 9, {});
+    const S = sim.spawnTribe(k0, {});
+    for (const c of [S, T]) { c.aggression = 0; if (c.dip) c.dip.think = 1e12; }
+    S.tech = sim.ERAS[5][1] + 0.02; S.era = 5; teach(sim, S, 5); T.tech = sim.ERAS[2][1] + 0.01; T.era = 2; teach(sim, T, 2);
+    for (let d = 1; d <= 5; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, S, k0); sim.pop[i] = 40; }
+    for (let d = 6; d <= 11; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, T, k0 + 9); if (i !== T.capital) sim.pop[i] = 0.02; }
+    sim.touchAll(); sim.recount(); const had = sim.cellsOf[T.id]; for (let y = 0; y < 40; y++) { sim.tick(); if (T.player && T.story) T.story.q = null; }
+    sim.recount(); return { sim, S, T, had, now: sim.cellsOf[T.id], war: !!(S.wars && S.wars[T.id] !== undefined) };
+  };
+  const a = setup(false); check(a.now < a.had && !a.war, `settlers of a realm in the Renaissance take ${a.had - a.now} of the ${a.had} regions of an Iron Age neighbour where few live, without a war`);
+  const b = setup(true); check(b.now >= b.had, `but not the player's (${b.had} regions, ${b.now} after forty years)`);
+}
+// where the world's people live: the old world, as history had it
+{
+  const sim = createSim(wd, 12345); { let placed = 0, tries = 0; const homes = []; while (placed < 25 && tries < 20000) { tries++; const i = sim.LI[Math.floor(sim.rnd() * sim.LI.length)]; const f = sim.homeOf(i); if (f < 0.45 || sim.owner[i] >= 0) continue; if (sim.rnd() > f * f * ((sim.flags[i] & 2) ? 1.6 : 1)) continue; let ok = true; for (const h of homes) { const dy = Math.abs(((i / W) | 0) - ((h / W) | 0)); let dx = Math.abs((i % W) - (h % W)); if (dx > W / 2) dx = W - dx; if (dx * dx + dy * dy < 22 * 22) { ok = false; break; } } if (!ok) continue; if (sim.spawnTribe(i, { tech: 0.018 + sim.rnd() * 0.017 })) { homes.push(i); placed++; } } sim.recount(); }
+  while (sim.year < 1000) sim.tick();
+  let world = 0, am = 0, monsoon = 0; for (const i of sim.LI) { const p = sim.pop[i]; world += p; const lon = ((i % W) + 0.5) / W * 360 - 180; if (lon < -30 && lon > -170) am += p; const k = sim.landClass(i); if (k === 9 || k === 15) monsoon += p; }
+  const top = sim.civs.filter(Boolean).sort((x, y) => sim.popOf[y.id] - sim.popOf[x.id]).slice(0, 5).map((c) => ((c.capital % W) + 0.5) / W * 360 - 180);
+  log(`   ${sim.fmtYear(sim.year)}: ${(world / 1000).toFixed(0)} million people, ${(100 * am / world).toFixed(0)}% in the Americas, ${(100 * monsoon / world).toFixed(0)}% on the monsoon's farmland; the five greatest realms at ${top.map((x) => x.toFixed(0)).join(', ')} degrees of longitude`);
+  check(am / world < 0.15 && monsoon / world > 0.25 && top.every((x) => !(x < -30 && x > -170)), 'by AD 1000 the old world holds the world\'s people, monsoon Asia the most of them, and the greatest realms');
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'probe | imagery | snow | clouds | sky | heights'
+        description: 'probe | imagery | snow | clouds | sky | heights | cover'
         required: false
         default: 'probe'
       args:
@@ -40,7 +40,7 @@ jobs:
           ARGS: ${{ github.event.inputs.args }}
         run: |
           set -euo pipefail
-          case "$MODE" in probe|imagery|snow|clouds|sky|heights) ;; *) echo "bad mode"; exit 1;; esac
+          case "$MODE" in probe|imagery|snow|clouds|sky|heights|cover) ;; *) echo "bad mode"; exit 1;; esac
           case "$ARGS" in *[!A-Za-z0-9.,/=_:\ -]*) echo "bad args"; exit 1;; esac
           mkdir -p out work
           # (the heights of the whole Earth want room: what the runner carries for other languages is not needed here)
