@@ -83,6 +83,9 @@
     // the ground's materials (textures.js: TEX.ground), laid at a ladder of sizes in a frame of cells a metre and a half across at the equator
     uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 20 }, uGndFar: { value: new Float32Array(24) }, uGndFarD: { value: new Float32Array(48) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(75).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.4, GND_PX) }, uGndT: { value: new THREE.Vector4(1, 1, 0.25, 3) }, uWaterK: { value: new THREE.Vector4(1, 1, 1, 1) }, uSkyR: { value: new Float32Array(45).fill(0.3) }, uSeaK: { value: new THREE.Vector4(1, 1, 1, 0) }, uGndShow: { value: -1 }, uGndV: { value: 1 }, uWild: { value: 1 }, uGndDbg: { value: 0 }, uGndFine: { value: new THREE.Vector3(0.75, 0.6, 2.25) }, uGndCls: { value: new Float32Array(24) },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndT: how far a material's brightness follows the photograph of the Earth (0..1), and its hue (a factor), how wide the span in which one step of the ladder gives way to the next (0.1: a patchwork of the two; 0.25 and more: they lie over each other), how ragged its edge; uGndShow: one layer everywhere (to look at it), or -1; uGndV: how much the ground varies from stretch to stretch (lusher, drier); uGndDbg: parts left out, to measure them (terrain.js); uGndFine: how many steps of the ladder lower the fine kinds of ground stand: at the closest, how fast that grows with height, at the most (uGndCls: which they are, from textures.js)
     uGlow: { value: 0 },      // 1 while the picture goes through post.js, which can hold light brighter than white and lets it bleed
+    // the weather (climate.js, terrain.js): the ice sheets as they stand (unit vector, square of the angular radius), how green each
+    // region of the dry lands is, the deepest droughts (the same, and how deep), how much colder than our own day the age is
+    uDome: { value: new Float32Array(4 * (window.CLIMATE ? CLIMATE.ND : 1)) }, uGreenS: { value: new THREE.Vector4(0, 0, 0, 0) }, uDryC: { value: new Float32Array(4 * (window.CLIMATE ? CLIMATE.MAXV : 1)) }, uDryS: { value: new Float32Array(window.CLIMATE ? CLIMATE.MAXV : 1) }, uChill: { value: 0 },
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
   if (window.AIR) { Object.assign(globals, AIR.uniforms); if (softGL) AIR.steps = window.GENESIS_AIR || 0.4; }      // the air (air.js); a software renderer takes fewer steps through it
@@ -665,6 +668,17 @@
       if (key !== agesKey) { agesKey = key; [...$('ages').children].forEach((el, k) => { el.className = (k < e ? 'past' : k === e ? 'now' : '') + (pc && k === lead && lead > e ? ' lead' : ''); if (k === e) el.style.setProperty('--p', Math.round(p * 100) + '%'); }); } }
   }
   let agesKey = '';
+  // the weather as the ground's shader is told it (climate.js): once a year of the world, not every frame
+  let climV = null, climYear = NaN, climSim = null;
+  function climateUniforms() {
+    const CL = sim && sim.climate, g = globals;
+    if (!CL) { if (climYear !== -1e9) { g.uDome.value.fill(0); g.uGreenS.value.set(0, 0, 0, 0); g.uDryC.value.fill(0); g.uDryS.value.fill(0); g.uChill.value = 0; climYear = -1e9; } return; }
+    if (CL.ver === climYear && climSim === sim) return; climYear = CL.ver; climSim = sim; climV = CL.view(climV);      // (again whenever the weather has moved: a year, or a world loaded)
+    const unit = (lon, lat, out, k) => { const a = lon * Math.PI / 180, b = lat * Math.PI / 180; out[k] = Math.cos(b) * Math.cos(a); out[k + 1] = Math.cos(b) * Math.sin(a); out[k + 2] = Math.sin(b); };
+    const D = g.uDome.value; for (let k = 0; k < CLIMATE.ND; k++) { unit(climV.domes[k * 4], climV.domes[k * 4 + 1], D, k * 4); const r = climV.domes[k * 4 + 2] / 6371; D[k * 4 + 3] = r > 0 ? r * r : 0; }
+    const C = g.uDryC.value, S = g.uDryS.value; for (let k = 0; k < CLIMATE.MAXV; k++) { if (k < climV.nDry) { unit(climV.dry[k * 4], climV.dry[k * 4 + 1], C, k * 4); const r = climV.dry[k * 4 + 2] / 6371; C[k * 4 + 3] = r * r; S[k] = climV.dry[k * 4 + 3]; } else { C[k * 4 + 3] = 0; S[k] = 0; } }
+    g.uGreenS.value.set(climV.green[0], climV.green[1], climV.green[2], climV.green[3]); g.uChill.value = climV.chill;
+  }
   function climTip() {
     const CL = sim && sim.climate; if (!CL) return ''; const ep = CL.epoch(), evs = window.CLIMATE.EVENTS.filter((e) => sim.year >= e.y0 && sim.year < e.y1);
     return `<div class="hint"><b>The climate: ${esc(ep.name)}.</b> ${esc(ep.text)}${evs.length ? ` Now: ${evs.map((e) => esc(e.name)).join(', ')}.` : ''}</div>`;
@@ -1487,6 +1501,7 @@
       // (and the sea is slower still: its ice is at its widest when winter ends, early in March and in September, eleven weeks behind the sun)
       { const iceN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.21) * Math.PI * 2); globals.uIceCold.value.set(iceN, 1 - iceN); }
       if (trees) { trees.season = globals.uSeason.value; trees.bareness = globals.uBare.value; } }
+    climateUniforms();
     const real = Math.min(1.5, (now - lastReal) / 1000); lastReal = now;      // (the step above is capped for the simulation's sake; these go by the clock, so a slow machine is not left with a half-moved picture)
     { const want = mode === 'intro' ? 1 : 0; if (Math.abs(want - homeK) > 0.0005) { homeK += (want - homeK) * (1 - Math.exp(-real * 3)); if (Math.abs(want - homeK) < 0.004) homeK = want; frameHome(); camera.updateProjectionMatrix(); } }
     if (!window.__sunLock) {
