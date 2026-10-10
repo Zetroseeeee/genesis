@@ -375,3 +375,21 @@ pestilence    | tools/scenes/tale.js | {years:10750,lon:2.35,lat:48.85,k:'plague
 peopled      | tools/scenes/land.js | {years:11000,look:'globe',alt:11000000,at:[75,25]} | | 230
 peopled_west | tools/scenes/land.js | {years:11000,look:'globe',alt:11000000,at:[-65,10]} | | 230
 land_panel   | tools/scenes/land.js | {years:11000,look:'panel'} | | 230
+# the weather of the Holocene (climate.js): the ice of 10,000 BC from orbit, over Scandinavia, at its edge low down; the green Sahara and Mega-Chad
+# of 7000 BC, its savanna from 40 km; a great drought laid over France; the lens of the harvest; the drying of 2200 BC over Akkad; the ice of
+# mountains on Iceland and the Cordillera; the western shore of Mega-Chad low down; then what it costs
+holo_ice     | tools/scenes/holocene.js | {lon:-88,lat:57,alt:5200000} | | 45
+holo_scand   | tools/scenes/holocene.js | {lon:18,lat:62,alt:2600000} | | 45
+holo_ice_low | tools/scenes/holocene.js | {lon:-80,lat:49.5,alt:260000,tilt:0.9,heading:0,years:400} | | 120
+holo_green   | tools/scenes/holocene.js | {years:3000,lon:14,lat:22,alt:6500000} | | 150
+holo_chad    | tools/scenes/holocene.js | {years:3000,lon:15,lat:15,alt:1300000} | | 150
+holo_savanna | tools/scenes/holocene.js | {years:3000,lon:9,lat:19,alt:40000,tilt:1.0,heading:0.4} | | 170
+holo_drought | tools/scenes/holocene.js | {years:8000,lon:3,lat:47,alt:2600000,drought:[2,47,750,0.45]} | | 220
+holo_lens    | tools/scenes/holocene.js | {years:8000,lon:20,lat:40,alt:9000000,drought:[2,47,750,0.45],lens:true} | | 220
+holo_42      | tools/scenes/holocene.js | {years:7850,lon:45,lat:32,alt:2200000,player:[44.4,32.5]} | | 220
+holo_iceland | tools/scenes/holocene.js | {lon:-18.6,lat:64.9,alt:900000} | | 45
+holo_cordillera | tools/scenes/holocene.js | {lon:-127,lat:55,alt:1300000} | | 45
+holo_chad_low | tools/scenes/holocene.js | {years:3000,lon:14.7,lat:15.5,alt:90000,tilt:0.8,heading:1.4} | | 170
+costk_ice    | tools/scenes/holocene.js | {lon:-80,lat:49.5,alt:260000,tilt:0.9,heading:0,years:400} | setTimeout(() => __T.costsClimate(), 90000); | 140
+costk_green  | tools/scenes/holocene.js | {years:3000,lon:9,lat:19,alt:40000,tilt:1.0,heading:0.4} | setTimeout(() => __T.costsClimate(), 120000); | 170
+costk_town   | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => { __sceneLook('town', 1.2, 1.4, 0.3); __T.costsClimate(); }, 9000); | 60

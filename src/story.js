@@ -308,6 +308,29 @@
       { t: () => 'Let it run its course', hint: () => 'It will burn itself out.', fx: () => ({ stab: -0.03 }), log: (x, d) => `${cap(x.outbreak(d.o).name)} in ${x.cell(d.i)}` },
     ], lapse: 2 });
 
+  // (the weather: a drought of the year's own or a great one, and the great colds; climate.js tells them through the host, with the
+  //  spell's number or the event's key and the town nearest it)
+  S({ k: 'drought', art: 'ev_famine', w: (x, d) => (d && (d.sp || d.ev) ? 1 : 0),
+    make: (x, d) => (d && (d.sp || d.ev) ? { sp: d.sp || 0, ev: d.ev || '', i: d.i >= 0 ? d.i : x.town() } : null), still: (x) => x.harvest() < 0.98,
+    title: (x, d) => (d.ev && x.climEvent(d.ev) ? cap(x.climEvent(d.ev).name) : 'The rains fail'),
+    text: (x, d) => { const E = d.ev && x.climEvent(d.ev), hv = Math.round(x.harvest() * 100);
+      return E ? `${E.text} About ${x.cell(d.i)} the harvest is ${hv} in a hundred of an ordinary year's, and the granaries are emptying.`
+        : `No rain since the sowing about ${x.cell(d.i)}: the wells are low, the fields are dust, and the harvest will be ${hv} in a hundred of an ordinary year's. ${x.era >= 2 ? 'The price of bread is climbing.' : 'The old people say it will be a long one.'}`; },
+    opts: [
+      { t: (x) => (x.era >= 1 ? 'Open the granaries, and buy grain abroad' : 'Share out the stores, and send to our kin for food'), hint: () => 'Fewer will starve, for some years.', fx: (x) => ({ coin: -0.8, relief: [Math.max(3, Math.round(x.turn / 2)), 0.4], est: { farmers: 0.04 } }), log: (x) => `The granaries of ${x.realm} are opened to the hungry` },
+      { t: (x) => (x.era >= 2 ? `Let the ${est(x, 'priests')} pray for rain` : 'Dance for rain, and give the gods what we have'), hint: () => 'The people take heart; the rain comes when it comes.', fx: () => ({ stab: 0.03, est: { priests: 0.05 } }), log: (x) => `Prayers for rain in ${x.realm}` },
+      { t: () => 'Every household must fend for itself', hint: () => 'Some will not.', fx: () => ({ stab: -0.03, est: { farmers: -0.05 } }), log: (x) => `Famine in ${x.realm}` },
+    ], lapse: 2 });
+  S({ k: 'frost', art: 'ev_famine', w: (x, d) => (d && d.ev ? 1 : 0),
+    make: (x, d) => (d && d.ev && x.climEvent(d.ev) ? { ev: d.ev, i: d.i >= 0 ? d.i : x.town() } : null),
+    title: (x, d) => cap(x.climEvent(d.ev).name),
+    text: (x, d) => `${x.climEvent(d.ev).text} About ${x.cell(d.i)} the harvest is ${Math.round(x.harvest() * 100)} in a hundred of an ordinary year's.`,
+    opts: [
+      { t: (x) => (x.era >= 2 ? 'Bread and firewood for the towns' : 'Share the fires and the stores'), hint: () => 'Fewer will die of the cold and the hunger.', fx: (x) => ({ coin: -0.7, relief: [Math.max(3, Math.round(x.turn / 2)), 0.35], est: { artisans: 0.04 } }), log: (x) => `${x.realm} feeds and warms its poor through the cold` },
+      { t: (x) => (x.era >= 4 ? 'Hold a fair on the frozen river' : 'Gather the people about the great fire'), hint: () => 'Hard times are borne together.', fx: () => ({ stab: 0.03 }), log: (x) => (x.era >= 4 ? `A fair on the frozen river in ${x.realm}` : '') },
+      { t: () => 'Endure it', hint: () => 'It will pass.', fx: () => ({ stab: -0.02 }), log: () => '' },
+    ], lapse: 2 });
+
   S({ k: 'flood', art: 'ev_flood', w: (x) => (x.river() >= 0 ? 0.45 : 0),
     make: (x) => ({ i: x.river() }), title: () => 'The river rises',
     text: (x, d) => `After weeks of rain the river has burst its banks above ${x.cell(d.i)}. The fields are under water, and the lower town is wading.`,
@@ -569,6 +592,7 @@
         stateFaith: () => h.faithOf(cv), faithName: (f) => h.faithName(f), preached: () => once('preached', () => h.otherFaith(cv)), holy: () => once('holy', () => h.holyFor(cv)),
         master: () => once('master', () => h.master(c)), great: (id) => h.great(id), kindName: (g) => h.kindName(g), cannotCommission: (id) => h.cannotCommission(c, id),
         murder: () => h.murder(cv), outbreak: (id) => (h.outbreak ? h.outbreak(id) : null),
+        harvest: () => (h.harvest ? h.harvest(c) : 1), spell: (id) => (h.spellOf ? h.spellOf(id) : null), climEvent: (key) => (h.climEvent ? h.climEvent(key) : null),
       });
       return x;
     }
@@ -598,6 +622,7 @@
       if (fx.marry !== undefined && civs[fx.marry]) add(`Royal marriage with ${h.name(civs[fx.marry])}`, 'pos');
       if (fx.colony) add('A colony across the sea', 'pos');
       if (fx.q) add(`Gates and harbours shut for ${Math.round(fx.q[1])} years: −${fx.q[0] === 2 ? 12 : 5}% income`, 'warn');
+      if (fx.relief) add(`The hungry fed for ${Math.round(fx.relief[0])} years: a famine takes ${Math.round(fx.relief[1] * 100)}% fewer`, 'pos');
       if (fx.cure && fx.cure < 1) add(`${Math.round((1 - fx.cure) * 100)}% fewer of the sick die`, 'pos');
       if (fx.commission) add(`−${h.commissionCost(cv)} coin`, 'neg');
       if (fx.then) add('Something will come of it', '');
@@ -630,6 +655,7 @@
       if (fx.marry !== undefined && civs[fx.marry]) h.marry(civs[fx.marry], cv);
       if (fx.colony) h.colony(cv);
       if (fx.q && h.quarantine) h.quarantine(cv, fx.q[0], fx.q[1]);
+      if (fx.relief && h.relief) h.relief(cv, fx.relief[0], fx.relief[1]);
       if (fx.cure && h.cure && d && d.o) h.cure(cv, d.o, fx.cure);
       if (fx.teach && civs[fx.teach[0]]) h.inspire(fx.teach[0], fx.teach[1]);
       if (fx.commission) h.commission(c, fx.commission);

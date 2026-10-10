@@ -20,11 +20,17 @@
 // ones closer, and the appetite of each age is set to keep the rhythm of wars above (WAR_AGE in sim.js). Measured then over 12345
 // and 777: wars begun in a whole history 4,500 and 4,500 (5,200 and 4,500 before); realms in AD 2000 225-240 (some forty more peoples
 // are swallowed over the ages, by settlers and by lords who join their vassals to the crown); vassals 40-55; the five greatest 14-18 %.
+// Since 0.39 the world has weather (climate.js): its famines took a tenth of the world's people before the machine age, and on the
+// land they emptied more peoples rose (realms in AD 2000 247 and 288) until the table of food was fitted again (tools/know/people.js,
+// raised only). Measured then over 12345 and 777 (0.38 in brackets): wars begun in a whole history 4,400 and 4,800 (4,500 and
+// 4,500); realms in AD 2000 235 and 233 (228 and 237); people in AD 2000 6,155 and 6,333 million (6,544 and 4,867); wars a realm
+// begins in a century at the dates above 0.16 0.28 0.36 0.42 0.57 0.45 and 0.11 0.32 0.36 0.46 0.49 0.38 (0.19 0.29 0.35 0.36 0.45
+// 0.41 and 0.16 0.29 0.36 0.38 0.49 0.39). A harder appetite in the Bronze Age (WAR_AGE 2.2) did not raise its rate.
 // If wars fall off, look at the line "appetite": pacts and fear should leave a realm somebody to fight about half the time.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;
 const src = process.env.SRC ? path.resolve(process.env.SRC) : path.join(root, 'src');
-for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'dynasty', 'story', 'legacy', 'intrigue', 'disease', 'land', 'sim']) { const p = path.join(src, f + '.js'); if (fs.existsSync(p)) (0, eval)(fs.readFileSync(p, 'utf8')); }
+for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'dynasty', 'story', 'legacy', 'intrigue', 'disease', 'land', 'climate', 'sim']) { const p = path.join(src, f + '.js'); if (fs.existsSync(p)) (0, eval)(fs.readFileSync(p, 'utf8')); }
 const args = process.argv.slice(2).map(Number); const seed = args[0] || 12345, last = args[1] === undefined ? 2050 : args[1];
 const W = 720, H = 360, N = W * H; const png = PNG.sync.read(fs.readFileSync(path.join(root, 'data/world.png')));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };

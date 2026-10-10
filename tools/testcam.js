@@ -106,6 +106,12 @@ window.__T.costsWinter = function () {
   const list = window.__costOld ? [['as it is', () => {}], ['the old rules', use(flat)]] : [['as it is', () => {}], ['the old rules', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is again', use(arr)], ['the old rules again', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a third time', use(arr)], ['the old rules, a third', use(flat)], ['its sums, the old numbers', use(blank)], ['as it is, a fourth', use(arr)]];
   __T.cost(list, 4, 5000);      // (window.__costOld: stop at the old rules, to see what they draw)
 };
+// what the weather costs (climate.js: the ice sheets, the green lands, the droughts, worked out at the corners of the ground's mesh and
+// drawn in its fragment shader where there is any): as it is, and with the ground's shader told there is no weather - turn and turn about
+window.__T.costsClimate = function () {
+  const on = () => { window.__noWeather = false; __G.climateRefresh && __G.climateRefresh(); }, off = () => { window.__noWeather = true; __G.climateRefresh && __G.climateRefresh(); };
+  __T.cost([['the weather', on], ['none', off], ['the weather again', on], ['none again', off], ['the weather a third time', on], ['none a third time', off], ['the weather', on]], 4, 1500);
+};
 // The old heights (data/e: one byte a texel, the high mountains smooth) in place of the new (data/h), or back: every elevation
 // pack is let go and the ground asks again - to hold the two against each other in one page
 window.__T.oldHeights = function (on) {

@@ -124,6 +124,41 @@
   // tilted up a hillside, and a strip of land flat at the sea's level); and the ground's small relief begins at the water's edge
   // and has its full height WET_RISE metres inland (still water lies level). The vertex shader and the CPU's twins of it.
   const SHORE_RISE = 220, WET_RISE = 90;
+  // The weather (climate.js) at a corner of the mesh: whether one of the ice sheets that still lie over the north is near and the lobes
+  // of its edge (uDome: each dome as a unit vector and the square of its angular radius), how green the dry lands are in the wet
+  // centuries (uGreenS: each region of CLIMATE.GREEN, its boxes written in here from that table), how deep a drought (uDryC, uDryS: the
+  // deepest twelve). Worked out at the corners: the lobes and the droughts are hundreds of kilometres across. The fragment shader finds
+  // the ice's edge itself (a dome of a hundred kilometres drawn between the corners was a polygon of the mesh) and roughens it.
+  const fx = (v) => (Math.round(v * 100) / 100).toFixed(2);
+  const GREEN_GLSL = window.CLIMATE ? CLIMATE.GREEN.slice(0, 4).map((g, k) => `wet = max(wet, uGreenS[${k}] * min(smoothstep(${fx(g.lon0 - g.fade)}, ${fx(g.lon0 + g.fade)}, lo), 1.0 - smoothstep(${fx(g.lon1 - g.fade)}, ${fx(g.lon1 + g.fade)}, lo)) * (1.0 - smoothstep(${fx(g.latFull)}, ${fx(g.latZero)}, la)));`).join('\n          ') : '';
+  const NDOME = window.CLIMATE ? CLIMATE.ND : 1, NDRY = window.CLIMATE ? CLIMATE.MAXV : 1;
+  const CL_ = window.CLIMATE || { LOBE: 1.8, LOBE_F: [4, 11, 26, 60], LOBE_W: [0.36, 0.3, 0.2, 0.14] };
+  const CLIM_V = `
+    uniform vec4 uDome[${NDOME}]; uniform vec4 uDomeA[${NDOME}]; uniform vec4 uGreenS; uniform vec4 uDryC[${NDRY}]; uniform float uDryS[${NDRY}];
+    varying vec4 vClim;
+    // (the lobes of an ice sheet's edge: the same integer hashes and value noise as climate.js's lobe(), so that the ice the simulation
+    //  knows and the ice the picture shows are one)
+    float hash3(uvec3 v) { v = v * 1664525u + 1013904223u; v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y; v ^= v >> 16u; v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y; return float((v.x ^ v.y ^ v.z) >> 8u) / 16777215.0; }
+    float vnoise3(vec3 q) { vec3 i = floor(q), f = q - i, u = f * f * (3.0 - 2.0 * f); uvec3 c = uvec3(ivec3(i));
+      return mix(mix(mix(hash3(c), hash3(c + uvec3(1, 0, 0)), u.x), mix(hash3(c + uvec3(0, 1, 0)), hash3(c + uvec3(1, 1, 0)), u.x), u.y), mix(mix(hash3(c + uvec3(0, 0, 1)), hash3(c + uvec3(1, 0, 1)), u.x), mix(hash3(c + uvec3(0, 1, 1)), hash3(c + uvec3(1, 1, 1)), u.x), u.y), u.z); }
+    float lobeK(vec3 p) { float v = ${CL_.LOBE_F.map((f, k) => `${CL_.LOBE_W[k].toFixed(3)} * vnoise3(p * ${f.toFixed(1)} + 1000.0)`).join(' + ')}; return max(0.05, 1.0 + ${CL_.LOBE.toFixed(3)} * (v - 0.5)); }
+    // (the ice itself is found in the fragment shader, by the very same sum: worked out here and drawn between the corners, a dome of a
+    //  hundred kilometres was a polygon of the mesh's quads. Here only whether any dome is near - within twice its radius, where no lobe
+    //  reaches - and the lobes, which change over a thousand kilometres and more)
+    vec4 climAt(float lon, float lat) {
+      vec3 p = vec3(cos(lat) * cos(lon), cos(lat) * sin(lon), sin(lat)); float wet = 0.0, dry = 0.0, lk = 1.0, near = 0.0;
+      for (int k = 0; k < ${NDOME}; k++) { vec4 d = uDome[k]; if (d.w > 0.0 && 2.0 * (1.0 - dot(p, d.xyz)) < d.w * abs(uDomeA[k].w) * 4.0) { near = 1.0; break; } }
+      if (near > 0.0) lk = lobeK(p);
+      float la = lat * 57.29578, lo = lon * 57.29578;
+      if (dot(uGreenS, vec4(1.0)) > 0.0 && la > 5.0 && la < 37.0) {
+          la -= (vnoise3(p * ${(window.CLIMATE ? CLIMATE.GREEN_JF : 7).toFixed(1)} + 2000.0) - 0.5) * ${(window.CLIMATE ? CLIMATE.GREEN_JA : 6).toFixed(1)};      // (the grassland's northern edge wanders by some degrees, as climate.js's does)
+          float wp = 0.75 + 0.5 * vnoise3(p * ${(window.CLIMATE ? CLIMATE.GREEN_PF : 12).toFixed(1)} + 3000.0);      // (and the wet years were wetter in some places than others: patches of some 500 km)
+          ${GREEN_GLSL}
+          wet = min(1.0, wet * wp);
+      }
+      for (int k = 0; k < ${NDRY}; k++) { vec4 c = uDryC[k]; if (c.w <= 0.0) continue; float t2 = 2.0 * (1.0 - dot(p, c.xyz)); if (t2 < c.w) { float q = 1.0 - t2 / c.w; dry = max(dry, uDryS[k] * q * q); } }
+      return vec4(lk, wet, dry, near);
+    }`;
   // And the rise begins a little inland, not at the water's edge: a triangle of the mesh that has one corner in the water must
   // lie flat, or the water in it climbs toward the corner on land (the sea stood up the shore like a wave about to break). So the
   // ground keeps to the water's level for a quad and a half of the tile's mesh as it is at the moment (uShoreQ, metres), and never
@@ -151,6 +186,7 @@
     ${ELEV_CR}
     ${WDEC} varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM;
     ${AIR_V}
+    ${CLIM_V}
     const float R_MV = ${R_M.toFixed(1)};
     float hAtV(vec2 uv) { return max(uElevMin + dot(texture2D(uElev, uElevRect.xy + uv * uElevRect.zw).rg, uElevK) * uElevScale, 0.0); }
     void main() {
@@ -214,6 +250,7 @@
       vec4 mvTop = modelViewMatrix * vec4(local, 1.0);      // (where the ground itself is: a skirt's lower edge hangs far below it, and has the ground's air, not that of the deep)
       if (position.z > 0.5) local -= unitv * uSkirt;
       vUV = vec2(u, v); vLon = lon; vLat = lat; vUnit = unitv; vGL = vec2(lon * cl - uGeoC.x, lat - uGeoC.y);
+      vClim = climAt(lon, lat);
       // precise Mercator offset from the tile centre (everything here is small, so float32 keeps centimetres): x = dlon, y = ln(tan(a+d)/tan(a))
       { float dl = uDLon0 + u * uDLon, dla = uDLat0 + v * uDLat; float dd = dla * 0.5; float td = sin(dd) / max(cos(uMercA + dd) * uCosA, 1e-4); vGLf = vec2(dl, log(max(1.0 + td / uTanA, 1e-4))); }
       vec4 mv = position.z > 0.5 ? modelViewMatrix * vec4(local, 1.0) : mvTop;
@@ -243,7 +280,7 @@
     }
     uniform sampler2D uWater; uniform vec4 uWaterRect, uWaterP;      // the water's edge (data/w): P = 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; for 2 the distance and the kind
     uniform float uDLon, uDLat, uLevel;
-    uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason; uniform vec4 uBare; uniform vec2 uIceCold;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
+    uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason; uniform vec4 uBare; uniform vec4 uIceCold;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
     uniform sampler2D uOwner, uPal, uSim, uNoise;
     // (the planet's own maps travel as one texture of two layers where they could be made one: info.png, and what grows there by
     //  nature - the map the trees are planted by)
@@ -267,6 +304,7 @@
     uniform sampler2D uClouds; uniform float uCloudShift, uCloudVis, uCloudNear; uniform vec2 uPhaseB, uPhaseRot;
     uniform sampler2D uDecal, uDecal2, uWaterN; uniform vec4 uDecalRect; uniform float uDecalOn, uQuality, uGlow;      // uGlow: 1 where the picture can hold light brighter than white (post.js lets it bleed), else 0
     varying vec2 vUV, vGL, vGLf; varying float vLon, vLat, vH; varying vec3 vUnit; varying vec3 vViewPos; varying mat3 vNM; varying vec3 vNrmV;
+    varying vec4 vClim; uniform float uChill; uniform vec4 uGreenS; uniform vec4 uDome[${NDOME}]; uniform vec4 uDomeA[${NDOME}];      // (the weather at this corner - climate.js: the lobes of the ice's edge, green in the wet centuries, a drought, whether a dome of ice is near; how much colder than our own day the age is; how green each dry region is; the domes as they stand: middle and the square of the radius, the long way and how long)
     const float PI = 3.14159265;
     ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
     ${AIR_F}
@@ -492,6 +530,33 @@
       vec4 nMic = noise2(gc(180.0));
       vec4 nFin = noise2(gc(800.0));
       #endif
+      // ---------- the weather of the age and of the year (climate.js) ----------
+      float pxR = sqrt(max(max(dot(dFdx(vGL), dFdx(vGL)), dot(dFdy(vGL), dFdy(vGL))), 1e-30)), noiseL = log2(pxR) + 9.0;      // (a pixel, radians across the ground; the level the card would take of the noise at one repeat a radian)
+      // The ice sheets that still lie over the north: ice over land, lake and sea alike. Found here, at the pixel, by the very sum
+      // climate.js makes: each dome an ellipse whose middle and reach the year has (uDome: the middle and the square of the radius;
+      // uDomeA: its long way and how long), lobed as climate.js's lobe() has it (vClim.x, from the corners); its edge ragged by the
+      // noise of the place. (Drawn between the corners of the mesh, a dome of a hundred kilometres was a polygon of its quads.)
+      float sheet = 0.0, rm = 9.0, rmSh = 9.0, wIce = 0.0; vec2 iceG = vec2(0.0); vec3 gB = vec3(0.0);      // (rm: how far toward the nearest dome's edge - the square of the distance over the square of the reach, 1 at the edge; rmSh: the same of the sheets alone; wIce: its square radius; iceG: the way out and down the ice, east and north, per radian)
+      if (vClim.w > 0.002) {
+        // (where two domes meet, the nearer by a soft minimum, and the way down weighed between them: by the hard one the ice had
+        //  a crease along every line where one dome gave way to the next, the outline of each ellipse drawn across the sheet)
+        vec3 u = vec3(cos(vLat) * cos(vLon), cos(vLat) * sin(vLon), sin(vLat)), gS = vec3(0.0), gM = vec3(0.0); float eS = 0.0, eM = 0.0, wS = 0.0, wM = 0.0;
+        for (int k = 0; k < ${NDOME}; k++) { vec4 d = uDome[k], A = uDomeA[k]; float ax = abs(A.w); if (d.w <= 0.0 || 2.0 * (1.0 - dot(u, d.xyz)) > d.w * ax * 5.7) continue; vec3 w = cross(d.xyz, A.xyz); float s = dot(u, A.xyz), t = dot(u, w), r = (s * s / ax + t * t * ax) / (d.w * vClim.x);
+          float e = exp(-12.0 * min(r, 6.0)); vec3 g = e * 2.0 * (s * A.xyz / ax + t * w * ax) / (d.w * vClim.x);
+          if (A.w > 0.0) { eS += e; gS += g; wS += e * d.w; } else { eM += e; gM += g; wM += e * d.w; } }
+        float rmS = eS > 1e-30 ? -log(eS) / 12.0 : 9.0, rmM = eM > 1e-30 ? -log(eM) / 12.0 : 9.0; rmSh = rmS;
+        if (eS + eM > 1e-30) { rm = -log(eS + eM) / 12.0; gB = (gS + gM) / (eS + eM); wIce = (wS + wM) / (eS + eM); }      // (for its colours and its slopes the nearer of all of them, softly: where the ice of a range meets a sheet there is no seam)
+        // (and the ground under it counts near its edge: the high ground holds the ice longest, it draws back from the valleys - by the
+        //  heights at the pixel. The ice of mountains (rmM: the domes so marked) is the ranges' own: white above a line that lies at
+        //  300 m in its heart and rises toward its edge and past it - a smooth oval laid over the Coast Mountains was a sticker, and
+        //  Iceland's ice a white disc on the sea about it.
+        //  Where a sheet covers it too, the sheet has it.)
+        float hHere = 0.25 * (hE + hW + hS + hN), s0 = rmS < 9.0 ? 1.0 - smoothstep(0.88, 1.0, rmS) + clamp((hHere - 700.0) / 2500.0, -0.12, 0.3) * smoothstep(0.55, 0.9, rmS) * (1.0 - smoothstep(1.0, 1.15, rmS)) : 0.0;
+        if (rmM < 1.35) { float ela = mix(300.0, 2100.0, smoothstep(0.0, 1.25, rmM)); s0 = max(s0, smoothstep(ela - 160.0, ela + 160.0, hHere) * (1.0 - smoothstep(1.15, 1.35, rmM))); }
+        // (its edge is a line, not a blur: as wide as a pixel there, whatever the height - by how fast the reckoning changes across one)
+        if (s0 > 0.0) { iceG = vec2(dot(gB, vec3(-sin(vLon), cos(vLon), 0.0)), dot(gB, vec3(-sin(vLat) * cos(vLon), -sin(vLat) * sin(vLon), cos(vLat))));
+          float kk = clamp(12.5 * length(iceG) * pxR, 0.006, 0.08);
+          sheet = smoothstep(0.5 - kk, 0.5 + kk, s0 + (nMac.g - 0.512) * 0.3 + (nMid.r - 0.5) * 0.12 * (1.0 - smoothstep(0.0, 1.5, noiseL + 10.23)) + (nMic.g - 0.5) * 0.05 * (1.0 - smoothstep(0.0, 1.5, noiseL + 13.13))); } }
       // ---------- imagery ----------
       // magnification estimate first (needed for the warp)
       // (uImgK: 4096 to a pack of the picture's four coarsest levels, and from there down as many as a pack of the fourth would have
@@ -543,7 +608,7 @@
       // Its four texels are fetched and weighed here: a texel is three hundred metres, from a hilltop a thousand pixels, and
       // a card's own weighing has 256 steps. The line where the distance passes nought lies true between the texels; what
       // roughens it at the scale of a cove or a rock is the noise of the place (a beach runs smooth, a steep shore ragged).
-      float wOn = step(0.5, uWaterP.x), wD = 0.0, wK = 0.0, wPx = 1.0, wCov = 0.0, wBend = 0.0, wOpen = 1.0; vec2 wLand = vec2(0.0);      // (wLand: the way to the nearest land, in the tile's own measure for a metre)
+      float wOn = step(0.5, uWaterP.x) * step(sheet, 0.995), wD = 0.0, wK = 0.0, wPx = 1.0, wCov = 0.0, wBend = 0.0, wOpen = 1.0; vec2 wLand = vec2(0.0);      // (wLand: the way to the nearest land, in the tile's own measure for a metre. Not under an ice sheet: what it would say is hidden)
       if (wOn > 0.5) {
         if (uWaterP.x > 1.5) { wD = uWaterP.z; wK = uWaterP.w; }      // (all land or all water, and wPx one metre: with a pixel called a kilometre wide, a fiftieth of every pixel of far land was sea, and had its waves reckoned)
         else {
@@ -605,6 +670,25 @@
       float bankW = smoothstep(0.03, 0.42, rivR) * (1.0 - vecRiver);
       float bridgeW = smoothstep(0.34, 0.46, dec.b) * vecRiver;           // where a road meets the river it crosses: a causeway of timber, later a bridge of stone
       vecRiver *= 1.0 - bridgeW;
+      // (the great lake of the wet centuries: Mega-Chad, as large as the Caspian, wherever the basin of Lake Chad lies under its old
+      //  shore - 325 m, drawn 2.8% taller, as all the heights are - while the western Sahara is green, falling back to the deepest
+      //  of the basin as it dries. By the heights at the pixel (by the mesh's corners its shore was a run of the quads' edges), and a
+      //  lake like any other: its shallows and its deep water, the sky in it. Its shore is a line a pixel wide, by how fast the
+      //  depth changes across one, and wanders by the noise of the place at the sizes the eye can make out: the basin is so flat
+      //  that a metre is kilometres of shore, and wandered by grain a pixel across the shore was a stipple of pools on dry land.)
+      //  (On ground that flat every hollow between the dunes a metre under the water's level is a pool, and a drowned dune an islet:
+      //  close to, an archipelago, as the Kanem's is; from where they are a pixel or two across, a stipple of dots beyond the shore. So
+      //  the shore is found on the heights weighed over a ring about the pixel as wide as some three pixels: what is smaller than
+      //  that goes to the mean, and comes back as the eye comes near.)
+      float chadW = 0.0, chadD = 0.0;
+      if (uGreenS.x > 0.05) { float la = vLat * 57.29578, lo = vLon * 57.29578, hC = 0.25 * (hE + hW + hS + hN);
+        vec2 eTx = fwidth(vUV * uElevRect.zw * vec2(textureSize(uElev, 0))); float ringT = max(2.0, 3.0 * max(eTx.x, eTx.y));      // (the ring's radius, in texels of the heights)
+        if (la > 9.5 && la < 20.5 && lo > 11.0 && lo < 21.5) { vec2 r = tuv / 1.6 * ringT, d = r * 0.7071;
+          hC = 0.4 * hC + 0.075 * (hAt(vUV + vec2(r.x, 0.0)) + hAt(vUV - vec2(r.x, 0.0)) + hAt(vUV + vec2(0.0, r.y)) + hAt(vUV - vec2(0.0, r.y)) + hAt(vUV + d) + hAt(vUV - d) + hAt(vUV + vec2(d.x, -d.y)) + hAt(vUV + vec2(-d.x, d.y))); }
+        chadD = mix(285.0, 336.0, smoothstep(0.3, 0.9, uGreenS.x)) - hC;
+        float v = chadD + (nMac.g - 0.512) * 2.0 + (nMid.r - 0.5) * 1.5 * (1.0 - smoothstep(0.0, 1.5, noiseL + 10.23)), k = clamp(fwidth(v) * 0.75, 0.05, 3.0);
+        chadW = smoothstep(-k, k, v) * min(smoothstep(11.5, 13.0, lo), 1.0 - smoothstep(19.5, 21.0, lo)) * min(smoothstep(10.0, 11.0, la), 1.0 - smoothstep(19.0, 20.0, la)); }
+      lakeW = max(lakeW, chadW);
       float inlandW = max(lakeW, max(riverLine, max(vecRiver, floodW * 0.95)));
       vec2 geo = vec2((vLon / PI + 1.0) * 0.5, 0.5 - vLat / PI);   // global equirect uv (v down)
       #ifdef INFO2
@@ -696,6 +780,35 @@
           float gr = clamp((base.g - max(base.r, base.b)) * 7.0, 0.0, 1.0), l0 = dot(base, vec3(0.299, 0.587, 0.114));
           base = mix(base, vec3(1.12, 1.0, 0.70) * mix(0.44, 0.54, smoothstep(0.08, 0.3, l0)), dryC * gr);      // (straw and earth: lighter than a wood, darker than the sand)
         } }
+      // (the land the ice has just left, and the land along its edge: stone, gravel, meltwater and the first moss and sedge - no wood
+      //  yet. The photograph has today's taiga there, which stood dark up to the ice's edge)
+      float bareIce = (1.0 - smoothstep(0.98, 1.3, rmSh + (nMac.g - 0.5) * 0.3 + (vClim.x - 1.0) * 0.6)) * (1.0 - sheet);      // (not a ring of one width: more of it in places, less in others. Of the sheets only: the ice of mountains lies on the heights well inside its dome, and a ring along the dome's edge stood off from it as a halo)
+      if (bareIce > 0.003) { float l0 = dot(base, vec3(0.299, 0.587, 0.114));
+        base = mix(base, mix(vec3(0.47, 0.45, 0.39), vec3(0.39, 0.41, 0.32), smoothstep(0.3, 0.7, nMid.g * 0.6 + nMac.b * 0.4)) * clamp(l0 / 0.3, 0.75, 1.3), bareIce * 0.5);
+        base = mix(base, vec3(0.52, 0.49, 0.44) * (0.8 + 0.4 * nMic.b), (1.0 - smoothstep(0.93, 0.99, rm + (nMid.b - 0.5) * 0.04)) * bareIce * 0.45); }      // (and along the ice's edge the gravel of its moraines and outwash, pale)
+      // The wet centuries: from the end of the last cold until about 3500 BC what is desert now was grassland with lakes and herds.
+      // The photograph's sand takes the colours of the Sahel as the Blue Marble has it in July - straw-grey steppe at the dry edge,
+      // olive grassland, the darker woodland of the Sudan where it was wettest - and keeps its own light and dark as a share (a
+      // remapping, as the country before the plough is: the dunes and wadis still show); bare rock stays rock. Its edge is a few
+      // degrees of country, ragged, the high massifs greener than the plains about them (the rain fell on them) and the great sand
+      // seas the last to green: as a wash over twelve degrees it was a coloured band laid across Africa. No closed wood (savW, below:
+      // the trees of a savanna are the trees' own, trees.js). And the dryness the ground's materials go by is the less (steppe and
+      // savanna for sand). A drought: what is green goes to straw, and the ground is the drier for the materials.
+      float savW = 0.0;
+      { float wetH = vClim.y * smoothstep(0.42, 0.75, clim) * (1.0 - smoothstep(0.3, 0.55, slope));
+        if (wetH > 0.003) { float l0 = dot(base, vec3(0.299, 0.587, 0.114));
+          // (patches of a hundred kilometres and of ten: each size of the noise gives way to its mean long before its repeat is small
+          //  in the picture, or the grassland is a lattice of blots, as the snow's edge was)
+          float pat = clamp(0.5 + (nMac.r - 0.5) * 1.7 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23)) + (nMid.g - 0.5) * 1.0 * (1.0 - smoothstep(0.0, 1.5, noiseL + 10.23)) + (nMic.b - 0.5) * 0.45 * (1.0 - smoothstep(0.0, 1.5, noiseL + 13.13)), 0.0, 1.0);
+          float wv = vClim.y + (pat - 0.5) * 0.35 + smoothstep(500.0, 1600.0, vH) * 0.25 - smoothstep(0.6, 0.78, l0) * 0.2;      // (how wet, here)
+          float g = smoothstep(0.12, 0.5, wv);
+          vec3 sav = mix(vec3(0.62, 0.54, 0.38), vec3(0.44, 0.44, 0.26), smoothstep(0.2, 0.55, wv));
+          sav = mix(sav, vec3(0.30, 0.33, 0.17), smoothstep(0.55, 0.9, wv) * smoothstep(0.4, 0.7, pat)) * clamp(pow(l0 / 0.62, 0.7), 0.6, 1.3);
+          savW = wetH * g;
+          base = mix(base, sav, savW * 0.92); clim = clamp(clim - vClim.y * g * (0.38 + 0.2 * pat), 0.0, 1.0); }
+        // (a drought: what is green goes to straw, and the rest is dustier and paler)
+        if (vClim.z > 0.003) { float l0 = dot(base, vec3(0.299, 0.587, 0.114)), gr = clamp((base.g - max(base.r, base.b)) * 8.0 + 0.4, 0.0, 1.0), dz = clamp(vClim.z * 1.8, 0.0, 0.9);
+          base = mix(base, vec3(1.12, 0.98, 0.68) * (l0 * 1.1 + 0.02), dz * gr); base = mix(base, vec3(1.08, 0.97, 0.8) * (l0 * 1.12 + 0.03), dz * 0.3 * (1.0 - gr)); clim = clamp(clim + vClim.z * 0.6, 0.0, 1.0); } }
       float lum = dot(base, vec3(0.299, 0.587, 0.114));
       float green = clamp((base.g - max(base.r, base.b) * 0.92) * 6.0 + 0.25, 0.0, 1.0);
       // (What is bright and has no colour of its own is not green, however the sum above reads it: a twelfth of a white is
@@ -718,16 +831,16 @@
       // across, and every place adds its own height: half the season more for each thousand metres. (By the map's cells alone
       // the snow of the Alps ended at one line over ridge and valley alike; here a valley is green for most of its winter under
       // white mountains, and the ranges of a dry plateau have their winter snow while the plateau has none.)
-      float noiseL = 0.5 * log2(max(max(dot(dFdx(vGL), dFdx(vGL)), dot(dFdy(vGL), dFdy(vGL))), 1e-30)) + 9.0;      // (the level the card would take of the noise at one repeat a radian)
       // (Its height by the heights' own texels, not by the mesh's corners: from far out a quad of the mesh is tens of kilometres,
       //  and by the corners the snow's edge was a smooth line that moved as the mesh grew finer under the eye. By the texels it
       //  is as ragged as the country, from every height the same.)
-      float snowHere = clamp(natv.a * 4.0 - 3.0 + 0.25 * (hE + hW + hS + hN) * 0.0005, 0.0, 1.25);
+      float snowHere = clamp(natv.a * 4.0 - 3.0 + 0.25 * (hE + hW + hS + hN) * 0.0005 + uChill * 0.12 * step(0.01, natv.a), 0.0, 1.25);      // (a cold age keeps the snow some weeks longer where it lies at all: uChill)
       float winterSnow = winter * mix(0.12, 1.0, smoothstep(0.05, 0.5, snowHere));
-      float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winterSnow - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0));
+      float snowLine0 = max(-900.0, 5100.0 - 4800.0 * pow(latN0, 1.3) - max(0.0, winterSnow - 0.4) * seasonK + max(0.0, 0.4 - winter) * seasonK * 0.35) + clim * 700.0 * (1.0 - smoothstep(0.5, 0.75, latN0)) - uChill * 300.0;
       // (The map of ice is of cells fourteen kilometres across: right for an ice sheet, which is flat, and a white blanket with a
       //  rounded edge over the high Himalaya, ridge and rock face and all. On sloping ground the photograph says where the ice is.)
       float ice = max(info.g * mix(1.0, white, smoothstep(0.06, 0.18, slope)), white * max(smoothstep(snowLine0 - 900.0, snowLine0 + 200.0, vH), smoothstep(0.7, 0.8, latN0)));
+      float iceLand = ice; ice = max(ice, sheet);      // (an ice sheet of climate.js's: found above. iceLand: the land's own snowfields and glaciers, which the land's materials draw - an ice sheet is drawn on its own, and under the edge of one the land was white as snow, a bright rim round the bare ice)
       // biome weights
       float aboveTree = smoothstep(treeLine - 300.0, treeLine + 200.0, vH);
       float steep = smoothstep(0.12, 0.42, slope);
@@ -741,6 +854,7 @@
       //  canals, reeds and grass. The plain of Mesopotamia between its rivers, all fields today, was a forest's canopy from the
       //  air in 10,000 BC. The trees that line a river there are the trees' own: trees.js, gallery.)
       { float dryF = wForest * smoothstep(0.62, 0.85, clim); wForest -= dryF; wGrass += dryF; }
+      { float o = wForest * max(savW, bareIce); wForest -= o; wGrass += o; }      // (nor in the green Sahara, a savanna, nor on the land the ice has just left)
       float wDesert = warm * (1.0 - green) * (1.0 - steep) * (1.0 - smoothstep(1800.0, 3000.0, vH));
       float wRock   = max(steep, smoothstep(treeLine + 400.0, treeLine + 1400.0, vH) * (1.0 - green * 0.5)) + (1.0 - green) * (1.0 - warm) * 0.5;
       // dithered transitions: land cover breaks up instead of fading
@@ -825,8 +939,8 @@
         // (dry grass is straw and olive, never the lime of the mossy ground it was scanned from; and what grows in dry country is
         //  grey with it: sage, not the green-gold of a wet meadow gone dry)
         float sage = 0.72 * (1.0 - 0.4 * smoothstep(0.4, 0.7, clim)); const vec3 STRAW = vec3(1.07, 1.0, 0.9);
-        // (ground that lies wholly under snow is not looked up at all: the snow is)
-        float snowW = max(snow, ice * 0.95); bool snowed = snowW > 0.76;
+        // (ground that lies wholly under snow is not looked up at all: the snow is. Nor under an ice sheet, which hides it whole)
+        float snowW = max(snow, iceLand * 0.95); bool snowed = snowW > 0.76 || sheet > 0.99;
         float hU = 0.5, t2 = w2 / max(w1 + w2, 1e-4), kB = 0.0; vec3 tex = vec3(0.5);
         // (nor what lies under a road; and under the trodden ground of a town, of which a little shows through, one material
         // will do, and its relief is not looked up: trodden earth has its own)
@@ -861,11 +975,11 @@
         land = mix(land, mix(land, vec3(0.42, 0.36, 0.3), 0.6), bare * wForest * 0.7);
         land = mix(land, land * vec3(1.06, 0.96, 0.74), winter * wGrass * 0.55);
         // snow on high cold ground and ice: it fills the hollows first, and what stands up in the ground shows through it longest
-        if (snowW > 0.01) {
+        if (max(snowW, sheet) > 0.01) {
           // (near: by the hollows of the ground under it; far: by broken stretches, the size the eye can make out)
-          float gNear = gndNear(6.0); gSnow = gnd(6.0); float sc = snowed ? 1.0 : smoothstep(0.35, 0.65, snowW + ((0.5 - hU) * 0.5 + (gSnow.a - 0.5) * 0.08 * gNear + (nMid.b + nMic.b - 0.87) * 0.22 * (1.0 - gNear) + (gully - 0.25 * gullyW) * 0.9) * (1.0 - snowW));      // (and the gullies hold it longest: couloirs of snow down a mountain's face, its ribs bare)
+          float gNear = gndNear(6.0); gSnow = gnd(6.0); float sc = step(0.01, snowW) * (snowed ? 1.0 : smoothstep(0.35, 0.65, snowW + ((0.5 - hU) * 0.5 + (gSnow.a - 0.5) * 0.08 * gNear + (nMid.b + nMic.b - 0.87) * 0.22 * (1.0 - gNear) + (gully - 0.25 * gullyW) * 0.9) * (1.0 - snowW)));      // (and the gullies hold it longest: couloirs of snow down a mountain's face, its ribs bare)
           gSnowN = gndN(6.0); gSnowOn = 1.0;
-          land = mix(land, mix(vec3(0.92, 0.94, 0.97), min(gSnow.rgb * vec3(0.9, 0.925, 0.96), vec3(1.02)), gOn), sc); gRel = mix(gRel, gSnowN, sc);
+          land = mix(land, mix(vec3(0.92, 0.94, 0.97), min(gSnow.rgb * vec3(0.9, 0.925, 0.96), vec3(1.02)), gOn), sc); gRel = mix(gRel, gSnowN, max(sc, sheet));
         }
         gRelK = gOn * uGndK.x;
       } else {
@@ -946,7 +1060,7 @@
           tex = mix(tex, gtex(uGround, 9.0, 4.0) * vec3(0.92, 0.95, 0.9), redK); }
         float bl = dot(texture(uGround, vec3(gcr(), gL)).rgb, vec3(0.299, 0.587, 0.114));                       // a rotated coarse copy breaks the repeat
         tex *= 0.74 + 0.52 * bl;
-        float snowW = max(snow, ice * 0.95); if (snowW > 0.01) tex = mix(tex, gtex(uGround, 6.0, 4.0) * 1.04, snowW);
+        float snowW = max(snow, iceLand * 0.95); if (snowW > 0.01) tex = mix(tex, gtex(uGround, 6.0, 4.0) * 1.04, snowW);
         float tl = dot(tex, vec3(0.299, 0.587, 0.114)), ll = dot(land, vec3(0.299, 0.587, 0.114));
         vec3 texLand = tex * pow(max(ll, 0.03) / max(tl, 0.05), 0.65);                                          // the imagery keeps its regional brightness
         texLand = mix(texLand, texLand * land / max(ll, 0.03), 0.3);                                             // and lends a share of its hue
@@ -1229,9 +1343,13 @@
       //  water between flat banks. It is given a river's water, as the game's own rivers have it beside it and between its
       //  pieces: shallows a furlong wide, pale and green, over a blue channel; brown with silt in dry country. A small lake of
       //  the plain is the same water. Not the peat lakes of the north, nor a lake between mountains, deep from the shore.)
-      float riverish = wOn * (1.0 - smoothstep(0.30, 0.62, wOpen)) * (1.0 - smoothstep(0.06, 0.16, bedFall)) * (1.0 - peat);      // (flat: not turned by one step of the heights, seven to twenty-seven metres - by those alone a pool had the two waters in patches, cut where its nearest bank changes)
+      float riverish = wOn * (1.0 - smoothstep(0.30, 0.62, wOpen)) * (1.0 - smoothstep(0.06, 0.16, bedFall)) * (1.0 - peat) * (1.0 - chadW);      // (flat: not turned by one step of the heights, seven to twenty-seven metres - by those alone a pool had the two waters in patches, cut where its nearest bank changes)
       lakeDeep = mix(lakeDeep, mix(vec3(0.03, 0.15, 0.25), vec3(0.36, 0.34, 0.24), arid * 0.4), riverish);
       depthLake = mix(depthLake, off * 0.015, riverish);
+      // (Mega-Chad: fresh and green-blue, its bed falling as gently as the basin's floor - shallows kilometres wide; and the lakes by the
+      //  ice sheets milky with what the ice grinds)
+      if (chadW > 0.0) { lakeDeep = mix(lakeDeep, vec3(0.04, 0.17, 0.21), chadW); depthLake = mix(depthLake, max(chadD, 0.0) * 0.8, chadW); }
+      if (bareIce > 0.0) lakeDeep = mix(lakeDeep, vec3(0.20, 0.36, 0.40), bareIce * 0.8);
       vec3 inland = mix(lakeDeep, mix(vec3(0.40, 0.38, 0.27), vec3(0.23, 0.41, 0.36), riverish), exp(-vec3(0.60, 0.20, 0.16) * (depthLake * (1.0 + 3.0 * peat))) * 0.85);      // (peat water hides its bed within a step from the shore)
       // ---------- waves ----------
       // Four sizes of one picture of a ruffled surface, each drifting its own way (repeats of 40 m, 160 m, 640 m and 2.5 km:
@@ -1249,7 +1367,7 @@
       vec2 wSlope = vec2(0.0); float wRough = mix(0.0003, 0.0010, seaShare);
       vec2 gdx = dFdx(vGL) * 50.0, gdy = dFdy(vGL) * 50.0;      // (how the place runs across the pixel: taken here, where every pixel passes; the lookups below are only made on water)
       #ifndef WATER_PLAIN
-      if (max(max(seaW, lakeW), max(vecRiver, floodW)) > 0.003 && uSeaK.w < 0.5) {
+      if (max(max(seaW, lakeW), max(vecRiver, floodW)) > 0.003 && uSeaK.w < 0.5 && sheet < 0.995) {
         // (Each size is laid askew by the noise of the place, as the ground's materials are: one picture repeated straight
         //  across twenty miles of sea showed in the sun's path as a lattice, and on a lake from a mile up as rows of dots.
         //  A size is bent by noise some four of its repeats long and more, and by half a repeat or so: bent by grain as
@@ -1327,10 +1445,14 @@
         // (High dry country has its hard winters without the snow: the lakes of Tibet freeze under a sky that brings none. And a
         //  lake freezes from its shores: out in a great one the ice comes weeks later and goes weeks sooner.)
         float coldShare = smoothstep(0.85, 1.0, info.b) * smoothstep(0.27, 0.36, latN0) * 0.55;
-        float lakeSeason = max(snowHere, coldShare) * 0.75 - 0.08 - (wOn > 0.5 ? 0.07 * smoothstep(300.0, 3000.0, off) : 0.0);
-        float frozen = max(smoothstep(0.0, 0.06, lakeSeason - iceOff) * max(smoothstep(0.3, 0.6, info.b), smoothstep(0.5, 0.8, snowHere)), smoothstep(0.01, 0.05, iceIn));      // (hard winters from 0.6 by the climate's class - Winnipeg's are 0.72 - or wherever snow lies for four months and more: a tarn of the Alps, a lake of the Qilian)
+        // (A lake keeps the sea's slow clock as it freezes - it holds the summer's warmth - but thaws on a quicker one, a few weeks behind
+        //  the sun, from its shores, the middle of a great lake last: uIceCold.zw, and thaw where that clock runs ahead of the sea's. On the
+        //  sea's clock both ways the lakes of northern Ontario were ice into July, white at the shore round open water.)
+        float lakeOff = acos(clamp(2.0 * mix(uIceCold.w, uIceCold.z, hemi) - 1.0, -1.0, 1.0)) * 0.31831, thaw = smoothstep(0.0, 0.04, mix(uIceCold.y, uIceCold.x, hemi) - mix(uIceCold.w, uIceCold.z, hemi));
+        float lakeSeason = max(snowHere, coldShare) * 0.75 - 0.08 - (wOn > 0.5 ? mix(0.07, -0.04, thaw) * smoothstep(300.0, 3000.0, off) : 0.0);
+        float frozen = max(max(smoothstep(0.0, 0.06, lakeSeason - lakeOff) * max(smoothstep(0.3, 0.6, info.b), smoothstep(0.5, 0.8, snowHere)), smoothstep(0.01, 0.05, iceIn)), sheet);      // (hard winters from 0.6 by the climate's class - Winnipeg's are 0.72 - or wherever snow lies for four months and more: a tarn of the Alps, a lake of the Qilian; and under the ice sheets of the north)
       #else
-        float frozen = snowLying * smoothstep(0.5, 0.85, info.b);
+        float frozen = max(snowLying * smoothstep(0.5, 0.85, info.b), sheet);
       #endif
         // (blown clear in places, of a size the eye can make out: each size of the noise gives way to its mean before its repeat is
         //  small in the picture - from forty kilometres up Ladoga's ice was a wallpaper of blots)
@@ -1352,6 +1474,7 @@
         float seaIce = smoothstep(iceEdge - 0.08, iceEdge + 0.04, latN0 + (nMac.r - 0.5) * 0.08 * (1.0 - smoothstep(0.0, 1.5, noiseL + 7.23))) * seaW;
         float floe = smoothstep(0.35, 0.65, nMid.b + 0.3 * nMic.a) * smoothstep(0.0, 0.08, latN0 - iceEdge + 0.1);
       #endif
+        seaIce = max(max(seaIce, sheet * seaW), bareIce * bareIce * seaW * smoothstep(0.35, 0.6, floe + (nMac.g - 0.5) * 0.4) * (0.35 + 0.65 * winter)); floe = max(floe, sheet);      // (the sea under an ice sheet is the sheet; off its edge the sea is ice that has broken from it, and the floes of a sea that freezes beside it)
         vec3 iceCol = mix(vec3(0.74, 0.82, 0.9), vec3(0.9, 0.93, 0.96), floe);
         water = mix(water, iceCol, seaIce * mix(0.55, 1.0, floe));
       #ifdef INFO2
@@ -1367,15 +1490,40 @@
       // ---------- compose surface ----------
       float inlandMix = max(max(inlandW * mix(0.9, 0.7, closeFade), lakeW * (wOn > 0.5 ? 1.0 : 0.95)), vecRiver * 0.97);   // a river is water from bank to bank, and a lake from shore to shore, not a tint on the ground
       vec3 col = mix(land, inland, inlandMix) * landW + water * seaW;
-      float wetAll = clamp(seaW + max(lakeW, max(vecRiver * 0.97, floodW * 0.8)) * landW, 0.0, 1.0);      // how much of the pixel is water that mirrors (not the far river country)
+      // (An ice sheet hides what lies under it - land, lakes and sea alike. Its heart is snow, with the long swells of the wind in it.
+      //  Within some tens of kilometres of its edge the winter's snow is gone by high summer and the ice itself shows: grey-blue,
+      //  banded along the edge with the dirt it carries, pocked with pools of meltwater; at the edge the dirt of its moraines.
+      //  climate.js. As a sheet of one white it was a sticker laid on the map.)
+      if (sheet > 0.002) {
+        // (how far in the bare ice reaches: further on a warm southern edge than a cold northern one, and not as one even ring - by the
+        //  lobes' own noise, hundreds of kilometres across, and the place's)
+        float summer = 1.0 - winter, abl = smoothstep(0.64, 0.9, rm + clamp((62.0 - abs(vLat) * 57.29578) * 0.012, -0.15, 0.15) + (vClim.x - 1.0) * 0.8 + (nMac.b - 0.5) * 0.2) * (0.3 + 0.7 * summer);
+        vec3 snowC = mix(vec3(0.85, 0.89, 0.94), vec3(0.96, 0.97, 0.99), smoothstep(0.3, 0.75, mix(nMac.r, 0.512, smoothstep(0.0, 1.5, noiseL + 7.23)) * 0.45 + nMid.g * 0.35 + nMic.r * 0.2));
+        vec3 iceC = mix(vec3(0.47, 0.54, 0.60), vec3(0.62, 0.69, 0.75), smoothstep(0.25, 0.75, nMid.b * 0.6 + nMic.g * 0.4));      // (bare ice has half the light of snow)
+        iceC = mix(iceC, vec3(0.41, 0.41, 0.39) * (0.85 + 0.3 * nMic.r), smoothstep(0.86, 0.93, rm + (nMid.r - 0.5) * 0.05) * 0.75);      // (and the last kilometres of it are dirty with what it carries)
+        float pool = smoothstep(0.66, 0.72, nMic.b * 0.55 + nFin.g * 0.45) * smoothstep(0.66, 0.78, rm) * (1.0 - smoothstep(0.88, 0.93, rm)) * summer;
+        iceC = mix(iceC, vec3(0.17, 0.44, 0.69), pool * 0.9);
+        float mor = smoothstep(0.08, 0.4, sheet) * (1.0 - smoothstep(0.5, 0.9, sheet));      // (the moraine along the edge)
+        vec3 sc = mix(snowC, iceC, abl);
+        #ifdef USE_GROUND
+        if (gSnowOn > 0.5) sc *= mix(vec3(1.0), min(gSnow.rgb * vec3(0.9, 0.925, 0.96), vec3(1.02)) / 0.9, gOn * 0.8);      // (and close to, the grain of the snow's own material, as on any snowfield)
+        #endif
+        sc = mix(sc, vec3(0.50, 0.47, 0.43) * (0.85 + 0.3 * nMic.b), mor * 0.6);
+        col = mix(col, sc, sheet); iced = max(iced, sheet); }
+      float wetAll = clamp(seaW + max(lakeW, max(vecRiver * 0.97, floodW * 0.8)) * landW, 0.0, 1.0) * (1.0 - sheet);      // how much of the pixel is water that mirrors (not the far river country; not under an ice sheet)
       col = mix(col, mix(vec3(0.33, 0.25, 0.17), vec3(0.50, 0.48, 0.44), paves) * (0.78 + 0.44 * nFin.r), bridgeW * landW);     // the deck of the crossing
+      foam *= 1.0 - sheet;      // (no surf under an ice sheet: its lines drew the coasts it buries)
       col = mix(col, vec3(0.94, 0.95, 0.96), foam);
       float flatW = max(1.0 - landW, min(1.0, inlandW * 1.4));        // rivers and lakes lie flat and ripple, whatever the slope they cross
+      // (an ice sheet's own surface is what is lit, not the hills it buries: a dome kilometres high - some 3,000 m for one 1,400 km
+      //  across - falling away faster toward its edge; drawn steeper than it is, as the ground is drawn taller)
+      if (sheet > 0.002) { float hI = 3000.0 * sqrt(sqrt(wIce) * 6371.0 / 1400.0); vec2 sl = -hI * 0.5 / sqrt(max(1.0 - rm, 0.004)) * iceG / ${R_M.toFixed(1)};
+        nEnu = normalize(mix(nEnu, normalize(vec3(-sl * uExag * 2.5, 1.0)), sheet)); }
       #ifdef USE_GROUND
       // the relief of what the ground is made of, laid over the lie of the land
       { vec2 r = gRel * gRelK; nEnu = normalize(vec3(nEnu.xy * sqrt(max(1.0 - dot(r, r), 0.04)) + r * nEnu.z, nEnu.z * sqrt(max(1.0 - dot(r, r), 0.04)))); }
       #endif
-      vec3 nLocal = normalize(mix(nEnu, nWater, flatW));
+      vec3 nLocal = normalize(mix(nEnu, nWater, flatW * (1.0 - sheet)));
       // ---------- lighting ----------
       vec3 upL = normalize(vUnit);
       vec3 northL = normalize(vec3(0.0, 1.0, 0.0) - upL.y * upL);
@@ -1414,6 +1562,7 @@
         }
         shadow = mix(1.0, shadow, shadowMix);
       }
+      shadow = mix(shadow, 1.0, sheet);      // (nor do the hills under an ice sheet throw shadows on it)
       shadow = min(shadow, 1.0 - 0.62 * max(castS, sunHidden(vViewPos)));       // block shadows far off, true ones from the sun's depth map near the camera
       // The clouds' shadows: of the cloud that stands between this ground and the sun, which is not the one overhead - the shell
       // is 25 km up (sky.js), and the lower the sun the further toward it that cloud is. The same picture, the same drift.
@@ -1437,9 +1586,9 @@
       //  is, the mountains of a winter were white and navy, like marbled paper.)
       // (and the eye closes a little to it: under a high sun every slope of a snowfield was past white, and the Himalaya a sheet
       //  of paper with no hills in it)
-      float snowAll = max(max(snow, ice * 0.95), snowCov) * landW * day;
+      float snowAll = max(max(max(snow, ice * 0.95), snowCov) * landW, sheet) * day;      // (an ice sheet over the sea is snow to the light, as it is over the land)
       ambC *= mix(vec3(1.0), vec3(1.55, 1.75, 2.15), snowAll * (1.0 - 0.6 * diff));
-      vec3 lit = col * (ambC + diff * (1.05 - 0.16 * snowAll) * sunCol * mix(1.0, 0.5, seaW * 0.3));
+      vec3 lit = col * (ambC + diff * (1.05 - 0.16 * snowAll) * sunCol * mix(1.0, 0.5, seaW * 0.3 * (1.0 - sheet)));
       // ---------- what the water mirrors ----------
       // Still water is a mirror, dark looked down into and bright along the eye's level (Fresnel): it shows the sky that
       // stands where its light comes from, and the sun as a path of sparks as wide as the water is rough. Reckoned in

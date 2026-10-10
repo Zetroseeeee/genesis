@@ -276,7 +276,8 @@
     // lies, in metres. Roofs and boughs go white by it with the ground.
     lyingAt(lon, lat, coldYear, h) {
       if (!this.snow) { const cold = Trees.COLD[this.climateAt(lon, lat)] || 0, thr = 1.02 - 0.55 * cold; return smooth(thr, thr + 0.1, coldYear) * smooth(0.08, 0.5, cold); }
-      const sn = this.snow, s = Math.min(1.25, Math.max(0, this.samp(sn, (lon + 180) / 360 * sn.width, (90 - lat) / 180 * sn.height, 0) * 4 - 3 + (h || 0) * 0.0005));
+      const sn = this.snow, m = this.samp(sn, (lon + 180) / 360 * sn.width, (90 - lat) / 180 * sn.height, 0), chill = this.sim && this.sim.climate ? this.sim.climate.chill() : 0;      // (a cold age keeps the snow some weeks longer where it lies at all, as the ground's shader has it: climate.js)
+      const s = Math.min(1.25, Math.max(0, m * 4 - 3 + (h || 0) * 0.0005 + (m > 0.01 ? chill * 0.12 : 0)));
       const off = Math.acos(Math.min(1, Math.max(-1, 2 * coldYear - 1))) / Math.PI;
       return Math.min(1, Math.max(0, (s * 0.58 - off) / 0.2 + 0.5)) * smooth(0.02, 0.4, s);
     }
@@ -292,7 +293,7 @@
     // forest weight at a point: mirrors the terrain shader's biome rules (weights are dithered with the same noise)
     forestAt(lon, lat, h) {
       const v = this.veg; const fx = (lon + 180) / 360 * v.width, fy = (90 - lat) / 180 * v.height;
-      const green = this.samp(v, fx, fy, 0), lum = this.samp(v, fx, fy, 1), warm = this.samp(v, fx, fy, 2);
+      let green = this.samp(v, fx, fy, 0); const lum = this.samp(v, fx, fy, 1), warm = this.samp(v, fx, fy, 2);
       const latN = Math.abs(lat) / 90; const treeLine = 4100 - 3900 * Math.pow(latN, 1.4), snowLine = 5100 - 4800 * Math.pow(latN, 1.3);
       if (h > snowLine - 300) return { f: 0, g: 0 };
       const aboveTree = smooth(treeLine - 300, treeLine + 200, h);
@@ -300,9 +301,16 @@
       const nMid = [this.noiseAt(gx, gy, 1200, 0), this.noiseAt(gx, gy, 1200, 1), this.noiseAt(gx, gy, 1200, 3)];
       const nMic = [this.noiseAt(gx, gy, 9000, 0), this.noiseAt(gx, gy, 9000, 1), this.noiseAt(gx, gy, 9000, 3)];
       // the wildwood (as in the terrain shader): green land that is not dry is forest wherever nobody farms it
-      let cult = 0; if (this.sim) { const ci = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W); cult = this.sim.owner[ci] >= 0 ? this.sim.cultivation(ci) * (this.sim.level[ci] ? 1 : 0.6) : 0; }
+      let cult = 0, wetC = 0; if (this.sim) { const ci = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W); cult = this.sim.owner[ci] >= 0 ? this.sim.cultivation(ci) * (this.sim.level[ci] ? 1 : 0.6) : 0;
+        // (the weather, climate.js: no tree on the ice sheets that still lie over the north; in the wet centuries the dry lands are steppe and savanna)
+        const CL = this.sim.climate; if (CL) { if (CL.ice[ci]) return { f: 0, g: 0 }; wetC = CL.wet[ci];
+          // (nor on the land the ice has just left, nor along its edge, nor under Mega-Chad: as the ground's shader has them, by the same sums)
+          const C = window.CLIMATE, y = this.sim.year, q = CL.bare ? Infinity : C.iceQ(lon, lat, y); if (q < 1.4 && hash2(Math.floor(lon * 977), Math.floor(lat * 977), 31) > smooth(1.0, 1.4, q)) return { f: 0, g: 0 };
+          if (lon > 11.5 && lon < 21 && lat > 10 && lat < 20 && h < C.chadLevel(y) + 1) return { f: 0, g: 0 }; } }
       // each tree looks its climate up a little to one side of itself, so two climates shade into each other
-      const kc = this.climateAt(lon + (nMic[0] - 0.5) * 0.3, lat + (nMic[1] - 0.5) * 0.3); const arid = Trees.ARID[kc];
+      let kc = this.climateAt(lon + (nMic[0] - 0.5) * 0.3, lat + (nMic[1] - 0.5) * 0.3);
+      if (wetC > 0.25 && kc >= 5 && kc <= 8) { kc = wetC > 0.6 ? 4 : 5; green = Math.max(green, wetC * 0.42); }      // (a desert or steppe of our day as the savanna or the hot steppe it was: the Köppen classes Aw and BSh)
+      const arid = Trees.ARID[kc];
       const wild = (1 - smooth(0.22, 0.48, warm)) * (1 - Math.min(1, cult * 1.4)) * (1 - smooth(0.35, 0.6, arid));
       let wF = green * (1 - smooth(0.32 + 0.2 * wild, 0.6 + 0.3 * wild, lum)) * (1 - aboveTree);
       let wG = green * smooth(0.28 + 0.2 * wild, 0.55 + 0.3 * wild, lum) + green * aboveTree * 0.6;

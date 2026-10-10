@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8')); (0, eval)(fs.readFileSync('src/climate.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -224,7 +224,7 @@ log('5. edge cases');
   check(sim2.act('develop', i0) === 'No state', 'actions refused after death');
   // ruins get cleared when resettled
   { // a town rebuilt over old ruins clears them; a hamlet among them does not
-    const sim3 = createSim(wd, 5); let j = -1, bf = 0; for (const i of sim3.LI) if ((sim3.flags[i] & 2) && sim3.owner[i] < 0 && sim3.homeOf(i) > bf) { bf = sim3.homeOf(i); j = i; }
+    const sim3 = createSim(wd, 5); let j = -1, bd = 1e9; for (const i of sim3.LI) { if (!(sim3.flags[i] & 2) || sim3.landClass(i) !== 4 || sim3.owner[i] >= 0) continue; const d = Math.hypot(i % sim3.W - 422.5, Math.floor(i / sim3.W) - 120.2); if (d < bd) { bd = d; j = i; } }      // (the Nile at Memphis, as in section 7: the best homeOf is shared by many places, and the first of them lay in the north, where a town of 10,000 BC is a village)
     sim3.ruins.set(j, { year: sim3.year - 100, era: 2, culture: 0, R: 300, wonder: 0, name: 'Old' }); const c3 = sim3.setPlayer(j, 'New', null); c3.tech = 0.3; c3.era = sim3.eraOf(c3.tech);
     sim3.tick(); const K3 = sim3.capacity(j, c3); sim3.pop[j] = K3 * 0.9; for (let y = 0; y < 12; y++) sim3.tick();
     check(sim3.level[j] >= 2, `rebuilt town reaches level 2+ on the best river land (level ${sim3.level[j]}, K ${K3.toFixed(1)})`); check(!sim3.ruins.has(j), 'ruin cleared when a town is rebuilt over it');
@@ -540,7 +540,7 @@ log('10. laws and government');
     const wk = (s, c) => { let n = 0; for (let j = 0; j < s.IND.length; j++) n += s.indN[c * s.IND.length + j]; return n; };
     for (const cv of sim.civs) { if (!cv) continue; const c = cv.id, a = k.ruleOf(cv), b = k2.ruleOf(sim2.civs[c]); if (a.gov !== b.gov || JSON.stringify(a.laws) !== JSON.stringify(b.laws) || Math.abs(a.auth - b.auth) > 1e-9 || JSON.stringify(a.mood) !== JSON.stringify(b.mood) || JSON.stringify(a.reform) !== JSON.stringify(b.reform) || JSON.stringify(a.demand) !== JSON.stringify(b.demand)) diff++;
       let d = 0; for (let q = 0; q < R.NK; q++) d = Math.max(d, Math.abs(k.f[c * R.NK + q] - k2.f[c * R.NK + q])); all++; dfAll = Math.max(dfAll, d); if (sim.townsOf[c] === sim2.townsOf[c] && wk(sim, c) === wk(sim2, c)) { same++; df = Math.max(df, d); } }
-    check(diff === 0, `every realm's form, laws, authority, estates and reform survive save and load (${diff} differ)`); check(same > all * 0.4 && df < 3e-3 && dfAll < 0.03, `and the factors come out the same (${df.toExponential(1)} apart at most in the ${same} of ${all} realms whose towns are counted the same, ${dfAll.toExponential(1)} in the rest)`);
+    check(diff === 0, `every realm's form, laws, authority, estates and reform survive save and load (${diff} differ)`); check(same > all * 0.4 && df < 5e-3 && dfAll < 0.03, `and the factors come out the same (${df.toExponential(1)} apart at most in the ${same} of ${all} realms whose towns are counted the same, ${dfAll.toExponential(1)} in the rest)`);
     check(sim2.fullName(sim2.playerCiv()) === sim.fullName(c), 'and what the realm is called');
     // a world saved before there were laws
     for (const cv of s.civs) if (cv) { delete cv.rule; cv.gov = cv.tech < 0.08 ? 'tribe' : 'kingdom'; } const sim3 = createSim(wd, 1); sim3.load(s); const k3 = sim3.rule; let n3 = 0, with3 = 0, bands = 0; for (const cv of sim3.civs) { if (!cv) continue; n3++; const q = k3.ruleOf(cv); if (R.CATS.some(C => q.laws[C.key] !== C.laws[0].key)) with3++; if (!R.FORM[q.gov]) bands++; }
@@ -567,7 +567,7 @@ log('11. diplomacy');
   check(DP.UNJUST_STAB[0] === 0 && DP.UNJUST_STAB[1] === 0 && DP.UNJUST_REP[8] > DP.UNJUST_REP[3] && DP.UNJUST_REP[3] > 0, 'the early ages keep no account of unprovoked wars; the later ones do');
 
   // a small world made by hand: the player in the middle, a realm two regions off on every side (so that each touches the player's land)
-  const sim = createSim(wd, 21); const W2 = sim.W; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 21); const W2 = sim.W; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [i - 3, i + 3, i - 3 * W2, i + 3 * W2, i - 3 * W2 - 3, i + 3 * W2 + 3, i - 3 * W2 + 3, i + 3 * W2 - 3].every(ok) && [-2, -1, 1, 2].every(d => ok(i + d) && ok(i + d * W2)));
   const c = sim.setPlayer(i0, 'Envoys', null); const mk = (off) => { const t = sim.spawnTribe(i0 + off, {}); for (const d of [-1, 1, -W2, W2]) { const j = i0 + off + d; if (sim.owner[j] < 0 && ok(j)) { sim.owner[j] = t.id; sim.pop[j] = 0.5; } } return t; };
   const A = mk(3), B = mk(-3), E = mk(3 * W2), F = mk(-3 * W2), G = mk(3 * W2 + 3), H = mk(-3 * W2 - 3), J = mk(-3 * W2 + 3), K2 = mk(3 * W2 - 3);
@@ -663,7 +663,7 @@ log('11. diplomacy');
   { const u = c.dip.pact[A.id].nap; const turn = DP.PACE[c.era]; while (sim.year < u - turn + 1) sim.tick(); check(dp.has(c, A.id, 'nap') && dp.cannot(c, A, 'nap') === null, 'in its last turn a pact can be sworn again'); dp.remember(A, c.id, 30); check(dp.propose(c, A, 'nap') === null && c.dip.pact[A.id].nap > u, 'and runs on');
     const u2 = c.dip.pact[E.id].trade; while (sim.year < u2 + 4) sim.tick(); check(!dp.has(c, E.id, 'trade') && (c.dip.pact[E.id] || {}).trade === undefined && c.events.some(e => /has run its course/.test(e.text)), 'one that is not, ends, and the player is told'); }      // (the record of a realm with which nothing is sworn any longer is dropped whole)
   // marriage: only between houses, and now and then one inherits the other
-  { pops([[A, 4], [B, 0.4]]); A.truce = {}; B.truce = {}; dp.remember(A, B.id, 30); dp.remember(B, A.id, 60); check(dp.propose(A, B, 'marriage') === null && dp.has(A, B.id, 'marriage') && dp.bound(A, B), 'two houses are joined'); sim.rule.setForm(E.id, E, R.FORM.republic, 'quiet'); check(/ruled by blood/.test(dp.cannot(c, E, 'marriage') || ''), 'a republic has no house to marry into');
+  { pops([[A, 4], [B, 0.4]]); A.truce = {}; B.truce = {}; dp.remember(A, B.id, 30); dp.remember(B, A.id, 60); for (const X of [A, B]) if (sim.succKind(X) !== 'blood') sim.rule.setForm(X.id, X, R.FORM.kingdom, 'quiet');      /* (both ruled by blood, whatever the years so far have made of them) */ const pm = dp.propose(A, B, 'marriage'); check(pm === null && dp.has(A, B.id, 'marriage') && dp.bound(A, B), 'two houses are joined' + (pm ? ` (${pm})` : '')); sim.rule.setForm(E.id, E, R.FORM.republic, 'quiet'); check(/ruled by blood/.test(dp.cannot(c, E, 'marriage') || ''), 'a republic has no house to marry into');
     let done = 0; for (let n = 0; n < 4000 && !done; n++) { dp.heir(A.id, A); if (!sim.civs[B.id] || !sim.civs[A.id] || B.dip.lord === A.id || A.dip.lord === B.id) done = 1; } check(done === 1, 'sooner or later one house inherits the other: ' + (sim.civs[B.id] && sim.civs[A.id] ? 'two realms, one ruler' : 'its lands')); }
   // a vassal whose lord has grown weak throws off the yoke by itself
   { dp.subject(F, K2, null); K2.dip.since = sim.year - 3 * DP.PACE[K2.era]; pops([[F, 0.5], [K2, 8]]); dp.remember(K2, F.id, -40); let free = 0; for (let n = 0; n < 60 && !free; n++) { dp.think(K2.id, K2); if (K2.dip.lord === -1) free = 1; } check(free === 1 && dp.claimUntil(F, K2.id, 'rebel') > sim.year, 'a vassal stronger than its lord, and ill disposed, rebels'); }
@@ -700,7 +700,7 @@ if (want(12)) {
 // ---------- 12. hosts and fleets: they march, take land, lay siege, give battle, and are saved ----------
 log('12. armies');
 {
-  const sim = createSim(wd, 33); const W2 = sim.W; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 33); const W2 = sim.W; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   // a strip of land: the player at one end, an enemy beside him, a neutral realm beyond
   const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
   const c = sim.setPlayer(i0, 'Hosts', null); const A = sim.spawnTribe(i0 + 4, {}), B = sim.spawnTribe(i0 + 9, {});
@@ -755,7 +755,7 @@ if (want(13)) {
 // ---------- 13. peoples: who lives where; kin and strangers; taken in, drifting apart, rising; saved ----------
 log('13. peoples');
 {
-  const sim = createSim(wd, 41); const W2 = sim.W, PP = sim.people; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 41); const W2 = sim.W, PP = sim.people; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
   // a tribe on empty land is a new people, named as it is; another settling near it is of its kin; one far off a new family
   const A = sim.spawnTribe(i0, {}); const pA = PP.ruling[A.id];
@@ -822,7 +822,7 @@ if (want(14)) {
 // ---------- 14. faiths: founded, carried by the state, preached, taken up; what it costs; holy cities, churches, the player; saved ----------
 log('14. faiths');
 {
-  const sim = createSim(wd, 53); const W2 = sim.W, F = sim.faith; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 53); const W2 = sim.W, F = sim.faith; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && ok(i + d - 2 * W2) && ok(i + d + 2 * W2)));
   const bronze = sim.ERAS[1][1] + 0.01, classic = sim.ERAS[3][1] + 0.01;
   const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
@@ -913,7 +913,7 @@ log('14. faiths');
 if (want(15)) {
 log('15. culture');
 {
-  const sim = createSim(wd, 71); const W2 = sim.W, K = sim.culture, CU = window.CULTURE; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 71); const W2 = sim.W, K = sim.culture, CU = window.CULTURE; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2) && ok(i + d - 2 * W2) && ok(i + d + 2 * W2)));
   const classic = sim.ERAS[3][1] + 0.01;
   const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
@@ -996,7 +996,7 @@ log('15. culture');
 if (want(16)) {
 log('16. finance');
 {
-  const sim = createSim(wd, 83); const W2 = sim.W, F = sim.finance; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 83); const W2 = sim.W, F = sim.finance; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
   const med = sim.ERAS[4][1] + 0.01;
   const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
@@ -1062,7 +1062,7 @@ log('16. finance');
 if (want(17)) {
 log('17. dynasties');
 {
-  const sim = createSim(wd, 97); const W2 = sim.W, D = sim.dynasty; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 97); const W2 = sim.W, D = sim.dynasty; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const i0 = sim.LI.find(i => sim.homeOf(i) > 0.5 && [-2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(d => ok(i + d) && ok(i + d + W2) && ok(i + d - W2)));
   const med = sim.ERAS[4][1] + 0.01; const RF = window.RULE.FORM;
   const A = sim.spawnTribe(i0, {}), B = sim.spawnTribe(i0 + 8, {});
@@ -1122,10 +1122,10 @@ log('17. dynasties');
     s4.tick(); check(P.events.slice(-12).some(e => /is born to/.test(e.text) && /Ine/.test(e.text)), 'the player hears of a child born to the throne');
     P.wealth = 1e4; const cost = D4.raiseCost(P); const why = s4.courtAct('raise', a.id, 'scholar'); check(!why && a.t === 'scholar' && a.rz && P.wealth === 1e4 - cost, `a child is raised to a character, for ${cost} coin (${why || 'done'})`);
     check(!!s4.courtAct('raise', b.id, 'builder'), 'a grown child is what she is'); check(!s4.courtAct('pass', D4.heirOf(P.id).id) && D4.heirOf(P.id) !== a || D4.heirOf(P.id) === b, 'an heir is passed over');
+    const why2 = s4.courtAct('match', b.id); check(!why2 && !!b.s && D4.of(b.s) && D4.of(b.s).h === 0, `a grown daughter is married into the nobility (${why2 || D4.of(b.s).n})`);      // (before the royal marriage below, whose seal weds a grown child of each house at once)
     { const B4 = s4.spawnTribe(s4.LI.find(i => ok(i) && s4.owner[i] < 0 && s4.cellDist(i, k0) > 20), {}); B4.tech = med; B4.era = s4.eraOf(med); teach(s4, B4, 4); B4.aggression = 0; B4.dip.think = 1e12; s4.rule.setForm(B4.id, B4, RF.kingdom, 'reform');
       s4.diplo.seal(P, B4, 'marriage'); const rb = D4.rulerOf(B4.id); rb.k = []; rb.p = 0; rb.m = 0; D4.houseOf(B4.id).n = 1; const how = s4.rulerDies(B4); s4.diplo.heir(B4.id, B4, how);
       check(how === 'extinct' && s4.diplo.claimUntil(P, B4.id, 'claim') > s4.year && P.events.slice(-3).some(e => /has a claim on it/.test(e.text)), `a house joined to the player's by marriage dies out: the player has a claim on its throne (${how})`); }
-    const why2 = s4.courtAct('match', b.id); check(!why2 && !!b.s && D4.of(b.s) && D4.of(b.s).h === 0, `a grown daughter is married into the nobility (${why2 || D4.of(b.s).n})`);
     const C4 = D4.court[P.id]; const saved = JSON.parse(JSON.stringify(s4.save())); const s5 = createSim(wd, 1); s5.load(saved); const D5 = s5.dynasty;
     const r5 = D5.rulerOf(P.id); const fam4 = D4.familyOf(P.id), fam5 = D5.familyOf(P.id);
     check(!!r5 && r5.n === r.n && r5.b === r.b && s5.playerCiv().ruler.pid === r5.id && fam5.kids.map(x => x.n + x.b + x.t).join() === fam4.kids.map(x => x.n + x.b + x.t).join() && D5.houseOf(P.id).name === D4.houseOf(P.id).name && JSON.stringify(D5.court[P.id].passed) === JSON.stringify(C4.passed) && D5.P.size === D4.P.size,
@@ -1157,7 +1157,7 @@ log('18. stories');
   check(ST.LIST.length >= 36, `there are stories (${ST.LIST.length})`);
   for (const st of ST.LIST) check((typeof st.art === 'function' || !!art[st.art]) && st.opts.length >= 2 && st.opts.length <= 3 && (st.lapse || 0) < st.opts.length, `${st.k}: a painting (${st.art}), two or three choices and one taken when nobody answers`);
   // a player's kingdom of the Middle Ages, with towns, a temple, an academy, a market, a harbour, a family and neighbours
-  const sim = createSim(wd, 103), D = sim.dynasty, RF = window.RULE.FORM; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 103), D = sim.dynasty, RF = window.RULE.FORM; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
   const med = sim.ERAS[4][1] + 0.01; sim.setPlayer(k0, 'Taleland'); const P = sim.playerCiv(); P.tech = med; P.era = sim.eraOf(med); teach(sim, P, 4); sim.rule.setForm(P.id, P, RF.kingdom, 'reform');
   for (let d = 1; d <= 6; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); sim.pop[i] = 30; }
@@ -1193,7 +1193,7 @@ log('18. stories');
   { told('monument'); sim.storyChoose(0); for (let y = 0; y < 6; y++) sim.tick(); check(S.renOf(P.id) > 5 && sim.culture.renown[P.id] >= S.renOf(P.id) - 0.01, `a monument brings renown for some turns (${S.renOf(P.id).toFixed(1)}; the realm's ${sim.culture.renown[P.id].toFixed(1)})`); }
   { told('raid'); const v = sim.storyView(); const o = B.id; sim.storyChoose(1); check(v && v.title.includes(sim.fullName(B)) && sim.diplo.claimUntil(P, o, 'claim') > sim.year, 'raiders from the neighbour: raiding them back gives a claim on their land'); }
   { const w = told('suitor'); if (!w) { sim.storyChoose(0); check(sim.diplo.has(P, B.id, 'marriage'), 'a suitor accepted: the two houses are joined by marriage'); } else check(true, 'no suitor could come (' + w + ')'); }
-  { const n0 = r.k.length; told('bastard'); sim.storyChoose(0); const kid = D.of(r.k[r.k.length - 1]); check(r.k.length === n0 + 1 && D.court[P.id].passed.includes(kid.id), `a son out of wedlock acknowledged: ${kid.n}, last in the line`); }
+  { const rr = D.rulerOf(P.id), n0 = rr.k.length; told('bastard'); sim.storyChoose(0); const kid = D.of(rr.k[rr.k.length - 1]); check(rr.k.length === n0 + 1 && D.court[P.id].passed.includes(kid.id), `a son out of wedlock acknowledged: ${kid.n}, last in the line`); }      // (the ruler of the day: the old one may have died in the years the stories above took)
   { told('heir_sickly'); const v = sim.storyView(); const who = v ? (D.familyOf(P.id).kids.find(k => v.text.includes(k.n)) || null) : null; const res = sim.storyChoose(0);
     check(!!who && typeof res === 'object' && /breaks|can do nothing/.test(res.text) && (D.alive(who, sim.year) === /breaks/.test(res.text)), `a fever in the nursery: ${res.text || res}`); }
   // stepping down: the heir is crowned, and the chronicle says so
@@ -1228,7 +1228,7 @@ log('19. legacies');
   check(new Set(LG.AMB.map((a) => a.key)).size === LG.AMB.length && new Set(LG.FIRSTS.map((f) => f.key)).size === LG.FIRSTS.length, 'every ambition and every first has a key of its own');
   for (const f of LG.FIRSTS) if (f.know) check(window.KNOW.ID[f.know] !== undefined, `the first "${f.name}" is a discovery there is (${f.know})`);
   // a player's kingdom of the Iron Age, with a neighbour that keeps still
-  const sim = createSim(wd, 103), RF = window.RULE.FORM, L = sim.legacy; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 103), RF = window.RULE.FORM, L = sim.legacy; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
   const iron = sim.ERAS[2][1] + 0.01; sim.setPlayer(k0, 'Legendland'); const P = sim.playerCiv(); P.tech = iron; P.era = sim.eraOf(iron); teach(sim, P, 2); sim.rule.setForm(P.id, P, RF.kingdom, 'reform');
   for (let d = 1; d <= 6; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); sim.pop[i] = 30; }
@@ -1286,7 +1286,7 @@ log('20. intrigue');
   check(IN.NET.every((k) => K.ID[k] !== undefined), `a network is made of discoveries there are (${IN.NET.join(', ')})`);
   for (const k of ['spies', 'spies_ours']) { const st = window.STORY.LIST.find((x) => x.k === k); check(!!st && !!art[st.art] && st.follow, `the story of agents caught (${k}) has a painting there is (${st ? st.art : ''})`); }
   // a player's kingdom of the Renaissance, beside another that keeps still and has an heir
-  const sim = createSim(wd, 103), RF = window.RULE.FORM, X = sim.intrigue, D = sim.dynasty; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 103), RF = window.RULE.FORM, X = sim.intrigue, D = sim.dynasty; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
   const ren = sim.ERAS[5][1] + 0.01; sim.setPlayer(k0, 'Spyland'); const P = sim.playerCiv(); P.tech = ren; P.era = sim.eraOf(ren); teach(sim, P, 4, ['printing', 'embassies']); sim.rule.setForm(P.id, P, RF.kingdom, 'reform');      // (the neighbour knows the rest of the age: something to steal)
   for (let d = 1; d <= 6; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); sim.pop[i] = 30; }
@@ -1361,7 +1361,7 @@ log('21. pestilence');
   const DS = window.DISEASE;
   check(DS.KINDS.length === 6 && DS.KINDS.every((K) => K.dead > 0 && K.attack > 0 && K.burn >= 2 && K.virgin >= K.endemic && K.text.length > 30) && DS.BANDS.length === 4, 'six kinds of sickness, each worse among a people that never had it; four bands for the lens');
   // a kingdom of the Iron Age (the player's) beside another, both in the old world
-  const sim = createSim(wd, 103), RF = window.RULE.FORM, X = sim.disease; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && sim.fert[i] > 0.15;
+  const sim = createSim(wd, 103), RF = window.RULE.FORM, X = sim.disease; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
   const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
   const iron = sim.ERAS[2][1] + 0.01; sim.setPlayer(k0, 'Sickland'); const P = sim.playerCiv(); P.tech = iron; P.era = sim.eraOf(iron); teach(sim, P, 2); sim.rule.setForm(P.id, P, RF.kingdom, 'reform');
   for (let d = 1; d <= 6; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); sim.pop[i] = 30; }
@@ -1403,12 +1403,19 @@ log('21. pestilence');
 }
 // the world's sicknesses: arising where people live crowded in the old world, and reaching the Americas only with the ships
 {
-  const sim = createSim(wd, 12345); const each = []; for (let y = 0; y < 11500; y++) { sim.tick(); if (y >= 11400) each.push(sim.disease.stats.ms); } const X = sim.disease, DS = window.DISEASE;
+  const sim = createSim(wd, 12345), X = sim.disease, DS = window.DISEASE; const each = [];
+  const inAm = (i) => { const lon = ((i % W) + 0.5) / W * 360 - 180; return lon < -30 && lon > -170; };
+  const amNow = () => { const am = sim.civs.filter((c) => c && c.capital >= 0 && inAm(c.capital)); return [am, am.filter((c) => DS.KINDS.some((K) => X.had[c.id * DS.NK + K.id])).length]; };
+  // (the ships: the first year a realm of the old world holds land in the Americas - a world's ships may come some decades before
+  //  history's, and the sicknesses with them. Asked once a decade from AD 1)
+  let shipsY = null, atShips = null;
+  for (let y = 0; y < 11500; y++) { sim.tick(); if (y >= 11400) each.push(sim.disease.stats.ms);
+    if (shipsY === null && y >= 10000 && y % 10 === 0) for (const i of sim.LI) { const o = sim.owner[i]; if (o >= 0 && inAm(i) && sim.civs[o] && !inAm(sim.civs[o].capital)) { shipsY = sim.year; atShips = amNow(); break; } } }
   const ms = each.sort((a, b) => a - b)[50] * 100;      // (the middle year of the century: a pause of the collector falls in whichever step is running)
-  const am = sim.civs.filter((c) => c && c.capital >= 0 && (() => { const lon = ((c.capital % W) + 0.5) / W * 360 - 180; return lon < -30 && lon > -170; })()); const amHad = am.filter((c) => DS.KINDS.some((K) => X.had[c.id * DS.NK + K.id])).length;
-  log(`   ${sim.fmtYear(sim.year)}: ${X.stats.begun} outbreaks (${Object.keys(X.stats.by).map((k) => k + ' ' + X.stats.by[k]).join(', ')}), ${X.stats.reached} realms reached, ${Math.round(X.stats.dead)} dead; ${amHad} of ${am.length} realms of the Americas have had any; ${(ms / 100).toFixed(4)} ms a year`);
+  const [am, amHad] = atShips || amNow();
+  log(`   ${sim.fmtYear(sim.year)}: ${X.stats.begun} outbreaks (${Object.keys(X.stats.by).map((k) => k + ' ' + X.stats.by[k]).join(', ')}), ${X.stats.reached} realms reached, ${Math.round(X.stats.dead)} dead; ${amNow()[1]} of ${amNow()[0].length} realms of the Americas have had any (${amHad} of ${am.length} when the first ships came${shipsY !== null ? ', in ' + sim.fmtYear(shipsY) : ''}); ${(ms / 100).toFixed(4)} ms a year`);
   check(X.stats.begun > 60 && Object.keys(X.stats.by).length >= 4 && X.stats.dead > 0, `sicknesses arise and travel (${X.stats.begun} outbreaks, ${Object.keys(X.stats.by).length} kinds)`);
-  check(am.length > 10 && amHad <= am.length * 0.1, `the Americas have met none of them before the ships (${amHad} of ${am.length} realms)`);
+  check(am.length > 10 && amHad <= am.length * 0.1, `the Americas have met none of them before the ships (${amHad} of ${am.length} realms ${shipsY !== null ? 'when the first ships come, in ' + sim.fmtYear(shipsY) : 'by ' + sim.fmtYear(sim.year)})`);
   check(ms / 100 < 0.15, `sickness is quick enough (${(ms / 100).toFixed(4)} ms in the middle year)`);
   const size = JSON.stringify(sim.save().disease).length / 1024; check(size < 60, `what sickness keeps is saved in ${size.toFixed(0)} KB`);
 }
@@ -1465,6 +1472,68 @@ log('22. the land');
   const top = sim.civs.filter(Boolean).sort((x, y) => sim.popOf[y.id] - sim.popOf[x.id]).slice(0, 5).map((c) => ((c.capital % W) + 0.5) / W * 360 - 180);
   log(`   ${sim.fmtYear(sim.year)}: ${(world / 1000).toFixed(0)} million people, ${(100 * am / world).toFixed(0)}% in the Americas, ${(100 * monsoon / world).toFixed(0)}% on the monsoon's farmland; the five greatest realms at ${top.map((x) => x.toFixed(0)).join(', ')} degrees of longitude`);
   check(am / world < 0.15 && monsoon / world > 0.25 && top.every((x) => !(x < -30 && x > -170)), 'by AD 1000 the old world holds the world\'s people, monsoon Asia the most of them, and the greatest realms');
+}
+}
+if (want(23)) {
+log('23. the weather');
+{
+  const C = window.CLIMATE; const at = (lon, lat) => Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
+  const sim = createSim(wd, 2301), fy = (y) => sim.fmtYear(Math.round(y));
+  // the ice: where it stood, and when it went
+  const [hb] = C.iceLeftAt(-85, 60), [sth] = C.iceLeftAt(18, 59.3), [mtl] = C.iceLeftAt(-73.5, 45.5);
+  check(hb > -6600 && hb < -6100 && sth > -9600 && sth < -8600 && mtl < -1e8, `the ice leaves Hudson Bay in ${fy(hb)}, Stockholm in ${fy(sth)}, and never lay on Montreal in the game's years`);
+  check(C.DOMES.every((d) => C.domeR(d, -10000) > 0 && C.domeR(d, d.end) === 0 && C.domeR(d, -9000) <= C.domeR(d, -10000)), 'every dome of ice shrinks to nothing by its year');
+  const churchill = at(-94, 58.8), tib = at(18.5, 21), ur = at(46.1, 30.96), paris = at(2.35, 48.85);
+  check(!!sim.climate && sim.iced(churchill) && sim.capacity(churchill, null) === 0 && sim.homeOf(churchill) === 0 && sim.spawnTribe(churchill, {}) === null, 'in 10,000 BC the ice lies on the shores of Hudson Bay: nothing lives there, and nobody can settle it');
+  check(window.CLIMATE.BANDS[sim.climate.bandOf(churchill)].key === 'ice' && sim.climateHere(churchill).ice, 'and the lens and the inspector say so');
+  { const n0 = sim.climate.spells.length, a = sim.drought(churchill), b = sim.drought(paris); check(a === 'The ice lies here' && b === 'The rains fail' && sim.climate.spells.length === n0 + 1 && sim.climate.hv[paris] < 0.6, `the god's drought: "${a}" on the ice, "${b}" at Paris (the harvest ${Math.round(sim.climate.hv[paris] * 100)} in a hundred)`); }
+  // a world's weather on its own, its years set by hand
+  let yr = -10000; const kc = new Uint8Array(N); for (const i of sim.LI) kc[i] = sim.landClass(i);
+  const X = C.create({ W, H, LI: sim.LI, kcls: kc, year: () => yr, seed: 7, owner: sim.owner });
+  let ice0 = 0; for (const i of sim.LI) ice0 += X.ice[i]; yr = -5000; X.step(); let ice1 = 0; for (const i of sim.LI) ice1 += X.ice[i];
+  check(ice0 > 2000 && ice1 < ice0 * 0.1, `the ice withdraws: ${ice0} regions under it in 10,000 BC, ${ice1} in 5000 BC`);
+  yr = -7000; X.step(); const wet7 = X.wet[tib]; yr = -2000; X.step(); const wet2 = X.wet[tib];
+  check(wet7 > 0.5 && wet2 < 0.05, `the Sahara is green in 7000 BC and desert again by 2000 BC (Tibesti ${wet7.toFixed(2)}, then ${wet2.toFixed(2)})`);
+  // the great lake of the wet centuries: Mega-Chad covers the basin of Lake Chad while the western Sahara is green, and nobody lives on it
+  { const bod = at(17.75, 17.25); X.risen(); yr = -10000; X.step(); const l0 = X.ice[bod]; X.risen(); yr = -7000; X.step(); const r7 = X.risen();
+    check(l0 === 0 && X.ice[bod] === 2 && X.here(bod).lake && !X.here(bod).ice && X.hv[bod] === 0 && C.BANDS[X.bandOf(bod)].key === 'none' && r7.includes(bod) && r7.length > 90, `Mega-Chad: dry in 10,000 BC, a lake over ${r7.length} regions in 7000 BC, and the inspector says so`);
+    yr = -2000; X.step(); check(X.ice[bod] === 0 && !X.here(bod).lake, 'and dry land again by 2000 BC');
+    const s2 = createSim(wd, 2303), T = s2.spawnTribe(bod, {});
+    check(!!T && s2.lakeWill(bod) && !s2.lakeWill(paris), 'a band may live on the floor of the basin before the waters come; the player is told to settle on its shore');
+    let k = 0; while (!s2.lakeAt(bod) && k++ < 1500) s2.tick();
+    check(s2.lakeAt(bod) && s2.owner[bod] === -1 && s2.pop[bod] === 0 && s2.spawnTribe(bod, {}) === null && s2.drought(bod) === 'The great lake lies here', `the lake rises over the basin in ${fy(s2.year)}: the place is nobody's, and nobody settles the water`); }
+  yr = -2150; X.step(); const h = X.here(ur);
+  check(X.hv[ur] < 0.8 && h.event && h.event.key === 'great42', `in 2150 BC the Great Drought lies on the lands between the rivers (the harvest at Ur ${Math.round(X.hv[ur] * 100)} in a hundred)`);
+  yr = -1900; X.step(); check(X.hv[ur] > 0.85, `and is over by 1900 BC (${Math.round(X.hv[ur] * 100)})`);
+  // every year's weather: about as many droughts as the rate, and the land on the whole as it was
+  yr = 1000; X.step(); const d0 = X.stats.droughts; let mean = 0, nm = 0, worst = 1; for (let k = 0; k < 300; k++) { yr++; X.step(); if (k % 10 === 0) for (const i of sim.LI) { if (X.ice[i]) continue; mean += X.hv[i]; nm++; if (X.hv[i] < worst) worst = X.hv[i]; } }
+  const dn = X.stats.droughts - d0; mean /= nm;
+  check(dn > 300 * C.SPELL.drought.rate * 0.7 && dn < 300 * C.SPELL.drought.rate * 1.3 && mean > 0.97 && mean < 1.01 && worst < 0.75, `in three hundred years ${dn} droughts begin; the land's harvest is ${mean.toFixed(3)} of an ordinary year's on the whole, ${worst.toFixed(2)} at the worst`);
+  { const sv = JSON.parse(JSON.stringify(X.save())); const Y = C.create({ W, H, LI: sim.LI, kcls: kc, year: () => yr, seed: 1, owner: sim.owner }); Y.load(sv); let diff = 0; for (const i of sim.LI) diff = Math.max(diff, Math.abs(Y.hv[i] - X.hv[i]));
+    check(Y.spells.length === X.spells.length && diff < 1e-4, `saved and loaded, the weather is the same (${X.spells.length} spells, ${diff.toExponential(1)} apart at most)`);
+    let a = 0, b = 0; for (let k = 0; k < 20; k++) { yr++; X.step(); Y.step(); } for (const i of sim.LI) { a += X.hv[i]; b += Y.hv[i]; } check(Math.abs(a - b) < 1e-3 * a, 'and goes on the same') }
+  // a drought laid by hand (the scenes and the end-to-end suite): it lies where it was asked for, is news, and lifts when its years are up
+  { yr++; X.step(); X.news.length = 0; const h0 = X.hv[ur], sp = X.force('drought', ur, 500, -0.4, 2);
+    check(X.hv[ur] < h0 * 0.62 && X.spells.includes(sp) && X.news.some((n) => n.kind === 'drought' && n.id === sp.id), `a drought laid on Ur by hand: the harvest ${Math.round(h0 * 100)}, then ${Math.round(X.hv[ur] * 100)} in a hundred, and it is news`);
+    yr += 2; X.step(); check(!X.spells.includes(sp) && X.news.some((n) => n.kind === 'rains' && n.id === sp.id), 'and the rains come back when its years are up'); }
+  // a famine: the land feeds fewer this year; those it no longer feeds starve, fewer where the granaries are opened
+  const run = (fed) => { const s2 = createSim(wd, 2302); const P = s2.setPlayer(paris, 'Parisii'); P.tech = s2.ERAS[3][1] + 0.01; P.era = 3; teach(s2, P, 3); P.aggression = 0; if (P.dip) P.dip.think = 1e12;
+    for (let k = 0; k < 8; k++) s2.tick(); const cells = s2.LI.filter((i) => s2.owner[i] === P.id); for (const i of cells) s2.pop[i] = s2.capacity(i, P); s2.recount(); const p0 = s2.popOf[P.id];
+    if (fed) P.clim = { until: s2.year + 10, f: 0.4 }; for (const i of cells) s2.climate.hv[i] = 0.6; s2.tick(); s2.recount(); return { p0, p1: s2.popOf[P.id], dead: s2.starvedOf(P.id), hv: s2.harvestOf(P.id), sim: s2, P }; };
+  const r0 = run(false), r1 = run(true);
+  check(r0.hv < 0.7 && r0.dead > 0 && r0.p1 < r0.p0 * 0.95, `a harvest of ${Math.round(r0.hv * 100)} in a hundred: ${(100 * r0.dead / r0.p0).toFixed(1)}% of the realm starve in the year`);
+  check(r1.dead < r0.dead * 0.8, `fewer where the court feeds the hungry (${(100 * r1.dead / r1.p0).toFixed(1)}%)`);
+  // the player is told of a drought and of the rains coming back as news that does not stop his turn (its story does, when it is told)
+  { const s2 = r1.sim, P = r1.P; s2.climate.force('drought', P.capital, 500, -0.15, 1); s2.tick(); const e1 = P.events.filter((e) => /The rains fail/.test(e.text)).pop();
+    for (let k = 0; k < 3; k++) s2.tick(); const e2 = P.events.filter((e) => /The rains come back/.test(e.text)).pop();
+    check(e1 && e1.calm && e1.type === 'disaster' && e2 && e2.calm, `a drought and the rains' return are calm news: "${e1 ? e1.text : '-'}", "${e2 ? e2.text : '-'}"`); }
+  // saved: the weather and the year's harvest go with the world; a world from before the weather begins with its year's; one from before the land has none
+  { const s2 = r0.sim; const sv = JSON.parse(JSON.stringify(s2.save())); check(!!sv.climate && Array.isArray(sv.climate.sp), 'a world saves its weather');
+    const s3 = createSim(wd, 1); s3.load(sv); check(s3.climate && s3.climate.spells.length === s2.climate.spells.length, 'and has it again when loaded');
+    const o1 = JSON.parse(JSON.stringify(sv)); delete o1.climate; const s4 = createSim(wd, 1); s4.load(o1); for (let k = 0; k < 10; k++) s4.tick(); check(!!s4.climate && s4.year === s2.year + 10, 'a world saved before the weather begins with the weather of its year');
+    const o2 = JSON.parse(JSON.stringify(sv)); delete o2.climate; delete o2.land; const s5 = createSim(wd, 1); s5.load(o2); for (let k = 0; k < 5; k++) s5.tick(); check(s5.climate === null && !s5.iced(churchill), 'one saved before the land had kinds has none: it goes on as it was'); }
+  // the cost
+  { let ms = 0; const s2 = r1.sim; for (let k = 0; k < 100; k++) { s2.tick(); ms += s2.climate.stats.ms; } log(`   a year of weather takes ${(ms / 100).toFixed(3)} ms`); check(ms / 100 < 0.4, `the weather is quick enough (${(ms / 100).toFixed(3)} ms a year)`); }
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

@@ -62,7 +62,9 @@
       const cosLat = new Float32Array(H), sinLat = new Float32Array(H); for (let y = 0; y < H; y++) { const la = (90 - (y + 0.5) / H * 180) * GEO.D2R; cosLat[y] = Math.cos(la); sinLat[y] = Math.sin(la); }
       // (under the lens of peoples every region is painted by the people that lives there, and the lines are drawn between
       // peoples, not realms: people.js; under the lens of faiths by the faith its people keep, the old ways unpainted: faith.js)
-      const PP = this.palMode === 'people' && sim.people ? { map: sim.people.ppl, list: sim.people.list, rgbOf: sim.people.rgbOf } : this.palMode === 'faith' && sim.faith ? { map: sim.faith.fth, list: sim.faith.list, rgbOf: sim.faith.rgbOf } : null;
+      let PP = this.palMode === 'people' && sim.people ? { map: sim.people.ppl, list: sim.people.list, rgbOf: sim.people.rgbOf } : this.palMode === 'faith' && sim.faith ? { map: sim.faith.fth, list: sim.faith.list, rgbOf: sim.faith.rgbOf } : null;
+      // (under the lens of the harvest every place is painted by this year's harvest there, in bands, an ordinary year unpainted: climate.js)
+      if (this.palMode === 'harvest' && sim.climate && window.CLIMATE) { const CL = sim.climate, B = window.CLIMATE.BANDS; if (!this.hrvMap || this.hrvMap.length !== W * H) this.hrvMap = new Uint16Array(W * H); const m = this.hrvMap; for (const i of sim.LI) m[i] = CL.bandOf(i); PP = { map: m, list: B, rgbOf: (p) => B[p].rgb }; }
       const pcents = this.pcentroids = PP ? new Map() : null;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const i = y * W + x, j = i * 4; const o = owner[i]; const c = o >= 0 ? civs[o] : null;
