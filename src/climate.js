@@ -43,7 +43,7 @@ window.CLIMATE = (function () {
     dome('cordillera', 'the ice of the western mountains', -125.28, 54.64, 403, -9700, { p: 1.8, ax: 2.4, az: 154.07, to: [-130.12, 56.07], mtn: 1 }),
     dome('scandinavia', 'the Scandinavian ice', 22.28, 64.89, 652, -7120, { hold: -9650, p: 0.98, ax: 1.76, az: 37.84, to: [17.55, 66.79] }),
     dome('southnorway', 'the ice of the mountains of Norway', 8.93, 61, 276, -7090, { hold: -9650, p: 1.75, ax: 1.68, az: 40.73, to: [13.18, 62.69], mtn: 1 }),
-    dome('iceland', 'the ice of Iceland', -18.6, 64.9, 205, -7500, { hold: -9650, p: 0.7, ax: 1.45, az: 90, to: [-17.5, 64.5] }),
+    dome('iceland', 'the ice of Iceland', -18.6, 64.9, 205, -7500, { hold: -9650, p: 0.7, ax: 1.45, az: 90, to: [-17.5, 64.5], mtn: 1 }),
     dome('highlands', 'the ice of the Highlands', -6.43, 57.18, 145, -9600, { p: 0.6, ax: 2.07, az: 129.07, to: [-5.2, 57.05], mtn: 1 }),
     /* DOMES:END */
   ];
@@ -134,10 +134,16 @@ window.CLIMATE = (function () {
   const greenProfile = (g, lon, lat) => { if (lat <= 0) return 0; const l = lat - greenJit(lon, lat); return Math.min(sstep(g.lon0 - g.fade, g.lon0 + g.fade, lon), 1 - sstep(g.lon1 - g.fade, g.lon1 + g.fade, lon)) * (1 - sstep(g.latFull, g.latZero, l)); };
   // how green each region is in a year (the cold of 6200 BC dried it for a lifetime)
   const greenS = (g, y) => sstep(g.on0, g.on1, y) * (1 - sstep(g.off0, g.off1, y)) * (1 - 0.6 * evRamp(EV.cold82, y));
-  // Mega-Chad (the ground's shader draws it, the trees keep out of it): the level of the great lake of the wet centuries in a year,
+  // Mega-Chad (the ground's shader draws it, the trees keep out of it, and the simulation's people: CHAD): the level of the great lake of the wet centuries in a year,
   // metres as the heights have them (its old shore at 325 m, drawn 2.8 % taller), falling back to the deepest of the basin as the
   // western Sahara dries; -Infinity when it is not there. It lies between 11.5 and 21 degrees east and 10 and 20 north.
   const chadLevel = (y) => { const g = greenS(GREEN[0], y); return g > 0.05 ? 285 + 51 * sstep(0.3, 0.9, g) : -Infinity; };
+  // The cells of the simulation's half-degree grid that the lake can cover, each as x - 380, y - 140 on the grid of 720 by 360 and the
+  // height under which half of it lies (data/h at level 5, as the shader draws them; tools/climate/chad.py): a hundred and twelve
+  // cells, 340,000 square kilometres at the lake's highest, as large as Mega-Chad was. Where half of a cell is under the water the
+  // simulation counts it lake: nobody lives on it and nothing grows (climate.lake), and the people of a place it rises over go to the
+  // nearest dry land of theirs (sim.js, drown).
+  const CHAD = '14.4.276 16.4.320 17.4.248 18.4.304 11.5.284 12.5.268 13.5.244 14.5.208 15.5.188 16.5.192 17.5.212 18.5.260 10.6.312 11.6.256 12.6.236 13.6.220 14.6.192 15.6.184 16.6.200 17.6.264 18.6.328 10.7.312 11.7.280 12.7.272 13.7.260 14.7.244 15.7.228 16.7.256 17.7.300 10.8.332 11.8.312 12.8.288 13.8.292 14.8.296 15.8.288 16.8.284 12.9.324 13.9.304 14.9.292 15.9.284 16.9.296 7.10.332 12.10.320 13.10.300 14.10.292 15.10.296 16.10.312 6.11.292 7.11.292 8.11.312 11.11.324 12.11.304 13.11.296 14.11.300 15.11.304 16.11.332 5.12.308 6.12.296 7.12.288 8.12.300 9.12.312 10.12.316 11.12.304 12.12.300 13.12.304 14.12.308 15.12.312 4.13.328 5.13.312 6.13.304 7.13.288 8.13.288 9.13.292 10.13.296 11.13.304 12.13.304 13.13.304 14.13.304 15.13.312 5.14.312 6.14.304 7.14.296 8.14.292 9.14.296 10.14.296 11.14.300 12.14.300 13.14.300 14.14.300 15.14.312 5.15.328 6.15.308 7.15.300 8.15.296 9.15.300 10.15.304 11.15.304 12.15.308 13.15.312 14.15.320 7.16.316 8.16.308 9.16.304 10.16.308 11.16.324 12.16.332 8.17.324 9.17.316 10.17.316 11.17.332 9.18.332 10.18.324'.split(' ').map((t) => t.split('.').map(Number));
   // what kinds of land the wet years changed (land.js's numbering: desert, steppe, high plateau), and how much
   const GREEN_KIND = { 4: 1, 5: 0.6, 13: 0.5 };
 
@@ -282,6 +288,9 @@ window.CLIMATE = (function () {
     const flush = () => { for (let k = 0; k < nDirty; k++) { const i = dirty[k]; hv[i] = ice[i] ? 0 : evF[i] * spF[i]; isDirty[i] = 0; } nDirty = 0; };
     // (how dry and how prone to bad years each land cell is, and the land the wet years could green: once)
     const greenK = new Float32Array(N); const iceCells = [], greenCells = [];
+    // (Mega-Chad's cells on this grid, and their heights; risen: the places the water has come over since the simulation last asked)
+    const chadCells = [], chadH = []; let risen = [];
+    for (const [cx, cy, hm] of CHAD) { const lon = (cx + 380.5) / 720 * 360 - 180, lat = 90 - (cy + 140.5) / 360 * 180, x = Math.floor((lon + 180) / 360 * W), yy = Math.floor((90 - lat) / 180 * H); if (x >= 0 && x < W && yy >= 0 && yy < H) { chadCells.push(yy * W + x); chadH.push(hm); } }
     for (const i of LI) { if (Gd.iceLeft[i] > -1e8) iceCells.push(i); const g = Gd.greenP[i] * (GREEN_KIND[kcls[i]] || 0); if (g > 0.01) { greenK[i] = g; greenCells.push(i); } }
     let s = ((h.seed || 1) * 2246822519 + 0x5EED) >>> 0;
     const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -293,6 +302,10 @@ window.CLIMATE = (function () {
     function slow(y) {
       let iceN = 0;
       for (const i of iceCells) { const v = !bare && y < Gd.iceLeft[i] ? 1 : 0; if (v !== ice[i]) { ice[i] = v; mark(i); } iceN += v; }
+      // (the great lake: a cell is lake while the water stands above the height half of it lies under - 2 in ice[], whose 1 is the ice;
+      //  never in a world saved before the weather, whose people may live where it would lie)
+      const lv = bare ? -Infinity : chadLevel(y);
+      for (let k = 0; k < chadCells.length; k++) { const i = chadCells[k], v = chadH[k] < lv ? 2 : 0; if (v !== ice[i]) { ice[i] = v; mark(i); if (v) risen.push(i); } }
       let moved = false; for (const i of greenCells) { const g = greenS(GREEN[Gd.greenR[i]], y) * greenK[i]; if (Math.abs(g - wet[i]) > 1e-4) { wet[i] = g; mark(i); moved = true; } }
       if (moved) wetVer++; slowAt = y; return iceN;
     }
@@ -361,13 +374,13 @@ window.CLIMATE = (function () {
     // a place this year: its harvest, the spell over it (how many years so far), the great event, the ice and the green
     function here(i) {
       const y = h.year(), x = i % W, yy = (i / W) | 0, lon = Gd.lonX[x], lat = Gd.latY[yy];
-      const out = { hv: hv[i], ice: !!ice[i], iceLeft: Gd.iceLeft[i], iceDome: Gd.iceDome[i] >= 0 ? DOMES[Gd.iceDome[i]].name : '', wet: wet[i], greenEnd: Gd.greenR[i] >= 0 ? GREEN[Gd.greenR[i]].off1 : 0, greenName: Gd.greenR[i] >= 0 ? GREEN[Gd.greenR[i]].name : '', spell: null, event: null };
+      const out = { hv: hv[i], ice: ice[i] === 1, lake: ice[i] === 2, iceLeft: Gd.iceLeft[i], iceDome: Gd.iceDome[i] >= 0 ? DOMES[Gd.iceDome[i]].name : '', wet: wet[i], greenEnd: Gd.greenR[i] >= 0 ? GREEN[Gd.greenR[i]].off1 : 0, greenName: Gd.greenR[i] >= 0 ? GREEN[Gd.greenR[i]].name : '', spell: null, event: null };
       let best = 0; for (const sp of spells) { const q = gcKm(lon, lat, sp.lon, sp.lat) / sp.r; if (q >= 1) continue; const v = Math.abs(sp.s) * SP_IN(q); if (v > best) { best = v; out.spell = { kind: sp.kind, years: y - sp.y0 + 1, depth: sp.s * SP_IN(q), id: sp.id }; } }
       let eb = 0; for (const e of EVENTS) { const r = evRamp(e, y); if (!r) continue; for (const [elon, elat, km] of e.where) { const q = gcKm(lon, lat, elon, elat) / km; const v = EV_IN(q) * r; if (v > eb) { eb = v; out.event = { key: e.key, name: e.name, kind: e.kind, text: e.text, y0: e.y0, y1: e.y1, share: v }; } } }
       return out;
     }
     // the band of the lens of the harvest a place is in
-    function bandOf(i) { if (ice[i]) return BK.ice; const v = hv[i]; if (v < 0.7) return BK.famine; if (v < 0.88) return BK.drought; if (v < 0.96) return BK.poor; if (v > 1.04) return BK.good; if (wet[i] > 0.25) return BK.green; return BK.none; }
+    function bandOf(i) { if (ice[i] === 2) return BK.none; if (ice[i]) return BK.ice; const v = hv[i]; if (v < 0.7) return BK.famine; if (v < 0.88) return BK.drought; if (v < 0.96) return BK.poor; if (v > 1.04) return BK.good; if (wet[i] > 0.25) return BK.green; return BK.none; }
     // what the ground's shader is told: the domes as they stand (lon, lat, km), how green each region is, the droughts (the deepest
     // MAXV of the spells and of the great droughts' circles: lon, lat, km, how much the harvest is down at the heart), the chill
     function view(out) {
@@ -402,7 +415,7 @@ window.CLIMATE = (function () {
     }
     // (a new world begins with the climate of its year, and with what has already begun counted as old)
     { const y = h.year(); for (const e of EVENTS) if (y > e.y0) seen.add(e.key); slow(y); events(y); news.length = 0; flush(); }
-    return { hv, ice, wet, greenK, greenCells, step, here, bandOf, view, spellsIn, force, save, load, news, stats, get spells() { return spells; }, get wetVer() { return wetVer; }, get ver() { return ver; }, get bare() { return bare; }, epoch: () => epochOf(h.year()), chill: () => { const y = h.year(); if (y !== chY) { chY = y; chV = chillOf(y); } return chV; }, iceLeft: Gd.iceLeft };
+    return { hv, ice, wet, greenK, greenCells, step, here, bandOf, view, spellsIn, force, save, load, news, stats, chadCells, risen: () => { const r = risen; risen = []; return r; }, get spells() { return spells; }, get wetVer() { return wetVer; }, get ver() { return ver; }, get bare() { return bare; }, epoch: () => epochOf(h.year()), chill: () => { const y = h.year(); if (y !== chY) { chY = y; chV = chillOf(y); } return chV; }, iceLeft: Gd.iceLeft };
   }
   return { create, DOMES, GREEN, EVENTS, EV, EPOCHS, BANDS, BK, SPELL, VAR, MAXV, ND, NGR, T0, ICE_P, LOBE, LOBE_F, LOBE_W, GREEN_JF, GREEN_JA, GREEN_PF, domeR, domeAt, frame, domeQ, lobeK, unit, chadLevel, greenS, evRamp, epochOf, chillOf, iceLeftAt, iceQ, lobe, gcKm, grid };
 })();

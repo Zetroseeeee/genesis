@@ -276,7 +276,7 @@
     if (!sim || mode === 'intro') return;
     const hit = mapcam.pickAt(cx, cy); if (!hit) return;
     const i = cellOf(hit.lon, hit.lat);
-    if (mode === 'choose') { if (!sim.land[i] || (sim.flags[i] & 8)) { toast('Your people need land to stand on'); return; } if (sim.iced && sim.iced(i)) { toast('The ice still lies here: nothing lives on it yet'); return; } if (sim.owner[i] >= 0) { toast('Someone already lives here'); return; } showFoundCard(hit, i, cx, cy); return; }
+    if (mode === 'choose') { if (!sim.land[i] || (sim.flags[i] & 8)) { toast('Your people need land to stand on'); return; } if (sim.iced && sim.iced(i)) { toast(sim.lakeAt(i) ? 'The great lake covers this land' : 'The ice still lies here: nothing lives on it yet'); return; } if (sim.lakeWill && sim.lakeWill(i)) { toast('The great lake of the wet centuries will rise over this land: settle on its shore'); return; } if (sim.owner[i] >= 0) { toast('Someone already lives here'); return; } showFoundCard(hit, i, cx, cy); return; }
     if (placing) { cancelPlacing(); return; }
     if (marching >= 0) { orderMarch(i); return; }
     if (tool) {
@@ -447,6 +447,7 @@
   // (the weather of a place, in a line: the ice, a drought and its year, a great drought or cold, a good year, the green lands: climate.js)
   function weatherOf(w) {
     if (!w) return null; const hv = Math.round(w.hv * 100);
+    if (w.lake) return { t: 'Under the great lake', tip: 'Mega-Chad: in the wet centuries the basin of Lake Chad holds a lake as large as the Caspian, with fish, hippopotamus and the fishermen on its shores. Nobody lives on the water; it falls back as the Sahara dries, and the land comes out again.', cls: 'pos' };
     if (w.ice) return { t: `Under the ice${w.iceLeft > -1e8 ? `, until about ${sim.fmtYear(Math.round(w.iceLeft / 100) * 100)}` : ''}`, tip: `${w.iceDome ? w.iceDome.charAt(0).toUpperCase() + w.iceDome.slice(1) : 'The ice'}: the last of the great ice sheets of the cold still lies here, and withdraws a few kilometres a year. Nothing lives on it.` };
     if (w.event && w.event.share > 0.25 && (w.event.kind !== 'warm' || hv > 101)) return { t: `${w.event.name.charAt(0).toUpperCase() + w.event.name.slice(1)}: the harvest ${hv} in a hundred`, tip: `${w.event.text} (${sim.fmtYear(w.event.y0)} to ${sim.fmtYear(w.event.y1)})`, cls: w.event.kind === 'warm' ? 'pos' : 'neg' };
     if (w.spell && w.spell.kind === 'drought') return { t: `A drought, the ${ordinal(w.spell.years)} year: the harvest ${hv} in a hundred`, tip: 'The rains have failed here: the land feeds fewer this year, and those it no longer feeds starve unless granaries, grain from abroad or the court\'s bread keep them. Crops are fewer at the market, and dearer.', cls: 'neg' };

@@ -2,7 +2,7 @@
 // forward from 10,000 BC (default none), a few hundred years at a time, with the player's people set down at `player`; then, if asked,
 // a drought is laid over [lon, lat, km, depth] for three years; then the globe from alt metres above lon, lat (tilt, heading), the
 // lens of the harvest on if `lens`; the year held at `season` (0.55: high summer in the north, early July) and the sun at `sun` [height, bearing]
-// over lon, lat (null: as the game's clock has it). Answers in window.__holo: the year, the age's climate, how many regions lie under the ice, how
+// over lon, lat (null: as the game's clock has it). Answers in window.__holo: the year, the age's climate, how many regions lie under the ice and under Mega-Chad, how
 // green the dry lands are, the droughts under way, the harvest at lon, lat.
 (() => {
   const G = window.__G; if (!G) return 'no game';
@@ -15,9 +15,9 @@
   const show = () => {
     const S = G.sim, CL = S.climate;
     if (P.drought && CL) { const [lon, lat, km, d] = P.drought; CL.force('drought', cellAt(lon, lat), km, -d, 3); CL.news.length = 0; }
-    let ice = 0, wet = 0; if (CL) for (const i of S.LI) { ice += CL.ice[i]; wet += CL.wet[i]; }
+    let ice = 0, wet = 0, lake = 0; if (CL) for (const i of S.LI) { ice += CL.ice[i] === 1 ? 1 : 0; lake += CL.ice[i] === 2 ? 1 : 0; wet += CL.wet[i]; }
     const here = CL ? CL.here(cellAt(P.lon, P.lat)) : null;
-    window.__holo = { year: S.fmtYear(S.year), epoch: CL ? CL.epoch().name : '', ice, wet: Math.round(wet), droughts: CL ? CL.spells.filter((x) => x.kind === 'drought').length : 0, hv: here ? +here.hv.toFixed(3) : 1, event: here && here.event ? here.event.name : '' };
+    window.__holo = { year: S.fmtYear(S.year), epoch: CL ? CL.epoch().name : '', ice, lake, wet: Math.round(wet), droughts: CL ? CL.spells.filter((x) => x.kind === 'drought').length : 0, hv: here ? +here.hv.toFixed(3) : 1, event: here && here.event ? here.event.name : '' };
     if (P.season !== null) { G.setSeason(P.season); window.__seasonLock = true; }
     if (P.sun) { const f = GEO.enu(P.lon, P.lat), [el, az] = P.sun; window.__sunLock = true; G.globals.uSun.value.copy(f.up).multiplyScalar(Math.sin(el)).addScaledVector(f.east, Math.sin(az) * Math.cos(el)).addScaledVector(f.north, Math.cos(az) * Math.cos(el)).normalize(); }
     const M = G.mapcam; M.fly = null; M.autoTilt = false; M.lon = M.tLon = P.lon; M.lat = M.tLat = P.lat; M.dist = M.tDist = P.alt / 6371000; M.tilt = M.tTilt = P.tilt; M.heading = M.tHeading = P.heading;

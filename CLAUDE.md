@@ -779,7 +779,8 @@ Conventions that matter:
   thirty places it never reached; `domefit.js map` draws them over each other: `shots/climate/icemap.png`). Their edge runs out in
   lobes (`lobe`: four sizes of a noise of the place made of integer hashes, `hash3` and `vnoise`, **the very same sum in the ground's
   vertex shader**, so that the ice the simulation knows and the ice the picture shows are one); the ice of mountains (`mtn`: the
-  Cordillera, the mountains of Norway, the Highlands) is drawn as the ranges hold it, white above a line that rises toward its edge.
+  Cordillera, the mountains of Norway, Iceland, the Highlands) is drawn as the ranges hold it, white above a line that lies at 300 m
+  in its heart and rises toward its edge (with the line at the sea's level in its heart, Iceland's ice was a white disc on the sea).
   Where one still lies nothing lives, nobody settles (`sim.iced`: the wild bands, expansion, colonies, tribes, the player's first
   land), nothing is yielded, no tree stands, and the land it has just left is bare (`iceQ`: the trees stand back from it). **The
   ground's shader finds the ice at the pixel** (drawn between the corners of the mesh, a dome of a hundred kilometres was a polygon of
@@ -797,7 +798,12 @@ Conventions that matter:
   sand seas last), no closed wood (savW: an olive photograph read as wood was a jungle's canopy from 40 km) and the dryness the
   materials go by the less; trees.js plants savanna and steppe trees there (the Köppen classes Aw and BSh). *Mega-Chad*, as large as the
   Caspian, is a lake of the water's own (`chadLevel`: 336 m as the heights have it, falling to the deepest of the basin as the western
-  Sahara dries), found by the heights at the pixel: its shallows kilometres wide, the sky in it, no trees in it. *Droughts and good
+  Sahara dries), found by the heights at the pixel: its shallows kilometres wide, the sky in it, no trees in it, its shore a line a
+  pixel wide that wanders by the noise of the place at the sizes the eye can make out (by grain a pixel across, a stipple of pools).
+  The simulation knows it too (`CHAD`: the hundred and twelve regions half of which lie under its highest shore, measured from the
+  heights by `tools/climate/chad.py`): a region under it is lake (`ICE` 2, `sim.lakeAt`; `sim.iced` answers for both), nobody lives
+  on it and nothing grows, the people of a place it rises over go to the nearest dry land of their realm (`drown` in `sim.js`), and the
+  player is told to found his people on its shore (`sim.lakeWill`). *Droughts and good
   years*: the great ones history remembers (`EVENTS`: where, in circles; when; how deep at the worst; drought, cold, warm or volcanic -
   the cold of 6200 BC, the Drying of 3900 BC that ended the green Sahara, the Great Drought of 2200 BC that broke the kingdoms of the
   river plains, the Long Drought of the Bronze Age's end, the warm centuries, the Dark Sun of 536, the drought of the Maya, the warm

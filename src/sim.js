@@ -258,7 +258,8 @@ function createSim(world, seed) {
   applyWet();
   const relief = new Float32Array(MAXC), hvSum = new Float32Array(MAXC), hvPop = new Float32Array(MAXC), starved = new Float32Array(MAXC);      // (what softens a famine in each realm; its harvest, weighed by its people; who starved this year)
   const FAMINE = 0.25;      // (of those a bad year's land no longer feeds, the share that die of it within the year where nothing softens it)
-  const iced = (i) => ICE !== null && landOn && ICE[i] === 1;
+  const iced = (i) => ICE !== null && landOn && ICE[i] !== 0;      // (under the ice, or under the great lake of the green Sahara: ICE 2, climate.js)
+  const lakeAt = (i) => ICE !== null && landOn && ICE[i] === 2;
   const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
   const CROP = new Float32Array(NG); for (let g = 1; g < NG; g++) { const G = ECON.GOODS[g]; if (G) CROP[g] = G.crop || (G.key === 'cattle' ? 0.6 : 0); }      // (how much of a good is a harvest: grain all of it, fish half, cattle some)
 
@@ -933,7 +934,7 @@ function createSim(world, seed) {
     if (landOn) for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (cv) landRow(cv); }
     // the weather of the year (climate.js): the ice, the green lands, the great droughts, every year's own; and what softens a famine
     // in each realm - its granaries, what its market can bring in, the bread the court gives out
-    const weather = climate && landOn; if (weather) { climate.step(); if (wetVer !== climate.wetVer) applyWet(); climateNews(); }
+    const weather = climate && landOn; if (weather) { climate.step(); for (const i of climate.risen()) drown(i); if (wetVer !== climate.wetVer) applyWet(); climateNews(); }
     if (weather) for (let c = 0; c < MAXC; c++) { const cv = civs[c]; hvSum[c] = 0; hvPop[c] = 0; starved[c] = 0; if (!cv) continue; const sat = market.sat[c * NC + CAT.food]; relief[c] = Math.min(0.85, 0.6 * (1 - keep[c]) + 0.4 * clamp01((sat - 0.6) / 0.4) + (cv.clim && cv.clim.until > year ? cv.clim.f : 0)); }
     for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; strengthOf[c] = strength(cv, 0, 0); fmOf[c] = fmNow(cv); growR[c] = growOf(cv.tech) * (1 - (cv.policy.tax - 1) * 0.15) * (0.7 + cv.stability * 0.3) * KF[c * NKF + KK.grow] * RF[c * NRF + RK.grow]; techSum += cv.tech; techN++; if (cv.tech > frontTech) frontTech = cv.tech; }
     meanTech = techN ? techSum / techN : 0.02;
@@ -1267,8 +1268,16 @@ function createSim(world, seed) {
   // the god's drought (climate.js): the rains fail for three years over some five hundred kilometres about the place, told as any drought is
   function drought(center) {
     if (!climate || !landOn) return 'The weather of this world is its own';
-    if (!land[center]) return 'Needs land'; if (iced(center)) return 'The ice lies here';
+    if (!land[center]) return 'Needs land'; if (iced(center)) return lakeAt(center) ? 'The great lake lies here' : 'The ice lies here';
     climate.force('drought', center, 550, -0.45, 3); return 'The rains fail';
+  }
+  // the great lake of the wet centuries rises over a place (climate.js: Mega-Chad): its people go to the nearest dry land of their
+  // realm, and the place is nobody's until the water falls back (it rises over centuries: what goes under is a fishing camp, not a city)
+  function drown(i) {
+    const o = owner[i]; let to = -1;
+    if (o >= 0) for (let k = 0; k < 8; k++) { const n = nbOf(i, k); if (n >= 0 && land[n] && owner[n] === o && !iced(n)) { to = n; break; } }
+    if (to >= 0) pop[to] += pop[i];
+    pop[i] = 0; owner[i] = -1; infra[i] = 0; walls[i] = 0; special[i] = 0; level[i] = 0; ind.delete(i);
   }
   function bounty(center) {
     const radius = 4; const y0 = (center / W) | 0, x0 = center - y0 * W; let hit = null;
@@ -1605,7 +1614,7 @@ function createSim(world, seed) {
     // the weather (climate.js), in a world whose land has kinds: a realm's harvest this year against an ordinary year's (weighed by its
     // people), who starved, what softens a famine there; a place's weather; whether the ice still lies on a place
     get climate() { return climate && landOn ? climate : null; }, harvestOf: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1), starvedOf: (c) => starved[c], reliefOf: (c) => relief[c],
-    climateHere: (i) => (climate && landOn ? climate.here(i) : null), iced,
+    climateHere: (i) => (climate && landOn ? climate.here(i) : null), iced, lakeAt, lakeWill: (i) => !!(climate && landOn && !climate.bare && year < CLIMATE.GREEN[0].off0 && climate.chadCells.includes(i)),      /* (land the great lake will rise over: the player is told to settle on its shore) */
     diseaseView: () => { const c = playerCiv(); return disease ? disease.view(c ? c.id : -1) : null; }, shutAgainst: (q) => { const c = playerCiv(); return c && disease ? disease.quarantine(c, q, 0) : 'No realm'; },
     intrigueView: (bid) => { const c = playerCiv(); return c && intrigue ? intrigue.view(c.id, bid === undefined ? -1 : bid) : null; },
     scheme: (bid, key) => { const c = playerCiv(), b = civs[bid]; if (!c || !intrigue) return 'No realm'; if (!b) return 'Nobody there'; return intrigue.begin(c, b, key); }, unscheme: () => { const c = playerCiv(); return c && intrigue ? intrigue.cancel(c) : 'No realm'; }, legacyView: () => { const c = playerCiv(); return c && legacy ? legacy.view(c.id) : null; }, storyView: () => { const c = playerCiv(); return c && story ? story.view(c.id) : null; }, storyTell: (key, d) => { const c = playerCiv(); return c && story ? story.tell(c, key, d) : 'No realm'; },
