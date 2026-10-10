@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~34 min for all 44).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~38 min for all 50).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
@@ -889,8 +889,8 @@ Conventions that matter:
   `SEA[age]`, a fiftieth of the pull in the Stone Age and a tenth in the Middle Ages - at four tenths Java peopled Australia in the
   Middle Ages - a quarter under sail, all of it with steam). How many go is the age's pace (`RATE`: four in ten thousand a year at
   the full pull of an empty land in the Stone Age, nine under sail, four in a thousand with steamships and railways, fewer again in
-  the settled last ages: the world's people leave their homes at one to one and a half in a thousand a year from 1800 on, to
-  other lands and to their own far frontiers, as history's some one in a thousand from 1850 to 1940) times the law of labour (`MOB`: serfs a quarter, slaves half,
+  the settled last ages: the world's people leave their homes at about one in a thousand a year from 1800 to 1950, to other
+  lands and to their own far frontiers, as history's some one in a thousand from 1850 to 1940, and half that since) times the law of labour (`MOB`: serfs a quarter, slaves half,
   free labour 1.3, an assigned workforce 0.3), at most half the crowd; a realm takes in at most 3 % of its room a year (`CAPIN`). *Refugees*: as many as a famine kills flee it (`FAMINE_FLEE`), a
   realm losing land to a war loses 0.4 % a year, one coming apart (stability under 0.3) up to 0.3 %: to any neighbour at peace with
   theirs that has room and a harvest. *Where they come*: a region whose newcomers come to more than its own people (or by a roll on
@@ -910,7 +910,7 @@ Conventions that matter:
   The autopilot's realms keep their borders open. The module throws no dice (the land's pass rolls a region's turning on a hash of
   the place and the year). *What it costs*: migrate.js a tenth to two tenths of a millisecond a year (worked out every five years),
   the land's pass about a tenth more (`migMove` in the realms that have people to move, `migCount` in the years the flows are worked
-  out: apart from the pass's loop, which runs slower with them written into it); with the world it makes, a year is some six in a
+  out: apart from the pass's loop, which runs slower with them written into it); with the world it makes, a year is some five to ten in a
   hundred dearer in the first ages and three to five in the last (test section 1: 0.25 of a unit a year, from 0.23). Saved with the world (`save().mig`: the decade's flows) and the realm (`civ.mig`); a world saved before
   migration has no flows yet, and keeps the table of food it was saved under (`FOOD_039`, `save().food` 39): people on the move
   fill the land's room sooner than it fills itself, so the world had a tenth more people, and the table of the later ages was

@@ -8,9 +8,10 @@
 // West); the Americas' share of the world's people rising after 1700 toward history's (Maddison, without Australia: 4 % in
 // 1820, 7 % in 1870, 11 % in 1913, 14 % in 1998), most of them of peoples from over the ocean by 1900; a year of it a tenth of a
 // millisecond or two. Then the regional census (tools/people/regions.js), the world's people (tools/know/people.js) and the
-// war-and-peace probe. Measured for 0.40, seed 12345: 0.1, 0.2, 0.4 in a thousand a year to 1600, 1700, 1800; 1.5, 1.0, 1.2, 1.0
-// to 1850, 1900, 1950, 2000; the Americas 1.8 % of the world in 1800, 3.4 % in 1900, 7.1 % in 2000 (0.39 had 3.9 %), 61 % of
-// them of peoples from over the ocean in 1900; 0.13 to 0.19 ms a year (0.33 about 1950).
+// war-and-peace probe. Measured for 0.40 over 12345 and 777: 0.1, 0.15, 0.3 in a thousand a year to 1600, 1700, 1800; 1.3, 0.8
+// to 1.1, 1.0 to 1.1, 0.4 to 0.7 to 1850, 1900, 1950, 2000; the Americas 2.4 and 6.1 % of the world in 1800, 3.4 and 4.9 % in
+// 1900, 6.9 and 6.3 % in 2000 (0.39 had 3.9 % in 12345), a third and an eighth of them of peoples from over the ocean in 1950;
+// 0.1 to 0.25 ms a year (0.38 about 1950).
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 global.performance = global.performance || require('perf_hooks').performance;
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;
