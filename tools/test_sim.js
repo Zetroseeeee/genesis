@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8')); (0, eval)(fs.readFileSync('src/climate.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -1465,6 +1465,51 @@ log('22. the land');
   const top = sim.civs.filter(Boolean).sort((x, y) => sim.popOf[y.id] - sim.popOf[x.id]).slice(0, 5).map((c) => ((c.capital % W) + 0.5) / W * 360 - 180);
   log(`   ${sim.fmtYear(sim.year)}: ${(world / 1000).toFixed(0)} million people, ${(100 * am / world).toFixed(0)}% in the Americas, ${(100 * monsoon / world).toFixed(0)}% on the monsoon's farmland; the five greatest realms at ${top.map((x) => x.toFixed(0)).join(', ')} degrees of longitude`);
   check(am / world < 0.15 && monsoon / world > 0.25 && top.every((x) => !(x < -30 && x > -170)), 'by AD 1000 the old world holds the world\'s people, monsoon Asia the most of them, and the greatest realms');
+}
+}
+if (want(23)) {
+log('23. the weather');
+{
+  const C = window.CLIMATE; const at = (lon, lat) => Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
+  const sim = createSim(wd, 2301), fy = (y) => sim.fmtYear(Math.round(y));
+  // the ice: where it stood, and when it went
+  const [hb] = C.iceLeftAt(-85, 60), [sth] = C.iceLeftAt(18, 59.3), [mtl] = C.iceLeftAt(-73.5, 45.5);
+  check(hb > -6600 && hb < -6100 && sth > -9600 && sth < -8600 && mtl < -1e8, `the ice leaves Hudson Bay in ${fy(hb)}, Stockholm in ${fy(sth)}, and never lay on Montreal in the game's years`);
+  check(C.DOMES.every((d) => C.domeR(d, -10000) > 0 && C.domeR(d, d.end) === 0 && C.domeR(d, -9000) <= C.domeR(d, -10000)), 'every dome of ice shrinks to nothing by its year');
+  const churchill = at(-94, 58.8), tib = at(18.5, 21), ur = at(46.1, 30.96), paris = at(2.35, 48.85);
+  check(!!sim.climate && sim.iced(churchill) && sim.capacity(churchill, null) === 0 && sim.homeOf(churchill) === 0 && sim.spawnTribe(churchill, {}) === null, 'in 10,000 BC the ice lies on the shores of Hudson Bay: nothing lives there, and nobody can settle it');
+  check(window.CLIMATE.BANDS[sim.climate.bandOf(churchill)].key === 'ice' && sim.climateHere(churchill).ice, 'and the lens and the inspector say so');
+  // a world's weather on its own, its years set by hand
+  let yr = -10000; const kc = new Uint8Array(N); for (const i of sim.LI) kc[i] = sim.landClass(i);
+  const X = C.create({ W, H, LI: sim.LI, kcls: kc, year: () => yr, seed: 7, owner: sim.owner });
+  let ice0 = 0; for (const i of sim.LI) ice0 += X.ice[i]; yr = -5000; X.step(); let ice1 = 0; for (const i of sim.LI) ice1 += X.ice[i];
+  check(ice0 > 2000 && ice1 < ice0 * 0.1, `the ice withdraws: ${ice0} regions under it in 10,000 BC, ${ice1} in 5000 BC`);
+  yr = -7000; X.step(); const wet7 = X.wet[tib]; yr = -2000; X.step(); const wet2 = X.wet[tib];
+  check(wet7 > 0.5 && wet2 < 0.05, `the Sahara is green in 7000 BC and desert again by 2000 BC (Tibesti ${wet7.toFixed(2)}, then ${wet2.toFixed(2)})`);
+  yr = -2150; X.step(); const h = X.here(ur);
+  check(X.hv[ur] < 0.8 && h.event && h.event.key === 'great42', `in 2150 BC the Great Drought lies on the lands between the rivers (the harvest at Ur ${Math.round(X.hv[ur] * 100)} in a hundred)`);
+  yr = -1900; X.step(); check(X.hv[ur] > 0.85, `and is over by 1900 BC (${Math.round(X.hv[ur] * 100)})`);
+  // every year's weather: about as many droughts as the rate, and the land on the whole as it was
+  yr = 1000; X.step(); const d0 = X.stats.droughts; let mean = 0, nm = 0, worst = 1; for (let k = 0; k < 300; k++) { yr++; X.step(); if (k % 10 === 0) for (const i of sim.LI) { if (X.ice[i]) continue; mean += X.hv[i]; nm++; if (X.hv[i] < worst) worst = X.hv[i]; } }
+  const dn = X.stats.droughts - d0; mean /= nm;
+  check(dn > 300 * C.SPELL.drought.rate * 0.7 && dn < 300 * C.SPELL.drought.rate * 1.3 && mean > 0.97 && mean < 1.01 && worst < 0.75, `in three hundred years ${dn} droughts begin; the land's harvest is ${mean.toFixed(3)} of an ordinary year's on the whole, ${worst.toFixed(2)} at the worst`);
+  { const sv = JSON.parse(JSON.stringify(X.save())); const Y = C.create({ W, H, LI: sim.LI, kcls: kc, year: () => yr, seed: 1, owner: sim.owner }); Y.load(sv); let diff = 0; for (const i of sim.LI) diff = Math.max(diff, Math.abs(Y.hv[i] - X.hv[i]));
+    check(Y.spells.length === X.spells.length && diff < 1e-4, `saved and loaded, the weather is the same (${X.spells.length} spells, ${diff.toExponential(1)} apart at most)`);
+    let a = 0, b = 0; for (let k = 0; k < 20; k++) { yr++; X.step(); Y.step(); } for (const i of sim.LI) { a += X.hv[i]; b += Y.hv[i]; } check(Math.abs(a - b) < 1e-3 * a, 'and goes on the same') }
+  // a famine: the land feeds fewer this year; those it no longer feeds starve, fewer where the granaries are opened
+  const run = (fed) => { const s2 = createSim(wd, 2302); const P = s2.setPlayer(paris, 'Parisii'); P.tech = s2.ERAS[3][1] + 0.01; P.era = 3; teach(s2, P, 3); P.aggression = 0; if (P.dip) P.dip.think = 1e12;
+    for (let k = 0; k < 8; k++) s2.tick(); const cells = s2.LI.filter((i) => s2.owner[i] === P.id); for (const i of cells) s2.pop[i] = s2.capacity(i, P); s2.recount(); const p0 = s2.popOf[P.id];
+    if (fed) P.clim = { until: s2.year + 10, f: 0.4 }; for (const i of cells) s2.climate.hv[i] = 0.6; s2.tick(); s2.recount(); return { p0, p1: s2.popOf[P.id], dead: s2.starvedOf(P.id), hv: s2.harvestOf(P.id), sim: s2, P }; };
+  const r0 = run(false), r1 = run(true);
+  check(r0.hv < 0.7 && r0.dead > 0 && r0.p1 < r0.p0 * 0.95, `a harvest of ${Math.round(r0.hv * 100)} in a hundred: ${(100 * r0.dead / r0.p0).toFixed(1)}% of the realm starve in the year`);
+  check(r1.dead < r0.dead * 0.8, `fewer where the court feeds the hungry (${(100 * r1.dead / r1.p0).toFixed(1)}%)`);
+  // saved: the weather and the year's harvest go with the world; a world from before the weather begins with its year's; one from before the land has none
+  { const s2 = r0.sim; const sv = JSON.parse(JSON.stringify(s2.save())); check(!!sv.climate && Array.isArray(sv.climate.sp), 'a world saves its weather');
+    const s3 = createSim(wd, 1); s3.load(sv); check(s3.climate && s3.climate.spells.length === s2.climate.spells.length, 'and has it again when loaded');
+    const o1 = JSON.parse(JSON.stringify(sv)); delete o1.climate; const s4 = createSim(wd, 1); s4.load(o1); for (let k = 0; k < 10; k++) s4.tick(); check(!!s4.climate && s4.year === s2.year + 10, 'a world saved before the weather begins with the weather of its year');
+    const o2 = JSON.parse(JSON.stringify(sv)); delete o2.climate; delete o2.land; const s5 = createSim(wd, 1); s5.load(o2); for (let k = 0; k < 5; k++) s5.tick(); check(s5.climate === null && !s5.iced(churchill), 'one saved before the land had kinds has none: it goes on as it was'); }
+  // the cost
+  { let ms = 0; const s2 = r1.sim; for (let k = 0; k < 100; k++) { s2.tick(); ms += s2.climate.stats.ms; } log(`   a year of weather takes ${(ms / 100).toFixed(3)} ms`); check(ms / 100 < 0.4, `the weather is quick enough (${(ms / 100).toFixed(3)} ms a year)`); }
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);
