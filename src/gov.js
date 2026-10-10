@@ -2,8 +2,9 @@
 // them, the forms of government, the estates of the realm (who holds power, how content they are and why), what the
 // ruler's authority allows, the reform under way and whatever an estate is demanding; and the faith of the realm (the
 // faiths of its people and around it, a faith's page, founding one, taking up another, missionaries, a church of one's
-// own); and the court (court.js: the ruling family, the line of succession, the house). It reads the simulation's rule and
-// faiths (sim.rule, rule.js; sim.faith, faith.js) and calls their few actions.
+// own); the peoples (folk.js: who lives in the realm, who came and who left, its borders); and the court (court.js: the
+// ruling family, the line of succession, the house). It reads the simulation's rule and faiths (sim.rule, rule.js; sim.faith,
+// faith.js) and calls their few actions.
 window.GOV = (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
