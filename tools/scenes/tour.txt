@@ -375,3 +375,12 @@ pestilence    | tools/scenes/tale.js | {years:10750,lon:2.35,lat:48.85,k:'plague
 peopled      | tools/scenes/land.js | {years:11000,look:'globe',alt:11000000,at:[75,25]} | | 230
 peopled_west | tools/scenes/land.js | {years:11000,look:'globe',alt:11000000,at:[-65,10]} | | 230
 land_panel   | tools/scenes/land.js | {years:11000,look:'panel'} | | 230
+holo_ice     | tools/scenes/holocene.js | {lon:-88,lat:57,alt:5200000} | | 45
+holo_scand   | tools/scenes/holocene.js | {lon:18,lat:62,alt:2600000} | | 45
+holo_ice_low | tools/scenes/holocene.js | {lon:-80,lat:49.5,alt:260000,tilt:0.9,heading:0,years:400} | | 120
+holo_green   | tools/scenes/holocene.js | {years:3000,lon:14,lat:22,alt:6500000} | | 150
+holo_chad    | tools/scenes/holocene.js | {years:3000,lon:15,lat:15,alt:1300000} | | 150
+holo_savanna | tools/scenes/holocene.js | {years:3000,lon:9,lat:19,alt:40000,tilt:1.0,heading:0.4} | | 170
+holo_drought | tools/scenes/holocene.js | {years:8000,lon:3,lat:47,alt:2600000,drought:[2,47,750,0.45]} | | 220
+holo_lens    | tools/scenes/holocene.js | {years:8000,lon:20,lat:40,alt:9000000,drought:[2,47,750,0.45],lens:true} | | 220
+holo_42      | tools/scenes/holocene.js | {years:7850,lon:45,lat:32,alt:2200000,player:[44.4,32.5]} | | 220
