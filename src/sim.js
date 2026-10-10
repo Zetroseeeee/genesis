@@ -281,8 +281,8 @@ function createSim(world, seed) {
   function pushWorld(e) { worldEvents.push(e); if (worldEvents.length > 600) worldEvents.splice(0, worldEvents.length - 600); }
   function pushOwn(c, e) { c.events.push(e); if (c.events.length > 80) c.events.splice(0, c.events.length - 80); }
   let evSeq = 0; // every event gets a running number, so the page can ask "what happened since I last looked"
-  function logEvent(c, text, important, type, loc) {
-    const e = { year, text, type: type || eventType(text), loc: loc !== undefined ? loc : c.capital, civ: c.id, seq: ++evSeq };
+  function logEvent(c, text, important, type, loc, calm) {      // (calm: news that does not stop the player's turn - a drought is told, and its story stops it when it matters)
+    const e = { year, text, type: type || eventType(text), loc: loc !== undefined ? loc : c.capital, civ: c.id, seq: ++evSeq }; if (calm) e.calm = 1;
     pushOwn(c, e);
     if (important || c.player) pushWorld({ ...e, mine: !!c.player });
     allEvents.push(e); if (allEvents.length > 6000) allEvents.splice(0, 1000);
@@ -548,9 +548,9 @@ function createSim(world, seed) {
         for (const c of n.realms) { const cv = civs[c]; if (!cv) continue; if (cv.player) { logEvent(cv, `${cap(E.name)} comes to ${fullName(cv)}`, true, 'disaster', nearTown(c, at)); if (E.depth < 0.9) storyTell(cv, E.kind === 'drought' ? 'drought' : 'frost', { ev: E.key, i: nearTown(c, at) }); } else if (cellsOf[c] > 150) logEvent(cv, `${cap(E.name)} comes to ${fullName(cv)}`, false, 'disaster', nearTown(c, at)); }
       } else if (n.kind === 'drought') {
         for (const c of n.realms) { const cv = civs[c]; if (!cv) continue; const t = nearTown(c, n.at);
-          if (cv.player) { logEvent(cv, `The rains fail about ${placeName(t)}`, true, 'disaster', t); if (n.s < -0.22) storyTell(cv, 'drought', { sp: n.id, i: t }); }
+          if (cv.player) { logEvent(cv, `The rains fail about ${placeName(t)}`, true, 'disaster', t, true); if (n.s < -0.22) storyTell(cv, 'drought', { sp: n.id, i: t }); }
           else if (cellsOf[c] > 150 && n.s < -0.3) logEvent(cv, `Drought in ${fullName(cv)}, about ${placeName(t)}`, false, 'disaster', t); }
-      } else if (n.kind === 'rains') { for (const c of n.realms) { const cv = civs[c]; if (cv && cv.player) logEvent(cv, `The rains come back about ${placeName(nearTown(c, n.at))}${n.years > 1 ? ` after ${n.years} dry years` : ''}`, false, 'disaster', nearTown(c, n.at)); } }
+      } else if (n.kind === 'rains') { for (const c of n.realms) { const cv = civs[c]; if (cv && cv.player) logEvent(cv, `The rains come back about ${placeName(nearTown(c, n.at))}${n.years > 1 ? ` after ${n.years} dry years` : ''}`, false, 'disaster', nearTown(c, n.at), true); } }
       else if (n.kind === 'plenty') { for (const c of n.realms) { const cv = civs[c]; if (cv && cv.player) logEvent(cv, `A good year about ${placeName(nearTown(c, n.at))}: the granaries are full`, false, 'state', nearTown(c, n.at)); } }
     }
   }
@@ -558,7 +558,7 @@ function createSim(world, seed) {
   function famineNews() {
     for (let c = 0; c < MAXC; c++) { const cv = civs[c]; const d = starved[c]; if (!cv || !(d > 0)) continue; const share = d / Math.max(1e-6, popOf[c] + d);
       if (cv.player ? share > 0.002 : share > 0.03 && cellsOf[c] > 100) { const k = cv.famineAt || -1e9; if (year - k < (cv.player ? 3 : 25)) continue; cv.famineAt = year;
-        logEvent(cv, `Famine in ${fullName(cv)}: ${fmtThousands(d)} starve${relief[c] > 0.3 ? ', though the granaries are opened' : ''}`, cv.player || share > 0.08, 'disaster'); } }
+        logEvent(cv, `Famine in ${fullName(cv)}: ${fmtThousands(d)} starve${relief[c] > 0.3 ? ', though the granaries are opened' : ''}`, cv.player || share > 0.08, 'disaster', undefined, share < 0.02); } }      // (the player's turn stops for a great famine only: two in a hundred of his people in the year)
   }
   const fmtThousands = (k) => { const n = k * 1000; return n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + ' million' : n >= 1000 ? Math.round(n / 1000) * 1000 >= 1e6 ? '1 million' : (Math.round(n / 1000) * 1000).toLocaleString() : Math.max(10, Math.round(n / 10) * 10).toLocaleString(); };
   function popScale(cv, share) { for (const i of townsOf_(cv.id)) pop[i] = Math.max(0, pop[i] * (1 + share)); }

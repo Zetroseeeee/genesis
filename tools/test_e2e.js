@@ -61,7 +61,7 @@ server.listen(0, async () => {
     await ev(() => { __G.mapcam.flyTo(31.25, 29.9, 0.02, { duration: 0.1, tilt: 0.2 }); }); await wait(1500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.click(vp.width / 2, vp.height / 2); await frames(3);
     s = await ev(() => ({ found: !document.getElementById('found').hidden, kv: document.getElementById('found-kv').textContent, title: document.getElementById('found-title').textContent }));
-    check(s.found, 'found card appears on click'); check(/Elevation/.test(s.kv) && /Fertility/.test(s.kv), 'found card lists elevation and fertility');
+    check(s.found, 'found card appears on click'); check(/Elevation/.test(s.kv) && /Feeds/.test(s.kv), 'found card lists elevation and what the land feeds');
     await ev(() => { document.getElementById('found-name').value = 'Kemet'; document.getElementById('found-ok').click(); }); await wait(2600); await frames(5);
     s = await state(); check(s.mode === 'play', 'mode play after founding'); check(s.player >= 0, 'player set');
     const nm = await ev(() => __G.sim.playerCiv().name); check(nm === 'Kemet', 'custom name used: ' + nm);
@@ -295,7 +295,7 @@ server.listen(0, async () => {
   await scenario('god powers: spawn, plague, meteor, bounty, prophet, enlighten', async (check) => {
     const r = await ev(() => { const S = __G.sim; document.getElementById('l-build').click(); const out = {}; const useAt = (tool, lon, lat) => { document.querySelector(`.dg[data-tool="${tool}"]`).click(); const hit = { lon, lat, h: 10 }; const pick = __G.mapcam.pickAt; __G.mapcam.pickAt = () => hit; __G.mapcam.onClick(0, 0); __G.mapcam.pickAt = pick; return [...document.querySelectorAll('.toast')].pop()?.textContent; };
       const e = S.civs.find(x => x && !x.player); const y = (e.capital / 720) | 0, x = e.capital - y * 720; const lon = (x + 0.5) / 720 * 360 - 180, lat = 90 - (y + 0.5) / 360 * 180;
-      const empty = S.LI.find(i => S.owner[i] < 0 && S.fert[i] > 0.5 && !(S.flags[i] & 8)); const ye = (empty / 720) | 0, xe = empty - ye * 720;
+      const empty = S.LI.find(i => S.owner[i] < 0 && S.fert[i] > 0.5 && !(S.flags[i] & 8) && !S.iced(i)); const ye = (empty / 720) | 0, xe = empty - ye * 720;
       const n0 = S.st.civCount; out.spawn = useAt('spawn', (xe + 0.5) / 720 * 360 - 180, 90 - (ye + 0.5) / 360 * 180); out.spawnOk = S.st.civCount === n0 + 1;
       const p0 = S.pop[e.capital]; out.plague = useAt('plague', lon, lat); out.plagueOk = S.pop[e.capital] < p0;
       out.bounty = useAt('bounty', lon, lat); out.bountyOk = S.bonusFert[e.capital] > 0;

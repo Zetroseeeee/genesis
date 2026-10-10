@@ -285,7 +285,7 @@
         msg = sim.act(tool, i);
         if (msg && msg.startsWith('Settled')) { const y = (i / W) | 0, x = i - y * W; sim.siteU[i] = clamp((hit.lon + 180) / 360 * W - x, 0.05, 0.95); sim.siteV[i] = clamp((90 - hit.lat) / 180 * H - y, 0.05, 0.95); }
       }
-      else if (tool === 'spawn') { const c = sim.spawnTribe(i); msg = c ? `${sim.fullName(c)} arrive` : 'Needs empty land'; }
+      else if (tool === 'spawn') { const c = sim.spawnTribe(i); msg = c ? `${sim.fullName(c)} arrive` : sim.iced && sim.iced(i) ? (sim.lakeAt(i) ? 'The great lake lies here' : 'The ice lies here') : 'Needs empty land'; }
       else if (tool === 'plague') { sim.plague(i, 10, false); msg = 'Plague unleashed'; }
       else if (tool === 'drought') msg = sim.drought(i);
       else if (tool === 'meteor') { sim.meteor(i); msg = 'Impact'; }
@@ -530,7 +530,7 @@
       if (g && g.rose > -1e8 && sim.year - g.rose <= TURN_YEARS[c.era] && !seen.ack.has('rose' + g.rose)) out.push({ id: 'rising', kind: 'rising', cls: 'war', t1: 'A rising', t2: (c.events.slice().reverse().find(e => e.type === 'law' && e.year === g.rose) || { text: 'An estate has risen against you' }).text, body: 'See who is angry, and why: open the estates.', act: () => { seen.ack.add('rose' + g.rose); GOV.open('estates'); } });
       const yb = Math.floor(sim.year / (TURN_YEARS[c.era] * 3)); if (g && g.army && !seen.ack.has('army' + yb)) out.push({ id: 'army', kind: 'rising', cls: 'warn', t1: 'The army is watching', t2: `Stability ${Math.round(c.stability * 100)}: where a government cannot hold, ${g.army.who.toLowerCase()} march on the capital`, body: 'Steady the realm (lower taxes, end a war, content the estates) before someone else offers to.', act: () => { seen.ack.add('army' + yb); GOV.open('estates'); } }); }
     if (seen.era >= 0 && c.era > seen.era) out.push({ id: 'era', kind: 'era', cls: 'good', t1: 'New era', t2: `Your people enter the ${sim.ERAS[c.era][0]}`, act: () => { seen.era = c.era; bigBanner(sim.ERAS[c.era][0], sim.fullName(c) + ' · ' + sim.fmtYear(sim.year), eraArt(c.era)); } });
-    const dis = c.events.slice(-12).filter(e => e.type === 'disaster' && sim.year - e.year <= 6 && !seen.ack.has('dis' + e.year + e.loc));
+    const dis = c.events.slice(-12).filter(e => e.type === 'disaster' && !e.calm && sim.year - e.year <= 6 && !seen.ack.has('dis' + e.year + e.loc));
     for (const e of dis.slice(0, 2)) out.push({ id: 'dis' + e.year, kind: 'disaster', cls: 'warn', t1: 'Disaster', t2: e.text, body: 'Fly there to see the damage. Treasuries rebuild walls and works.', act: () => { seen.ack.add('dis' + e.year + e.loc); if (e.loc >= 0) { const [lon, lat] = placeOf(e.loc); mapcam.flyTo(lon, lat, Math.max(viewDist(e.loc), 0.0012)); select(e.loc); } } });
     return out;
   }
@@ -590,7 +590,7 @@
     { const t = TREE.tile(); if (t && t.waiting && recent.some(e => e.type === 'know')) { seen.ack.delete('study'); endTurn('study'); return; } }
     // (envoys with something that cannot wait: a peace offered, a call to arms, a demand to submit. What is merely proposed waits for the turn's end)
     { const t = ENVOYS.tile(); if (t && t.offers.some((o) => o.since > turnRun.start && (o.kind === 'peace' || o.kind === 'call' || o.kind === 'submit') && !seen.ack.has('offer' + o.id))) { endTurn('envoy'); return; } }
-    if (recent.some(e => e.type === 'disaster' && !seen.ack.has('dis' + e.year + e.loc))) { endTurn('disaster'); return; }
+    if (recent.some(e => e.type === 'disaster' && !e.calm && !seen.ack.has('dis' + e.year + e.loc))) { endTurn('disaster'); return; }      // (not a calm one: a drought is told, and only a story of it stops the turn - with one in every few decades a turn of the Stone Age stopped four times)
   }
   // what needs the player, as a row of seals beside the turn button: the nearest is what the button opens; each opens its own
   let notesKey = '', notesList = [];
@@ -779,7 +779,7 @@
   let feedIdx = 0, lastFeedAt = 0;
   function pumpFeed(now) {
     const ev = sim.worldEvents; if (ev.length < feedIdx) feedIdx = 0;
-    while (feedIdx < ev.length) { const e = ev[feedIdx++]; if (settings.continuous && e.mine && (e.type === 'war' || e.type === 'era' || e.type === 'disaster') && now - lastFeedAt > 2500) { lastFeedAt = now; bigBanner(e.type === 'era' ? e.text.replace(/^.*enters the /, '') : e.text, sim.fmtYear(e.year), e.type === 'era' ? eraArt(sim.civs[e.civ] ? sim.civs[e.civ].era : 0) : e.type === 'war' ? artOf('ev_war') : ''); } }
+    while (feedIdx < ev.length) { const e = ev[feedIdx++]; if (settings.continuous && e.mine && (e.type === 'war' || e.type === 'era' || (e.type === 'disaster' && !e.calm)) && now - lastFeedAt > 2500) { lastFeedAt = now; bigBanner(e.type === 'era' ? e.text.replace(/^.*enters the /, '') : e.text, sim.fmtYear(e.year), e.type === 'era' ? eraArt(sim.civs[e.civ] ? sim.civs[e.civ].era : 0) : e.type === 'war' ? artOf('ev_war') : ''); } }
   }
 
   // ---------- notifications ----------

@@ -835,7 +835,9 @@ Conventions that matter:
   what it means), the realm's harvest and who starved, a line in what is under way, the stories of drought and of the great colds,
   the lens of the harvest, the date's page names the climate of the age, the founding card the weather of the place, the god's
   drought; the chronicle tells of droughts, the rains coming back and famines in the player's realm and of the great ones in the
-  world. A world saved before the weather begins with the weather of its year (what had begun is not news) and without the ice sheets
+  world. A drought and the rains' return are calm news (`logEvent`'s `calm`: they do not stop the player's turn, the drought's story
+  does when it is told; a famine stops it only when two in a hundred of his people starve in the year): with a drought every few
+  decades about a small realm, a turn of the Stone Age stopped four times. A world saved before the weather begins with the weather of its year (what had begun is not news) and without the ice sheets
   (`bare`: its people may live where they would have lain); one saved before the land had kinds has none. Look at the Mac's `holo_*`
   after touching any of it.
 - **Pestilence** (`disease.js`; `sim.disease`; the lens of sickness, Shift+P, in `main.js` and `world.js`). Six kinds (`KINDS`:

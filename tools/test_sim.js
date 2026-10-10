@@ -1523,6 +1523,10 @@ log('23. the weather');
   const r0 = run(false), r1 = run(true);
   check(r0.hv < 0.7 && r0.dead > 0 && r0.p1 < r0.p0 * 0.95, `a harvest of ${Math.round(r0.hv * 100)} in a hundred: ${(100 * r0.dead / r0.p0).toFixed(1)}% of the realm starve in the year`);
   check(r1.dead < r0.dead * 0.8, `fewer where the court feeds the hungry (${(100 * r1.dead / r1.p0).toFixed(1)}%)`);
+  // the player is told of a drought and of the rains coming back as news that does not stop his turn (its story does, when it is told)
+  { const s2 = r1.sim, P = r1.P; s2.climate.force('drought', P.capital, 500, -0.15, 1); s2.tick(); const e1 = P.events.filter((e) => /The rains fail/.test(e.text)).pop();
+    for (let k = 0; k < 3; k++) s2.tick(); const e2 = P.events.filter((e) => /The rains come back/.test(e.text)).pop();
+    check(e1 && e1.calm && e1.type === 'disaster' && e2 && e2.calm, `a drought and the rains' return are calm news: "${e1 ? e1.text : '-'}", "${e2 ? e2.text : '-'}"`); }
   // saved: the weather and the year's harvest go with the world; a world from before the weather begins with its year's; one from before the land has none
   { const s2 = r0.sim; const sv = JSON.parse(JSON.stringify(s2.save())); check(!!sv.climate && Array.isArray(sv.climate.sp), 'a world saves its weather');
     const s3 = createSim(wd, 1); s3.load(sv); check(s3.climate && s3.climate.spells.length === s2.climate.spells.length, 'and has it again when loaded');
