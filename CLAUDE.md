@@ -815,7 +815,9 @@ Conventions that matter:
   **What it gives**: every cell's harvest this year against an ordinary year's (`hv`; 0 under the ice), by which the land's capacity
   is multiplied; a famine takes a quarter a year of those the land no longer feeds (`FAMINE`), less by what softens it (`relief`:
   granaries, what the market brings in, the court's bread - the drought story's `relief: [years, share]`); crops at the market are as
-  good as the harvest (`CROP`: grain all of it, fish half, cattle some). A spell is laid on its cells when it begins and taken off when
+  good as the harvest (`CROP`: grain all of it, fish half, cattle some). Its famines took a tenth of the world's people before the
+  machine age, and more peoples rose on the land they emptied: the table of food was fitted again with it (raised only), and the
+  market's yields measured again. A spell is laid on its cells when it begins and taken off when
   it ends; an event's places are found once and its share changes in fifths: a year of it is a fifth of a millisecond. The age's chill
   (`EPOCHS`, `chillOf`: the last cold, the great thaw, the Holocene warmth, the drying, the warm centuries, the cold of the dark
   centuries, the warm years of the north, the Little Ice Age, the thaw of the machine age, the warming) keeps the snow some weeks
@@ -823,7 +825,12 @@ Conventions that matter:
   shores, the middle of a great lake last: `uIceCold.zw`; on the sea's clock both ways the lakes of northern Ontario were ice into
   July.) The ground's shader is told once a year of the world (`view`, `climateUniforms` in `main.js`): the domes as they stand (the
   middle and the square of the radius, the long way and how long: `uDome`, `uDomeA`), how green each region is, the deepest twelve
-  droughts (`MAXV`), the chill; the lobes, the green and the droughts it works out at the corners of its mesh (`vClim`). COSTK The
+  droughts (`MAXV`), the chill; the lobes, the green and the droughts it works out at the corners of its mesh (`vClim`). *What it
+  costs* (the build Mac, 1680 by 1050, turn and turn about in one page: `costk_*`, `__T.costsClimate()`): low over the ice's edge 16.9
+  frames a second against 17.8 without the weather, low over the green Sahara 13.9 against 14.1, a town 23.1 and 23.3 (nothing that
+  can be measured). It was 14.5 against 17.0 over the ice while what an ice sheet hides was still reckoned under it: the ice's sums
+  come before the water's, and under a whole sheet the water's edge, the waves and the land's materials are not looked up; a dome
+  whose nearest part is three times its reach away is passed over. The
   player: the inspector's "This year" line (the ice, a drought and its year, a great event, a good year, the green lands, each with
   what it means), the realm's harvest and who starved, a line in what is under way, the stories of drought and of the great colds,
   the lens of the harvest, the date's page names the climate of the age, the founding card the weather of the place, the god's
