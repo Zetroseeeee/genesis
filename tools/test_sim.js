@@ -1479,6 +1479,7 @@ log('23. the weather');
   const churchill = at(-94, 58.8), tib = at(18.5, 21), ur = at(46.1, 30.96), paris = at(2.35, 48.85);
   check(!!sim.climate && sim.iced(churchill) && sim.capacity(churchill, null) === 0 && sim.homeOf(churchill) === 0 && sim.spawnTribe(churchill, {}) === null, 'in 10,000 BC the ice lies on the shores of Hudson Bay: nothing lives there, and nobody can settle it');
   check(window.CLIMATE.BANDS[sim.climate.bandOf(churchill)].key === 'ice' && sim.climateHere(churchill).ice, 'and the lens and the inspector say so');
+  { const n0 = sim.climate.spells.length, a = sim.drought(churchill), b = sim.drought(paris); check(a === 'The ice lies here' && b === 'The rains fail' && sim.climate.spells.length === n0 + 1 && sim.climate.hv[paris] < 0.6, `the god's drought: "${a}" on the ice, "${b}" at Paris (the harvest ${Math.round(sim.climate.hv[paris] * 100)} in a hundred)`); }
   // a world's weather on its own, its years set by hand
   let yr = -10000; const kc = new Uint8Array(N); for (const i of sim.LI) kc[i] = sim.landClass(i);
   const X = C.create({ W, H, LI: sim.LI, kcls: kc, year: () => yr, seed: 7, owner: sim.owner });
@@ -1496,6 +1497,10 @@ log('23. the weather');
   { const sv = JSON.parse(JSON.stringify(X.save())); const Y = C.create({ W, H, LI: sim.LI, kcls: kc, year: () => yr, seed: 1, owner: sim.owner }); Y.load(sv); let diff = 0; for (const i of sim.LI) diff = Math.max(diff, Math.abs(Y.hv[i] - X.hv[i]));
     check(Y.spells.length === X.spells.length && diff < 1e-4, `saved and loaded, the weather is the same (${X.spells.length} spells, ${diff.toExponential(1)} apart at most)`);
     let a = 0, b = 0; for (let k = 0; k < 20; k++) { yr++; X.step(); Y.step(); } for (const i of sim.LI) { a += X.hv[i]; b += Y.hv[i]; } check(Math.abs(a - b) < 1e-3 * a, 'and goes on the same') }
+  // a drought laid by hand (the scenes and the end-to-end suite): it lies where it was asked for, is news, and lifts when its years are up
+  { yr++; X.step(); X.news.length = 0; const h0 = X.hv[ur], sp = X.force('drought', ur, 500, -0.4, 2);
+    check(X.hv[ur] < h0 * 0.62 && X.spells.includes(sp) && X.news.some((n) => n.kind === 'drought' && n.id === sp.id), `a drought laid on Ur by hand: the harvest ${Math.round(h0 * 100)}, then ${Math.round(X.hv[ur] * 100)} in a hundred, and it is news`);
+    yr += 2; X.step(); check(!X.spells.includes(sp) && X.news.some((n) => n.kind === 'rains' && n.id === sp.id), 'and the rains come back when its years are up'); }
   // a famine: the land feeds fewer this year; those it no longer feeds starve, fewer where the granaries are opened
   const run = (fed) => { const s2 = createSim(wd, 2302); const P = s2.setPlayer(paris, 'Parisii'); P.tech = s2.ERAS[3][1] + 0.01; P.era = 3; teach(s2, P, 3); P.aggression = 0; if (P.dip) P.dip.think = 1e12;
     for (let k = 0; k < 8; k++) s2.tick(); const cells = s2.LI.filter((i) => s2.owner[i] === P.id); for (const i of cells) s2.pop[i] = s2.capacity(i, P); s2.recount(); const p0 = s2.popOf[P.id];

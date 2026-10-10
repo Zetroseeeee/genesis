@@ -1264,6 +1264,12 @@ function createSim(world, seed) {
     }
     if (hit) logEvent(hit, `Fire falls from the sky upon ${fullName(hit)}`, true); else pushWorld({ year, text: `A meteor strikes ${describeCell(center)}`, civ: -1, type: 'disaster', loc: center });
   }
+  // the god's drought (climate.js): the rains fail for three years over some five hundred kilometres about the place, told as any drought is
+  function drought(center) {
+    if (!climate || !landOn) return 'The weather of this world is its own';
+    if (!land[center]) return 'Needs land'; if (iced(center)) return 'The ice lies here';
+    climate.force('drought', center, 550, -0.45, 3); return 'The rains fail';
+  }
   function bounty(center) {
     const radius = 4; const y0 = (center / W) | 0, x0 = center - y0 * W; let hit = null;
     for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
@@ -1603,7 +1609,7 @@ function createSim(world, seed) {
     diseaseView: () => { const c = playerCiv(); return disease ? disease.view(c ? c.id : -1) : null; }, shutAgainst: (q) => { const c = playerCiv(); return c && disease ? disease.quarantine(c, q, 0) : 'No realm'; },
     intrigueView: (bid) => { const c = playerCiv(); return c && intrigue ? intrigue.view(c.id, bid === undefined ? -1 : bid) : null; },
     scheme: (bid, key) => { const c = playerCiv(), b = civs[bid]; if (!c || !intrigue) return 'No realm'; if (!b) return 'Nobody there'; return intrigue.begin(c, b, key); }, unscheme: () => { const c = playerCiv(); return c && intrigue ? intrigue.cancel(c) : 'No realm'; }, legacyView: () => { const c = playerCiv(); return c && legacy ? legacy.view(c.id) : null; }, storyView: () => { const c = playerCiv(); return c && story ? story.view(c.id) : null; }, storyTell: (key, d) => { const c = playerCiv(); return c && story ? story.tell(c, key, d) : 'No realm'; },
-    storyChoose: (i) => { const c = playerCiv(); if (!c || !story) return 'No realm'; const r = story.choose(c.id, i); dynastyNews(); financeNews(); cultureNews(); return r; }, setStories: (on) => { storiesOn = !!on; }, get storiesOn() { return storiesOn; }, plague, meteor, bounty,
+    storyChoose: (i) => { const c = playerCiv(); if (!c || !story) return 'No realm'; const r = story.choose(c.id, i); dynastyNews(); financeNews(); cultureNews(); return r; }, setStories: (on) => { storiesOn = !!on; }, get storiesOn() { return storiesOn; }, plague, meteor, bounty, drought,
     TRAITS, traitOf, fullName, fmtYear, describeCell, isAtWar, capacity, eraOf, strength, save, load, recount, rnd, religionName, makeName, logEvent, evolveGovAll,
     settlementsOf(id) { const out = []; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === id && level[i]) out.push(i); } out.sort((a, b) => pop[b] - pop[a]); return out; },
     cultivation(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 0; const c = civs[o]; const K = capacity(i, c); const farm = Math.min(1, Math.max(0, (c.tech - 0.025) / 0.1)); return K > 0.01 ? Math.min(1, pop[i] / K) * farm * (level[i] ? 1 : 0.6) : 0; },

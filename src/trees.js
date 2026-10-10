@@ -303,7 +303,10 @@
       // the wildwood (as in the terrain shader): green land that is not dry is forest wherever nobody farms it
       let cult = 0, wetC = 0; if (this.sim) { const ci = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W); cult = this.sim.owner[ci] >= 0 ? this.sim.cultivation(ci) * (this.sim.level[ci] ? 1 : 0.6) : 0;
         // (the weather, climate.js: no tree on the ice sheets that still lie over the north; in the wet centuries the dry lands are steppe and savanna)
-        const CL = this.sim.climate; if (CL) { if (CL.ice[ci]) return { f: 0, g: 0 }; wetC = CL.wet[ci]; } }
+        const CL = this.sim.climate; if (CL) { if (CL.ice[ci]) return { f: 0, g: 0 }; wetC = CL.wet[ci];
+          // (nor on the land the ice has just left, nor along its edge, nor under Mega-Chad: as the ground's shader has them, by the same sums)
+          const C = window.CLIMATE, y = this.sim.year, q = CL.bare ? Infinity : C.iceQ(lon, lat, y); if (q < 1.4 && hash2(Math.floor(lon * 977), Math.floor(lat * 977), 31) > smooth(1.0, 1.4, q)) return { f: 0, g: 0 };
+          if (lon > 11.5 && lon < 21 && lat > 10 && lat < 20 && h < C.chadLevel(y) + 1) return { f: 0, g: 0 }; } }
       // each tree looks its climate up a little to one side of itself, so two climates shade into each other
       let kc = this.climateAt(lon + (nMic[0] - 0.5) * 0.3, lat + (nMic[1] - 0.5) * 0.3);
       if (wetC > 0.25 && kc >= 5 && kc <= 8) { kc = wetC > 0.6 ? 4 : 5; green = Math.max(green, wetC * 0.42); }      // (a desert or steppe of our day as the savanna or the hot steppe it was: the Köppen classes Aw and BSh)

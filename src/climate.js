@@ -22,31 +22,40 @@ window.CLIMATE = (function () {
   // Domes of ice: where each stood at the end of the last cold (r0, kilometres, in 10,050 BC: twelve thousand years before the
   // radiocarbon's present) and the year it was gone. A dome shrinks slowly at first and then fast (p, ICE_P on the whole): the ice
   // over Hudson Bay held until the lake behind it broke through, in 6200 BC, and was gone within a lifetime; the Scandinavian ice
-  // stood at its moraines until the last cold ended (hold: 9650 BC) and then went back across the Gulf of Bothnia in two thousand years. Together they are the Laurentide ice
-  // sheet (Keewatin, Hudson, Labrador, Foxe), the last of the Cordilleran and the Innuitian, and the Scandinavian one (the Scandes
-  // and the dome over the Gulf of Bothnia), Iceland's and the Highlands' (after Dyke 2004 and Hughes et al. 2016, at this grain).
+  // stood at its moraines until the last cold ended (hold: 9650 BC) and then went back across the Gulf of Bothnia in two thousand
+  // years. A dome is not round: it is an ellipse as long again as it is wide by ax (its area that of the circle of r0), its long way
+  // at az degrees from north, and as it shrinks its middle moves from where it stood toward where its last ice lay (to). Together they
+  // are the Laurentide ice sheet (Keewatin, Hudson, Labrador, Quebec, Baffin), the last of the Cordilleran and the Innuitian, the
+  // Scandinavian (with the mountains of southern Norway), Iceland's and the Highlands'. The ice of mountains (mtn) is drawn as the
+  // ranges hold it: about its edge only the heights are white (the shader's own; the simulation counts the dome). Fitted to where the margins stood
+  // (after Dyke 2004 for North America; Hughes et al. 2016 and Stroeven et al. 2016 for Scandinavia), a few hundred years at a
+  // time: a margin every thousand years and the years the ice left some forty places, by tools/climate/domefit.js.
   const T0 = -10050, ICE_P = 0.7;
-  const dome = (key, name, lon, lat, r0, end, hold, p) => ({ key, name, lon, lat, r0, end, hold: hold || T0, p: p || ICE_P });
+  const dome = (key, name, lon, lat, r0, end, o) => ({ key, name, lon, lat, r0, end, hold: o.hold || T0, p: o.p || ICE_P, ax: o.ax || 1, az: o.az || 0, to: o.to || [lon, lat], mtn: !!o.mtn });
   const DOMES = [
-    dome('keewatin', 'the ice of the Keewatin', -97, 61, 1350, -5900),
-    dome('hudson', 'the ice over Hudson Bay', -86, 59, 1200, -6250),
-    dome('labrador', 'the ice of Labrador', -71, 54.5, 900, -4800),
-    dome('foxe', 'the ice of Baffin', -74, 68, 800, -5000),
-    dome('cordillera', 'the ice of the western mountains', -126, 56, 450, -8500),
-    dome('innuitian', 'the ice of the high Arctic', -82, 79, 600, -6000),
-    dome('scandes', 'the ice of the southern Scandinavian mountains', 14, 61.5, 420, -7700, -9650, 0.5),
-    dome('lapland', 'the ice of Lapland', 20, 67.5, 330, -7650, -9650, 0.5),
-    dome('bothnia', 'the ice over the Gulf of Bothnia', 25, 64.5, 600, -8000, -9650, 0.5),
-    dome('iceland', 'the ice of Iceland', -18.5, 64.9, 220, -8000),
-    dome('highlands', 'the ice of the Highlands', -4.8, 56.8, 120, -9650),
+    /* DOMES:BEGIN */
+    dome('keewatin', 'the ice of the Keewatin', -100.96, 62.93, 1175, -5430, { p: 0.81, ax: 2.33, az: 139.24, to: [-98.34, 65.35] }),
+    dome('hudson', 'the ice over Hudson Bay', -84.83, 59.16, 970, -6110, { p: 0.25, ax: 1.45, az: 127.75, to: [-86.64, 60.42] }),
+    dome('labrador', 'the ice of Labrador', -72.92, 55.23, 858, -4880, { p: 0.51, ax: 1.8, az: 72.63, to: [-72.38, 56.51] }),
+    dome('quebec', 'the ice of Quebec', -76.12, 50.2, 570, -5580, { p: 1.98, ax: 1.09, az: 84.96, to: [-71.01, 51.54] }),
+    dome('foxe', 'the ice of Baffin', -75, 67.5, 820, -4500, { p: 0.8, ax: 2, az: 120, to: [-73.5, 70] }),
+    dome('innuitian', 'the ice of the high Arctic', -85, 78.5, 550, -6500, { p: 0.7, ax: 1.8, az: 70, to: [-84, 79.5] }),
+    dome('cordillera', 'the ice of the western mountains', -125.28, 54.64, 403, -9700, { p: 1.8, ax: 2.4, az: 154.07, to: [-130.12, 56.07], mtn: 1 }),
+    dome('scandinavia', 'the Scandinavian ice', 22.28, 64.89, 652, -7120, { hold: -9650, p: 0.98, ax: 1.76, az: 37.84, to: [17.55, 66.79] }),
+    dome('southnorway', 'the ice of the mountains of Norway', 8.93, 61, 276, -7090, { hold: -9650, p: 1.75, ax: 1.68, az: 40.73, to: [13.18, 62.69], mtn: 1 }),
+    dome('iceland', 'the ice of Iceland', -18.6, 64.9, 205, -7500, { hold: -9650, p: 0.7, ax: 1.45, az: 90, to: [-17.5, 64.5] }),
+    dome('highlands', 'the ice of the Highlands', -6.43, 57.18, 145, -9600, { p: 0.6, ax: 2.07, az: 129.07, to: [-5.2, 57.05], mtn: 1 }),
+    /* DOMES:END */
   ];
   const ND = DOMES.length;
   const domeR = (d, y) => (y >= d.end ? 0 : y <= d.hold ? d.r0 : d.r0 * Math.pow((d.end - y) / (d.end - d.hold), d.p));
-  // An ice sheet's edge is not a circle: it runs out in lobes down the valleys and lakes and back over the hills. Each dome's reach is
-  // its radius times the square root of 1 + LOBE (lobe - 1/2), lobe a smooth noise of the place (three sizes, some 1,500, 550 and 250 km
-  // across) made of integer hashes - the very same sum as the ground's shader makes (terrain.js), so the ice the simulation knows
-  // and the ice the picture shows are one.
-  const LOBE = 0.9, LOBE_F = [4.0, 11.0, 26.0], LOBE_W = [0.5, 0.33, 0.17];
+  // where a dome's middle stands in a year, and its radius
+  const domeAt = (d, y) => { const r = domeR(d, y), s = 1 - r / d.r0; return [d.lon + (d.to[0] - d.lon) * s, d.lat + (d.to[1] - d.lat) * s, r]; };
+  // An ice sheet's edge is not a smooth curve: it runs out in lobes down the valleys and lakes and back over the hills. Each dome's
+  // reach is its radius times the square root of 1 + LOBE (lobe - 1/2), lobe a smooth noise of the place (four sizes, some 1,600, 580,
+  // 250 and 100 km across) made of integer hashes - the very same sum as the ground's shader makes (terrain.js), so the ice the
+  // simulation knows and the ice the picture shows are one.
+  const LOBE = 1.8, LOBE_F = [4.0, 11.0, 26.0, 60.0], LOBE_W = [0.36, 0.3, 0.2, 0.14];
   function hash3(x, y, z) {
     x = (Math.imul(x, 1664525) + 1013904223) >>> 0; y = (Math.imul(y, 1664525) + 1013904223) >>> 0; z = (Math.imul(z, 1664525) + 1013904223) >>> 0;
     x = (x + Math.imul(y, z)) >>> 0; y = (y + Math.imul(z, x)) >>> 0; z = (z + Math.imul(x, y)) >>> 0;
@@ -60,12 +69,31 @@ window.CLIMATE = (function () {
     const c = (a, b, d) => hash3(ix + a, iy + b, iz + d), l = (a, b, t) => a + (b - a) * t;
     return l(l(l(c(0, 0, 0), c(1, 0, 0), ux), l(c(0, 1, 0), c(1, 1, 0), ux), uy), l(l(c(0, 0, 1), c(1, 0, 1), ux), l(c(0, 1, 1), c(1, 1, 1), ux), uy), uz);
   }
-  function lobe(lon, lat) {
-    const a = lon * D2R, b = lat * D2R, x = Math.cos(b) * Math.cos(a), y = Math.cos(b) * Math.sin(a), z = Math.sin(b); let v = 0;
-    for (let k = 0; k < LOBE_F.length; k++) v += LOBE_W[k] * vnoise(x * LOBE_F[k] + 1000, y * LOBE_F[k] + 1000, z * LOBE_F[k] + 1000);
-    return v;
+  const unit = (lon, lat) => { const a = lon * D2R, b = lat * D2R; return [Math.cos(b) * Math.cos(a), Math.cos(b) * Math.sin(a), Math.sin(b)]; };
+  function lobeU(u) { let v = 0; for (let k = 0; k < LOBE_F.length; k++) v += LOBE_W[k] * vnoise(u[0] * LOBE_F[k] + 1000, u[1] * LOBE_F[k] + 1000, u[2] * LOBE_F[k] + 1000); return v; }
+  const lobe = (lon, lat) => lobeU(unit(lon, lat));
+  const lobeK = (u) => Math.max(0.05, 1 + LOBE * (lobeU(u) - 0.5));      // (the square of a dome's reach here, over the square of its radius)
+  // a dome in a year as the shader is told of it: its middle, its long way and the way across (unit vectors), the square of its
+  // radius in radians (0: gone)
+  function frame(d, y) {
+    const [lon, lat, r] = domeAt(d, y), a = lon * D2R, b = lat * D2R, c = unit(lon, lat), e = [-Math.sin(a), Math.cos(a), 0], n = [-Math.sin(b) * Math.cos(a), -Math.sin(b) * Math.sin(a), Math.cos(b)];
+    const s = Math.sin(d.az * D2R), co = Math.cos(d.az * D2R), m = [n[0] * co + e[0] * s, n[1] * co + e[1] * s, n[2] * co + e[2] * s];
+    return { c, m, w: [c[1] * m[2] - c[2] * m[1], c[2] * m[0] - c[0] * m[2], c[0] * m[1] - c[1] * m[0]], W: r > 0 ? (r / R_KM) * (r / R_KM) : 0, lon, lat, r };
   }
-  const reachK = (lon, lat) => Math.sqrt(Math.max(0.05, 1 + LOBE * (lobe(lon, lat) - 0.5)));      // (a dome's reach here, over its radius)
+  // how far a place lies toward the dome's edge: the square of its distance across the ellipse over the square of the radius (it lies
+  // under the ice while this is less than lobeK there)
+  const domeQ = (d, f, u) => { if (!(f.W > 0) || u[0] * f.c[0] + u[1] * f.c[1] + u[2] * f.c[2] < 0.8) return Infinity; const s = u[0] * f.m[0] + u[1] * f.m[1] + u[2] * f.m[2], t = u[0] * f.w[0] + u[1] * f.w[1] + u[2] * f.w[2]; return (s * s / d.ax + t * t * d.ax) / f.W; };
+  // (each dome at 64 steps of its life, made once: the year the ice left a place is found among them, then to a year or two between two)
+  const TRACK = 64; const tracks = DOMES.map((d) => { const t = []; for (let k = 0; k <= TRACK; k++) t.push(frame(d, d.hold + (d.end - d.hold) * k / TRACK)); return t; });
+  // how far toward the ice's edge a place lies in a year, as the ground's shader reckons it: under 1 under the ice, 1 at its edge, more
+  // beyond it (Infinity far from any dome). The trees ask it, to stand back from the ice: the land it has just left is bare.
+  let qY = NaN, qF = null;      // (the domes of the year last asked about)
+  function iceQ(lon, lat, y) {
+    if (y !== qY) { qY = y; qF = DOMES.map((d) => (y < d.end ? frame(d, y) : null)); }
+    const u = unit(lon, lat); let q = Infinity, lk = 0;
+    for (let k = 0; k < ND; k++) { const f = qF[k]; if (!f || !(f.W > 0) || u[0] * f.c[0] + u[1] * f.c[1] + u[2] * f.c[2] < 0.8) continue; if (!lk) lk = lobeK(u); q = Math.min(q, domeQ(DOMES[k], f, u) / lk); }
+    return q;
+  }
   // great-circle kilometres
   function gcKm(lon1, lat1, lon2, lat2) {
     const a = lat1 * D2R, b = lat2 * D2R, c = Math.sin(a) * Math.sin(b) + Math.cos(a) * Math.cos(b) * Math.cos((lon2 - lon1) * D2R);
@@ -73,8 +101,15 @@ window.CLIMATE = (function () {
   }
   // the year the ice left a place (-1e9: it lay there in no year of the game), and which dome held it last
   function iceLeftAt(lon, lat) {
-    let best = -1e9, who = -1, rk = 0;
-    for (let k = 0; k < ND; k++) { const d = DOMES[k], km = gcKm(lon, lat, d.lon, d.lat); if (km >= d.r0 * 1.25) continue; if (!rk) rk = reachK(lon, lat); const R = d.r0 * rk; if (km >= R) continue; const t = d.end - (d.end - d.hold) * Math.pow(km / R, 1 / d.p); if (t > best) { best = t; who = k; } }
+    const u = unit(lon, lat); let best = -1e9, who = -1, lk = 0;
+    for (let k = 0; k < ND; k++) {
+      const d = DOMES[k], T = tracks[k]; if (!(T[0].W > 0) || u[0] * T[0].c[0] + u[1] * T[0].c[1] + u[2] * T[0].c[2] < 0.8) continue; if (!lk) lk = lobeK(u);
+      if (!(domeQ(d, T[0], u) < lk)) continue;
+      let j = 0; while (j < TRACK && domeQ(d, T[j + 1], u) < lk) j++;
+      let a = d.hold + (d.end - d.hold) * j / TRACK, b = Math.min(d.end, d.hold + (d.end - d.hold) * (j + 1) / TRACK);
+      for (let it = 0; it < 7; it++) { const m = (a + b) / 2; if (domeQ(d, frame(d, m), u) < lk) a = m; else b = m; }
+      if (a > best) { best = a; who = k; }
+    }
     return [best, who];
   }
 
@@ -99,6 +134,10 @@ window.CLIMATE = (function () {
   const greenProfile = (g, lon, lat) => { if (lat <= 0) return 0; const l = lat - greenJit(lon, lat); return Math.min(sstep(g.lon0 - g.fade, g.lon0 + g.fade, lon), 1 - sstep(g.lon1 - g.fade, g.lon1 + g.fade, lon)) * (1 - sstep(g.latFull, g.latZero, l)); };
   // how green each region is in a year (the cold of 6200 BC dried it for a lifetime)
   const greenS = (g, y) => sstep(g.on0, g.on1, y) * (1 - sstep(g.off0, g.off1, y)) * (1 - 0.6 * evRamp(EV.cold82, y));
+  // Mega-Chad (the ground's shader draws it, the trees keep out of it): the level of the great lake of the wet centuries in a year,
+  // metres as the heights have them (its old shore at 325 m, drawn 2.8 % taller), falling back to the deepest of the basin as the
+  // western Sahara dries; -Infinity when it is not there. It lies between 11.5 and 21 degrees east and 10 and 20 north.
+  const chadLevel = (y) => { const g = greenS(GREEN[0], y); return g > 0.05 ? 285 + 51 * sstep(0.3, 0.9, g) : -Infinity; };
   // what kinds of land the wet years changed (land.js's numbering: desert, steppe, high plateau), and how much
   const GREEN_KIND = { 4: 1, 5: 0.6, 13: 0.5 };
 
@@ -204,7 +243,7 @@ window.CLIMATE = (function () {
     for (let y = 0; y < H; y++) { latY[y] = 90 - (y + 0.5) / H * 180; cosY[y] = Math.cos(latY[y] * D2R); sinY[y] = Math.sin(latY[y] * D2R); }
     const iceLeft = new Float32Array(N).fill(-1e9), iceDome = new Int8Array(N).fill(-1), greenP = new Float32Array(N), greenR = new Int8Array(N).fill(-1);
     for (let y = 0; y < H; y++) {
-      const lat = latY[y]; const nearIce = DOMES.some((d) => Math.abs(lat - d.lat) * 111.2 < d.r0 * 1.25); const inGreen = lat > 5 && lat < 37;
+      const lat = latY[y]; const nearIce = DOMES.some((d) => Math.min(Math.abs(lat - d.lat), Math.abs(lat - d.to[1])) * 111.2 < d.r0 * Math.sqrt(d.ax) * 1.3); const inGreen = lat > 5 && lat < 37;
       if (!nearIce && !inGreen) continue;
       for (let x = 0; x < W; x++) {
         const i = y * W + x, lon = lonX[x];
@@ -247,13 +286,13 @@ window.CLIMATE = (function () {
     let s = ((h.seed || 1) * 2246822519 + 0x5EED) >>> 0;
     const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const poisson = (l) => { let k = 0, p = Math.exp(-l), q = p, u = rnd(); while (u > q && k < 20) { k++; p *= l / k; q += p; } return k; };
-    let spells = [], nid = 1, evSig = '', slowAt = -1e9, first = true, wetVer = 0, ver = 0; const seen = new Set(); const news = [];
+    let spells = [], nid = 1, evSig = '', slowAt = -1e9, first = true, wetVer = 0, ver = 0, bare = false; const seen = new Set(); const news = [];      // (bare: a world saved before the weather, which never had the ice sheets: people may live where they would have lain, and an update must not starve them)
     const stats = { droughts: 0, plenty: 0, events: 0, ms: 0 }; let chY = NaN, chV = 0;
 
     // the ice and the green lands: once a decade (the ice withdraws a few kilometres a year)
     function slow(y) {
       let iceN = 0;
-      for (const i of iceCells) { const v = y < Gd.iceLeft[i] ? 1 : 0; if (v !== ice[i]) { ice[i] = v; mark(i); } iceN += v; }
+      for (const i of iceCells) { const v = !bare && y < Gd.iceLeft[i] ? 1 : 0; if (v !== ice[i]) { ice[i] = v; mark(i); } iceN += v; }
       let moved = false; for (const i of greenCells) { const g = greenS(GREEN[Gd.greenR[i]], y) * greenK[i]; if (Math.abs(g - wet[i]) > 1e-4) { wet[i] = g; mark(i); moved = true; } }
       if (moved) wetVer++; slowAt = y; return iceN;
     }
@@ -332,8 +371,8 @@ window.CLIMATE = (function () {
     // what the ground's shader is told: the domes as they stand (lon, lat, km), how green each region is, the droughts (the deepest
     // MAXV of the spells and of the great droughts' circles: lon, lat, km, how much the harvest is down at the heart), the chill
     function view(out) {
-      const y = h.year(); out = out || { domes: new Float32Array(ND * 4), green: new Float32Array(4), dry: new Float32Array(MAXV * 4), nDry: 0, chill: 0 };
-      for (let k = 0; k < ND; k++) { const d = DOMES[k]; out.domes[k * 4] = d.lon; out.domes[k * 4 + 1] = d.lat; out.domes[k * 4 + 2] = domeR(d, y); out.domes[k * 4 + 3] = 0; }
+      const y = h.year(); out = out || { domes: new Float32Array(ND * 4), domeA: new Float32Array(ND * 4), green: new Float32Array(4), dry: new Float32Array(MAXV * 4), nDry: 0, chill: 0 };
+      for (let k = 0; k < ND; k++) { const d = DOMES[k], f = frame(d, y); out.domes.set(f.W > 0 && !bare ? [f.c[0], f.c[1], f.c[2], f.W] : [0, 0, 0, 0], k * 4); out.domeA.set([f.m[0], f.m[1], f.m[2], d.mtn ? -d.ax : d.ax], k * 4); }      // (as the shader takes them: the middle and the square of the radius in radians, the long way and how long - less than nought for the ice of mountains)
       for (let g = 0; g < 4; g++) out.green[g] = g < NGR ? greenS(GREEN[g], y) : 0;
       const dry = []; for (const sp of spells) if (sp.s < 0) dry.push([sp.lon, sp.lat, sp.r, -sp.s]);
       for (const e of EVENTS) { if (e.kind !== 'drought') continue; const r = evRamp(e, y); if (!r) continue; for (const [lon, lat, km] of e.where) dry.push([lon, lat, km, (1 - e.depth) * r]); }
@@ -347,9 +386,14 @@ window.CLIMATE = (function () {
       for (const sp of spells) { let n = 0, worst = 1; within(Gd, sp.lon, sp.lat, sp.r, (i, q2) => { if (h.owner[i] !== c) return; n++; const v = 1 + sp.s * SP_IN2(q2); if (sp.s < 0 ? v < worst : v > worst) worst = v; }); if (n) out.push({ id: sp.id, kind: sp.kind, years: y - sp.y0 + 1, cells: n, worst, at: sp.i }); }
       return out.sort((a, b) => b.cells - a.cells);
     }
-    function save() { return { s, nid, sp: spells.map((x) => [x.id, x.kind === 'drought' ? 0 : 1, x.i, x.r, x.s, x.y0, x.y1]), seen: [...seen] }; }
+    // a spell laid by hand where it is asked for (scenes and tests: tools/scenes/holocene.js, the end-to-end suite), told as one that came by itself
+    function force(kind, i, r, sev, years) {
+      const y = h.year(), sp = { id: nid++, kind, i, lon: Gd.lonX[i % W], lat: Gd.latY[(i / W) | 0], r, s: sev, y0: y, y1: y + years };
+      spells.push(sp); lay(sp, true); flush(); ver++; news.push({ kind, id: sp.id, year: y, realms: sp.realms, at: i, s: sev }); return sp;
+    }
+    function save() { return { s, nid, sp: spells.map((x) => [x.id, x.kind === 'drought' ? 0 : 1, x.i, x.r, x.s, x.y0, x.y1]), seen: [...seen], bare: bare || undefined }; }
     function load(o) {
-      spells = []; seen.clear(); evSig = ''; first = true;
+      spells = []; seen.clear(); evSig = ''; first = true; bare = !o || !!o.bare;
       if (o) { s = o.s >>> 0; nid = o.nid || 1; for (const a of o.sp || []) { const i = a[2]; spells.push({ id: a[0], kind: a[1] ? 'plenty' : 'drought', i, lon: Gd.lonX[i % W], lat: Gd.latY[(i / W) | 0], r: a[3], s: a[4], y0: a[5], y1: a[6] }); } for (const k of o.seen || []) seen.add(k); }
       else { const y = h.year(); for (const e of EVENTS) if (y >= e.y0) seen.add(e.key); }      // (a world from before the weather: what has begun already is not news)
       ice.fill(0); wet.fill(0); hv.fill(1); evF.fill(1); spF.fill(1); inEv.fill(0); spN.fill(0); evCells = []; nDirty = 0; isDirty.fill(0);
@@ -358,7 +402,7 @@ window.CLIMATE = (function () {
     }
     // (a new world begins with the climate of its year, and with what has already begun counted as old)
     { const y = h.year(); for (const e of EVENTS) if (y > e.y0) seen.add(e.key); slow(y); events(y); news.length = 0; flush(); }
-    return { hv, ice, wet, greenK, greenCells, step, here, bandOf, view, spellsIn, save, load, news, stats, get spells() { return spells; }, get wetVer() { return wetVer; }, get ver() { return ver; }, epoch: () => epochOf(h.year()), chill: () => { const y = h.year(); if (y !== chY) { chY = y; chV = chillOf(y); } return chV; }, iceLeft: Gd.iceLeft };
+    return { hv, ice, wet, greenK, greenCells, step, here, bandOf, view, spellsIn, force, save, load, news, stats, get spells() { return spells; }, get wetVer() { return wetVer; }, get ver() { return ver; }, get bare() { return bare; }, epoch: () => epochOf(h.year()), chill: () => { const y = h.year(); if (y !== chY) { chY = y; chV = chillOf(y); } return chV; }, iceLeft: Gd.iceLeft };
   }
-  return { create, DOMES, GREEN, EVENTS, EV, EPOCHS, BANDS, BK, SPELL, VAR, MAXV, ND, NGR, T0, ICE_P, LOBE, LOBE_F, LOBE_W, GREEN_JF, GREEN_JA, GREEN_PF, domeR, greenS, evRamp, epochOf, chillOf, iceLeftAt, lobe, gcKm, grid };
+  return { create, DOMES, GREEN, EVENTS, EV, EPOCHS, BANDS, BK, SPELL, VAR, MAXV, ND, NGR, T0, ICE_P, LOBE, LOBE_F, LOBE_W, GREEN_JF, GREEN_JA, GREEN_PF, domeR, domeAt, frame, domeQ, lobeK, unit, chadLevel, greenS, evRamp, epochOf, chillOf, iceLeftAt, iceQ, lobe, gcKm, grid };
 })();

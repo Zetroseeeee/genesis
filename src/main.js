@@ -5,7 +5,7 @@
   const esc = (s) => String(s).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
   // trade goods: their glyphs and chips are the market screen's (market.js)
   const goodSvg = MARKET.svg, goodChip = MARKET.chip;
-  const knowsCell = (i) => { if (!sim || !sim.goods[i]) return false; const pc = sim.playerCiv(); return pc ? pc.era >= sim.gera[i] : true; };      // what your age understands of the land
+  const knowsCell = (i) => { if (!sim || !sim.goods[i] || (sim.iced && sim.iced(i))) return false;      /* (nothing is yielded under the ice sheets: climate.js) */ const pc = sim.playerCiv(); return pc ? pc.era >= sim.gera[i] : true; };      // what your age understands of the land
   const fmtPop = (k) => { const p = k * 1000; return p >= 1e9 ? (p / 1e9).toFixed(2) + ' bn' : p >= 1e6 ? (p / 1e6).toFixed(1) + ' m' : p >= 1e3 ? Math.round(p / 1e3) + ' k' : String(Math.round(p)); };
   const fmtInt = (n) => Math.round(n).toLocaleString();
   const fmtSigned = (n, d = 1) => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(d);
@@ -78,14 +78,15 @@
     uFertView: { value: 0 }, uPolitical: { value: 1 }, uLens: { value: 0 }, uLabelsOn: { value: 1 },
     uClouds: { value: null }, uCloudShift: { value: 0 }, uCloudVis: { value: 0 }, uCloudNear: { value: 0 },
     uDecal: { value: null }, uDecalRect: { value: new THREE.Vector4(0, 0, 0, 0) }, uDecalOn: { value: 0 }, uQuality: { value: 1 }, uDecal2: { value: null }, uWaterN: { value: null },
-    uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) }, uIceCold: { value: new THREE.Vector2(1, 0) },
+    uSeason: { value: new THREE.Vector4(1, 0, 0, 0) }, uBare: { value: new THREE.Vector4(0, 0, 0, 0) }, uIceCold: { value: new THREE.Vector4(1, 0, 1, 0) },
     uGround: { value: null }, uLanduse: { value: null }, uShallows: { value: null }, uTexMix: { value: 0 },   // generated ground textures (textures.js)
     // the ground's materials (textures.js: TEX.ground), laid at a ladder of sizes in a frame of cells a metre and a half across at the equator
     uGnd: { value: null }, uGndN: { value: null }, uGndShal: { value: 20 }, uGndFar: { value: new Float32Array(24) }, uGndFarD: { value: new Float32Array(48) }, uGndFarN: { value: 512 }, uGndMean: { value: new Float32Array(75).fill(0.5) }, uLadK: { value: 6371000 / 1.5 }, uGndK: { value: new THREE.Vector4(1, 1, 0.4, GND_PX) }, uGndT: { value: new THREE.Vector4(1, 1, 0.25, 3) }, uWaterK: { value: new THREE.Vector4(1, 1, 1, 1) }, uSkyR: { value: new Float32Array(45).fill(0.3) }, uSeaK: { value: new THREE.Vector4(1, 1, 1, 0) }, uGndShow: { value: -1 }, uGndV: { value: 1 }, uWild: { value: 1 }, uGndDbg: { value: 0 }, uGndFine: { value: new THREE.Vector3(0.75, 0.6, 2.25) }, uGndCls: { value: new Float32Array(24) },      // uGndK: how strong the relief, how much of the materials is shown, how far the repeats are bent, pixels to a repeat; uGndT: how far a material's brightness follows the photograph of the Earth (0..1), and its hue (a factor), how wide the span in which one step of the ladder gives way to the next (0.1: a patchwork of the two; 0.25 and more: they lie over each other), how ragged its edge; uGndShow: one layer everywhere (to look at it), or -1; uGndV: how much the ground varies from stretch to stretch (lusher, drier); uGndDbg: parts left out, to measure them (terrain.js); uGndFine: how many steps of the ladder lower the fine kinds of ground stand: at the closest, how fast that grows with height, at the most (uGndCls: which they are, from textures.js)
     uGlow: { value: 0 },      // 1 while the picture goes through post.js, which can hold light brighter than white and lets it bleed
-    // the weather (climate.js, terrain.js): the ice sheets as they stand (unit vector, square of the angular radius), how green each
-    // region of the dry lands is, the deepest droughts (the same, and how deep), how much colder than our own day the age is
-    uDome: { value: new Float32Array(4 * (window.CLIMATE ? CLIMATE.ND : 1)) }, uGreenS: { value: new THREE.Vector4(0, 0, 0, 0) }, uDryC: { value: new Float32Array(4 * (window.CLIMATE ? CLIMATE.MAXV : 1)) }, uDryS: { value: new Float32Array(window.CLIMATE ? CLIMATE.MAXV : 1) }, uChill: { value: 0 },
+    // the weather (climate.js, terrain.js): the ice sheets as they stand (the middle as a unit vector, the square of the angular
+    // radius; the long way as a unit vector, how long), how green each region of the dry lands is, the deepest droughts (the same,
+    // and how deep), how much colder than our own day the age is
+    uDome: { value: new Float32Array(4 * (window.CLIMATE ? CLIMATE.ND : 1)) }, uDomeA: { value: new Float32Array(4 * (window.CLIMATE ? CLIMATE.ND : 1)).fill(1) }, uGreenS: { value: new THREE.Vector4(0, 0, 0, 0) }, uDryC: { value: new Float32Array(4 * (window.CLIMATE ? CLIMATE.MAXV : 1)) }, uDryS: { value: new Float32Array(window.CLIMATE ? CLIMATE.MAXV : 1) }, uChill: { value: 0 },
   };
   if (window.SHADOWS) Object.assign(globals, SHADOWS.uniforms);     // the sun's depth map (shadows.js): the same uniform objects everywhere
   if (window.AIR) { Object.assign(globals, AIR.uniforms); if (softGL) AIR.steps = window.GENESIS_AIR || 0.4; }      // the air (air.js); a software renderer takes fewer steps through it
@@ -178,7 +179,7 @@
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
       mapcam.onClick = onClick; mapcam.locked = true; mapcam.autoTilt = settings.autoTilt;
-      window.__G = { settings, loadSettings, get sim() { return sim; }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, get troops() { return troops; }, selectHost: (id) => selectHost(id), get hostSel() { return hostSel; }, startTurn, endTurn, turnRun, attention: () => computeAttention(), terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
+      window.__G = { settings, loadSettings, get sim() { return sim; }, climateRefresh: () => { climYear = NaN; climateUniforms(); }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, get troops() { return troops; }, selectHost: (id) => selectHost(id), get hostSel() { return hostSel; }, startTurn, endTurn, turnRun, attention: () => computeAttention(), terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
       buildEconomy(); buildDock(); buildMinimapBase(); bindUI();
       newWorld((Math.random() * 2 ** 31) | 0);
       previewSave(); homeAim(false);                // a saved world is shown on the home screen as it was left
@@ -286,6 +287,7 @@
       }
       else if (tool === 'spawn') { const c = sim.spawnTribe(i); msg = c ? `${sim.fullName(c)} arrive` : 'Needs empty land'; }
       else if (tool === 'plague') { sim.plague(i, 10, false); msg = 'Plague unleashed'; }
+      else if (tool === 'drought') msg = sim.drought(i);
       else if (tool === 'meteor') { sim.meteor(i); msg = 'Impact'; }
       else if (tool === 'bounty') { sim.bounty(i); msg = 'The land turns green'; }
       else if (tool === 'prophet') msg = sim.prophet(i);
@@ -671,11 +673,11 @@
   // the weather as the ground's shader is told it (climate.js): once a year of the world, not every frame
   let climV = null, climYear = NaN, climSim = null;
   function climateUniforms() {
-    const CL = sim && sim.climate, g = globals;
+    const CL = sim && !window.__noWeather ? sim.climate : null, g = globals;      // (window.__noWeather: the ground's shader told there is none, to measure what it costs: __T.costsClimate)
     if (!CL) { if (climYear !== -1e9) { g.uDome.value.fill(0); g.uGreenS.value.set(0, 0, 0, 0); g.uDryC.value.fill(0); g.uDryS.value.fill(0); g.uChill.value = 0; climYear = -1e9; } return; }
     if (CL.ver === climYear && climSim === sim) return; climYear = CL.ver; climSim = sim; climV = CL.view(climV);      // (again whenever the weather has moved: a year, or a world loaded)
     const unit = (lon, lat, out, k) => { const a = lon * Math.PI / 180, b = lat * Math.PI / 180; out[k] = Math.cos(b) * Math.cos(a); out[k + 1] = Math.cos(b) * Math.sin(a); out[k + 2] = Math.sin(b); };
-    const D = g.uDome.value; for (let k = 0; k < CLIMATE.ND; k++) { unit(climV.domes[k * 4], climV.domes[k * 4 + 1], D, k * 4); const r = climV.domes[k * 4 + 2] / 6371; D[k * 4 + 3] = r > 0 ? r * r : 0; }
+    g.uDome.value.set(climV.domes); g.uDomeA.value.set(climV.domeA);
     const C = g.uDryC.value, S = g.uDryS.value; for (let k = 0; k < CLIMATE.MAXV; k++) { if (k < climV.nDry) { unit(climV.dry[k * 4], climV.dry[k * 4 + 1], C, k * 4); const r = climV.dry[k * 4 + 2] / 6371; C[k * 4 + 3] = r * r; S[k] = climV.dry[k * 4 + 3]; } else { C[k * 4 + 3] = 0; S[k] = 0; } }
     g.uGreenS.value.set(climV.green[0], climV.green[1], climV.green[2], climV.green[3]); g.uChill.value = climV.chill;
   }
@@ -812,8 +814,9 @@
     settle: '<path d="M6 21V4h10l-2 3 2 3H6"/>', develop: '<path d="M12 21V9M12 13c-3 0-5-2-5-5 3 0 5 2 5 5zm0-4c3 0 5-2 5-5-3 0-5 2-5 5z"/><path d="M4 21h16"/>', fortify: '<path d="M4 21V9h3V6h3v3h4V6h3v3h3v12z"/><path d="M10 21v-5h4v5"/>', port: '<circle cx="12" cy="5" r="2"/><path d="M12 7v14M5 13c0 4 3 7 7 7s7-3 7-7M3 13h4M17 13h4"/>', academy: '<path d="M4 21h16M6 21V10M10 21V10M14 21V10M18 21V10M3 10l9-6 9 6z"/>', temple: '<path d="M12 21c4 0 6-3 6-6 0-4-4-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-3 5-3 8 0 3 2 6 6 6z"/>', capital: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/><path d="M4 21h16"/>', market: '<path d="M4 10l2-5h12l2 5M4 10h16v3H4zM6 13v8h12v-8M10 21v-5h4v5"/>', wonder: '<path d="M12 3l3 6 6 1-4.5 4.2 1.2 6.3L12 17.5 6.3 20.5l1.2-6.3L3 10l6-1z"/>', levy: '<path d="M12 3l8 3v6c0 5-3 8-8 9-5-1-8-4-8-9V6z"/><path d="M12 8v8M8 12h8"/>', fleet: '<path d="M12 3v12M12 4l6 9h-6M4 16h16l-2 4H6z"/>',
     spawn: '<circle cx="12" cy="6" r="3"/><path d="M5 21c0-5 3-8 7-8s7 3 7 8"/>', plague: '<path d="M12 3a7 7 0 0 0-7 7c0 3 2 5 3 6v4h8v-4c1-1 3-3 3-6a7 7 0 0 0-7-7z"/><circle cx="9.5" cy="10.5" r="1"/><circle cx="14.5" cy="10.5" r="1"/>', meteor: '<path d="M20 4l-9 9M20 4l-5 1M20 4l-1 5"/><circle cx="8" cy="16" r="4"/>', bounty: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>', prophet: '<path d="M12 3l2.7 6 6.3.6-4.8 4.3 1.5 6.4L12 17l-5.7 3.3 1.5-6.4L3 9.6l6.3-.6z"/>', enlighten: '<path d="M9 21h6M10 18h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
   };
+  ICONS.drought = TK_ICON.dry;
   const GODS = [
-    { id: 'spawn', n: 'Spawn', tip: 'Drop a new people on empty land.' }, { id: 'plague', n: 'Plague', tip: 'A great dying, and a pestilence that goes on from there.' }, { id: 'meteor', n: 'Meteor', tip: 'Fire from the sky. Erases what it hits.' }, { id: 'bounty', n: 'Bounty', tip: 'Make land fertile.' }, { id: 'prophet', n: 'Prophet', tip: 'Found a religion in the state you click.' }, { id: 'enlighten', n: 'Enlighten', tip: 'Hand a state a burst of knowledge.' },
+    { id: 'spawn', n: 'Spawn', tip: 'Drop a new people on empty land.' }, { id: 'plague', n: 'Plague', tip: 'A great dying, and a pestilence that goes on from there.' }, { id: 'drought', n: 'Drought', tip: 'The rains fail for three years over some five hundred kilometres: the harvest withers, and those it no longer feeds starve.' }, { id: 'meteor', n: 'Meteor', tip: 'Fire from the sky. Erases what it hits.' }, { id: 'bounty', n: 'Bounty', tip: 'Make land fertile.' }, { id: 'prophet', n: 'Prophet', tip: 'Found a religion in the state you click.' }, { id: 'enlighten', n: 'Enlighten', tip: 'Hand a state a burst of knowledge.' },
   ];
   function buildDock() {
     const mk = (t, god) => { const b = document.createElement('button'); b.className = 'dg' + (god ? ' god' : ''); b.dataset.tool = t.id; b.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[t.id]}</svg><span class="n">${t.n}</span><span class="c" id="cost-${t.id}"></span><span class="tip"><b>${t.n}</b>${t.tip}</span>`; b.addEventListener('click', () => setTool(t.id)); return b; };
@@ -1499,7 +1502,11 @@
       const coldN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.08) * Math.PI * 2);
       globals.uBare.value.set(leafOff(seasonPhase), leafOff((seasonPhase + 0.5) % 1), coldN, 1 - coldN);
       // (and the sea is slower still: its ice is at its widest when winter ends, early in March and in September, eleven weeks behind the sun)
-      { const iceN = 0.5 + 0.5 * Math.cos((seasonPhase - 0.21) * Math.PI * 2); globals.uIceCold.value.set(iceN, 1 - iceN); }
+      // (the sea's ice is widest eleven weeks behind the sun; a lake freezes on that clock but thaws on one five weeks behind it, the
+      //  two joined over a few weeks either side of the turn: terrain.js, lakeOff)
+      { const sm = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }, cl = (ph) => 0.5 + 0.5 * Math.cos((ph - 0.21) * Math.PI * 2);
+        const lake = (ph) => { const t = sm(0.15, 0.3, ph) * (1 - sm(0.55, 0.7, ph)); return cl(ph) + (0.5 + 0.5 * Math.cos((ph - 0.13) * Math.PI * 2) - cl(ph)) * t; };
+        const iceN = cl(seasonPhase); globals.uIceCold.value.set(iceN, 1 - iceN, lake(seasonPhase), lake((seasonPhase + 0.5) % 1)); }
       if (trees) { trees.season = globals.uSeason.value; trees.bareness = globals.uBare.value; } }
     climateUniforms();
     const real = Math.min(1.5, (now - lastReal) / 1000); lastReal = now;      // (the step above is capped for the simulation's sake; these go by the clock, so a slow machine is not left with a half-moved picture)

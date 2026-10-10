@@ -946,6 +946,33 @@ server.listen(0, async () => {
     check(r.on && r.land.includes(r.kind) && /farmland/.test(r.land) && r.tip.length > 20, `the capital's land: ${r.land.slice(0, 80)} (${r.tip.slice(0, 60)})`);
     check(/Land/.test(r.realm) && /%/.test(r.realm), 'the realm\'s panel names its land by kind');
   });
+  await scenario('the weather: a drought over the realm, the court asked and the granaries opened; the inspector, the realm\'s panel and the tracker name it, the tracker opens the lens of the harvest with its key; the date names the age\'s climate', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    // a deep drought laid over the capital for three years, with stories on (this scenario can run by itself)
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), CL = S.climate; if (!CL) return { none: 1 }; S.setStories(true); if (c.story) { c.story.q = null; c.story.s = {}; }
+      const sp = CL.force('drought', c.capital, 650, -0.45, 3); __G.run(1); return { reach: sp.realms.includes(c.id), q: c.story && c.story.q ? c.story.q.k : '', hv: +S.harvestOf(c.id).toFixed(3) }; });
+    check(r.reach && r.q === 'drought' && r.hv < 0.95, `a drought over the capital: the realm's harvest ${r.hv} of an ordinary year's, and the court is told (${JSON.stringify(r)})`);
+    await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    r = await ev(() => ({ title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | ') }));
+    check(r.n === 3 && /hungry fed for \d+ years/.test(r.chips), `its page: "${r.title}" (${r.chips.slice(0, 140)})`);
+    await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2); await ev(() => { if (TALES.isOpen()) TALES.close(); });
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(); S.setStories(false); __G.run(1); return { clim: c.clim || null, relief: +S.reliefOf(c.id).toFixed(2) }; });
+    check(r.clim && r.clim.f >= 0.35 && r.relief >= 0.35, `the granaries are opened: a famine takes ${Math.round(r.relief * 100)}% fewer`);
+    // the inspector and the realm's panel
+    r = await ev(() => { __G.select(__G.sim.playerCiv().capital); return { cell: document.getElementById('sel-cell').textContent, realm: document.getElementById('sc-kv').textContent }; });
+    check(/This year/.test(r.cell) && /harvest \d+ in a hundred/.test(r.cell), 'the inspector: ' + r.cell.slice(r.cell.indexOf('This year'), r.cell.indexOf('This year') + 70));
+    check(/Harvest\d+ in a hundred/.test(r.realm), 'the realm\'s panel names the harvest');
+    // the tracker names it, and opens the lens of the harvest with its key
+    r = await ev(() => { __G.run(0); const b = document.querySelector('#tk-body .trk.dry, #tk-body .trk.cold'); const t = b ? b.textContent : ''; if (b) b.click(); return { row: t }; }); await frames(3);
+    r = Object.assign(r, await ev(() => ({ on: document.getElementById('v-hrv').classList.contains('on'), mode: __G.world.palMode, key: document.getElementById('govkey').textContent })));
+    check(/%/.test(r.row) && r.on && r.mode === 'harvest' && /This year's harvest · yours \d+ in a hundred/.test(r.key) && /\) · you/.test(r.key), `the tracker's line (${r.row.slice(0, 60)}) opens the lens of the harvest, with its key (${r.key.slice(0, 90)})`);
+    await page.keyboard.press('Shift+H'); await frames(3); r = await ev(() => ({ on: document.getElementById('v-hrv').classList.contains('on'), mode: __G.world.palMode })); check(!r.on && r.mode === 'realm', 'Shift+H turns it off');
+    // the date: the age's climate
+    await ev(() => document.getElementById('date').dispatchEvent(new PointerEvent('pointerenter'))); await wait(900);
+    r = await ev(() => { const t = document.getElementById('tip'); const out = { hidden: t.hidden, text: t.textContent }; document.getElementById('date').dispatchEvent(new PointerEvent('pointerleave')); return out; });
+    check(!r.hidden && /The climate: /.test(r.text), 'the date names the age\'s climate: ' + r.text.slice(r.text.indexOf('The climate'), r.text.indexOf('The climate') + 80));
+    await ev(() => { const S = __G.sim; for (const sp of S.climate.spells.slice()) if (sp.kind === 'drought') sp.y1 = S.year; __G.run(1); S.playerCiv().clim = null; S.setStories(true); __T.quiet(); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);
