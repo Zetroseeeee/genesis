@@ -853,7 +853,7 @@ log('14. faiths');
   check(F.stats.preached > p0, `those who preach it carry it from region to region (${F.stats.preached - p0} in ${y} years)`);
   // other faiths cost a realm some steadiness, measured against its age; the laws weigh on it
   for (const i of bCells) { if (i !== B.capital) F.fth[i] = g; }
-  for (y = 0; y < 6; y++) sim.tick();
+  do sim.tick(); while (((sim.year % 5) + 5) % 5 !== 0);      // (to the next count of the faiths: at it its ruler may take up the faith most of his people hold, as by lot)
   const sp = sim.stabilityParts(B); check(F.otherShare[B.id] > 0.3 && sp.faiths < 0, `a realm of many other faiths is the less steady for it (${Math.round(F.otherShare[B.id] * 100)}% others: ${(sp.faiths * 100).toFixed(1)} stability)`);
   const R = sim.rule.ruleOf(B), was = R.laws.faith; R.laws.faith = 'tolerance'; const calm = F.lawF(B.id, 'minor'), slow = F.lawF(B.id, 'conv'); R.laws.faith = 'orthodoxy'; const hot = F.lawF(B.id, 'minor'), fast = F.lawF(B.id, 'conv'), hold = F.lawF(B.id, 'resist'); R.laws.faith = was;
   check(calm < 1 && slow < 1 && hot > 1 && fast > 1.5 && hold < 0.5, `laws: many gods in one peace quiet other faiths (${calm}) and carry the realm's slowly (${slow}); an enforced orthodoxy angers them (${hot}), carries it fast (${fast}) and holds it against preachers (${hold})`);

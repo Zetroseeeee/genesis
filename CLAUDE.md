@@ -910,7 +910,9 @@ Conventions that matter:
   The autopilot's realms keep their borders open. The module throws no dice (the land's pass rolls a region's turning on a hash of
   the place and the year). Saved with the world (`save().mig`: the decade's flows) and the realm (`civ.mig`); a world saved before
   migration has no flows yet, and keeps the table of food it was saved under (`FOOD_039`, `save().food` 39): people on the move
-  fill the land's room sooner than it fills itself, so the world had a tenth more people, and the table was lowered for it. After touching it run `tools/migrate/probe.js` over 12345 and 777, the regional census
+  fill the land's room sooner than it fills itself, so the world had a tenth more people, and the table of the later ages was
+  fitted again, lower by up to a sixth (the first ages' points held where they were: lowered with the rest, the Stone Age's bands
+  left more land to new peoples and the world had twenty realms more). After touching it run `tools/migrate/probe.js` over 12345 and 777, the regional census
   (`tools/people/regions.js`), the world's people (`tools/know/people.js`) and the war-and-peace probe.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
