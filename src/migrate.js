@@ -13,25 +13,29 @@ window.MIGRATE = (function () {
   'use strict';
   // the share of a realm's people that would leave in a year at the full pull of an empty land, by age: feet and carts, then the
   // ships of the ocean, then steamships and railways (the great emigrations of the nineteenth century: a twentieth of Europe in a
-  // decade), then the closed borders and settled lands of the last ages
-  const RATE = [0.0006, 0.0007, 0.0008, 0.001, 0.001, 0.002, 0.007, 0.005, 0.004];
+  // decade at their height; of the world, some one in a thousand a year from 1850 to 1940, to other lands and to its own far
+  // frontiers), then the closed borders and settled lands of the last ages
+  const RATE = [0.0004, 0.0005, 0.0005, 0.0006, 0.0006, 0.0009, 0.004, 0.0035, 0.003];
   // how readily the law of labour lets people go (rule.js's labour field: a serf is bound to the land; free hands go where the work is)
   const MOB = { kin: 1, corvee: 0.8, slavery: 0.5, serfdom: 0.25, guilds: 0.9, free: 1.3, factoryacts: 1.3, unions: 1.3, assigned: 0.3 };
   // refugees: of those a famine kills, as many again flee it; of a realm losing its land to a war a share a year; of one coming apart
   const FAMINE_FLEE = 1.0, WAR_FLEE = 0.004, UNREST_FLEE = 0.003;
   // newcomers from a realm that knows more bring some of it: a share of the difference, by how many they are of the people (the
-  // host adds it to what the realm learns that year, as a neighbour's teaching)
-  const TEACH = 0.5;
+  // host adds it to what the realm learns that year, as a neighbour's teaching), at most TEACH_MAX in five years
+  const TEACH = 0.25, TEACH_MAX = 0.015;
   // how much of a realm's room it can take in a year (the rest of the newcomers do not come)
-  const CAPIN = 0.06;
+  const CAPIN = 0.03;
   // newcomers unsettle a realm when they are many: a decade's of them beyond a share of its people (NEW0) costs stability, by NEW_K;
   // a realm that bars its crowded people from leaving keeps them restless
   const NEW0 = 0.03, NEW_K = 0.5, BARRED_K = 0.03;
   // how often the flows are worked out (years; the host moves the people every year by the last of them)
   const EVERY = 5;
   // a destination's pull: how much emptier it is than home (its people against what its land feeds), how much better people live
-  // there (to a power), its borders, kinship; less over the sea in the early ages; the realm's own far land by its share of room
-  const GAP0 = 0.05, LIVE_POW = 1.5, SEA = [0.15, 0.2, 0.3, 0.35, 0.4, 0.7, 1, 1, 1], SELF = 1.2, KIN = 1.5, FAITH_KIN = 1.2;
+  // there (to a power), its borders, kinship; hardly at all over the sea before the ships of the ocean (a boat takes a family to
+  // the next island, not a people over the sea: at four tenths of the pull in the Middle Ages, Java peopled Australia), a
+  // quarter of it under sail (a few thousand a year crossed to the Americas), all of it with steam; the realm's own far land by
+  // its share of room
+  const GAP0 = 0.05, LIVE_POW = 1.5, SEA = [0.02, 0.03, 0.05, 0.08, 0.1, 0.25, 1, 1, 1], SELF = 1.2, KIN = 1.5, FAITH_KIN = 1.2;
   // what the player's realm says of its borders, and of its people leaving (kept on the realm: civ.mig.b, civ.mig.l)
   const BORDERS = [['open', 'Open', 'Anyone who comes may stay and work.', 1], ['guarded', 'Guarded', 'Some are let in, as the work needs them.', 0.35], ['closed', 'Closed', 'Strangers are turned back at the border.', 0.03]];
   const LEAVING = [['free', 'Free to go', 'Whoever wants to leave may leave.', 1], ['barred', 'Barred', 'Nobody leaves without the crown\'s leave: fewer go.', 0.15]];
@@ -119,7 +123,7 @@ window.MIGRATE = (function () {
         inF[d] = Math.min(CAPIN * 1.5, inSum[d] / room[d]);
         const s = inFrom[d]; if (s >= 0) { inPpl[d] = pplOf[s]; inFth[d] = fthOf[s]; }
         const abroad = inSum[d] - selfIn[d]; if (abroad > 0) rec(dv, yr).i += abroad * EVERY;
-        if (taught[d] > 0 && h.teach) h.teach(d, Math.min(0.03, TEACH * EVERY * taught[d] / Math.max(1, h.pop(d))));
+        if (taught[d] > 0 && h.teach) h.teach(d, Math.min(TEACH_MAX, TEACH * EVERY * taught[d] / Math.max(1, h.pop(d))));
       }
       if (yr % 10 === 0) decade(yr);
       stats.ms += (typeof performance !== 'undefined' ? performance.now() : 0) - t0;

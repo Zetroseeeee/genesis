@@ -410,6 +410,7 @@
       if (s.s) for (let c = 0; c < Math.min(MAXC, s.s.length); c++) { state[c] = s.s[c]; if (civs[c]) civs[c].religion = state[c] && list[state[c]] ? list[state[c]].name : null; }
       if (s.pend) for (let k = 0; k < s.pend.length; k += 3) { pending[s.pend[k]] = s.pend[k + 1]; pendingAt[s.pend[k]] = s.pend[k + 2]; }
       if (s.mis) for (let k = 0; k < s.mis.length; k += 3) { missionTo[s.mis[k]] = s.mis[k + 1]; missionUntil[s.mis[k]] = s.mis[k + 2]; }
+      for (let k = 0; k < LI.length; k++) { const i = LI[k], F = list[fth[i]]; if (F) { F.n++; F.pop += pop[i]; } }      // (how many keep each faith, for the key and the pages until the next count)
       return true;
     }
     // a world saved before faiths had regions: every faith by its name, its holy city the capital of the first realm that

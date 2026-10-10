@@ -1581,7 +1581,11 @@ log('24. people on the move');
   // saved and loaded: the decade's flows and the realms' words go with the world; a world from before has none, its borders open
   { const sv = JSON.parse(JSON.stringify(sim.save())); check(!!sv.mig && sv.mig.flows.length > 0, 'a world saves the decade\'s migrations');
     const s3 = createSim(wd, 1); s3.load(sv); check(s3.mig.flows.length === M.flows.length && s3.playerCiv().mig && s3.playerCiv().mig.b === 'open', 'and has them again when loaded');
-    const old = JSON.parse(JSON.stringify(sv)); delete old.mig; for (const c of old.civs || []) if (c) delete c.mig; const s4 = createSim(wd, 1); s4.load(old); for (let k = 0; k < 6; k++) s4.tick(); check(s4.mig && s4.mig.policy(s4.playerCiv()).b === 0, 'a world saved before people moved begins with its borders open'); }
+    const old = JSON.parse(JSON.stringify(sv)); delete old.mig; for (const c of old.civs || []) if (c) delete c.mig; const s4 = createSim(wd, 1); s4.load(old); for (let k = 0; k < 6; k++) s4.tick(); check(s4.mig && s4.mig.policy(s4.playerCiv()).b === 0, 'a world saved before people moved begins with its borders open');
+    // (and it keeps the table of food it was saved under, through further saves: people on the move fill the land sooner, and the
+    //  table was lowered for it; an update must not starve anyone's people)
+    const again = JSON.parse(JSON.stringify(s4.save())), s5 = createSim(wd, 1); s5.load(again);
+    check(s3.foodTable === 0 && s4.foodTable === 39 && again.food === 39 && s5.foodTable === 39, `and keeps the table of food it was saved under, through further saves (${s4.foodMult(0.92).toFixed(2)} at the Information Age, not ${s3.foodMult(0.92).toFixed(2)})`); }
   // the cost
   { let ms0 = M.stats.ms, y0 = M.stats.years; for (let k = 0; k < 100; k++) sim.tick(); const ms = (M.stats.ms - ms0) / Math.max(1, M.stats.years - y0); log(`   a year of migration takes ${ms.toFixed(3)} ms`); check(ms < 0.25, `people on the move are quick enough (${ms.toFixed(3)} ms a year)`); }
 }

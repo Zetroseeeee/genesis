@@ -141,6 +141,9 @@ function createSim(world, seed) {
   const growOf = (t) => 0.006 + t * 0.02 + (t > 0.66 ? Math.min(0.016, (t - 0.66) / 0.24 * 0.016) : 0);
   // A world saved before there were laws was fed by the table of its day (0.15), and keeps it: an update must not starve anyone's people.
   const FOOD_015 = [[0, 0.00527], [0.04, 0.0118], [0.08, 0.0277], [0.13, 0.0672], [0.18, 0.107], [0.24, 0.197], [0.3, 0.224], [0.36, 0.23], [0.42, 0.239], [0.49, 0.411], [0.55, 0.551], [0.6, 0.944], [0.66, 1.66], [0.73, 2.97], [0.8, 4.23], [0.86, 8.88], [0.92, 11.1], [1, 12.5]];
+  // A world saved before people moved (0.38 and 0.39: the land had kinds, the people stayed where they were born) keeps the table
+  // of 0.39: people on the move fill the land's room sooner, and the table was lowered for it.
+  const FOOD_039 = [[0, 0.00499], [0.04, 0.00972], [0.08, 0.0307], [0.13, 0.075], [0.18, 0.11], [0.24, 0.168], [0.3, 0.219], [0.36, 0.317], [0.42, 0.324], [0.49, 0.382], [0.55, 0.534], [0.6, 0.756], [0.66, 1.33], [0.73, 2.13], [0.8, 2.46], [0.86, 4.08], [0.92, 7.43], [1, 10.7]];
   // A world saved before the land had kinds (0.37 and before) keeps the table of 0.37 and the old map (see landOn).
   const FOOD_037 = [[0, 0.00508], [0.04, 0.0108], [0.08, 0.0253], [0.13, 0.0587], [0.18, 0.0894], [0.24, 0.155], [0.3, 0.191], [0.36, 0.223], [0.42, 0.227], [0.49, 0.351], [0.55, 0.472], [0.6, 0.753], [0.66, 1.32], [0.73, 2.29], [0.8, 3.1], [0.86, 6.42], [0.92, 8.57], [1, 10.2]];
   let foodTab = FOOD;
@@ -1532,14 +1535,14 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(c.player ? -30 : cellsOf[c.id] > 20 ? -15 : -6), rulers: c.rulers.slice(-3) } : null), /* (the reigns of a realm are its houses' lines now: dynasty.js; a save is better small) */ worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
-      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, climate: climate && landOn ? climate.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : undefined, land: landOn ? 1 : undefined,
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, climate: climate && landOn ? climate.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : foodTab === FOOD_039 ? 39 : undefined, land: landOn ? 1 : undefined,
     };
   }
   function load(s) {
     const u8 = (str) => { const bin = atob(str); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
     year = s.year; tickCount = s.tickCount; player = s.player; rs = s.rs >>> 0;
     landOn = LM && s.land === 1;      // (a world saved before the land had kinds goes on as it was, and with the table of food it was saved under)
-    foodTab = landOn ? FOOD : s.food === 15 || s.heard === undefined ? FOOD_015 : FOOD_037; FM0 = lerpTable(foodTab, 0); warCnt.fill(-1);      // (see FOOD_015)
+    foodTab = landOn ? (s.food === 39 || s.mig === undefined ? FOOD_039 : FOOD) : s.food === 15 || s.heard === undefined ? FOOD_015 : FOOD_037; FM0 = lerpTable(foodTab, 0); warCnt.fill(-1);      // (see FOOD_015)
     if (climate) { climate.load(landOn ? s.climate : null); applyWet(); }      // (a world saved before the weather begins with the climate of its year: what had begun is not news)
     const p8 = u8(s.pop); for (let i = 0; i < N; i++) pop[i] = p8[i] ? (Math.pow(2, p8[i] / 16) - 1) / 20 : 0;
     owner.fill(-1); { let i = 0; for (let k = 0; k < s.owner.length; k += 2) { const v = s.owner[k], n = s.owner[k + 1]; for (let q = 0; q < n; q++) owner[i++] = v; } }
@@ -1621,7 +1624,7 @@ function createSim(world, seed) {
     // the year in which the first peoples knew this much, by this world's calendar (history's own, unless the world came from before the calendar)
     homeOf, get landOn() { return landOn; }, forageCap: (i) => (landOn ? forA[i] * WSCALE * 30 * FM0 * RCF[flags[i] & 6] * (1 + bonusFert[i] * 2) : 0), apart: (c) => landOn && wfOf[c] < 1,
     landOf: (c) => { if (!landOn) return []; const n = new Uint32Array(NLC); for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c) n[kcls[i]]++; } return Array.from(n).map((v, k) => [k, v]).filter((x) => x[1] > 0).sort((x, y) => y[1] - x[1]); }, landClass: (i) => (landOn ? kcls[i] : -1), farmland: (i) => (landOn ? farmA[i] / Math.max(0.08, cosLat[(i / W) | 0]) : fert[i]),
-    histYear(t) { return histYearOf(t) - calShift; }, get calShift() { return calShift; }, foodMult, get foodOld() { return foodTab === FOOD_015; },
+    histYear(t) { return histYearOf(t) - calShift; }, get calShift() { return calShift; }, foodMult, get foodOld() { return foodTab === FOOD_015; }, get foodTable() { return foodTab === FOOD_015 ? 15 : foodTab === FOOD_037 ? 37 : foodTab === FOOD_039 ? 39 : 0; },
     cellDist, claim, splitCiv,      // (a region changing hands, a province breaking away: for the tests)
     // where a realm's yearly income comes from (the same sum the tick makes), for the ledger
     incomeParts(cv) {

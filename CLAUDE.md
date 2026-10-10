@@ -886,15 +886,18 @@ Conventions that matter:
   valley and has room for many farmers), where people live better (`ls` to the power 1.5), where their own people (half again) or
   faith (a fifth again) live, where the harvest is good, never to an enemy: to the realm's own far land (`SELF`, by its share of
   room: colonies, the frontier), to its neighbours over land, to the realms its market's links reach (harbours: over the sea at
-  `SEA[age]`, a sixth in the Stone Age, all of it from the Industrial). How many go is the age's pace (`RATE`: six in ten thousand
-  a year at the full pull of an empty land in the Stone Age, seven in a thousand with steamships, fewer again in the settled last
-  ages) times the law of labour (`MOB`: serfs a quarter, slaves half, free labour 1.3, an assigned workforce 0.3), at most half the
-  crowd; a realm takes in at most 6 % of its room a year (`CAPIN`). *Refugees*: as many as a famine kills flee it (`FAMINE_FLEE`), a
+  `SEA[age]`, a fiftieth of the pull in the Stone Age and a tenth in the Middle Ages - at four tenths Java peopled Australia in the
+  Middle Ages - a quarter under sail, all of it with steam). How many go is the age's pace (`RATE`: four in ten thousand a year at
+  the full pull of an empty land in the Stone Age, nine under sail, four in a thousand with steamships and railways, fewer again in
+  the settled last ages: the world's people leave their homes at one to one and a half in a thousand a year from 1800 on, to
+  other lands and to their own far frontiers, as history's some one in a thousand from 1850 to 1940) times the law of labour (`MOB`: serfs a quarter, slaves half,
+  free labour 1.3, an assigned workforce 0.3), at most half the crowd; a realm takes in at most 3 % of its room a year (`CAPIN`). *Refugees*: as many as a famine kills flee it (`FAMINE_FLEE`), a
   realm losing land to a war loses 0.4 % a year, one coming apart (stability under 0.3) up to 0.3 %: to any neighbour at peace with
   theirs that has room and a harvest. *Where they come*: a region whose newcomers come to more than its own people (or by a roll on
   their share) takes their people and faith - the largest stream's (`inPpl`, `inFth`; never a holy city): so the peoples of Europe
   spread over the Americas with the ships, and a famine's refugees make a province of their own across the border. Newcomers from a
-  realm that knows more teach (`TEACH`: through `tech`, as a neighbour's teaching). *What they do*: a decade's newcomers beyond 3 in
+  realm that knows more teach (`TEACH`: a quarter of the difference by the share of the people they are, at most `TEACH_MAX` in
+  five years, through `tech`, as a neighbour's teaching). *What they do*: a decade's newcomers beyond 3 in
   a hundred of a realm's people cost it stability (`unrest`, `NEW0`, `NEW_K`: 'Newcomers, and those kept from leaving' in the
   tooltip); the merchants like the hands they bring, the farmers count them strangers on the land (rule.js's conditions, by their
   share up to a quarter). **The player** says what his realm's borders are (open, guarded: a third of the pull, closed: hardly any)

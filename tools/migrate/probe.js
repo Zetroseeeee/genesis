@@ -2,10 +2,15 @@
 // border, how many flee (famine, war, unrest), the greatest flows of the decade, the share of the world's people in the Americas and
 // how many of them are of peoples from beyond the ocean, how many regions newcomers made theirs, and how long a year of it takes.
 //   node tools/migrate/probe.js [seed[,seed...]] [last year]
-// What to hold it to: few go in the early ages (they move with the land their realms take), more with ships and far more with
-// steamships; the Americas' share of the world's people rising after 1500 toward history's (Maddison: 2 % in 1500, 4 % in 1820,
-// 8 % in 1870, 11 % in 1913, 14 % in 1998 with the Offshoots); a year of it some hundredths of a millisecond. Then the regional
-// census (tools/people/regions.js), the world's people (tools/know/people.js) and the war-and-peace probe.
+// What to hold it to: few go in the early ages (they move with the land their realms take: a hundredth or two in a thousand a
+// year), a tenth to four tenths in a thousand a year under sail, one to one and a half with steamships and railways (history: some
+// one in a thousand a year from 1850 to 1940, to other lands and to the world's own frontiers: Siberia, Manchuria, the American
+// West); the Americas' share of the world's people rising after 1700 toward history's (Maddison, without Australia: 4 % in
+// 1820, 7 % in 1870, 11 % in 1913, 14 % in 1998), most of them of peoples from over the ocean by 1900; a year of it a tenth of a
+// millisecond or two. Then the regional census (tools/people/regions.js), the world's people (tools/know/people.js) and the
+// war-and-peace probe. Measured for 0.40, seed 12345: 0.1, 0.2, 0.4 in a thousand a year to 1600, 1700, 1800; 1.5, 1.0, 1.2, 1.0
+// to 1850, 1900, 1950, 2000; the Americas 1.8 % of the world in 1800, 3.4 % in 1900, 7.1 % in 2000 (0.39 had 3.9 %), 61 % of
+// them of peoples from over the ocean in 1900; 0.13 to 0.19 ms a year (0.33 about 1950).
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 global.performance = global.performance || require('perf_hooks').performance;
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;

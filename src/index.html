@@ -886,7 +886,7 @@
   .gv-tenet b { font-size: 13px; font-weight: 600; } .gv-tenet small { font-size: 11.5px; color: var(--text-3); line-height: 1.4; } .gv-tenet:hover { border-color: color-mix(in srgb, var(--gold) 50%, transparent); }
   .gv-tenet.on { background: linear-gradient(90deg, rgb(185 139 240 / 0.22), rgb(185 139 240 / 0.06)), rgb(22 29 41); border-color: var(--cul); } .gv-tenet.on small { color: var(--text-2); } .gv-tenet:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
   /* the peoples: rows that are not buttons */
-  .fk-row { cursor: default; } .fk-row:hover { border-color: transparent; }
+  .fk-row { cursor: default; } .fk-row:hover { border-color: transparent; } .fk-row.n { grid-template-columns: 10px minmax(0, 1fr) auto; } .fk-row em { white-space: nowrap; }
   /* the court: the ruling family as a tree of faces, the line of succession, the house */
   .ct-house { display: flex; align-items: center; gap: 14px; padding: 14px 16px 12px 14px; border-bottom: 1px solid var(--rule); background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 10%, transparent), transparent 70%); }
   .ct-house h3 { margin: 2px 0 3px; font-family: var(--display); font-size: calc(22px * var(--ui-scale)); font-weight: 600; letter-spacing: 0.05em; line-height: 1.1; color: var(--gold-2); }
