@@ -53,6 +53,7 @@
   #flows { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
   #flows path { fill: none; stroke-linecap: round; stroke-dasharray: 1 9; opacity: 0.9; animation: flow 1.1s linear infinite; filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.7)); }
   #flows path.out { stroke: var(--gold-2); } #flows path.in { stroke: var(--select); animation-direction: reverse; }
+  #flows path.mig { stroke-dasharray: 2 7; opacity: 0.85; animation-duration: 1.6s; }
   @keyframes flow { to { stroke-dashoffset: -10; } }
   @media (prefers-reduced-motion: reduce) { #flows path { animation: none; } }
   .hidehud #flows { display: none; } body[data-mode="intro"] #flows { display: none; }
@@ -884,6 +885,8 @@
   .gv-tenet { appearance: none; text-align: left; font: inherit; color: var(--text); background: rgb(18 24 34); border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
   .gv-tenet b { font-size: 13px; font-weight: 600; } .gv-tenet small { font-size: 11.5px; color: var(--text-3); line-height: 1.4; } .gv-tenet:hover { border-color: color-mix(in srgb, var(--gold) 50%, transparent); }
   .gv-tenet.on { background: linear-gradient(90deg, rgb(185 139 240 / 0.22), rgb(185 139 240 / 0.06)), rgb(22 29 41); border-color: var(--cul); } .gv-tenet.on small { color: var(--text-2); } .gv-tenet:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  /* the peoples: rows that are not buttons */
+  .fk-row { cursor: default; } .fk-row:hover { border-color: transparent; }
   /* the court: the ruling family as a tree of faces, the line of succession, the house */
   .ct-house { display: flex; align-items: center; gap: 14px; padding: 14px 16px 12px 14px; border-bottom: 1px solid var(--rule); background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 10%, transparent), transparent 70%); }
   .ct-house h3 { margin: 2px 0 3px; font-family: var(--display); font-size: calc(22px * var(--ui-scale)); font-weight: 600; letter-spacing: 0.05em; line-height: 1.1; color: var(--gold-2); }
@@ -1309,12 +1312,13 @@
 <dialog id="gov"><div class="modal panel" tabindex="-1">
   <div class="phead"><h2 class="display">Laws</h2><span class="micro" id="gv-sub"></span><span id="gv-auth"></span><button class="btn icon ghost" id="gv-close" title="Close (Esc)">✕</button></div>
   <div class="gv-now" id="gv-now"></div>
-  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button><button data-gtab="court">Court</button></div>
+  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button><button data-gtab="folk">Peoples</button><button data-gtab="court">Court</button></div>
   <div class="gv-body">
     <section data-gpane="laws" class="gv-split"><div class="gv-list" id="gv-laws"></div><aside class="gv-info" id="gv-info"></aside></section>
     <section data-gpane="form" class="gv-split" hidden><div class="gv-list" id="gv-forms"></div><aside class="gv-info" id="gv-finfo"></aside></section>
     <section data-gpane="estates" id="gv-estates" hidden></section>
     <section data-gpane="faith" class="gv-split" hidden><div class="gv-list" id="gv-faiths"></div><aside class="gv-info" id="gv-fthinfo"></aside></section>
+    <section data-gpane="folk" class="gv-split" hidden><div class="gv-list" id="gv-folk"></div><aside class="gv-info" id="gv-fkinfo"></aside></section>
     <section data-gpane="court" class="gv-split" hidden><div class="gv-list" id="gv-court"></div><aside class="gv-info" id="gv-ctinfo"></aside></section>
   </div>
 </div></dialog>
@@ -1439,6 +1443,7 @@
 <script src="disease.js"></script>
 <script src="land.js"></script>
 <script src="climate.js"></script>
+<script src="migrate.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -1460,6 +1465,7 @@
 <script src="envoys.js"></script>
 <script src="works.js"></script>
 <script src="court.js"></script>
+<script src="folk.js"></script>
 <script src="tales.js"></script>
 <script src="troops.js"></script>
 <script src="main.js"></script>

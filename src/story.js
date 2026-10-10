@@ -350,7 +350,7 @@
     ], lapse: 2 });
 
   S({ k: 'settlers', art: 'st_settlers', w: (x) => (x.cells() >= 6 ? (x.troubled() ? 1 : 0.25) : 0),
-    make: (x) => { const o = x.troubled(); return { o: o ? o.id : -1, why: o ? (o.wars && Object.keys(o.wars).length ? 'war' : 'hunger and disorder') : 'hunger', n: 200 + Math.floor(x.rnd() * 18) * 50 }; },
+    make: (x, d) => { const o = d && d.o >= 0 && x.civ(d.o) ? x.civ(d.o) : x.troubled(); return { o: o ? o.id : -1, why: o ? (o.wars && Object.keys(o.wars).length ? 'war' : d && d.o >= 0 ? 'hunger and want' : 'hunger and disorder') : 'hunger', n: d && d.n > 0 ? d.n : 200 + Math.floor(x.rnd() * 18) * 50 }; },      // (told by the host when many come over the border in a decade: migrate.js; d.o the realm they come from, d.n families)
     title: () => 'Strangers at the border',
     text: (x, d) => `${d.n.toLocaleString()} families have come over the border${d.o >= 0 && x.civ(d.o) ? ' from ' + x.name(x.civ(d.o)) : ''}, fleeing ${d.why}. They have their oxen and their tools with them, and they ask for land to work.`,
     opts: [
