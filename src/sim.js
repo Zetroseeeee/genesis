@@ -23,6 +23,7 @@ function createSim(world, seed) {
   const DISEASE = window.DISEASE;      // pestilence that travels (disease.js; likewise)
   const LAND = window.LAND;      // what the land feeds (land.js; a tool that does not load it, or a world without data/soil.png, feeds by the old map)
   const CLIMATE = window.CLIMATE;      // the ice, the green Sahara, droughts and good years (climate.js; only in a world whose land has kinds)
+  const MIGRATE = window.MIGRATE;      // people on the move: emigrants, refugees, settlers (migrate.js; likewise)
   const { land, fert, elev, flags } = world;   // land Uint8, fert Float32 0..1, elev Uint8, flags Uint8 (1 land,2 river,4 coast,8 ice)
 
   // ---------- RNG ----------
@@ -133,13 +134,16 @@ function createSim(world, seed) {
   // moves the table until the people on Earth are as many as history counted, century by century (5 million in 8000 BC,
   // 220 at the turn of the era, 970 in 1800, 6,140 in 2000).
   /* FOOD:BEGIN */
-  const FOOD = [[0, 0.00499], [0.04, 0.00972], [0.08, 0.0307], [0.13, 0.075], [0.18, 0.11], [0.24, 0.168], [0.3, 0.219], [0.36, 0.317], [0.42, 0.324], [0.49, 0.382], [0.55, 0.534], [0.6, 0.756], [0.66, 1.33], [0.73, 2.13], [0.8, 2.46], [0.86, 4.08], [0.92, 7.43], [1, 10.7]];
+  const FOOD = [[0, 0.00499], [0.04, 0.00972], [0.08, 0.0307], [0.13, 0.075], [0.18, 0.105], [0.24, 0.152], [0.3, 0.206], [0.36, 0.332], [0.42, 0.338], [0.49, 0.356], [0.55, 0.519], [0.6, 0.708], [0.66, 1.24], [0.73, 1.9], [0.8, 2.15], [0.86, 3.44], [0.92, 7.49], [1, 10.3]];
   /* FOOD:END */
   // how fast a people can grow where there is room: a little faster as it learns, and much faster in the last ages
   // (the land's limit is then the only brake, as it was once children stopped dying)
   const growOf = (t) => 0.006 + t * 0.02 + (t > 0.66 ? Math.min(0.016, (t - 0.66) / 0.24 * 0.016) : 0);
   // A world saved before there were laws was fed by the table of its day (0.15), and keeps it: an update must not starve anyone's people.
   const FOOD_015 = [[0, 0.00527], [0.04, 0.0118], [0.08, 0.0277], [0.13, 0.0672], [0.18, 0.107], [0.24, 0.197], [0.3, 0.224], [0.36, 0.23], [0.42, 0.239], [0.49, 0.411], [0.55, 0.551], [0.6, 0.944], [0.66, 1.66], [0.73, 2.97], [0.8, 4.23], [0.86, 8.88], [0.92, 11.1], [1, 12.5]];
+  // A world saved before people moved (0.38 and 0.39: the land had kinds, the people stayed where they were born) keeps the table
+  // of 0.39: people on the move fill the land's room sooner, and the table was lowered for it.
+  const FOOD_039 = [[0, 0.00499], [0.04, 0.00972], [0.08, 0.0307], [0.13, 0.075], [0.18, 0.11], [0.24, 0.168], [0.3, 0.219], [0.36, 0.317], [0.42, 0.324], [0.49, 0.382], [0.55, 0.534], [0.6, 0.756], [0.66, 1.33], [0.73, 2.13], [0.8, 2.46], [0.86, 4.08], [0.92, 7.43], [1, 10.7]];
   // A world saved before the land had kinds (0.37 and before) keeps the table of 0.37 and the old map (see landOn).
   const FOOD_037 = [[0, 0.00508], [0.04, 0.0108], [0.08, 0.0253], [0.13, 0.0587], [0.18, 0.0894], [0.24, 0.155], [0.3, 0.191], [0.36, 0.223], [0.42, 0.227], [0.49, 0.351], [0.55, 0.472], [0.6, 0.753], [0.66, 1.32], [0.73, 2.29], [0.8, 3.1], [0.86, 6.42], [0.92, 8.57], [1, 10.2]];
   let foodTab = FOOD;
@@ -224,6 +228,7 @@ function createSim(world, seed) {
   let legacy = null;    // (what each realm will be remembered for: legacy.js)
   let intrigue = null;    // (its spies and schemes: intrigue.js)
   let disease = null;    // (its sicknesses: disease.js)
+  let mig = null;    // (its people on the move: migrate.js)
   let storiesOn = true;      // (the player's: the page's setting)
   function fullName(c) { return rule ? rule.fullName(c) : c.name; }
   function religionName(st) {
@@ -257,6 +262,7 @@ function createSim(world, seed) {
   function applyWet() { if (!climate) return; wetVer = climate.wetVer; const G = climate.greenCells, wet = climate.wet; for (let k = 0; k < G.length; k++) { const i = G[k]; forA[i] = forA0[i] + wet[i] * greenAdd[k]; } }
   applyWet();
   const relief = new Float32Array(MAXC), hvSum = new Float32Array(MAXC), hvPop = new Float32Array(MAXC), starved = new Float32Array(MAXC);      // (what softens a famine in each realm; its harvest, weighed by its people; who starved this year)
+  const cellsLY = new Int32Array(MAXC);      // (how many regions each realm held a year before: those that lost land to a war send refugees, migrate.js)
   const FAMINE = 0.25;      // (of those a bad year's land no longer feeds, the share that die of it within the year where nothing softens it)
   const iced = (i) => ICE !== null && landOn && ICE[i] !== 0;      // (under the ice, or under the great lake of the green Sahara: ICE 2, climate.js)
   const lakeAt = (i) => ICE !== null && landOn && ICE[i] === 2;
@@ -351,7 +357,7 @@ function createSim(world, seed) {
   const warCnt = new Int16Array(MAXC).fill(-1); const warsOf = (cv) => { const c = cv.id; let k = warCnt[c]; if (k < 0) { k = 0; for (const _ in cv.wars) k++; warCnt[c] = k; } return k; };
   // how each realm is governed (rule.js): its form, its laws and its estates leave factors here every year, as knowledge does
   const worksIn = (c) => { let k = 0; const b = c * IND.length; for (let j = 0; j < IND.length; j++) k += indN[b + j]; return k; };
-  rule = RULE.create({ MAXC, civs, year: () => year, rnd, knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1, popOf, urban, townsOf, cellsOf, temples, markets, ports, acad, wonders,
+  rule = RULE.create({ MAXC, civs, year: () => year, rnd, knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1, popOf, urban, townsOf, cellsOf, temples, markets, ports, acad, wonders, newcomers: (c) => (mig && landOn ? mig.share(c) : 0),
     works: worksIn, sat: (c, key) => market.sat[c * NC + CAT[key]], living: (c) => market.LS[c], traded: (c) => market.gdp[c] > 0 ? (market.impV[c] + market.expV[c]) / (2 * market.gdp[c]) : (civs[c] && civs[c].rule && civs[c].rule.tr) || 0,      // (a world just loaded has no year of trade behind it yet: what it was when saved)
     warsN: warsOf, tongue: (cv) => STYLES[cv.style] ? STYLES[cv.style].k : '', nameOf: (cv) => fullName(cv), span: (cv) => spanOf(cv),
     event: (cv, text, important, kind) => logEvent(cv, text, important || !!cv.player, kind === 'state' ? 'state' : 'law'), alarm: () => {}, news: (cv, text) => logEvent(cv, text, true, 'state'),
@@ -374,7 +380,8 @@ function createSim(world, seed) {
     P.dynasty = dynasty ? dynasty.unrest(cv) : 0;      // (a child on the throne, and a regent ruling for him: dynasty.js)
     P.story = story ? story.unrest(cv) : 0;      // (what the realm's choices left behind for some years: a festival remembered, a monument, an old ruler who will not let go: story.js)
     P.sickness = disease ? disease.unrest(c) : 0;      // (the fear a pestilence brings while it burns: disease.js)
-    P.target = 1 + P.wars + P.overreach + P.taxes + P.stance + P.temples + P.wonders + P.luxuries + P.hunger + P.ruler + P.knowledge + P.rule + P.peoples + P.faiths + P.culture + P.finance + P.dynasty + P.story + P.sickness; return P;
+    P.newcomers = mig && landOn ? mig.unrest(cv) : 0;      // (many newcomers in a decade, a crowded people barred from leaving: migrate.js)
+    P.target = 1 + P.wars + P.overreach + P.taxes + P.stance + P.temples + P.wonders + P.luxuries + P.hunger + P.ruler + P.knowledge + P.rule + P.peoples + P.faiths + P.culture + P.finance + P.dynasty + P.story + P.sickness + P.newcomers; return P;
   }
   const spanOf = (cv) => (40 + cv.tech * 3000) * KF[cv.id * NKF + KK.reach] * RF[cv.id * NRF + RK.reach];      // how many regions a realm holds without strain
   const fmNow = (cv) => foodMult(cv.tech) * KF[cv.id * NKF + KK.food] * RF[cv.id * NRF + RK.food];
@@ -679,6 +686,20 @@ function createSim(world, seed) {
     cradle: (c) => { const cv = civs[c]; if (!cv || cv.capital < 0) return false; const lon = ((cv.capital % W) + 0.5) / W * 360 - 180, lat = 90 - (((cv.capital / W) | 0) + 0.5) / H * 180; return !(lon < -30 && lon > -170) && !(lat < -10 && lon > 110); },
     shut: (cv) => (cv.sick ? (cv.sick.q === 2 ? 0.85 : cv.sick.q === 1 ? 0.5 : 0) : 0),
     reached: (cv, o) => { if (cv.player || cellsOf[cv.id] > 150) logEvent(cv, `${o.name.charAt(0).toUpperCase() + o.name.slice(1)} reaches ${fullName(cv)}`, cv.player, 'disaster'); if (cv.player) storyTell(cv, 'plague', { o: o.id }); } }) : null;
+  // people on the move (migrate.js): from land that cannot feed them, from famine, war and unrest, to room and a better living; the
+  // land pass moves them (outF, genF, inF), and newcomers who outnumber a place make it theirs (inPpl, inFth)
+  mig = MIGRATE && LM ? MIGRATE.create({ civs, MAXC, year: () => year, pop: (c) => popOf[c], fm: (c) => fmOf[c], starved: (c) => starved[c], lost: (c) => Math.max(0, cellsLY[c] - cellsOf[c]),
+    stab: (cv) => cv.stability, nb: (c) => nearNb[c] || lastNb[c], partners: partnersOf, ls: (c) => market.LS[c], ruling: (c) => (people ? people.ruling[c] : 0),
+    faith: (c) => (faith ? faith.state[c] : 0), labour: (cv) => rule.ruleOf(cv).laws.labour, harvest: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1),
+    atWar: (cv, d) => cv.wars[d] !== undefined, news: migrationNews, teach: (d, x) => { const dv = civs[d]; if (dv && x > 0) dv.tech = Math.min(1, dv.tech + x); } }) : null;
+  // a decade's great flow of people: the player hears where his own went and whence newcomers came; the world of the greatest
+  function migrationNews(a, b, v) {
+    const A = civs[a], B = civs[b]; if (!A || !B) return; const k = v * 1000, n = k >= 1e6 ? (k / 1e6).toFixed(1) + ' million' : Math.round(k / 1000) * 1000 >= 1000 ? (Math.round(k / 1000) * 1000).toLocaleString() : Math.max(10, Math.round(k / 10) * 10).toLocaleString();
+    const shA = v / Math.max(1e-6, popOf[a]), shB = v / Math.max(1e-6, popOf[b]);
+    if (A.player && shA > 0.005) logEvent(A, `In ten years ${n} of the people of ${fullName(A)} have gone to ${fullName(B)}`, false, 'state', A.capital, true);
+    if (B.player && shB > 0.005) { logEvent(B, `In ten years ${n} have come from ${fullName(A)} to live in ${fullName(B)}`, false, 'state', B.capital, true); if (shB > 0.01 && (nearNb[b] || lastNb[b] || []).includes(a)) storyTell(B, 'settlers', { o: a, n: Math.max(50, Math.round(v * 20 / 50) * 50) }); }      // (many over the border: the story of strangers at the border - of the decade's newcomers, five to a family, a tenth at the gate at once)
+    if (!A.player && !B.player && v > 300) pushWorld({ year, text: `A great migration: ${n} from ${fullName(A)} to ${fullName(B)} in ten years`, civ: a, type: 'state', loc: B.capital });
+  }
   // a story of the player's family, told when it happens if no other waits and none of its kind was told lately (a birth, a wedding)
   function storyTell(cv, key, d) { if (!story || !cv || !cv.player || !storiesOn) return; const S = cv.story; if (S && (S.q || year - (S.s[key] || -1e9) < 1.5 * RULE.PACE[cv.era])) return; story.tell(cv, key, d); }
   // how a new ruler is told: who died and at what age, whose child the heir is and how old, who rules for a child, the line that
@@ -921,13 +942,26 @@ function createSim(world, seed) {
     let best = 0; for (const c of civs) if (c && c.tech > best) best = c.tech;
     history.push({ year, pop: total, wild, civs: civCount, best, gdp: Math.round(market.worldGdp), trade: Math.round(market.worldTrade), top: top.slice(0, 12).map(t => [t[0], Math.round(t[1]), t[2]]) });
   }
+  // people on the move in a region, as migrate.js reckoned them last year: some of those the land cannot feed leave, refugees flee,
+  // newcomers fill the room; where they come to outnumber those who were there, the place is of their people and faith (a place
+  // newcomers come to year after year is theirs before long: each year as likely as they are a share of its people). And, in the
+  // years it works the flows out, what the realm's land feeds, who would leave and where there is room. (Apart from the land's pass,
+  // whose loop over every region is the year's heaviest: it runs faster without them in it.)
+  function migMove(i, o, p, K) {
+    const of = mig.outF[o], gf = mig.genF[o], inf = mig.inF[o];
+    if (of > 0 && p > 0.6 * K) p -= (p - 0.6 * K) * of;
+    if (gf > 0) p -= p * gf;
+    if (inf > 0 && p < 0.8 * K) { const a = (0.8 * K - p) * inf, sh = a / (p + a); if (sh > 0.5 || (Math.imul(i ^ Math.imul(year, 0x2C1B3C6D), 0x297A2D39) >>> 0) / 4294967296 < sh) { const np = mig.inPpl[o], nf = mig.inFth[o]; if (np && people) people.ppl[i] = np; if (nf && faith && !faith.holyAt.has(i)) faith.fth[i] = nf; } p += a; }
+    return p;
+  }
+  function migCount(o, p, K) { mig.cap[o] += K; if (p > 0.6 * K) mig.crowd[o] += p - 0.6 * K; if (p < 0.8 * K) mig.room[o] += 0.8 * K - p; }
   // ---------- main tick ----------
   let meanTech = 0.02, lastFounding = -99999;
   function tick() {
     tickCount++; year++; warCnt.fill(-1);
     if (tickCount % 25 === 0) shufflePerm();
     // per-civ accumulators
-    popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); townsOf.fill(0); townPick.fill(-1); townKey.fill(0xFFFFFFFF); bestPop.fill(-1); rawPop.fill(0); held.fill(0); urban.fill(0); portCells.fill(-1);
+    cellsLY.set(cellsOf); popOf.fill(0); cellsOf.fill(0); acad.fill(0); temples.fill(0); ports.fill(0); markets.fill(0); wonders.fill(0); mines.fill(0); townsOf.fill(0); townPick.fill(-1); townKey.fill(0xFFFFFFFF); bestPop.fill(-1); rawPop.fill(0); held.fill(0); urban.fill(0); portCells.fill(-1);
     const budget = new Float32Array(MAXC);
     let techSum = 0, techN = 0;
     frontTech = 0;
@@ -941,6 +975,10 @@ function createSim(world, seed) {
     // pass 1: growth + accumulate (order-independent); the dead of last year's sickness are taken first (disease.js: a share of each realm)
     const sick = disease && disease.dying() ? disease.killF : null;
     roomKey.fill(0xFFFFFFFF); roomCell.fill(-1);
+    // (people on the move: what the land feeds, who would leave and where there is room are counted in the years migrate.js works
+    //  the flows out; the people are moved every year, in the realms it has any to move: migMove, migCount)
+    const migOn = mig !== null && landOn, migAcc = migOn && year % MIGRATE.EVERY === 0; if (migAcc) { mig.cap.fill(0); mig.crowd.fill(0); mig.room.fill(0); }
+    const mAct = migOn ? mig.act : null;
     for (let k = 0; k < LI.length; k++) {
       const i = LI[k]; const o = owner[i]; const c = o >= 0 ? civs[o] : null;
       let p = pop[i]; if (sick !== null && o >= 0) { const q = sick[o]; if (q > 0) p *= 1 - q; }
@@ -950,6 +988,8 @@ function createSim(world, seed) {
         p += r * p * Math.max(-10, 1 - p / Math.max(K, 0.01)); // overfull land empties by at most ~a quarter a year
         // (a famine: in a bad year those the land no longer feeds die, a share of them a year, fewer where something softens it)
         if (weather && p > K) { const hv = HV[i]; if (hv < 0.97) { const d = (p - K) * FAMINE * (c ? 1 - relief[o] : 1); p -= d; if (c) starved[o] += d; } }
+        // (people on the move, as migrate.js reckoned them last year)
+        if (migOn && c) { if (mAct[o] === 1) p = migMove(i, o, p, K); if (migAcc) migCount(o, p, K); }
         if (p < 0.001) p = 0;
         pop[i] = p;
         // (a far cell of a realm with room in it, one a year chosen as by lot: where its emigrants go - colonies across the sea, a frontier far off)
@@ -978,6 +1018,7 @@ function createSim(world, seed) {
     // per-civ bookkeeping
     for (let c = 0; c < MAXC; c++) if (civs[c]) mightOf[c] = strength(civs[c], popOf[c], mines[c]);
     diplo.tick();      // (who trades with whom; what tribute changes hands this year)
+    if (migOn) mig.step();      // (who leaves, and for where: the land pass of next year moves them)
     for (let c = 0; c < MAXC; c++) {
       const cv = civs[c]; if (!cv) continue;
       if (cellsOf[c] === 0) { diplo.fell(cv); killCiv(cv, 'its last lands were lost'); continue; }
@@ -1505,14 +1546,14 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(c.player ? -30 : cellsOf[c.id] > 20 ? -15 : -6), rulers: c.rulers.slice(-3) } : null), /* (the reigns of a realm are its houses' lines now: dynasty.js; a save is better small) */ worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
-      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, climate: climate && landOn ? climate.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : undefined, land: landOn ? 1 : undefined,
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, climate: climate && landOn ? climate.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : foodTab === FOOD_039 ? 39 : undefined, land: landOn ? 1 : undefined,
     };
   }
   function load(s) {
     const u8 = (str) => { const bin = atob(str); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
     year = s.year; tickCount = s.tickCount; player = s.player; rs = s.rs >>> 0;
     landOn = LM && s.land === 1;      // (a world saved before the land had kinds goes on as it was, and with the table of food it was saved under)
-    foodTab = landOn ? FOOD : s.food === 15 || s.heard === undefined ? FOOD_015 : FOOD_037; FM0 = lerpTable(foodTab, 0); warCnt.fill(-1);      // (see FOOD_015)
+    foodTab = landOn ? (s.food === 39 || s.mig === undefined ? FOOD_039 : FOOD) : s.food === 15 || s.heard === undefined ? FOOD_015 : FOOD_037; FM0 = lerpTable(foodTab, 0); warCnt.fill(-1);      // (see FOOD_015)
     if (climate) { climate.load(landOn ? s.climate : null); applyWet(); }      // (a world saved before the weather begins with the climate of its year: what had begun is not news)
     const p8 = u8(s.pop); for (let i = 0; i < N; i++) pop[i] = p8[i] ? (Math.pow(2, p8[i] / 16) - 1) / 20 : 0;
     owner.fill(-1); { let i = 0; for (let k = 0; k < s.owner.length; k += 2) { const v = s.owner[k], n = s.owner[k + 1]; for (let q = 0; q < n; q++) owner[i++] = v; } }
@@ -1553,6 +1594,7 @@ function createSim(world, seed) {
     if (story) story.load(s.story);
     if (intrigue) intrigue.load(s.intrigue);      // (the schemes under way are on the realms: civ.intrigue; a world saved before them has none)
     if (disease) disease.load(s.disease);      // (a world saved before sickness travelled has none under way, and its peoples have had nothing yet)
+    if (mig) mig.load(s.mig);      // (a world saved before people moved between realms has no flows yet; its realms' borders are open)
     if (legacy) { legacy.load(s.legacy); if (!s.legacy) legacy.settle(); }      // (a world from before legacies: each realm begins in its own age with nothing remembered)      // (what each realm's stories left behind is on the realm: civ.story; a world saved before stories begins without)
   }
   // who touches whom by land, read off the map (the tick keeps it up from border contacts afterwards)
@@ -1593,7 +1635,7 @@ function createSim(world, seed) {
     // the year in which the first peoples knew this much, by this world's calendar (history's own, unless the world came from before the calendar)
     homeOf, get landOn() { return landOn; }, forageCap: (i) => (landOn ? forA[i] * WSCALE * 30 * FM0 * RCF[flags[i] & 6] * (1 + bonusFert[i] * 2) : 0), apart: (c) => landOn && wfOf[c] < 1,
     landOf: (c) => { if (!landOn) return []; const n = new Uint32Array(NLC); for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c) n[kcls[i]]++; } return Array.from(n).map((v, k) => [k, v]).filter((x) => x[1] > 0).sort((x, y) => y[1] - x[1]); }, landClass: (i) => (landOn ? kcls[i] : -1), farmland: (i) => (landOn ? farmA[i] / Math.max(0.08, cosLat[(i / W) | 0]) : fert[i]),
-    histYear(t) { return histYearOf(t) - calShift; }, get calShift() { return calShift; }, foodMult, get foodOld() { return foodTab === FOOD_015; },
+    histYear(t) { return histYearOf(t) - calShift; }, get calShift() { return calShift; }, foodMult, get foodOld() { return foodTab === FOOD_015; }, get foodTable() { return foodTab === FOOD_015 ? 15 : foodTab === FOOD_037 ? 37 : foodTab === FOOD_039 ? 39 : 0; },
     cellDist, claim, splitCiv,      // (a region changing hands, a province breaking away: for the tests)
     // where a realm's yearly income comes from (the same sum the tick makes), for the ledger
     incomeParts(cv) {
@@ -1613,7 +1655,7 @@ function createSim(world, seed) {
     get story() { return story; }, get legacy() { return legacy; }, get intrigue() { return intrigue; }, get disease() { return disease; },
     // the weather (climate.js), in a world whose land has kinds: a realm's harvest this year against an ordinary year's (weighed by its
     // people), who starved, what softens a famine there; a place's weather; whether the ice still lies on a place
-    get climate() { return climate && landOn ? climate : null; }, harvestOf: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1), starvedOf: (c) => starved[c], reliefOf: (c) => relief[c],
+    get climate() { return climate && landOn ? climate : null; }, get mig() { return mig && landOn ? mig : null; }, migPolicy: (what, key) => { const c = playerCiv(); if (!c || !mig) return 'No realm'; return mig.setPolicy(c, what, key); }, harvestOf: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1), starvedOf: (c) => starved[c], reliefOf: (c) => relief[c],
     climateHere: (i) => (climate && landOn ? climate.here(i) : null), iced, lakeAt, lakeWill: (i) => !!(climate && landOn && !climate.bare && year < CLIMATE.GREEN[0].off0 && climate.chadCells.includes(i)),      /* (land the great lake will rise over: the player is told to settle on its shore) */
     diseaseView: () => { const c = playerCiv(); return disease ? disease.view(c ? c.id : -1) : null; }, shutAgainst: (q) => { const c = playerCiv(); return c && disease ? disease.quarantine(c, q, 0) : 'No realm'; },
     intrigueView: (bid) => { const c = playerCiv(); return c && intrigue ? intrigue.view(c.id, bid === undefined ? -1 : bid) : null; },

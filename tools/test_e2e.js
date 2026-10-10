@@ -973,6 +973,31 @@ server.listen(0, async () => {
     check(!r.hidden && /The climate: /.test(r.text), 'the date names the age\'s climate: ' + r.text.slice(r.text.indexOf('The climate'), r.text.indexOf('The climate') + 80));
     await ev(() => { const S = __G.sim; for (const sp of S.climate.spells.slice()) if (sp.kind === 'drought') sp.y1 = S.year; __G.run(1); S.playerCiv().clim = null; S.setStories(true); __T.quiet(); });
   });
+  await scenario('people on the move: the Peoples tab (who lives in the realm, who came and left, the world\'s migrations), the borders and the leaving set there, the streams under the lens of peoples, the realm\'s panel', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
+    // a decade's flows laid by hand: some of the player's people gone to a neighbour, some of another realm's come to his
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), M = S.mig; if (!M) return { none: 1 }; const o = S.civs.find((x) => x && x !== c && x.capital >= 0); if (!o) return { none: 2 };
+      M.load({ rot: 0, flows: [[c.id, o.id, 40], [o.id, c.id, 25]] }); c.mig = { b: 'open', l: 'free', o: 0, i: 0, y: S.year, li: 25, lo: 40 }; return { o: o.id, name: S.fullName(o) }; });
+    check(!r.none, 'the world has people on the move (' + JSON.stringify(r) + ')');
+    await ev(() => GOV.open('folk')); await frames(2);
+    r = await ev(() => ({ open: document.getElementById('gov').open, pane: !document.querySelector('#gov [data-gpane="folk"]').hidden, list: document.getElementById('gv-folk').textContent, info: document.getElementById('gv-fkinfo').textContent, btns: document.querySelectorAll('#gv-fkinfo [data-mig-b]').length }));
+    check(r.open && r.pane && /Your peoples/.test(r.list) && /Who came/.test(r.list) && /Who left/.test(r.list) && /The world/.test(r.list), 'the Peoples tab: ' + r.list.replace(/\s+/g, ' ').slice(0, 120));
+    check(/Your borders/.test(r.info) && /leaving/.test(r.info) && r.btns === 3, 'the borders and the leaving: ' + r.info.replace(/\s+/g, ' ').slice(0, 100));
+    await ev(() => document.querySelector('#gv-fkinfo [data-mig-b="closed"]').click()); await frames(2);
+    r = await ev(() => ({ b: __G.sim.playerCiv().mig.b, on: !!document.querySelector('#gv-fkinfo [data-mig-b="closed"].on') }));
+    check(r.b === 'closed' && r.on, 'the borders closed, and the page says so');
+    await ev(() => document.querySelector('#gv-fkinfo [data-mig-b="open"]').click()); await frames(1);
+    await ev(() => document.getElementById('gov').close()); await frames(1);
+    // the streams of the decade under the lens of peoples, and the key that tells of them
+    await page.keyboard.press('i'); await frames(4);
+    r = await ev(() => ({ mode: __G.world.palMode, paths: document.querySelectorAll('#flows path.mig').length, key: document.getElementById('govkey').textContent }));
+    check(r.mode === 'people' && r.paths === 2 && /great migrations/.test(r.key), `the lens of peoples draws the decade's migrations as streams (${r.paths}), and its key says so`);
+    await page.keyboard.press('i'); await frames(3); r = await ev(() => document.querySelectorAll('#flows path.mig').length); check(r === 0, 'and they go with the lens');
+    // the realm's panel and the tracker
+    r = await ev(() => { __G.select(__G.sim.playerCiv().capital); return document.getElementById('sc-kv').textContent; });
+    check(/On the move/.test(r), 'the realm\'s panel says who came and who left: ' + r.slice(r.indexOf('On the move'), r.indexOf('On the move') + 50));
+    await ev(() => { __G.sim.playerCiv().mig = { b: 'open', l: 'free', o: 0, i: 0, y: __G.sim.year }; __G.sim.mig.load({ rot: 0, flows: [] }); __T.quiet(); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);

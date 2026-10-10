@@ -24,7 +24,7 @@
   // what share of their people realms of each age usually rule of other peoples (tools/people/norm.js measures it):
   // a realm is restless only for what it holds beyond its age's way, and a little steadier for less
   // NORM-BEGIN
-  const NORM = [0.021, 0.056, 0.077, 0.059, 0.046, 0.042, 0.034, 0.023, 0.013];
+  const NORM = [0.039, 0.064, 0.09, 0.076, 0.072, 0.081, 0.116, 0.091, 0.046];
   // NORM-END
   // a people drifts apart where it has spread farther than this from its home, in regions, by age (roads, books and a
   // common ruler hold a tongue together over more ground)
@@ -210,6 +210,7 @@
       s.l.forEach((q, k) => list.push({ id: k + 1, name: q[0], t: q[1], parent: q[2], fam: q[3], born: q[4], home: q[5], hue: q[6], sat: q[7], lit: q[8], gone: q[9] || 0, n: 0, pop: 0 }));
       let i = 0; for (let k = 0; k < s.map.length; k += 2) { const p = s.map[k], n = s.map[k + 1]; ppl.fill(p, i, Math.min(N, i + n)); i += n; }
       if (s.r) for (let c = 0; c < Math.min(MAXC, s.r.length); c++) ruling[c] = s.r[c];
+      for (let k = 0; k < LI.length; k++) { const i = LI[k], P = list[ppl[i]]; if (P) { P.n++; P.pop += pop[i]; } }      // (how many each people is, for the key and the pages until the next count)
       return true;
     }
     // a world saved before there were peoples: every realm's land is its own people's, wild land nobody's known

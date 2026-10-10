@@ -353,6 +353,9 @@ peoples_near | tools/scenes/peoples.js | {years:9000,lon:30,lat:45,alt:1800,tilt
 # --- faiths: the lens of faiths over the Old World in 500 BC and in AD 1500, with their holy cities; a region from closer ---
 faiths_old   | tools/scenes/peoples.js | {years:9500,lon:40,lat:35,alt:7500,lens:'fth'} | | 140
 faiths_late  | tools/scenes/peoples.js | {years:11500,lon:40,lat:35,alt:7500,lens:'fth'} | | 170
+mig_tab      | tools/scenes/migrate.js | {years:11880} | | 200
+mig_globe    | tools/scenes/migrate.js | {years:11880,look:'globe',lon:-35,lat:30,alt:11000000} | | 210
+mig_stream   | tools/scenes/migrate.js | {years:11880,look:'globe',alt:5000000,tilt:0.45} | | 210
 faiths_near  | tools/scenes/peoples.js | {years:11000,lon:35,lat:38,alt:2200,tilt:0.3,lens:'fth'} | | 160
 faith_found  | tools/scenes/faithpage.js | {years:9800,lon:35.2,lat:31.8,page:'new'} | | 150
 faith_page   | tools/scenes/faithpage.js | {years:11200,lon:12.5,lat:41.9,page:'mine'} | | 170

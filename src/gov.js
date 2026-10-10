@@ -2,8 +2,9 @@
 // them, the forms of government, the estates of the realm (who holds power, how content they are and why), what the
 // ruler's authority allows, the reform under way and whatever an estate is demanding; and the faith of the realm (the
 // faiths of its people and around it, a faith's page, founding one, taking up another, missionaries, a church of one's
-// own); and the court (court.js: the ruling family, the line of succession, the house). It reads the simulation's rule and
-// faiths (sim.rule, rule.js; sim.faith, faith.js) and calls their few actions.
+// own); the peoples (folk.js: who lives in the realm, who came and who left, its borders); and the court (court.js: the
+// ruling family, the line of succession, the house). It reads the simulation's rule and faiths (sim.rule, rule.js; sim.faith,
+// faith.js) and calls their few actions.
 window.GOV = (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
@@ -62,6 +63,7 @@ window.GOV = (function () {
     $('gov').addEventListener('close', () => { lastSig = ''; });
     $('gov').addEventListener('click', (e) => {
       if (tab === 'court' && window.COURT && COURT.click(e, S(), (m) => { if (ctx.toast) ctx.toast(m); })) { if (ctx.afterAct) ctx.afterAct(); render(); return; }
+      if (tab === 'folk' && window.FOLK && FOLK.click(e, S(), (m) => { if (ctx.toast) ctx.toast(m); })) { if (ctx.afterAct) ctx.afterAct(); render(); return; }
       const a = e.target.closest('[data-gact]'); if (a) { act(a.dataset.gact, a.dataset.k); return; }
       const j = e.target.closest('[data-kgo]'); if (j && ctx.openTree) { close(); ctx.openTree(j.dataset.kgo); return; }
       const g = e.target.closest('[data-ggo]'); if (g) { show(g.dataset.ggo); return; }
@@ -248,7 +250,7 @@ window.GOV = (function () {
   function render() {
     const s = S(); if (!s || !isOpen()) return; const c = me(); if (!c) return;
     $('gv-sub').textContent = `${s.fullName(c)} · ${RL().FORM[RU().ruleOf(c).gov].name} · ${s.fmtYear(s.year)}`;
-    renderNow(); if (tab === 'laws') renderLaws(); else if (tab === 'form') renderForms(); else if (tab === 'faith') renderFaith(); else if (tab === 'court') { if (window.COURT) COURT.render($('gv-court'), $('gv-ctinfo'), s, c); } else renderEstates();
+    renderNow(); if (tab === 'laws') renderLaws(); else if (tab === 'form') renderForms(); else if (tab === 'faith') renderFaith(); else if (tab === 'court') { if (window.COURT) COURT.render($('gv-court'), $('gv-ctinfo'), s, c); } else if (tab === 'folk') { if (window.FOLK) FOLK.render($('gv-folk'), $('gv-fkinfo'), s, c); } else renderEstates();
     lastSig = sig();
   }
   const sig = () => { const s = S(), c = me(); if (!c) return String(s.year); const Q = RU().ruleOf(c); const F = s.faith; return `${s.year}:${Q.gov}:${Object.values(Q.laws).join(',')}:${Q.reform ? Q.reform.key : ''}:${Q.demand ? Q.demand.key : ''}:${Math.floor(Q.auth)}:${F ? F.state[c.id] + '/' + F.pending[c.id] + '/' + F.missionTo[c.id] : ''}:${Math.floor(c.wealth)}`; };

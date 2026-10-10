@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~34 min for all 44).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~38 min for all 50).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
@@ -98,7 +98,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   the table of how many a unit of land feeds at each stage of knowledge (`FOOD` in `src/sim.js`, between its marks).
   One fit moves the world a long way (fewer people learn more slowly, and feed fewer still): take the fit that
   measures best, not the last. A world keeps the table it was saved under when a refit lowers it (`FOOD_015`,
-  `save().food`): an update must not starve anyone's people.
+  `FOOD_039`, `save().food`): an update must not starve anyone's people.
   Fit the pace first, then what the ages expect of rule (`tools/rule/norm.js`), then the people, then the market's
   yields (`calibrate.js`): each stands on the one before.
 - `node tools/people/probe.js [seed,seed] [last year] [--write]` — the world's peoples through the ages: how many, of how
@@ -159,6 +159,11 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   nothing holds (the high Arctic, Baffin, Iceland) until the years the ice leaves the points are as near history's as it can make them
   (some minutes; it prints the worst points), and `--write` puts the table into `src/climate.js` between its DOMES marks. Run it after
   touching the domes or the lobes, then test_sim 23 and the climate probe.
+- `node tools/migrate/probe.js [seed,seed] [last year]` — people on the move through the ages: how many leave their homes in each
+  span and how many of them for other realms, how many flee, how many in a thousand a year, the Americas' share of the world's people
+  and how many of them are of peoples from over the ocean, the decade's greatest streams, how long a year of it takes. Hold it to its
+  header; run it after touching `migrate.js` or the land's pass, then `tools/people/regions.js`, `tools/know/people.js` and the
+  war-and-peace probe over 12345 and 777.
 - `node tools/disease/probe.js [seed,seed] [last year]` — sickness through the ages: outbreaks by kind, how far they go and how
   many they kill, the world's people, the Americas' share of them and which sicknesses their realms have met, the worst outbreaks,
   how long a year of it takes. Run it after touching `disease.js`, then `tools/know/people.js` (the world's people against
@@ -273,10 +278,12 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/disease.js` | `DISEASE` | Pestilence that travels: six kinds (smallpox, measles, plague, typhus, influenza, cholera), the age that breeds each, how readily it passes and kills; one world's sickness: outbreaks and where they burn, what every people has lived through, who is spared, quarantines; pure data (the dead are taken by the host) |
 | `src/climate.js` | `CLIMATE` | The weather of the Holocene: the ice sheets that withdraw from the north, the green Sahara of the wet centuries, the great droughts and colds history remembers, every year's droughts and good years; one world's weather: every place's harvest this year, the ice, the green lands; pure data |
 | `src/land.js` | `LAND` | What the land feeds: sixteen kinds of land (`data/soil.png`), how intensely each kind's farmland is farmed in each age (`FIT`, measured by `tools/people/landfit.js`), what it gives people who do not farm, the continents' crops and beasts; pure data |
+| `src/migrate.js` | `MIGRATE` | People on the move: emigrants from crowded land to land with room and a better living (the realm's own far land, its neighbours, the realms its roads and ships reach), refugees of famine, war and unrest, the newcomers' people and faith taking the places they come to outnumber; the player's borders and leaving; one world's flows, the decade's greatest; pure data |
 | `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
 | `src/court.js` | `COURT` | The Court, the laws screen's last tab: the ruling family as a tree of faces (parents, the throne and consort, brothers and sisters, children, grandchildren), the line of succession, a regency, the house and its reigns; a person's page (raise as, pass over, marry) |
+| `src/folk.js` | `FOLK` | The Peoples tab, the laws screen's tab before the Court: the realm's peoples, its rulers' people abroad, who came and who left in the last ten years, the world's great migrations, the policies of borders and of leaving |
 | `src/works.js` | `WORKS` | The culture screen: renown against the age, the next great person, the golden age, patronage, the living great people (commissions), the works held and lost; the world's renowned realms, golden ages, great people of late and greatest works |
 | `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
@@ -869,6 +876,47 @@ Conventions that matter:
   (`save().disease`: the outbreaks under way and the realms they burn in, what every people has had, who is spared, the
   quarantines) and the realm (`civ.sick`); a world saved before sickness travelled has none under way, and its peoples have had
   nothing yet. The old disk of death from nowhere (`plague(center, radius, natural)`) is not used while this is loaded.
+- **Migration** (`migrate.js`; `sim.mig`; the Peoples tab of the laws screen, `folk.js`; streams under the lens of peoples). People
+  go from land that cannot feed them to land with room and a better living. The simulation's pass over the land fills, realm by
+  realm, what its land feeds (`cap`), its people beyond six tenths of that, cell by cell (`crowd`: who would leave), and its room
+  below eight tenths (`room`); every five years (`EVERY`) the flows are worked out from those, and every year the land's pass moves
+  the people by the last of them (`outF`: the share of a crowded cell's crowd that leaves, `genF`: the share of everyone that flees,
+  `inF`: the share of a roomy cell's room that newcomers fill). *Emigrants* go where it is emptier as their own ways would farm it
+  (the density gap with the destination's food per unit of land against theirs, `fm`: a land of hunters is full at a few to a
+  valley and has room for many farmers), where people live better (`ls` to the power 1.5), where their own people (half again) or
+  faith (a fifth again) live, where the harvest is good, never to an enemy: to the realm's own far land (`SELF`, by its share of
+  room: colonies, the frontier), to its neighbours over land, to the realms its market's links reach (harbours: over the sea at
+  `SEA[age]`, a fiftieth of the pull in the Stone Age and a tenth in the Middle Ages - at four tenths Java peopled Australia in the
+  Middle Ages - a quarter under sail, all of it with steam). How many go is the age's pace (`RATE`: four in ten thousand a year at
+  the full pull of an empty land in the Stone Age, nine under sail, four in a thousand with steamships and railways, fewer again in
+  the settled last ages: the world's people leave their homes at about one in a thousand a year from 1800 to 1950, to other
+  lands and to their own far frontiers, as history's some one in a thousand from 1850 to 1940, and half that since) times the law of labour (`MOB`: serfs a quarter, slaves half,
+  free labour 1.3, an assigned workforce 0.3), at most half the crowd; a realm takes in at most 3 % of its room a year (`CAPIN`). *Refugees*: as many as a famine kills flee it (`FAMINE_FLEE`), a
+  realm losing land to a war loses 0.4 % a year, one coming apart (stability under 0.3) up to 0.3 %: to any neighbour at peace with
+  theirs that has room and a harvest. *Where they come*: a region whose newcomers come to more than its own people (or by a roll on
+  their share) takes their people and faith - the largest stream's (`inPpl`, `inFth`; never a holy city): so the peoples of Europe
+  spread over the Americas with the ships, and a famine's refugees make a province of their own across the border. Newcomers from a
+  realm that knows more teach (`TEACH`: a quarter of the difference by the share of the people they are, at most `TEACH_MAX` in
+  five years, through `tech`, as a neighbour's teaching). *What they do*: a decade's newcomers beyond 3 in
+  a hundred of a realm's people cost it stability (`unrest`, `NEW0`, `NEW_K`: 'Newcomers, and those kept from leaving' in the
+  tooltip); the merchants like the hands they bring, the farmers count them strangers on the land (rule.js's conditions, by their
+  share up to a quarter). **The player** says what his realm's borders are (open, guarded: a third of the pull, closed: hardly any)
+  and whether his people may leave (free, barred: a seventh go, and the crowded who stay are restless: `BARRED_K`), on the realm as
+  `civ.mig` (`b`, `l`; the decade's going and coming `o`, `i`, the last decade's `lo`, `li`). The Peoples tab: the realm's peoples,
+  its rulers' people abroad, who came and who left in the last decade, the world's great migrations, the policies. The player hears
+  of his decade's flows (calm news: they do not stop the turn), of a neighbour's people coming in numbers as a story (`settlers`),
+  and the world of its greatest; the lens of peoples draws the decade's 24 greatest streams from capital to capital in the colour of
+  the people that goes (`#flows path.mig`); the realm's panel says who is on the move; the tracker has a line while many come or go.
+  The autopilot's realms keep their borders open. The module throws no dice (the land's pass rolls a region's turning on a hash of
+  the place and the year). *What it costs*: migrate.js a tenth to two tenths of a millisecond a year (worked out every five years),
+  the land's pass about a tenth more (`migMove` in the realms that have people to move, `migCount` in the years the flows are worked
+  out: apart from the pass's loop, which runs slower with them written into it); with the world it makes, a year is some five to ten in a
+  hundred dearer in the first ages and three to five in the last (test section 1: 0.25 of a unit a year, from 0.23). Saved with the world (`save().mig`: the decade's flows) and the realm (`civ.mig`); a world saved before
+  migration has no flows yet, and keeps the table of food it was saved under (`FOOD_039`, `save().food` 39): people on the move
+  fill the land's room sooner than it fills itself, so the world had a tenth more people, and the table of the later ages was
+  fitted again, lower by up to a sixth (the first ages' points held where they were: lowered with the rest, the Stone Age's bands
+  left more land to new peoples and the world had twenty realms more). After touching it run `tools/migrate/probe.js` over 12345 and 777, the regional census
+  (`tools/people/regions.js`), the world's people (`tools/know/people.js`) and the war-and-peace probe.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

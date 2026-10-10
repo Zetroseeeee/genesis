@@ -40,7 +40,7 @@
   // what share of their people realms of each age usually hold of other faiths (tools/faith/probe.js --write measures it):
   // a realm is restless only for what it holds beyond its age's way, and a little steadier for less
   // NORM-BEGIN
-  const NORM = [0, 0.036, 0.017, 0.063, 0.071, 0.081, 0.082, 0.107, 0.129];
+  const NORM = [0, 0.039, 0.021, 0.087, 0.074, 0.079, 0.109, 0.161, 0.212];
   // NORM-END
   // a faith held farther from its holy city than this, in regions, by age, may split
   const SPLIT = [24, 26, 28, 30, 32, 34, 40, 50, 60];
@@ -410,6 +410,7 @@
       if (s.s) for (let c = 0; c < Math.min(MAXC, s.s.length); c++) { state[c] = s.s[c]; if (civs[c]) civs[c].religion = state[c] && list[state[c]] ? list[state[c]].name : null; }
       if (s.pend) for (let k = 0; k < s.pend.length; k += 3) { pending[s.pend[k]] = s.pend[k + 1]; pendingAt[s.pend[k]] = s.pend[k + 2]; }
       if (s.mis) for (let k = 0; k < s.mis.length; k += 3) { missionTo[s.mis[k]] = s.mis[k + 1]; missionUntil[s.mis[k]] = s.mis[k + 2]; }
+      for (let k = 0; k < LI.length; k++) { const i = LI[k], F = list[fth[i]]; if (F) { F.n++; F.pop += pop[i]; } }      // (how many keep each faith, for the key and the pages until the next count)
       return true;
     }
     // a world saved before faiths had regions: every faith by its name, its holy city the capital of the first realm that

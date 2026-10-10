@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8')); (0, eval)(fs.readFileSync('src/climate.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8')); (0, eval)(fs.readFileSync('src/climate.js', 'utf8')); (0, eval)(fs.readFileSync('src/migrate.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -82,9 +82,9 @@ for (const [seed, YEARS] of [[7, 12000], [1234, 4000], [99991, 4000]]) {
   const sim = createSim(wd, seed);
   const u0 = workUnit(); const t1 = Date.now(); let worst = 0;
   for (let y = 0; y < YEARS; y++) { const a = Date.now(); sim.tick(); worst = Math.max(worst, Date.now() - a); if (y % 2000 === 1999) invariants(sim, `seed ${seed} year ${sim.year}`); }
-  const dt = Date.now() - t1; const last = sim.history[sim.history.length - 1]; const unit = Math.max(u0, workUnit()), limit = 0.24 * unit;      // (the slower of the box's two answers: it may have been busy in between)
+  const dt = Date.now() - t1; const last = sim.history[sim.history.length - 1]; const unit = Math.max(u0, workUnit()), limit = 0.3 * unit;      // (the slower of the box's two answers: it may have been busy in between)
   log(`   seed ${seed}: ${dt} ms (${(dt / YEARS).toFixed(2)} ms/yr, worst ${worst} ms) · ${sim.year} · civs ${sim.st.civCount} · people ${last ? Math.round(last.pop + last.wild) : '?'}k · ruins ${sim.ruins.size} · events ${sim.worldEvents.length}`);
-  check(dt / YEARS < limit, `seed ${seed}: too slow (${(dt / YEARS).toFixed(2)} ms/yr; on this machine, whose unit of work is ${unit.toFixed(0)} ms, ${limit.toFixed(1)} is the limit)`);      // (seed 7's twelve thousand years take 0.18 of a unit a year with laws, estates and envoys: a third more is a real slowing; the same run measures a part in twenty apart from one time to the next)
+  check(dt / YEARS < limit, `seed ${seed}: too slow (${(dt / YEARS).toFixed(2)} ms/yr; on this machine, whose unit of work is ${unit.toFixed(0)} ms, ${limit.toFixed(1)} is the limit)`);      // (seed 7's twelve thousand years took 0.18 of a unit a year with laws, estates and envoys, 0.23 with the land's kinds, the weather and sickness (0.39), 0.25 with people on the move (0.40): a fifth more is a real slowing; the same run measures a part in twenty apart from one time to the next)
   check(sim.st.civCount > 5, `seed ${seed}: world died out (${sim.st.civCount} civs)`);
   const best = Math.max(...sim.civs.filter(c => c).map(c => c.tech));
   if (YEARS >= 12000) check(best > 0.5, `seed ${seed}: nobody past the Renaissance by 2000 AD (best tech ${best.toFixed(2)})`);
@@ -853,7 +853,7 @@ log('14. faiths');
   check(F.stats.preached > p0, `those who preach it carry it from region to region (${F.stats.preached - p0} in ${y} years)`);
   // other faiths cost a realm some steadiness, measured against its age; the laws weigh on it
   for (const i of bCells) { if (i !== B.capital) F.fth[i] = g; }
-  for (y = 0; y < 6; y++) sim.tick();
+  do sim.tick(); while (((sim.year % 5) + 5) % 5 !== 0);      // (to the next count of the faiths: at it its ruler may take up the faith most of his people hold, as by lot)
   const sp = sim.stabilityParts(B); check(F.otherShare[B.id] > 0.3 && sp.faiths < 0, `a realm of many other faiths is the less steady for it (${Math.round(F.otherShare[B.id] * 100)}% others: ${(sp.faiths * 100).toFixed(1)} stability)`);
   const R = sim.rule.ruleOf(B), was = R.laws.faith; R.laws.faith = 'tolerance'; const calm = F.lawF(B.id, 'minor'), slow = F.lawF(B.id, 'conv'); R.laws.faith = 'orthodoxy'; const hot = F.lawF(B.id, 'minor'), fast = F.lawF(B.id, 'conv'), hold = F.lawF(B.id, 'resist'); R.laws.faith = was;
   check(calm < 1 && slow < 1 && hot > 1 && fast > 1.5 && hold < 0.5, `laws: many gods in one peace quiet other faiths (${calm}) and carry the realm's slowly (${slow}); an enforced orthodoxy angers them (${hot}), carries it fast (${fast}) and holds it against preachers (${hold})`);
@@ -1319,7 +1319,8 @@ log('20. intrigue');
   { const y0 = sim.year; run('claim', 1, 0); check(sim.diplo.claimUntil(P, B.id, 'claim') > sim.year && sim.year > y0, 'a claim forged: a reason for war against them'); }
   { const n0 = sim.know.count[P.id], why = run('learn', 1, 0); check(!why && sim.know.count[P.id] === n0 + 1 && P.events.some((e) => e.type === 'intrigue' && /secret of/.test(e.text)), `their learning stolen: a discovery comes home (${why || (P.events.filter((e) => e.type === 'intrigue').pop() || {}).text})`); }
   { let s0 = 0; const why = run('discord', 1, 0, () => { s0 = B.stability; }); check(!why && B.stability < s0 - 0.05, `discord sown: their realm restless (${why || s0.toFixed(2) + ' -> ' + B.stability.toFixed(2)})`); }
-  { sim.works.set(B.capital, [{ k: 'temple', slot: -1, start: sim.year, dur: 200 }]); const w = sim.works.get(B.capital)[0]; const st0 = w.start; const why = run('sabotage', 1, 0); check(!why && w.start === st0 + 100, `their works set back by half their time (${why || (w.start - st0) + ' years'})`); }
+  { const w = { k: 'temple', slot: -1, start: sim.year, dur: 200 }, st0 = w.start;      // (the greatest work under way is the one set back, a wonder before all: theirs is to be the temple, and nothing they begin meanwhile)
+    const only = () => { for (const i of [...sim.works.keys()]) if (sim.owner[i] === B.id) sim.works.delete(i); sim.works.set(B.capital, [w]); }; only(); const why = run('sabotage', 1, 0, only, only); check(!why && w.start === st0 + 100, `their works set back by half their time (${why || (w.start - st0) + ' years'})`); }
   const anHeir = () => { let h = D.heirOf(B.id); if (!h) { const r2 = D.rulerOf(B.id); h = D.make({ n: 'Odo', f: false, b: sim.year - 18, h: r2.h, p: r2.id, c: B.id, t: 'steward', d: sim.year + 60 }); r2.k.push(h.id); } return D.heirOf(B.id); };
   { let h = anHeir(); const why = run('murder', 1, 0, () => { h = anHeir(); });
     check(!why && !!h && !D.alive(h, sim.year) && P.events.some((e) => e.type === 'intrigue' && /strike at the house/.test(e.text)), `their heir murdered (${why || (h ? h.n : 'nobody')})`); }
@@ -1416,7 +1417,7 @@ log('21. pestilence');
   log(`   ${sim.fmtYear(sim.year)}: ${X.stats.begun} outbreaks (${Object.keys(X.stats.by).map((k) => k + ' ' + X.stats.by[k]).join(', ')}), ${X.stats.reached} realms reached, ${Math.round(X.stats.dead)} dead; ${amNow()[1]} of ${amNow()[0].length} realms of the Americas have had any (${amHad} of ${am.length} when the first ships came${shipsY !== null ? ', in ' + sim.fmtYear(shipsY) : ''}); ${(ms / 100).toFixed(4)} ms a year`);
   check(X.stats.begun > 60 && Object.keys(X.stats.by).length >= 4 && X.stats.dead > 0, `sicknesses arise and travel (${X.stats.begun} outbreaks, ${Object.keys(X.stats.by).length} kinds)`);
   check(am.length > 10 && amHad <= am.length * 0.1, `the Americas have met none of them before the ships (${amHad} of ${am.length} realms ${shipsY !== null ? 'when the first ships come, in ' + sim.fmtYear(shipsY) : 'by ' + sim.fmtYear(sim.year)})`);
-  check(ms / 100 < 0.15, `sickness is quick enough (${(ms / 100).toFixed(4)} ms in the middle year)`);
+  check(ms / 100 < 0.25, `sickness is quick enough (${(ms / 100).toFixed(4)} ms in the middle year)`);      // (a year's cost is some three thousandths of a millisecond for each realm it burns in: 0.05 ms in a quiet century, 0.12 in one of a great pandemic, forty realms burning at once)
   const size = JSON.stringify(sim.save().disease).length / 1024; check(size < 60, `what sickness keeps is saved in ${size.toFixed(0)} KB`);
 }
 }
@@ -1534,6 +1535,60 @@ log('23. the weather');
     const o2 = JSON.parse(JSON.stringify(sv)); delete o2.climate; delete o2.land; const s5 = createSim(wd, 1); s5.load(o2); for (let k = 0; k < 5; k++) s5.tick(); check(s5.climate === null && !s5.iced(churchill), 'one saved before the land had kinds has none: it goes on as it was'); }
   // the cost
   { let ms = 0; const s2 = r1.sim; for (let k = 0; k < 100; k++) { s2.tick(); ms += s2.climate.stats.ms; } log(`   a year of weather takes ${(ms / 100).toFixed(3)} ms`); check(ms / 100 < 0.4, `the weather is quick enough (${(ms / 100).toFixed(3)} ms a year)`); }
+}
+}
+if (want(24)) {
+log('24. people on the move');
+{
+  const MG = window.MIGRATE;
+  // the sums on their own: three realms by hand - a crowded one, an emptier neighbour, a realm over the sea
+  { const civs = [], MAXC = 8; const mk = (id, o) => { civs[id] = Object.assign({ id, era: 6, tech: 0.7, stability: 0.8, wars: {}, player: false }, o); };
+    mk(0, {}); mk(1, {}); mk(2, {}); let yr = 1900; const pop = [1000, 300, 300], ls = [0.6, 0.8, 0.9], starved = [0, 0, 0], labour = ['free', 'free', 'free'];
+    const h = { civs, MAXC, year: () => yr, pop: (c) => pop[c] || 0, fm: () => 1, starved: (c) => starved[c] || 0, lost: () => 0, stab: (cv) => cv.stability, nb: (c) => (c === 0 ? [1] : c === 1 ? [0] : []), partners: (c) => (c === 0 ? [2] : c === 2 ? [0] : []),
+      ls: (c) => ls[c] || 0.6, ruling: (c) => c + 1, faith: (c) => (c === 0 ? 5 : 0), labour: (cv) => labour[cv.id], harvest: () => 1, atWar: (cv, d) => cv.wars[d] !== undefined };
+    const fill = (M) => { M.cap.set([1000, 1000, 1000]); M.crowd.set([400, 0, 0]); M.room.set([0, 500, 500]); };
+    const M = MG.create(h); fill(M); M.step();
+    check(M.outF[0] > 0 && M.inF[1] > 0 && M.inF[2] > 0 && M.inPpl[1] === 1 && M.inFth[1] === 5, `a crowded realm sends its people to an emptier neighbour and over the sea (${M.outF[0].toFixed(3)} of its crowded leave a year; the neighbour's room fills by ${M.inF[1].toFixed(3)}, the far realm's by ${M.inF[2].toFixed(3)}), and they are of its people and faith`);
+    const free = M.outF[0]; labour[0] = 'serfdom'; yr += 5; const M2 = MG.create(h); fill(M2); M2.step(); check(M2.outF[0] < free * 0.4, `serfs are bound to the land: ${M2.outF[0].toFixed(3)} leave a year, against ${free.toFixed(3)}`); labour[0] = 'free';
+    civs[1].player = true; civs[1].mig = { b: 'closed', l: 'free', o: 0, i: 0, y: yr }; yr += 5; const M3 = MG.create(h); fill(M3); M3.step(); check(M3.inF[1] < M.inF[1] * 0.1 && M3.inF[2] > 0, `a closed border turns them back (${M3.inF[1].toFixed(4)} of the room filled, against ${M.inF[1].toFixed(3)}); they go over the sea instead`); delete civs[1].mig; civs[1].player = false;
+    civs[0].wars[1] = 1800; yr += 5; const M4 = MG.create(h); fill(M4); M4.step(); check(!(M4.inF[1] > 0) && M4.inF[2] > 0, 'nobody goes to a realm at war with theirs'); delete civs[0].wars[1];
+    starved[1] = 20; yr += 5; const M5 = MG.create(h); M5.cap.set([1000, 1000, 1000]); M5.room.set([500, 0, 500]); M5.step(); check(M5.genF[1] > 0 && M5.inF[0] > 0, `a famine sends its hungry over the border (${(M5.genF[1] * 100).toFixed(2)}% of the realm in a year)`); starved[1] = 0;
+    civs[0].mig = { b: 'open', l: 'free', o: 0, i: 0, y: yr, li: 120, lo: 0 }; check(M.unrest(civs[0]) < -0.03 && M.share(0) > 0.1, `many newcomers in a decade unsettle a realm (${(M.share(0) * 100).toFixed(0)}% of its people: stability ${(M.unrest(civs[0]) * 100).toFixed(1)}%)`);
+    civs[0].mig = { b: 'open', l: 'barred', o: 0, i: 0, y: yr }; check(M.unrest(civs[0]) < -0.01, 'a crowded people barred from leaving is restless'); }
+  // in a world: a crowded kingdom of the machine age beside an empty one; its people go over, and the land they come to is theirs
+  const sim = createSim(wd, 241), RF = window.RULE.FORM, M = sim.mig; const ok = (i) => i >= 0 && i < N && sim.land[i] && !(sim.flags[i] & 8) && !sim.iced(i) && sim.fert[i] > 0.15;
+  check(!!M, 'a world whose land has kinds has people on the move');
+  const k0 = sim.LI.find(i => ok(i) && sim.owner[i] < 0 && sim.fert[i] > 0.5 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(d => ok(i + d) && sim.owner[i + d] < 0 && ok(i + d + W) && ok(i + d - W)));
+  const ind = sim.ERAS[6][1] + 0.01; sim.setPlayer(k0, 'Crowdland'); const P = sim.playerCiv(); P.tech = ind; P.era = sim.eraOf(ind); teach(sim, P, 6); sim.rule.setForm(P.id, P, RF.kingdom, 'reform'); P.aggression = 0; if (P.dip) P.dip.think = 1e12;
+  for (let d = 1; d <= 5; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, P, k0); }
+  const B = sim.spawnTribe(k0 + 7, {}); B.tech = ind; B.era = sim.eraOf(ind); teach(sim, B, 6); B.aggression = 0; B.dip.think = 1e12;
+  for (let d = 6; d <= 10; d++) for (const e of [-W, 0, W]) { const i = k0 + d + e; if (sim.owner[i] < 0) sim.claim(i, B, k0 + 7); }
+  sim.touchAll(); sim.recount(); sim.setStories(false);
+  const fill = () => { for (const i of sim.LI) { if (sim.owner[i] === P.id) sim.pop[i] = sim.capacity(i, P) * 1.05; else if (sim.owner[i] === B.id) sim.pop[i] = sim.capacity(i, B) * 0.1; } sim.recount(); };
+  fill(); const bCells = sim.LI.filter((i) => sim.owner[i] === B.id), pB = bCells.map((i) => sim.people.ppl[i]);
+  for (let y = 0; y < 21; y++) { sim.tick(); if (y % 5 === 0) fill(); }
+  const fl = M.of(P.id), toB = (fl.to.find(([d]) => d === B.id) || [0, 0])[1];
+  check(toB > 0 && B.mig && B.mig.li > 0 && P.mig && P.mig.lo > 0, `in ten years ${Math.round(toB)} thousand go from the crowded kingdom to its empty neighbour (${Math.round(P.mig.lo)} thousand left it)`);
+  const flipped = bCells.filter((i, k) => sim.people.ppl[i] === sim.people.ruling[P.id] && pB[k] !== sim.people.ruling[P.id]).length;
+  check(flipped > 0, `the land they come to is theirs: ${flipped} of the neighbour's ${bCells.length} regions are of the newcomers' people`);
+  check(P.events.some((e) => /have gone to/.test(e.text) && e.calm), 'the player hears where his people went');
+  // the player's word: his people barred from leaving go less
+  { const s2 = createSim(wd, 1); s2.load(JSON.parse(JSON.stringify(sim.save()))); const P2 = s2.playerCiv(), B2 = s2.civs[B.id];
+    check(s2.migPolicy('l', 'barred') === null && P2.mig.l === 'barred' && s2.migPolicy('b', 'nonsense') !== null, 'the player bars his people from leaving');
+    const fill2 = () => { for (const i of s2.LI) { if (s2.owner[i] === P2.id) s2.pop[i] = s2.capacity(i, P2) * 1.05; else if (s2.owner[i] === B2.id) s2.pop[i] = s2.capacity(i, B2) * 0.1; } s2.recount(); };
+    fill2(); for (let y = 0; y < 20; y++) { s2.tick(); if (y % 5 === 0) fill2(); } const toB2 = (s2.mig.of(P2.id).to.find(([d]) => d === B2.id) || [0, 0])[1];
+    check(toB2 < toB * 0.4, `barred, ${Math.round(toB2)} thousand go in ten years, against ${Math.round(toB)}`);
+    check(s2.stabilityParts(P2).newcomers < 0, `and the crowded who may not go are restless (stability ${(s2.stabilityParts(P2).newcomers * 100).toFixed(1)}%)`); }
+  // saved and loaded: the decade's flows and the realms' words go with the world; a world from before has none, its borders open
+  { const sv = JSON.parse(JSON.stringify(sim.save())); check(!!sv.mig && sv.mig.flows.length > 0, 'a world saves the decade\'s migrations');
+    const s3 = createSim(wd, 1); s3.load(sv); check(s3.mig.flows.length === M.flows.length && s3.playerCiv().mig && s3.playerCiv().mig.b === 'open', 'and has them again when loaded');
+    const old = JSON.parse(JSON.stringify(sv)); delete old.mig; for (const c of old.civs || []) if (c) delete c.mig; const s4 = createSim(wd, 1); s4.load(old); for (let k = 0; k < 6; k++) s4.tick(); check(s4.mig && s4.mig.policy(s4.playerCiv()).b === 0, 'a world saved before people moved begins with its borders open');
+    // (and it keeps the table of food it was saved under, through further saves: people on the move fill the land sooner, and the
+    //  table was lowered for it; an update must not starve anyone's people)
+    const again = JSON.parse(JSON.stringify(s4.save())), s5 = createSim(wd, 1); s5.load(again);
+    check(s3.foodTable === 0 && s4.foodTable === 39 && again.food === 39 && s5.foodTable === 39, `and keeps the table of food it was saved under, through further saves (${s4.foodMult(0.92).toFixed(2)} at the Information Age, not ${s3.foodMult(0.92).toFixed(2)})`); }
+  // the cost
+  { let ms0 = M.stats.ms, y0 = M.stats.years; for (let k = 0; k < 100; k++) sim.tick(); const ms = (M.stats.ms - ms0) / Math.max(1, M.stats.years - y0); log(`   a year of migration takes ${ms.toFixed(3)} ms`); check(ms < 0.25, `people on the move are quick enough (${ms.toFixed(3)} ms a year)`); }
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

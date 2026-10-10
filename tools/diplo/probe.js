@@ -26,11 +26,16 @@
 // 4,500); realms in AD 2000 235 and 233 (228 and 237); people in AD 2000 6,155 and 6,333 million (6,544 and 4,867); wars a realm
 // begins in a century at the dates above 0.16 0.28 0.36 0.42 0.57 0.45 and 0.11 0.32 0.36 0.46 0.49 0.38 (0.19 0.29 0.35 0.36 0.45
 // 0.41 and 0.16 0.29 0.36 0.38 0.49 0.39). A harder appetite in the Bronze Age (WAR_AGE 2.2) did not raise its rate.
+// Since 0.40 people move (migrate.js): they fill the land's room sooner than it fills itself, and the table of food of the later
+// ages was fitted again (the first ages' points held: lowered with the rest, they left the Stone Age's bands land for twenty realms
+// more). Measured then over 12345 and 777 (0.39 in brackets): wars begun in a whole history 4,371 and 4,897 (4,425 and 4,760);
+// realms in AD 2000 225 and 265 (235 and 233); people in AD 2000 6,404 and 5,738 million (6,155 and 6,333); wars a realm begins
+// in a century at the dates above 0.15 0.26 0.33 0.41 0.48 0.40 and 0.12 0.30 0.33 0.41 0.58 0.46.
 // If wars fall off, look at the line "appetite": pacts and fear should leave a realm somebody to fight about half the time.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;
 const src = process.env.SRC ? path.resolve(process.env.SRC) : path.join(root, 'src');
-for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'dynasty', 'story', 'legacy', 'intrigue', 'disease', 'land', 'climate', 'sim']) { const p = path.join(src, f + '.js'); if (fs.existsSync(p)) (0, eval)(fs.readFileSync(p, 'utf8')); }
+for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'dynasty', 'story', 'legacy', 'intrigue', 'disease', 'land', 'climate', 'migrate', 'sim']) { const p = path.join(src, f + '.js'); if (fs.existsSync(p)) (0, eval)(fs.readFileSync(p, 'utf8')); }
 const args = process.argv.slice(2).map(Number); const seed = args[0] || 12345, last = args[1] === undefined ? 2050 : args[1];
 const W = 720, H = 360, N = W * H; const png = PNG.sync.read(fs.readFileSync(path.join(root, 'data/world.png')));
 const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N) };
