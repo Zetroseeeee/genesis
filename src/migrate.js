@@ -6,8 +6,9 @@
 // newcomers come to outnumber the people of a place, it is theirs: their people and their faith (the host's land pass, by inPpl and
 // inFth).
 // Everything here is flat arrays a realm long: the host's land pass fills cap (what the realm's land feeds), crowd (its people beyond
-// six tenths of that, cell by cell: who would leave) and room (below eight tenths: room for newcomers), and moves the people by outF
-// (the share of the crowded that leave), genF (the share of all that flee) and inF (the share of the room that newcomers fill).
+// six tenths of that, cell by cell: who would leave) and room (below eight tenths: room for newcomers) in the years the flows are
+// worked out (EVERY), and moves the people every year by outF (the share of the crowded that leave), genF (the share of all that
+// flee) and inF (the share of the room that newcomers fill), in the realms where act is set.
 //   MIGRATE.create(h) -> { cap, crowd, room, outF, genF, inF, inPpl, inFth, step, of, setPolicy, save, load, ... } for one world.
 window.MIGRATE = (function () {
   'use strict';
@@ -50,7 +51,7 @@ window.MIGRATE = (function () {
     const civs = h.civs, MAXC = h.MAXC;
     const cap = new Float32Array(MAXC), crowd = new Float32Array(MAXC), room = new Float32Array(MAXC);
     const outF = new Float32Array(MAXC), genF = new Float32Array(MAXC), inF = new Float32Array(MAXC);
-    const inPpl = new Uint16Array(MAXC), inFth = new Uint16Array(MAXC);
+    const inPpl = new Uint16Array(MAXC), inFth = new Uint16Array(MAXC), act = new Uint8Array(MAXC);      // (act: the realm has people leaving or coming: the host's pass looks at nothing else)
     const roomLeft = new Float32Array(MAXC), inSum = new Float32Array(MAXC), selfIn = new Float32Array(MAXC), inMax = new Float32Array(MAXC), inFrom = new Int32Array(MAXC), taught = new Float32Array(MAXC);
     const dens = new Float32Array(MAXC), lsP = new Float32Array(MAXC), bOf = new Float32Array(MAXC), hvOf = new Float32Array(MAXC), sq = new Float32Array(MAXC), fmOf = new Float32Array(MAXC);
     const pplOf = new Uint16Array(MAXC), fthOf = new Uint16Array(MAXC);
@@ -79,7 +80,7 @@ window.MIGRATE = (function () {
     //  by what was worked out last)
     function step() {
       const yr = h.year(); stats.years++; if (yr % EVERY !== 0) return; const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
-      outF.fill(0); genF.fill(0); inF.fill(0); inPpl.fill(0); inFth.fill(0); inSum.fill(0); selfIn.fill(0); inMax.fill(0); inFrom.fill(-1); taught.fill(0);
+      outF.fill(0); genF.fill(0); inF.fill(0); inPpl.fill(0); inFth.fill(0); inSum.fill(0); selfIn.fill(0); inMax.fill(0); inFrom.fill(-1); taught.fill(0); act.fill(0);
       for (let c = 0; c < MAXC; c++) {
         const cv = civs[c]; if (!cv || !(cap[c] > 0)) { roomLeft[c] = 0; continue; }
         roomLeft[c] = room[c] * CAPIN; dens[c] = h.pop(c) / cap[c]; lsP[c] = Math.pow(Math.max(0.1, h.ls(c)), LIVE_POW); sq[c] = Math.sqrt(room[c]);
@@ -114,13 +115,14 @@ window.MIGRATE = (function () {
         // from where: the emigrants from the crowded land, the refugees from everyone
         if (fromCrowd > 0 && crowd[c] > 0) outF[c] = fromCrowd / crowd[c];
         if (fled > 0) genF[c] = Math.min(0.05, fled / P);
+        if (outF[c] > 0 || genF[c] > 0) act[c] = 1;
         stats.out += went * EVERY; stats.refugees += fled * EVERY;
         if (went > wentC) rec(cv, yr).o += (went - wentC) * EVERY;
       }
       // who comes: the largest of them (the realm's own people, where it is its own), filling the room they take
       for (let d = 0; d < MAXC; d++) {
         const dv = civs[d]; if (!dv || !(inSum[d] > 0) || !(room[d] > 0)) continue;
-        inF[d] = Math.min(CAPIN * 1.5, inSum[d] / room[d]);
+        inF[d] = Math.min(CAPIN * 1.5, inSum[d] / room[d]); act[d] = 1;
         const s = inFrom[d]; if (s >= 0) { inPpl[d] = pplOf[s]; inFth[d] = fthOf[s]; }
         const abroad = inSum[d] - selfIn[d]; if (abroad > 0) rec(dv, yr).i += abroad * EVERY;
         if (taught[d] > 0 && h.teach) h.teach(d, Math.min(TEACH_MAX, TEACH * EVERY * taught[d] / Math.max(1, h.pop(d))));
@@ -143,7 +145,7 @@ window.MIGRATE = (function () {
     function setPolicy(cv, what, key) { const m = rec(cv, h.year()); if (what === 'b' && BK[key] !== undefined) m.b = key; else if (what === 'l' && LK[key] !== undefined) m.l = key; else return 'No such policy'; return null; }
     function save() { return { rot, flows: lastFlows.map(([a, b, v]) => [a, b, Math.round(v * 10) / 10]) }; }
     function load(s) { if (!s) return; rot = s.rot | 0; lastFlows = Array.isArray(s.flows) ? s.flows.filter((f) => Array.isArray(f) && f.length === 3) : []; }
-    return { cap, crowd, room, outF, genF, inF, inPpl, inFth, step, of, share, unrest, setPolicy, policy, save, load, stats, get flows() { return lastFlows; } };
+    return { cap, crowd, room, outF, genF, inF, inPpl, inFth, act, step, of, share, unrest, setPolicy, policy, save, load, stats, get flows() { return lastFlows; } };
   }
-  return { create, RATE, MOB, BORDERS, LEAVING, BK, LK, CAPIN, SEA, NEW0, NEW_K };
+  return { create, RATE, MOB, BORDERS, LEAVING, BK, LK, CAPIN, SEA, NEW0, NEW_K, EVERY };
 })();

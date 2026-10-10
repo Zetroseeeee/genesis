@@ -908,7 +908,10 @@ Conventions that matter:
   and the world of its greatest; the lens of peoples draws the decade's 24 greatest streams from capital to capital in the colour of
   the people that goes (`#flows path.mig`); the realm's panel says who is on the move; the tracker has a line while many come or go.
   The autopilot's realms keep their borders open. The module throws no dice (the land's pass rolls a region's turning on a hash of
-  the place and the year). Saved with the world (`save().mig`: the decade's flows) and the realm (`civ.mig`); a world saved before
+  the place and the year). *What it costs*: migrate.js a tenth to two tenths of a millisecond a year (worked out every five years),
+  the land's pass about a tenth more (`migMove` in the realms that have people to move, `migCount` in the years the flows are worked
+  out: apart from the pass's loop, which runs slower with them written into it); with the world it makes, a year is some six in a
+  hundred dearer in the first ages and three to five in the last (test section 1: 0.25 of a unit a year, from 0.23). Saved with the world (`save().mig`: the decade's flows) and the realm (`civ.mig`); a world saved before
   migration has no flows yet, and keeps the table of food it was saved under (`FOOD_039`, `save().food` 39): people on the move
   fill the land's room sooner than it fills itself, so the world had a tenth more people, and the table of the later ages was
   fitted again, lower by up to a sixth (the first ages' points held where they were: lowered with the rest, the Stone Age's bands

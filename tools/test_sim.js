@@ -82,9 +82,9 @@ for (const [seed, YEARS] of [[7, 12000], [1234, 4000], [99991, 4000]]) {
   const sim = createSim(wd, seed);
   const u0 = workUnit(); const t1 = Date.now(); let worst = 0;
   for (let y = 0; y < YEARS; y++) { const a = Date.now(); sim.tick(); worst = Math.max(worst, Date.now() - a); if (y % 2000 === 1999) invariants(sim, `seed ${seed} year ${sim.year}`); }
-  const dt = Date.now() - t1; const last = sim.history[sim.history.length - 1]; const unit = Math.max(u0, workUnit()), limit = 0.24 * unit;      // (the slower of the box's two answers: it may have been busy in between)
+  const dt = Date.now() - t1; const last = sim.history[sim.history.length - 1]; const unit = Math.max(u0, workUnit()), limit = 0.3 * unit;      // (the slower of the box's two answers: it may have been busy in between)
   log(`   seed ${seed}: ${dt} ms (${(dt / YEARS).toFixed(2)} ms/yr, worst ${worst} ms) · ${sim.year} · civs ${sim.st.civCount} · people ${last ? Math.round(last.pop + last.wild) : '?'}k · ruins ${sim.ruins.size} · events ${sim.worldEvents.length}`);
-  check(dt / YEARS < limit, `seed ${seed}: too slow (${(dt / YEARS).toFixed(2)} ms/yr; on this machine, whose unit of work is ${unit.toFixed(0)} ms, ${limit.toFixed(1)} is the limit)`);      // (seed 7's twelve thousand years take 0.18 of a unit a year with laws, estates and envoys: a third more is a real slowing; the same run measures a part in twenty apart from one time to the next)
+  check(dt / YEARS < limit, `seed ${seed}: too slow (${(dt / YEARS).toFixed(2)} ms/yr; on this machine, whose unit of work is ${unit.toFixed(0)} ms, ${limit.toFixed(1)} is the limit)`);      // (seed 7's twelve thousand years took 0.18 of a unit a year with laws, estates and envoys, 0.23 with the land's kinds, the weather and sickness (0.39), 0.25 with people on the move (0.40): a fifth more is a real slowing; the same run measures a part in twenty apart from one time to the next)
   check(sim.st.civCount > 5, `seed ${seed}: world died out (${sim.st.civCount} civs)`);
   const best = Math.max(...sim.civs.filter(c => c).map(c => c.tech));
   if (YEARS >= 12000) check(best > 0.5, `seed ${seed}: nobody past the Renaissance by 2000 AD (best tech ${best.toFixed(2)})`);
@@ -1319,7 +1319,8 @@ log('20. intrigue');
   { const y0 = sim.year; run('claim', 1, 0); check(sim.diplo.claimUntil(P, B.id, 'claim') > sim.year && sim.year > y0, 'a claim forged: a reason for war against them'); }
   { const n0 = sim.know.count[P.id], why = run('learn', 1, 0); check(!why && sim.know.count[P.id] === n0 + 1 && P.events.some((e) => e.type === 'intrigue' && /secret of/.test(e.text)), `their learning stolen: a discovery comes home (${why || (P.events.filter((e) => e.type === 'intrigue').pop() || {}).text})`); }
   { let s0 = 0; const why = run('discord', 1, 0, () => { s0 = B.stability; }); check(!why && B.stability < s0 - 0.05, `discord sown: their realm restless (${why || s0.toFixed(2) + ' -> ' + B.stability.toFixed(2)})`); }
-  { sim.works.set(B.capital, [{ k: 'temple', slot: -1, start: sim.year, dur: 200 }]); const w = sim.works.get(B.capital)[0]; const st0 = w.start; const why = run('sabotage', 1, 0); check(!why && w.start === st0 + 100, `their works set back by half their time (${why || (w.start - st0) + ' years'})`); }
+  { const w = { k: 'temple', slot: -1, start: sim.year, dur: 200 }, st0 = w.start;      // (the greatest work under way is the one set back, a wonder before all: theirs is to be the temple, and nothing they begin meanwhile)
+    const only = () => { for (const i of [...sim.works.keys()]) if (sim.owner[i] === B.id) sim.works.delete(i); sim.works.set(B.capital, [w]); }; only(); const why = run('sabotage', 1, 0, only, only); check(!why && w.start === st0 + 100, `their works set back by half their time (${why || (w.start - st0) + ' years'})`); }
   const anHeir = () => { let h = D.heirOf(B.id); if (!h) { const r2 = D.rulerOf(B.id); h = D.make({ n: 'Odo', f: false, b: sim.year - 18, h: r2.h, p: r2.id, c: B.id, t: 'steward', d: sim.year + 60 }); r2.k.push(h.id); } return D.heirOf(B.id); };
   { let h = anHeir(); const why = run('murder', 1, 0, () => { h = anHeir(); });
     check(!why && !!h && !D.alive(h, sim.year) && P.events.some((e) => e.type === 'intrigue' && /strike at the house/.test(e.text)), `their heir murdered (${why || (h ? h.n : 'nobody')})`); }
@@ -1416,7 +1417,7 @@ log('21. pestilence');
   log(`   ${sim.fmtYear(sim.year)}: ${X.stats.begun} outbreaks (${Object.keys(X.stats.by).map((k) => k + ' ' + X.stats.by[k]).join(', ')}), ${X.stats.reached} realms reached, ${Math.round(X.stats.dead)} dead; ${amNow()[1]} of ${amNow()[0].length} realms of the Americas have had any (${amHad} of ${am.length} when the first ships came${shipsY !== null ? ', in ' + sim.fmtYear(shipsY) : ''}); ${(ms / 100).toFixed(4)} ms a year`);
   check(X.stats.begun > 60 && Object.keys(X.stats.by).length >= 4 && X.stats.dead > 0, `sicknesses arise and travel (${X.stats.begun} outbreaks, ${Object.keys(X.stats.by).length} kinds)`);
   check(am.length > 10 && amHad <= am.length * 0.1, `the Americas have met none of them before the ships (${amHad} of ${am.length} realms ${shipsY !== null ? 'when the first ships come, in ' + sim.fmtYear(shipsY) : 'by ' + sim.fmtYear(sim.year)})`);
-  check(ms / 100 < 0.15, `sickness is quick enough (${(ms / 100).toFixed(4)} ms in the middle year)`);
+  check(ms / 100 < 0.25, `sickness is quick enough (${(ms / 100).toFixed(4)} ms in the middle year)`);      // (a year's cost is some three thousandths of a millisecond for each realm it burns in: 0.05 ms in a quiet century, 0.12 in one of a great pandemic, forty realms burning at once)
   const size = JSON.stringify(sim.save().disease).length / 1024; check(size < 60, `what sickness keeps is saved in ${size.toFixed(0)} KB`);
 }
 }

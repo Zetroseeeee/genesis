@@ -942,6 +942,19 @@ function createSim(world, seed) {
     let best = 0; for (const c of civs) if (c && c.tech > best) best = c.tech;
     history.push({ year, pop: total, wild, civs: civCount, best, gdp: Math.round(market.worldGdp), trade: Math.round(market.worldTrade), top: top.slice(0, 12).map(t => [t[0], Math.round(t[1]), t[2]]) });
   }
+  // people on the move in a region, as migrate.js reckoned them last year: some of those the land cannot feed leave, refugees flee,
+  // newcomers fill the room; where they come to outnumber those who were there, the place is of their people and faith (a place
+  // newcomers come to year after year is theirs before long: each year as likely as they are a share of its people). And, in the
+  // years it works the flows out, what the realm's land feeds, who would leave and where there is room. (Apart from the land's pass,
+  // whose loop over every region is the year's heaviest: it runs faster without them in it.)
+  function migMove(i, o, p, K) {
+    const of = mig.outF[o], gf = mig.genF[o], inf = mig.inF[o];
+    if (of > 0 && p > 0.6 * K) p -= (p - 0.6 * K) * of;
+    if (gf > 0) p -= p * gf;
+    if (inf > 0 && p < 0.8 * K) { const a = (0.8 * K - p) * inf, sh = a / (p + a); if (sh > 0.5 || (Math.imul(i ^ Math.imul(year, 0x2C1B3C6D), 0x297A2D39) >>> 0) / 4294967296 < sh) { const np = mig.inPpl[o], nf = mig.inFth[o]; if (np && people) people.ppl[i] = np; if (nf && faith && !faith.holyAt.has(i)) faith.fth[i] = nf; } p += a; }
+    return p;
+  }
+  function migCount(o, p, K) { mig.cap[o] += K; if (p > 0.6 * K) mig.crowd[o] += p - 0.6 * K; if (p < 0.8 * K) mig.room[o] += 0.8 * K - p; }
   // ---------- main tick ----------
   let meanTech = 0.02, lastFounding = -99999;
   function tick() {
@@ -962,7 +975,10 @@ function createSim(world, seed) {
     // pass 1: growth + accumulate (order-independent); the dead of last year's sickness are taken first (disease.js: a share of each realm)
     const sick = disease && disease.dying() ? disease.killF : null;
     roomKey.fill(0xFFFFFFFF); roomCell.fill(-1);
-    const migOn = mig !== null && landOn; if (migOn) { mig.cap.fill(0); mig.crowd.fill(0); mig.room.fill(0); }
+    // (people on the move: what the land feeds, who would leave and where there is room are counted in the years migrate.js works
+    //  the flows out; the people are moved every year, in the realms it has any to move: migMove, migCount)
+    const migOn = mig !== null && landOn, migAcc = migOn && year % MIGRATE.EVERY === 0; if (migAcc) { mig.cap.fill(0); mig.crowd.fill(0); mig.room.fill(0); }
+    const mAct = migOn ? mig.act : null;
     for (let k = 0; k < LI.length; k++) {
       const i = LI[k]; const o = owner[i]; const c = o >= 0 ? civs[o] : null;
       let p = pop[i]; if (sick !== null && o >= 0) { const q = sick[o]; if (q > 0) p *= 1 - q; }
@@ -972,13 +988,8 @@ function createSim(world, seed) {
         p += r * p * Math.max(-10, 1 - p / Math.max(K, 0.01)); // overfull land empties by at most ~a quarter a year
         // (a famine: in a bad year those the land no longer feeds die, a share of them a year, fewer where something softens it)
         if (weather && p > K) { const hv = HV[i]; if (hv < 0.97) { const d = (p - K) * FAMINE * (c ? 1 - relief[o] : 1); p -= d; if (c) starved[o] += d; } }
-        // (people on the move, as migrate.js reckoned them last year: some of those the land cannot feed leave, refugees flee, newcomers
-        //  fill the room; where they come to outnumber those who were there, the place is of their people and faith)
-        if (migOn && c) { const of = mig.outF[o], gf = mig.genF[o], inf = mig.inF[o];
-          if (of > 0 && p > 0.6 * K) p -= (p - 0.6 * K) * of;
-          if (gf > 0) p -= p * gf;
-          if (inf > 0 && p < 0.8 * K) { const a = (0.8 * K - p) * inf, sh = a / (p + a); if (sh > 0.5 || (Math.imul(i ^ Math.imul(year, 0x2C1B3C6D), 0x297A2D39) >>> 0) / 4294967296 < sh) { const np = mig.inPpl[o], nf = mig.inFth[o]; if (np && people) people.ppl[i] = np; if (nf && faith && !faith.holyAt.has(i)) faith.fth[i] = nf; } p += a; }      // (a place newcomers come to year after year is theirs before long: each year as likely as they are a share of its people)
-          mig.cap[o] += K; if (p > 0.6 * K) mig.crowd[o] += p - 0.6 * K; if (p < 0.8 * K) mig.room[o] += 0.8 * K - p; }
+        // (people on the move, as migrate.js reckoned them last year)
+        if (migOn && c) { if (mAct[o] === 1) p = migMove(i, o, p, K); if (migAcc) migCount(o, p, K); }
         if (p < 0.001) p = 0;
         pop[i] = p;
         // (a far cell of a realm with room in it, one a year chosen as by lot: where its emigrants go - colonies across the sea, a frontier far off)
