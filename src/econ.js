@@ -187,7 +187,7 @@
   // CAL is measured, not chosen: tools/econ/calibrate.js runs the world and works out, for every raw good, how many
   // lots the world would use for each lot-per-thousand its land could give. A yield is that times the good's abund.
   /* CAL:BEGIN */
-  const CAL = {grain: 0.833, fish: 0.515, cattle: 0.694, timber: 0.509, stone: 0.518, salt: 0.256, copper: 0.0514, tin: 0.0949, iron: 0.179, horses: 0.0462, gold: 0.0125, gems: 0.0154, wine: 0.0593, spices: 0.0113, silk: 0.00178, furs: 0.0834, ivory: 0.00277, cotton: 0.302, coal: 10.6, oil: 6.87, rice: 0.348, maize: 1.31, wool: 0.371, olives: 0.825, sugar: 0.161, tea: 0.079, coffee: 0.597, cocoa: 5.32, tobacco: 1.32, silver: 0.0582, amber: 0.087, obsidian: 1.96, incense: 2.2, dyes: 0.243, jade: 0.0204, saltpetre: 0.033, rubber: 0.505, gas: 13.5, uranium: 0.405, bauxite: 1.71, rareearth: 0.283, lithium: 0.669};
+  const CAL = {grain: 0.85, fish: 0.54, cattle: 0.715, timber: 0.508, stone: 0.516, salt: 0.258, copper: 0.0539, tin: 0.0803, iron: 0.174, horses: 0.0471, gold: 0.00622, gems: 0.0138, wine: 0.0611, spices: 0.012, silk: 0.00189, furs: 0.0748, ivory: 0.00258, cotton: 0.311, coal: 11.6, oil: 6.95, rice: 0.348, maize: 0.828, wool: 0.361, olives: 0.907, sugar: 0.165, tea: 0.0917, coffee: 0.503, cocoa: 7.15, tobacco: 1.35, silver: 0.0775, amber: 0.0764, obsidian: 2.2, incense: 2, dyes: 0.251, jade: 0.0144, saltpetre: 0.0356, rubber: 0.618, gas: 12.9, uranium: 0.304, bauxite: 1.49, rareearth: 0.213, lithium: 0.726};
   /* CAL:END */
   const yieldOf = (g) => (CAL[g.key] === undefined ? 0.5 : CAL[g.key]) * g.abund;
 

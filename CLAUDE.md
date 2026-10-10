@@ -98,7 +98,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   the table of how many a unit of land feeds at each stage of knowledge (`FOOD` in `src/sim.js`, between its marks).
   One fit moves the world a long way (fewer people learn more slowly, and feed fewer still): take the fit that
   measures best, not the last. A world keeps the table it was saved under when a refit lowers it (`FOOD_015`,
-  `save().food`): an update must not starve anyone's people.
+  `FOOD_039`, `save().food`): an update must not starve anyone's people.
   Fit the pace first, then what the ages expect of rule (`tools/rule/norm.js`), then the people, then the market's
   yields (`calibrate.js`): each stands on the one before.
 - `node tools/people/probe.js [seed,seed] [last year] [--write]` — the world's peoples through the ages: how many, of how
@@ -909,7 +909,8 @@ Conventions that matter:
   the people that goes (`#flows path.mig`); the realm's panel says who is on the move; the tracker has a line while many come or go.
   The autopilot's realms keep their borders open. The module throws no dice (the land's pass rolls a region's turning on a hash of
   the place and the year). Saved with the world (`save().mig`: the decade's flows) and the realm (`civ.mig`); a world saved before
-  migration has no flows yet. After touching it run `tools/migrate/probe.js` over 12345 and 777, the regional census
+  migration has no flows yet, and keeps the table of food it was saved under (`FOOD_039`, `save().food` 39): people on the move
+  fill the land's room sooner than it fills itself, so the world had a tenth more people, and the table was lowered for it. After touching it run `tools/migrate/probe.js` over 12345 and 777, the regional census
   (`tools/people/regions.js`), the world's people (`tools/know/people.js`) and the war-and-peace probe.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse

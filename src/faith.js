@@ -40,7 +40,7 @@
   // what share of their people realms of each age usually hold of other faiths (tools/faith/probe.js --write measures it):
   // a realm is restless only for what it holds beyond its age's way, and a little steadier for less
   // NORM-BEGIN
-  const NORM = [0, 0.036, 0.017, 0.063, 0.071, 0.081, 0.082, 0.107, 0.129];
+  const NORM = [0, 0.039, 0.021, 0.087, 0.074, 0.079, 0.109, 0.161, 0.212];
   // NORM-END
   // a faith held farther from its holy city than this, in regions, by age, may split
   const SPLIT = [24, 26, 28, 30, 32, 34, 40, 50, 60];

@@ -24,7 +24,7 @@
   // what share of their people realms of each age usually rule of other peoples (tools/people/norm.js measures it):
   // a realm is restless only for what it holds beyond its age's way, and a little steadier for less
   // NORM-BEGIN
-  const NORM = [0.021, 0.056, 0.077, 0.059, 0.046, 0.042, 0.034, 0.023, 0.013];
+  const NORM = [0.039, 0.064, 0.09, 0.076, 0.072, 0.081, 0.116, 0.091, 0.046];
   // NORM-END
   // a people drifts apart where it has spread farther than this from its home, in regions, by age (roads, books and a
   // common ruler hold a tongue together over more ground)

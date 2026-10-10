@@ -134,7 +134,7 @@ function createSim(world, seed) {
   // moves the table until the people on Earth are as many as history counted, century by century (5 million in 8000 BC,
   // 220 at the turn of the era, 970 in 1800, 6,140 in 2000).
   /* FOOD:BEGIN */
-  const FOOD = [[0, 0.00499], [0.04, 0.00972], [0.08, 0.0307], [0.13, 0.075], [0.18, 0.11], [0.24, 0.168], [0.3, 0.219], [0.36, 0.317], [0.42, 0.324], [0.49, 0.382], [0.55, 0.534], [0.6, 0.756], [0.66, 1.33], [0.73, 2.13], [0.8, 2.46], [0.86, 4.08], [0.92, 7.43], [1, 10.7]];
+  const FOOD = [[0, 0.00472], [0.04, 0.00885], [0.08, 0.0291], [0.13, 0.0698], [0.18, 0.103], [0.24, 0.155], [0.3, 0.206], [0.36, 0.309], [0.42, 0.315], [0.49, 0.36], [0.55, 0.515], [0.6, 0.717], [0.66, 1.25], [0.73, 1.94], [0.8, 2.19], [0.86, 3.46], [0.92, 6.68], [1, 9.7]];
   /* FOOD:END */
   // how fast a people can grow where there is room: a little faster as it learns, and much faster in the last ages
   // (the land's limit is then the only brake, as it was once children stopped dying)

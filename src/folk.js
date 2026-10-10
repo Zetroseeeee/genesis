@@ -30,7 +30,7 @@ window.FOLK = (function () {
     const rows = ofMine.map(([p, v]) => row(css(P.rgbOf(p)), cap(P.nameOf(p)), p === mine ? 'your rulers\' people' : 'under your rule', v, pct(v))).join('')
       + (rest.length ? row('var(--text-3)', rest.length === 1 ? cap(P.nameOf(rest[0][0])) : `${rest.length} other peoples`, rest.length === 1 ? 'under your rule' : rest.slice(0, 3).map((q) => cap(P.nameOf(q[0]))).join(', ') + (rest.length > 3 ? ' ...' : ''), restV, pct(restV)) : '');
     const away = abroad(s, P, c.id, mine); const awayAll = away.reduce((a, q) => a + q[1], 0);
-    const awayRows = away.slice(0, 6).map(([o, v]) => row(css(P.rgbOf(mine)), s.fullName(s.civs[o]), 'their land', undefined, many(v))).join('');
+    const awayRows = away.slice(0, 6).map(([o, v]) => row(css(P.rgbOf(mine)), s.fullName(s.civs[o]), `${pct(v / Math.max(1e-6, s.popOf[o]))} of their people`, undefined, many(v))).join('');
     const fl = M ? M.of(c.id) : { to: [], from: [] }, m = c.mig || {};
     const came = fl.from.slice(0, 6).map(([o, v]) => { const ov = s.civs[o]; return ov ? row(css(P.rgbOf(P.ruling[o])), s.fullName(ov), cap(P.nameOf(P.ruling[o])), undefined, many(v)) : ''; }).join('');
     const went = fl.to.slice(0, 6).map(([o, v]) => { const ov = s.civs[o]; return ov ? row(css(P.rgbOf(P.ruling[o])), s.fullName(ov), cap(P.nameOf(P.ruling[o])), undefined, many(v)) : ''; }).join('');
