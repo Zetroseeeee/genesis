@@ -9,10 +9,11 @@ const results = []; let page, browser, port; const errors = []; const t0 = Date.
 const log = (...a) => { const line = `[${((Date.now() - t0) / 1000).toFixed(0)}s] ` + a.join(' '); console.log(line); fs.appendFileSync('shots/test_e2e.log', line + '\n'); };
 const TC = fs.readFileSync('tools/testcam.js', 'utf8');
 
-async function fresh(viewport) {
+async function fresh(viewport, opts) {
   if (page) await page.close();
   page = await browser.newPage({ viewport: viewport || { width: 1024, height: 640 } });
   await page.addInitScript(() => { window.GENESIS_TEX_URL = 'data/tex/atlas_local.json'; });   // the CDN atlases are unreachable from the test box: use the labelled synthetic set
+  if (!(opts && opts.sound)) await page.addInitScript(() => { window.GENESIS_MUTE = 1; });      // (the sound of the world only where a scenario listens: on a software renderer it is time taken from the picture)
   page.on('pageerror', e => errors.push('PAGEERROR ' + e.message)); page.on('console', m => { if (m.type() === 'error' && !/fonts|ERR_TUNNEL|googleapis/.test(m.text())) errors.push('CONSOLE ' + m.text().slice(0, 300)); else if (/THREE.WebGLProgram|Shader Error|GL_INVALID/.test(m.text())) errors.push('GL ' + m.text().slice(0, 300)); });
   await page.goto(`http://127.0.0.1:${port}/local.html`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__G && window.__G.sim && document.getElementById('loading').hidden, null, { timeout: 60000 });
@@ -1142,6 +1143,41 @@ server.listen(0, async () => {
       const b = await ev(() => ({ n: __G.world.buildingCount, kinds: Object.keys(__G.world.inst).filter(k => __G.world.inst[k].count > 0) }));
       check(r.culture === cul, `${cul}: culture classified as ${r.culture}`); check(b.n > 200, `${cul}: ${b.n} buildings`);
     }
+  });
+  await scenario('sound: the world heard as the camera sees it (surf by the sea, the woods, a town), the interface clicks, the volumes', async (check) => {
+    await fresh(undefined, { sound: true }); await ev(() => __G.start(31.25, 29.9, 'Kemet')); await wait(400); await frames(3); await ev(TC);
+    check(await ev(() => !!window.SOUND && !!SOUND.E), 'the sound of the world is there');
+    await page.keyboard.press('Shift');      // (a gesture: a page's sound may begin only after one)
+    await page.waitForFunction(() => SOUND.state === 'running', null, { timeout: 15000 }).catch(() => {});
+    check(await ev(() => SOUND.state) === 'running', 'the sound is running after a key: ' + await ev(() => SOUND.state));
+    // by the sea: the coast of the delta, low
+    await ev(() => { __T.cam(31.9, 31.45, 400 / 6371000, 0.9, 0); __G.setSeason && __G.setSeason(0.45); });
+    await wait(4000); await frames(4);
+    const sea = await ev(() => ({ sc: SOUND.scene && { water: SOUND.scene.water, shore: SOUND.scene.shore, agl: SOUND.scene.agl, zone: SOUND.scene.zone }, lv: Object.assign({}, SOUND.X.lv) }));
+    check(sea.sc && sea.sc.agl < 2000, 'the scene is the camera\'s: ' + JSON.stringify(sea.sc));
+    check(sea.lv.surf > 0.02 || sea.lv.sea > 0.02, 'the sea is heard by the coast: ' + JSON.stringify(sea.lv) + ' ' + JSON.stringify(sea.sc));
+    // high above: only the wind of the heights; from space nothing
+    await ev(() => __T.cam(31.25, 29.9, 30000 / 6371000, 0, 0)); await wait(1500); await frames(3);
+    const hi = await ev(() => Object.assign({}, SOUND.X.lv));
+    check(hi.high > 0.05 && !(hi.surf > 0.01) && !(hi.crickets > 0.01), 'from 30 km the wind of the heights and nothing of the ground: ' + JSON.stringify(hi));
+    await ev(() => __T.cam(31.25, 29.9, 3, 0, 0)); await wait(1500); await frames(3);
+    const sp = await ev(() => Object.assign({}, SOUND.X.lv));
+    check(Object.values(sp).every((v) => !(v > 0.01)), 'from space nothing: ' + JSON.stringify(sp));
+    // over the capital, low: its murmur and its work
+    await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 900 / 6371000, 0.8, 0); }); await wait(4000); await frames(4);
+    const town = await ev(() => ({ tw: SOUND.scene.town, lv: Object.assign({}, SOUND.X.lv) }));
+    check(town.tw && town.tw.k > 0.2 && town.lv.murmur > 0.02, 'a town is heard from above it: ' + JSON.stringify(town));
+    // the interface: a click on a button sounds, the menu's sliders set the volumes and are kept
+    const v0 = await ev(() => SOUND.E.stats.voices);
+    await page.click('#btn-menu').catch(() => {}); await wait(400);
+    const v1 = await ev(() => SOUND.E.stats.voices);
+    check(v1 > v0, 'a click is heard: ' + v0 + ' -> ' + v1);
+    check(await ev(() => !!document.getElementById('vol-world')), 'the menu has the volumes');
+    await ev(() => { const el = document.getElementById('vol-world'); el.value = '0.3'; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); });
+    check(await ev(() => SOUND.vol.world === 0.3 && __G.settings.vol.world === 0.3 && JSON.parse(localStorage.getItem('genesis-settings')).vol.world === 0.3), 'the world\'s volume is set and kept');
+    await ev(() => { const el = document.getElementById('vol-world'); el.value = '0.8'; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); });
+    await ev(() => { const m = document.getElementById('menu'); if (m.open) m.close(); });
+    await fresh();      // (back to a page without sound for what follows)
   });
   await scenario('render: long live run (continuous, 30 s real time) stays error-free', async (check) => {
     await ev(() => { __G.mapcam.fly = null; const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.02, 0.6, 0); document.getElementById('opt-continuous').click(); document.getElementById('turn').click(); for (let k = 0; k < 4; k++) document.getElementById('btn-faster').click(); });

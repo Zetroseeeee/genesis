@@ -637,5 +637,5 @@
       this.modelCount[ti] = countM; this.last[ti].partial = waiting;
     }
   }
-  window.TREES = { Trees };
+  window.TREES = { Trees, zoneOf };
 })();

@@ -418,6 +418,8 @@
         herds.push(prev && prev.kind === e.kind ? prev : this.herd(key, e.kind, !!e.kept, e.lon, e.lat, e.k || K_OPEN, e.n, e.still, e.yaw)); }
       this.herds = herds;
     }
+    // the herds within m metres of a place, and how near each is (0..1): what the sound of the world hears of them (sound.js)
+    near(lon, lat, m) { const out = []; const cl = Math.max(0.2, Math.cos(lat * D2R)); for (const h of this.herds) { const dx = (h.lon - lon) * cl * 111320, dz = (h.lat - lat) * 111320, d = Math.sqrt(dx * dx + dz * dz); if (d < m) out.push({ kind: h.kind, kept: h.kept, k: 1 - d / m }); } return out; }
     herd(key, kind, kept, lon, lat, k, n, still, yaw) {
       const sp = SP[kind]; if (!n) n = sp.n[0] + Math.floor(hash(key, 47) * (sp.n[1] - sp.n[0] + 1));
       const spread = Math.sqrt(n) * (sp.L + 0.5) * 2.2;      // (true metres: a herd stands a few body lengths apart; where the beasts stand is kept in true metres and drawn k times)
