@@ -865,6 +865,7 @@
     acc += dt; sAcc += dt; if (acc < 0.1) return;
     const d = acc; acc = 0;
     if (E.ctx.state !== 'running') return;
+    const t0 = performance.now();
     SOUND.X.load();
     if (sAcc >= 0.25 || !SOUND.scene) { SOUND.scene = sceneOf(sAcc); sAcc = 0; }
     const sc = SOUND.scene;
@@ -885,6 +886,7 @@
       }
       if (me.era !== lastEra) { if (me.era > lastEra) SOUND.sting('age'); lastEra = me.era; }
     }
+    const ms = performance.now() - t0; SOUND.ms = SOUND.ms === undefined ? ms : SOUND.ms * 0.95 + ms * 0.05;      // (what a tenth of a second of the soundscape costs the page, on the whole)
   };
   SOUND.reset = function () { seenSeq = -1; lastEra = -1; };
   // a piece of news, as the interface would sound it, and how much it matters against others that come at once

@@ -1167,6 +1167,7 @@ server.listen(0, async () => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 900 / 6371000, 0.8, 0); }); await wait(4000); await frames(4);
     const town = await ev(() => ({ tw: SOUND.scene.town, lv: Object.assign({}, SOUND.X.lv) }));
     check(town.tw && town.tw.k > 0.2 && town.lv.murmur > 0.02, 'a town is heard from above it: ' + JSON.stringify(town));
+    const ms = await ev(() => SOUND.ms); check(ms < 3, 'the soundscape costs the page little: ' + (ms && ms.toFixed(2)) + ' ms a tenth of a second'); console.log('   sound: ' + (ms && ms.toFixed(3)) + ' ms a tenth of a second (software renderer), ' + await ev(() => SOUND.E.stats.voices) + ' voices so far');
     // the interface: a click on a button sounds, the menu's sliders set the volumes and are kept
     const v0 = await ev(() => SOUND.E.stats.voices);
     await page.click('#btn-menu').catch(() => {}); await wait(400);

@@ -88,6 +88,13 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `node tools/space/probe.js [seed] [last year]` — a world through the Space Age (to 2150): realms in each age at each date, the
   most learned, the world's people, anything on a realm that is not a number, what the leader knows and how it is governed, the save
   loaded again and run on. Run it after touching any table by age.
+- `node tools/sound/render.js [scenes | birds | beasts | all] [--solo layers] [--secs N]`, then `python3 tools/sound/sheet.py [names]`
+  and `python3 tools/sound/gallery.py birds <kinds>` — the sound of the world without the game: a scene (a coast by day, a wood at
+  dawn, a summer night, the savanna, towns of five ages, a battle, the heights, the interface in four ages; every bird and every beast
+  in turn) rendered off the page into `shots/sound/<name>.wav`, its loudness as broadcasters measure it (LUFS: the whole, and the
+  loudest and quietest three seconds) and a spectrogram (`shots/sound/sheet.png`, `<gallery>_grid.png`). `--solo surf,birds` keeps
+  only those layers. Nothing can be listened to here: hold a change to the numbers (the levels in the header of the sound's notes
+  below) and to the pictures (a bird's song is a run of bent lines where that bird sings, a wave a swell, a crash and a long hiss).
 - `node tools/econ/probe.js [seed] [last year] [goods]` — the world's economy through the ages in numbers: prices
   against the usual, output against need, who is short, how much crosses borders, what the workshops make, and how
   long the market takes a year. `node tools/econ/calibrate.js [seed,seed] --write` measures how much each raw good's land
@@ -281,6 +288,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/textures.js` | `TEX` | Generated material atlases as texture arrays; the ground's scanned materials (`TEX.ground`); UI art |
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
 | `src/fauna.js` | `FAUNA` | The beasts and birds about the eye: herds wild and kept (`Fauna`), flocks in the air (`Flocks`); pure drawing |
+| `src/sound.js` | `SOUND` | The sound of the world: wind, sea, woods, birds, insects, beasts, towns, battles - what the camera looks at - and the interface's voice in the age's instruments, all made as it is heard by the Web Audio API (no recordings) |
 | `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand; the faith; the court (`court.js`) |
@@ -1586,6 +1594,43 @@ Conventions that matter:
   beasts sooner (`budget`, `lodK`). *What it costs* (the build Mac, 1680 by 1050, turn and turn about in one page: `costf_herds`,
   `__T.costsFauna()`): over the savanna with 870 beasts and 620 birds 16.9 frames a second against 17.6 without either (with no
   speck-sized mesh it was 16.2 against 17.2). Look at the Mac's `herds_*` and `birds_*` after touching any of it.
+- **Sound** (`sound.js`; `SOUND`; the volumes in the menu, `settings.vol`). Nothing is a recording: every sound is made as it is
+  heard by the Web Audio API, out of noise, oscillators and filters, so it can follow the world anywhere and the game carries no
+  sound files. *The engine* (`Engine`): the world's, the interface's and (for later) music's buses under the master, through a gentle
+  compressor; two rooms made of noise that darkens as it dies (the open air's, 1.4 s, for the world; a hall, 2.8 s, for the
+  interface); the elements - a whistle bent along a curve (`whistle`: a bird's note, a flute), a harsh voice through formants
+  (`rasp`: a crow, a gull, a beast), a knock (noise through a resonance), struck partials (`partials`, `BELLS`: church, bronze,
+  temple, stone, chime, glass, anvil), a plucked string (Karplus-Strong in tune by an all-pass: lyre, lute, harp), a piano, an
+  electric piano and glass (frequency modulation), a drum, a horn, a choir's "ah", a swish of paper, a rumble. *What many voices
+  make together* is rendered once into a loop off the page's thread (`TEX`, an OfflineAudioContext, its end faded into its start):
+  crickets, frogs (peepers, croakers, a toad), cicadas, a crowd's murmur (voices through the formants of vowel after vowel, in
+  syllables, phrases and pauses), a fire, a battle's din; only once the sound is first heard (`X.load`: a page nobody listens to
+  renders nothing). *The scene* (`sceneOf`, four times a second): the eye's height above the ground, the sun where it looks, the
+  time of year there (`seasonPhase`, south half a year on), the flora zone (`TREES.zoneOf`) and woods and grass (`forestAt`), the
+  ice, the water about the point looked at and six round it (`terrain.shoreAt`: how far the shore is, how open, sea or fresh), the
+  nearest town and how large it is drawn against how far it is (`world.nearTowns`), a battle of the last two years near by
+  (`sim.battles`), the herds (`fauna.near`), how fast the eye moves. *The soundscape* (`Scape`): beds faded to their levels (the wind
+  in gusts, stronger the higher and more open, the wind of the heights over the clouds and nothing from space; the leaves of a wood
+  in the gusts, still at a calm dawn; the sea's roar; a rush when the eye flies; the textures), and spots: breakers on an open coast
+  every eight seconds or so (a low roar as the wave curls, the crash, the long hiss of the wash), laps on a lake; singers - birds of
+  the zone (`SINGERS`, the Americas their own: `NEW_WORLD`) in their season, most at dawn, few in winter, each a place and a distance
+  singing again after its pause until the eye goes elsewhere; the night's (`NIGHT`: owls, the scops owl, nightingales, nightjars,
+  loons on northern lakes, the whip-poor-will); beasts (wolves in the north while there are wolves, hyenas and lions on the savanna,
+  the herds near by, a village's dogs and its cock at dawn); a town's work by its age (`WORK`: flint knapped, an axe, a smithy, a
+  mason, hooves, carts, bells - a temple's deep bell in the east -, a steam whistle, a factory, traffic, electric cars) and its fires
+  after dark where nobody has lamps (style era up to 5); a battle's clash by the age (bronze, muskets and cannon, rifles and shells).
+  It all fades as the eye rises: birds and insects within a kilometre or two, a town while it is large in the picture and the eye
+  under 30 km, the surf a few kilometres up. A page open over the world (`modal`) halves the world. *The interface* (`Voice`): a
+  click for anything pressed (a document listener in `bindUI`), a page opening and closing (a MutationObserver on the dialogs'
+  `open`), a story's page (`story`), the turn begun (`turn`) and ended (`stop` when it ran its course, `alert` when something needs
+  the player: `endTurn`), and what the realm's own news brings (`stingFor`: a discovery, a war, a peace, a great person, a wonder, a
+  golden age, a disaster, a town founded; a new age), in the age's instruments (`KIT`) and the player's people's scale (`SCALE`).
+  The page may sound only after a gesture (`wake`); a hidden window is silent. `window.GENESIS_MUTE` keeps it from starting: the
+  test suite's pages are muted but for the scenario that listens (`fresh(.., { sound: true })`). *The levels* (`tools/sound/render.js`
+  with the render's buses; the game's are some 2.6 dB quieter at the menu's settings): a still meadow -28 LUFS, a coast -26.5 (its waves
+  -23 at the crash, -29.5 between), a wood at dawn -25, a summer night -25, a town -24 to -29, the heights -26, a battle -23, winter in
+  a wood -33, the interface's stings -19 at their loudest. *What it costs*: the audio runs on its own thread; the page's part is
+  `SOUND.update` (`SOUND.ms`, a tenth of a second of it: some hundredths of a millisecond on the build Mac).
 - **After dark** (`life.js`): open fires burn from dusk till morning in towns that have no lamps yet (style era ≤ 5):
   a great one on the square, braziers either side of each gate and before the great buildings, a few before house
   doors where there is room. Each is two instances of the smoke mesh: a flame (a card facing the eye) and the pool of
