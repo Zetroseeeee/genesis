@@ -299,11 +299,19 @@ function createSim(world, seed) {
   let evSeq = 0; // every event gets a running number, so the page can ask "what happened since I last looked"
   function logEvent(c, text, important, type, loc, calm) {      // (calm: news that does not stop the player's turn - a drought is told, and its story stops it when it matters)
     const e = { year, text, type: type || eventType(text), loc: loc !== undefined ? loc : c.capital, civ: c.id, seq: ++evSeq }; if (calm) e.calm = 1;
-    pushOwn(c, e);
+    pushOwn(c, e); if (c.player && MARK[e.type]) mark(c, e.type, text);
     if (important || c.player) pushWorld({ ...e, mine: !!c.player });
     allEvents.push(e); if (allEvents.length > 6000) allEvents.splice(0, 1000);
   }
   const allEvents = [];
+  // ---------- the player's annals and story (the epilogue: epilogue.js) ----------
+  // every ten years how many the realm is, how much land it holds and its age (thinned once there are many: the first ages of a long
+  // game every twenty years and then forty); and the moments of its story as they are told, each kind up to so many (the oldest of a
+  // kind goes first). Kept on the realm and saved with it; when the player's realm falls it is kept as it was (fallen).
+  const MARK = { era: 20, culture: 140, state: 90, faith: 40, war: 140, ruler: 140 };
+  function mark(c, type, text) { const m = c.marks || (c.marks = []); m.push([year, type, text]); let n = 0; for (const x of m) if (x[1] === type) n++; if (n > MARK[type]) m.splice(m.findIndex((x) => x[1] === type), 1); }
+  function annal(c) { let a = c.annals || (c.annals = []); a.push([year, Math.round(popOf[c.id] * 10) / 10, cellsOf[c.id], c.era]); while (a.length > 640) { const h = a.length >> 1, keep = []; for (let k = 0; k < a.length; k++) if (k >= h || k % 2 === 0) keep.push(a[k]); a = c.annals = keep; } }
+  let fallen = null;
   function newCiv(home, opts = {}) {
     if (!freeIds.length) return null;
     const id = freeIds.pop();
@@ -743,6 +751,7 @@ function createSim(world, seed) {
     return `${gone}${who}, ${T.a}, ${verb} ${realm}${H && DYNASTY.dynastic(kind) && H.n <= 1 ? ', the first of ' + H.name : ''}`;
   }
   function killCiv(c, why) {
+    if (c.player) { annal(c); mark(c, 'state', `${fullName(c)} is no more${why ? ' — ' + why : ''}`); c.fell = [year, why || '', fullName(c)]; fallen = c; }      // (the player's realm as it was when it fell: the epilogue tells its story)
     for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === c.id && level[i] >= 2) markRuin(i, c.era, c.culture); }
     // (its enemies' wars with it are over now: left on their lists until they next looked, they passed to whoever was born under its number)
     for (const k in c.wars) { const e = civs[+k]; if (e && e.wars[c.id] !== undefined) { delete e.wars[c.id]; warCnt[e.id] = -1; } }
@@ -1245,6 +1254,7 @@ function createSim(world, seed) {
     livingWorld(); faithNews();
     countIndustry(); market.step(); if (tickCount % 3 === 0) hungerWatch();
     if (year % 20 === 0) record();
+    if (year % 10 === 0) { const pc = playerCiv(); if (pc) annal(pc); }
     st.year = year; st.civCount = civCount;
   }
   // ---------- the living world ----------
@@ -1572,13 +1582,13 @@ function createSim(world, seed) {
       pop: b64(p8), owner: runs, infra: sparse(infra), walls: sparse(walls), special: sparse(special), peak: sparse(peak), slotA: sparse(slotA), slotB: sparse(slotB), bonus, names, sites,
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
-      civs: civs.map(c => c ? { ...c, events: c.events.slice(c.player ? -30 : cellsOf[c.id] > 20 ? -15 : -6), rulers: c.rulers.slice(-3) } : null), /* (the reigns of a realm are its houses' lines now: dynasty.js; a save is better small) */ worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
+      civs: civs.map(c => c ? { ...c, events: c.events.slice(c.player ? -30 : cellsOf[c.id] > 20 ? -15 : -6), rulers: c.rulers.slice(-3) } : null), fallen: fallen ? { ...fallen, events: [], rulers: (fallen.rulers || []).slice(-3) } : undefined, /* (the reigns of a realm are its houses' lines now: dynasty.js; a save is better small) */ worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
       econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, woods: woods && landOn ? woods.save() : undefined, climate: climate && landOn ? climate.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : foodTab === FOOD_039 ? 39 : undefined, land: landOn ? 1 : undefined,
     };
   }
   function load(s) {
     const u8 = (str) => { const bin = atob(str); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
-    year = s.year; tickCount = s.tickCount; player = s.player; rs = s.rs >>> 0;
+    year = s.year; tickCount = s.tickCount; player = s.player; rs = s.rs >>> 0; fallen = s.fallen || null;
     landOn = LM && s.land === 1;      // (a world saved before the land had kinds goes on as it was, and with the table of food it was saved under)
     foodTab = landOn ? (s.food === 39 || s.mig === undefined ? FOOD_039 : FOOD) : s.food === 15 || s.heard === undefined ? FOOD_015 : FOOD_037; FM0 = lerpTable(foodTab, 0); warCnt.fill(-1);      // (see FOOD_015)
     if (climate) { climate.load(landOn ? s.climate : null); applyWet(); }      // (a world saved before the weather begins with the climate of its year: what had begun is not news)
@@ -1680,7 +1690,18 @@ function createSim(world, seed) {
     // the discovery the player's realm lacks to raise this work here (null: none, whatever else may stand in the way)
     needFor(kind, i) { const c = playerCiv(); if (!c) return null; if (kind === 'farm') return i >= 0 && infra[i] < 5 ? know.lacks(c.id, 'farm', infra[i] + 1) : null; if (kind === 'walls') return i >= 0 && walls[i] < 3 ? know.lacks(c.id, 'walls', walls[i] + 1) : null; if (kind === 'mine') return i >= 0 && goods[i] ? know.estate(c.id, goods[i]) : null; return know.lacks(c.id, kind); },
     tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, faithCosts, faithAct, faithNews, cultureNews, financeNews, financeAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = finance.act(c.id, what, a, b); financeNews(); return r; }, dynastyNews, rulerDies, courtAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = dynasty.act(c.id, what, a, b); dynastyNews(); return r; },
-    get story() { return story; }, get legacy() { return legacy; }, get intrigue() { return intrigue; }, get disease() { return disease; },
+    get story() { return story; }, get legacy() { return legacy; }, get intrigue() { return intrigue; }, get disease() { return disease; }, get fallen() { return fallen; },
+    // the story of the player's realm, living or fallen (epilogue.js): its annals and moments, what it is remembered for and where that
+    // stands among every realm that lived (the great legacies of the fallen too)
+    epilogue: () => {
+      const c = playerCiv() || fallen; if (!c) return null; const alive = c === playerCiv(), nm = alive ? fullName(c) : (c.fell && c.fell[2]) || c.name;
+      const pts = c.legacy ? c.legacy.pts.slice() : [0, 0, 0, 0, 0, 0], total = pts.reduce((a, b) => a + b, 0); let above = 0, of = 1;
+      for (const o of civs) if (o && o !== c) { of++; if (legacy && legacy.scoreOf(o.id) > total) above++; }
+      if (legacy) for (const g of legacy.save().hall) { if (g[0] === nm) continue; of++; if (g[1] > total) above++; }
+      const annals = (c.annals || []).slice(); if (alive && (!annals.length || annals[annals.length - 1][0] < year)) annals.push([year, Math.round(popOf[c.id] * 10) / 10, cellsOf[c.id], c.era]);      // (where it stands now ends its line)
+      return { id: c.id, alive, name: nm, people: c.name, color: c.color, founded: c.founded, year, era: c.era, fell: c.fell || null, annals, marks: (c.marks || []).slice(), events: (c.events || []).slice(),
+        pts, total, place: above + 1, of, civ: c, pop: alive ? popOf[c.id] : 0, cells: alive ? cellsOf[c.id] : 0 };
+    },
     // the weather (climate.js), in a world whose land has kinds: a realm's harvest this year against an ordinary year's (weighed by its
     // people), who starved, what softens a famine there; a place's weather; whether the ice still lies on a place
     get climate() { return climate && landOn ? climate : null; }, get mig() { return mig && landOn ? mig : null; }, get woods() { return woods && landOn ? woods : null; }, cleared: (i) => (woods && landOn ? woods.cleared(i) : cultivationOf(i)), woodsPolicy: (key) => { const c = playerCiv(); if (!c || !woods || !landOn) return 'No realm'; return woods.setPolicy(c, key); }, migPolicy: (what, key) => { const c = playerCiv(); if (!c || !mig) return 'No realm'; return mig.setPolicy(c, what, key); }, harvestOf: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1), starvedOf: (c) => starved[c], reliefOf: (c) => relief[c],

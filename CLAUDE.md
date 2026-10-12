@@ -295,6 +295,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
+| `src/epilogue.js` | `EPILOGUE` | The story of the player's people: told when the realm falls, when the Holocene ends (AD 2150), or from the Chronicle's 'Your story' |
 | `src/court.js` | `COURT` | The Court, the laws screen's last tab: the ruling family as a tree of faces (parents, the throne and consort, brothers and sisters, children, grandchildren), the line of succession, a regency, the house and its reigns; a person's page (raise as, pass over, marry) |
 | `src/country.js` | `COUNTRY` | The Land tab, the laws screen's tab before the Court: the realm's woods against nature's (by the bands of the lens), its kinds of land, the year's harvest, its timber, the world's woods and who keeps most and least of theirs, the word on the woods |
 | `src/folk.js` | `FOLK` | The Peoples tab, the laws screen's tab before the Land: the realm's peoples, its rulers' people abroad, who came and who left in the last ten years, the world's great migrations, the policies of borders and of leaving |
@@ -765,6 +766,20 @@ Conventions that matter:
   places stories happen in come from a list of each realm's settlements made once a decade (`townsOf_` in `sim.js`; a pass
   over the land is a millisecond). The module throws its own dice; a year of it is under half a millisecond. After
   touching it run `tools/story/probe.js` (which choices are taken: none always, none never) and the war-and-peace probe.
+- **The epilogue** (`epilogue.js`; `sim.epilogue()`). The player's realm keeps its annals (`c.annals`: every ten years how many it is,
+  its regions and its age, thinned once there are more than 640) and the moments of its story as they are told (`c.marks`: every event
+  of the player's realm of the kinds `MARK` in `sim.js` lists, each kind up to its number, the oldest of a kind going first); both are
+  saved with it. When the realm falls (`killCiv`) it is kept as it was (`sim.fallen`, saved as `save().fallen`, with `c.fell`: the year,
+  why, its name). The page tells its story: the painting of the age it reached, how it began and ended in the chronicle's voice, the last
+  ruler's face (`faceOf` in `main.js`), six figures (its height, its widest, the ages, golden ages and wonders, great people and
+  masterpieces, what it is remembered for and where that stands among every realm that ever lived, the fallen's great legacies with
+  them), a chart of its people (log) and land over the ages with each age the same width (the world's dates of the ages: `AGE_AT`), the
+  moments age by age (`kindOf` reads them: the ages entered, golden ages, wonders, masterpieces and great people, faiths, the wars that
+  began and ended, reigns, the founding and the fall; twelve wars, fourteen great people and eight reigns, spread over its life), the six
+  paths and the world's firsts that were its own. `epilogueWatch` in `main.js` opens it when the player's realm falls (once; a world loaded
+  after its fall is not told again) and when the year reaches 2150 with the realm alive (once: `c.epilogue`; the world may be played
+  on). A world saved before 0.46 begins its annals when it is loaded. `tools/scenes/epilogue.js` runs a world and opens the page
+  (`epi_*` in the tour); the simulation's tests (section 26) and the last end-to-end scenario hold it.
 - **Legacies** (`legacy.js`; `sim.legacy`; the Legacy tab of the Chronicle in `main.js`). Every age sets every realm six
   ambitions, one in each path (arms, wealth, splendour, learning, faith, reach: `LEGACY.OF[era]`); each is a test on what the
   realm has (`x`: the host's answers, on a prototype made once a world, what costs a search counted once in five years: workshops, trade,
