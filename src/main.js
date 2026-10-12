@@ -22,7 +22,7 @@
   const turnRun = { active: false, start: 0, target: 0, evIdx: 0, capital: -1, wars: '', era: 0, towns: 0, townSet: null, reason: '' };
   const seen = { wars: new Set(), era: -1, ack: new Set(), turns: 0 };
   const view = { political: true, soil: false, clouds: true, labels: true, trade: false, gov: false, rel: false, ppl: false, fth: false, ren: false, sick: false, hrv: false, wds: false };
-  const settings = { uiScale: 1, tipDelay: 300, glass: false, autoTilt: true, quality: 'high', continuous: false, textures: true, stories: true };
+  const settings = { uiScale: 1, tipDelay: 300, glass: false, autoTilt: true, quality: 'high', continuous: false, textures: true, stories: true, vol: { master: 0.8, world: 0.8, ui: 0.7 } };
   const worldData = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8Array(N), flags: new Uint8Array(N), soil: null };
   const TURN_YEARS = RULE.PACE;      // a turn, by age (200 years in the Stone Age down to 5): about a discovery, or a reform, to a turn at history's pace; a hundred and seventy turns from the first fields to the present
   const speed = () => settings.continuous ? (paused ? 0 : SPEEDS[speedIdx]) : (turnRun.active ? 600 : 0);
@@ -179,6 +179,8 @@
       globals.uOwner.value = world.ownerTex; globals.uPal.value = world.palTex; globals.uSim.value = world.simTex;
       mapcam = new MAPCAM.MapCamera(camera, renderer.domElement, terrain);
       mapcam.onClick = onClick; mapcam.locked = true; mapcam.autoTilt = settings.autoTilt;
+      // the sound of the world (sound.js): what the camera looks at is what is heard
+      if (window.SOUND) SOUND.init({ cam: mapcam, terrain, trees, world, fauna, sim: () => sim, sun: () => globals.uSun.value, season: () => seasonPhase, mode: () => mode, modal: () => modalNow, snow: () => world.bUniforms.uSnow.value, bare: (lat) => (lat >= 0 ? globals.uBare.value.x : globals.uBare.value.y), cold: (lat) => (lat >= 0 ? globals.uBare.value.z : globals.uBare.value.w), volume: Object.assign({ master: 0.8, world: 0.8, ui: 0.7 }, settings.vol) });
       window.__G = { settings, loadSettings, get sim() { return sim; }, climateRefresh: () => { climYear = NaN; climateUniforms(); }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, get troops() { return troops; }, get fauna() { return fauna; }, get birds() { return birds; }, selectHost: (id) => selectHost(id), get hostSel() { return hostSel; }, startTurn, endTurn, turnRun, attention: () => computeAttention(), terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
       buildEconomy(); buildDock(); buildMinimapBase(); bindUI();
       newWorld((Math.random() * 2 ** 31) | 0);
@@ -576,10 +578,14 @@
     if (!sim || mode !== 'play' || turnRun.active) return;
     $('report').hidden = true; deselectTool();
     snapshotTurn(); turnRun.target = sim.year + turnLength(); turnRun.reason = ''; turnRun.active = true; paused = false; acc = 0; seen.turns++;
+    if (window.SOUND) SOUND.sting('turn');
     updateTurnButton();
   }
   function endTurn(reason) {
     if (!turnRun.active) return; turnRun.active = false; paused = true; turnRun.reason = reason || '';
+    // (the turn's end is heard: a soft close when it ran its course, a call when something needs the player; news that has a sound of
+    //  its own - a war, a new age, a discovery, a disaster, a story - is heard as that)
+    if (window.SOUND) { const r = reason || ''; if (r === '') SOUND.sting('stop'); else if (!/^(stopped|story|era|war|disaster|study|gone|end|fall)$/.test(r)) SOUND.sting('alert'); }
     world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); showReport();
     if (reason === 'story') setTimeout(() => { if (!turnRun.active && mode === 'play') TALES.show(() => updateTurnButton()); }, 380);      // (the story is read as soon as the turn has stopped)
   }
@@ -1224,6 +1230,12 @@
     $('m-new').addEventListener('click', () => { $('menu').close(); goHomeScreen(true); });
     $('ui-scale').value = settings.uiScale; $('ui-scale-v').textContent = settings.uiScale.toFixed(2); $('ui-scale').addEventListener('input', (e) => { settings.uiScale = +e.target.value; $('ui-scale-v').textContent = settings.uiScale.toFixed(2); applySettings(); });
     $('tip-delay').value = settings.tipDelay; $('tip-delay-v').textContent = settings.tipDelay; $('tip-delay').addEventListener('input', (e) => { settings.tipDelay = +e.target.value; $('tip-delay-v').textContent = settings.tipDelay; applySettings(); });
+    // the sound: three sliders (sound.js), and the interface's own voice - a click for what is pressed, a page that opens and closes, a
+    // story's page turned
+    { const V = settings.vol = Object.assign({ master: 0.8, world: 0.8, ui: 0.7 }, settings.vol);
+      for (const k of ['master', 'world', 'ui']) { const el = $('vol-' + k), out = $('vol-' + k + '-v'); if (!el) continue; el.value = V[k]; out.textContent = Math.round(V[k] * 100); el.addEventListener('input', (e) => { V[k] = +e.target.value; out.textContent = Math.round(V[k] * 100); if (window.SOUND) SOUND.setVolume(V); }); el.addEventListener('change', () => applySettings()); }
+      document.addEventListener('click', (e) => { if (!window.SOUND) return; const b = e.target.closest && e.target.closest('button, .btn, .hm, .tab, [role="tab"], summary, select'); if (!b || b.disabled) return; SOUND.ui(b.matches('.tab, [role="tab"], summary') ? 'tab' : 'click'); }, true);
+      new MutationObserver((ms) => { if (!window.SOUND) return; for (const m of ms) { const d = m.target; if (d.tagName !== 'DIALOG') continue; if (d.open) SOUND[d.id === 'tale' ? 'sting' : 'ui'](d.id === 'tale' ? 'story' : 'open'); else SOUND.ui('close'); } }).observe(document.body, { attributes: true, attributeFilter: ['open'], subtree: true }); }
     $('opt-glass').checked = settings.glass; $('opt-glass').addEventListener('change', (e) => { settings.glass = e.target.checked; applySettings(); });
     $('opt-autotilt').checked = settings.autoTilt; $('opt-autotilt').addEventListener('change', (e) => { settings.autoTilt = e.target.checked; applySettings(); });
     $('opt-textures').checked = settings.textures !== false; $('opt-textures').addEventListener('change', (e) => { settings.textures = e.target.checked; applySettings(); });
@@ -1522,6 +1534,7 @@
   window.addEventListener('beforeunload', () => saveLocal(false));      // closing the window or restarting the game keeps the world as it is
 
   // ---------- loop ----------
+  let modalNow = false;
   let frameNo = 0; let last = performance.now(), acc = 0, texAge = 0, uiAge = 0, tpsCount = 0, tpsT = 0, sunAngle = 0.6, mmT = 0, olT = 0, seasonPhase = 0.45;
   let framesDrawn = 0, lastReal = performance.now();
   // The sky as water mirrors it (the ground's shader: uSkyR). Its light from five heights above the horizon, toward the sun,
@@ -1547,6 +1560,7 @@
     requestAnimationFrame(frame);
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     const modalOpen = $('chron').open || $('menu').open || $('news').open || $('market').open || $('know').open || $('gov').open || $('dip').open || $('cult').open || $('tale').open;
+    modalNow = modalOpen || !!($('epi') && $('epi').open);
     mapcam.update(dt);
     camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();      // everything this frame (sun in view space, shadow lookup) works from the camera where it now is
     // seasons: one year every four minutes of real time; the sun's declination swings with it and the ground follows
@@ -1628,6 +1642,7 @@
     if (window.AIR) skyMirror();
     const posted = postOk && !POST.off && !POST.broken && settings.quality === 'high'; globals.uGlow.value = world.bUniforms.uGlow.value = posted ? 1 : 0; if (life) life.uniforms.uGlow.value = posted ? 1 : 0;
     updateLabels(); updatePlots(); updateFlows();
+    if (window.SOUND) SOUND.update(real);
     if (now - mmT > 700) { mmT = now; updateMinimap(false); }
     tpsT += dt; if (tpsT > 1) { $('yps').textContent = tpsCount + ' yr/s'; tpsCount = 0; tpsT = 0; const d = $('debug'); if (d.style.display === 'block') d.textContent = `elev ${JSON.stringify(terrain.stats.elevLevels)} tiles ${terrain.stats.tiles} sse ${terrain.stats.sse | 0} packs i${terrain.stats.packsI} e${terrain.stats.packsE} loading ${terrain.stats.loading} buildings ${world.buildingCount} trees ${trees ? trees.count : 0} labels ${labelEls.size} movers ${movers ? movers.stats.agents + '/' + movers.stats.walkers + '/' + movers.stats.ships : 0} beasts ${fauna ? fauna.stats.herds + '/' + fauna.stats.beasts : 0} birds ${birds ? birds.stats.flocks + '/' + birds.stats.birds : 0} alt ${(mapcam.alt * 6371).toFixed(1)}km dist ${(mapcam.dist * 6371).toFixed(1)}km tilt ${(mapcam.tilt * 57.3).toFixed(0)}`; }
     if (trees) trees.uCover.value = !trees.coverOff && (posted ? POST.samples > 1 : msaa) ? 1 : 0;      // (cut-out trees: several samples a pixel smooth their outlines)

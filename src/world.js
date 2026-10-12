@@ -107,7 +107,7 @@
       const sim = this.sim; if (!sim) { return; }
       const dist = cam.dist; const now = performance.now();
       const show = dist < 0.12;   // towns are drawn at strategy-map scale, so they read from ~750 km up
-      if (!show) { if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; this._casterSig = null; if (window.MODELS && MODELS.ready) { MODELS.begin(); MODELS.end(); } } return; }
+      if (!show) { this.nearTowns = []; if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; this._casterSig = null; if (window.MODELS && MODELS.ready) { MODELS.begin(); MODELS.end(); } } return; }
       const moved = GEO.distKm(cam.lon, cam.lat, this.lastBuild.lon, this.lastBuild.lat) > Math.max(0.15, dist * 6371 * 0.12);
       const stale = now - this.lastBuild.t > 1500 || this.lastBuild.tex !== this.texVersion;
       const arrived = window.MODELS && MODELS.dirty;       // a model file finished loading: swap it in
@@ -130,6 +130,8 @@
         for (let dx = -rx; dx <= rx; dx++) { const x = ((cx0 + dx) % W + W) % W; const i = y * W + x; if (!sim.level[i] || sim.owner[i] < 0) continue; const c = sim.civs[sim.owner[i]]; if (!c) continue; const [cLon, cLat] = this.siteOf(i); cells.push([GEO.distKm(cam.lon, cam.lat, cLon, cLat), i, cLon, cLat, cl, c]); }
       }
       cells.sort((a, b) => a[0] - b[0]);
+      // (the nearest few, for the sound of the world: where they stand, how large they are drawn, the age and the people they are built by)
+      this.nearTowns = cells.slice(0, 6).map(([dKm, i, cLon, cLat, cl, c]) => { const cul = TOWN.civCulture(sim, c); return { lon: cLon, lat: cLat, R: TOWN.radiusM(sim, i, c), era: c.era, style: TOWN.styleEra ? TOWN.styleEra(c.era, cul) : c.era, cul, lvl: sim.level[i] }; });
       for (const [dKm, i, cLon, cLat, cl, c] of cells) {
         if (total >= TOTAL_MAX) break;
         const R = TOWN.radiusM(sim, i, c); const Rk = R / 1000;
