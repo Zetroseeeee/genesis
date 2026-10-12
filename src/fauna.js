@@ -495,7 +495,7 @@
     gull:     { span: 1.3, len: 0.55, neck: 0.06, beat: 7, tip: 0.25, wing: 0.72, col: [0xeceae6] },                         // white, a grey back, black tips
     crow:     { span: 0.95, len: 0.45, neck: 0.04, beat: 11, col: [0x1b1b1e, 0x232326] },
     vulture:  { span: 2.6, len: 0.95, neck: 0.12, beat: 4, tip: 0.6, col: [0x3d3026, 0x4a3a2c, 0x56483a] },
-    starling: { span: 0.4, len: 0.2, neck: 0.02, beat: 16, col: [0x17171a] },
+    starling: { span: 0.55, len: 0.26, neck: 0.02, beat: 16, col: [0x17171a] },      // (a little larger than life: a cloud of them must read)
   };
   const BKINDS = Object.keys(BIRDS);
   function birdGeometry(o) {
@@ -571,7 +571,11 @@
       const a = Math.random() * 6.2832, d = Math.sqrt(Math.random()) * 3.5, cl = Math.max(0.2, Math.cos(cam.lat * D2R));
       const lon = cam.lon + Math.cos(a) * d / 111 / cl, lat = cam.lat + Math.sin(a) * d / 111;
       const c = this.choose(sim, lon, lat, season, day, dusk); if (!c) return;
-      this.flocks.push(this.flock(c[0], c[1], lon, lat, season));
+      let L = lon, A = lat;
+      if (c[0] === 'gull' && !(this.terrain.isWater && this.terrain.isWater(L, A))) for (let k = 0; k < 10; k++) {      // (gulls over the water, where there is water near)
+        const b = Math.random() * 6.2832, r = 0.4 + Math.random() * 2.2, l2 = lon + Math.cos(b) * r / 111 / cl, a2 = lat + Math.sin(b) * r / 111;
+        if (this.terrain.isWater(l2, a2)) { L = l2; A = a2; break; } }
+      this.flocks.push(this.flock(c[0], c[1], L, A, season));
     }
     // a flock: where it is (an anchor and its offset, true metres east and north), how high it flies (metres above the ground, as drawn), its birds
     flock(kind, mode, lon, lat, season) {
@@ -588,7 +592,7 @@
         const n = 4 + Math.floor(R() * 14); f.head = R() * 6.2832; f.v = 11; f.h = 30 + R() * 50; f.x = -Math.cos(f.head) * 600; f.z = -Math.sin(f.head) * 600;
         for (let i = 0; i < n; i++) f.birds.push({ fx: (R() - 0.5) * 25, fz: (R() - 0.5) * 15, fy: (R() - 0.5) * 6, ph: R(), amp: 1, col: B.col[Math.floor(R() * B.col.length)] });
       } else {      // starlings gathering at dusk, a cloud that folds and turns
-        const n = 420 + Math.floor(R() * 320); f.h = 90 + R() * 70;
+        const n = 420 + Math.floor(R() * 320); f.h = 150 + R() * 100;
         for (let i = 0; i < n; i++) { let u, v, w; do { u = R() * 2 - 1; v = R() * 2 - 1; w = R() * 2 - 1; } while (u * u + v * v + w * w > 1); f.birds.push({ u, v, w, ph: R(), amp: 1, col: B.col[0] }); }
       }
       return f;
@@ -626,7 +630,7 @@
             yaw = a + b.w * Math.PI / 2; bank = 0.35 * b.w;
             amp = f.mode === 'wheel' ? (Math.sin(t * 0.45 + b.ph * 17) > 0.55 ? 0.9 : 0) : 0;      // (a gull beats its wings now and then; a vulture glides)
           } else {
-            const th = t * 0.17 + f.lat, s1 = 1 + 0.55 * Math.sin(t * 0.31 + b.v * 2.1), s2 = 1 + 0.45 * Math.sin(t * 0.23 + b.u * 2.7), A = 40 + 4 * kB;
+            const th = t * 0.17 + f.lat, s1 = 1 + 0.55 * Math.sin(t * 0.31 + b.v * 2.1), s2 = 1 + 0.45 * Math.sin(t * 0.23 + b.u * 2.7), A = 60 + 5 * kB;
             const ux = b.u * s1 * 1.6 + 0.4 * Math.sin(t * 0.4 + b.w * 2), uz = b.w * s2, cth = Math.cos(th), sth = Math.sin(th);
             x = f.x + (ux * cth - uz * sth) * A; z = f.z + (ux * sth + uz * cth) * A; y = f.h + b.v * A * 0.45 * (1 + 0.4 * Math.sin(t * 0.37 + b.u * 3)); yaw = th + Math.PI / 2;
           }

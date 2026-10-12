@@ -1554,8 +1554,8 @@ Conventions that matter:
   a neck and head turning at the neck's root, horns, antlers, tusks, a trunk, wool, a mane, a tail) whose pieces are blended into one
   surface (`blend`: each vertex is moved onto a smooth union of its own piece and the body's, over 7 % of the shoulder's height, and lit
   by that union: as separate pieces they were balloon animals) - horn, ivory and whatever is thinner than the blending's reach stay
-  crisp. Made when a kind is first wanted, finely (some 2,000 triangles) while a beast is longer than 40 pixels and coarsely (some 600)
-  beyond; a herd under a pixel is not drawn. They graze with their heads down (the angle that brings the muzzle to the grass is worked
+  crisp. Made when a kind is first wanted, finely (some 2,000 triangles) while a beast is longer than 40 pixels, coarsely (some 600)
+  down to 12 and as a speck (some 250) below; a herd under a pixel is not drawn. They graze with their heads down (the angle that brings the muzzle to the grass is worked
   out from the shape), look up now and then, walk a few lengths to better grass, swish their tails, and the herd drifts; the stags have
   antlers and the hinds not (the instance's dice); patches of white on some cattle, stripes on the zebra. Drawn 6 times life size in
   open country, the town's own scale beside a town, and never smaller than the eye's distance over 470 (`K_EYE`, up to 16 times): a
@@ -1568,7 +1568,9 @@ Conventions that matter:
   drawn 8 to 30 times life size by the eye's distance. For pictures: `__G.fauna.extra = [{ kind, lon, lat, n, kept, k, still, yaw }]`
   puts a herd where asked, `__G.fauna.zoo(lon, lat)` stands every kind in rows, heads up, and `__G.birds.extra = [{ kind, mode, lon,
   lat }]` starts a flock (mode: skein, wheel, soar, cross, cloud). A software renderer gets half the herds and flocks and the coarse
-  beasts sooner (`budget`, `lodK`). Look at the Mac's `herds_*` after touching any of it.
+  beasts sooner (`budget`, `lodK`). *What it costs* (the build Mac, 1680 by 1050, turn and turn about in one page: `costf_herds`,
+  `__T.costsFauna()`): over the savanna with 870 beasts and 620 birds 16.9 frames a second against 17.6 without either (with no
+  speck-sized mesh it was 16.2 against 17.2). Look at the Mac's `herds_*` and `birds_*` after touching any of it.
 - **After dark** (`life.js`): open fires burn from dusk till morning in towns that have no lamps yet (style era ≤ 5):
   a great one on the square, braziers either side of each gate and before the great buildings, a few before house
   doors where there is room. Each is two instances of the smoke mesh: a flame (a card facing the eye) and the pool of
