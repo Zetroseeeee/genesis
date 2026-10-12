@@ -55,7 +55,7 @@ window.EPILOGUE = (function () {
   }
   const AGE_RE = [/Stone/, /Bronze/, /Iron/, /Classical/, /Medieval|Middle Ages/, /Renaissance/, /Industrial/, /Modern/, /Information/, /Space/];
   const cap1 = (x) => x.charAt(0).toUpperCase() + x.slice(1);
-  const ICON = { age: '◆', golden: '✦', wonder: '▲', master: '❖', great: '✧', faith: '☩', war: '⚔', split: '◇', fall: '✕', found: '●', reign: '♛' };
+  const ICON = { age: 'era', golden: 'era', wonder: 'state', master: 'culture', great: 'culture', faith: 'faith', war: 'war', split: 'state', fall: 'disaster', found: 'city', reign: 'ruler' };      // (the chronicle's own icons: main.js's FEED_ICON)
   function moments(v) {
     const all = []; for (const m of v.marks) { const k = kindOf(m); if (k) all.push({ y: m[0], k, x: m[2] }); }
     // the wars: those that changed the realm most are many; keep twelve, spread over its life
@@ -82,7 +82,8 @@ window.EPILOGUE = (function () {
     const height = peak && peak[1] > 0 && !(v.alive && atPeak) ? ` At its height, in ${fy(peak[0])}, its people numbered ${fmtPop(peak[1])}${wide && wide[2] > 1 ? `; the realm was widest in ${fy(wide[0])}, with ${fmtInt(wide[2])} regions` : ''}.` : '';
     if (!v.alive) { const [y, why] = v.fell || [v.year, '']; return `The realm rose in ${fy(v.founded)} and fell in ${fy(y)}${why ? ' (' + why + ')' : ''}, after ${span(v.founded, y)}, in the ${age}.${height}${remembered}`; }
     const now = ` In ${fy(v.year)} its people number ${fmtPop(v.pop)}${atPeak ? ', more than ever' : ''}, in ${fmtInt(v.cells)} regions, in the ${age}.`;
-    if (mode === 'end') return `The Holocene ends. Founded in ${fy(v.founded)}, the realm has lasted ${span(v.founded, v.year)}.${now}${height}${remembered}`;
+    if (mode === 'end') { const H = s.history, h = H && H.length ? H[H.length - 1] : null; const world = h ? ` The world it leaves holds ${fmtPop(h.pop + h.wild)} people, in ${fmtInt(s.st.civCount)} realms.` : '';
+      return `The Holocene ends. Founded in ${fy(v.founded)}, the realm has lasted ${span(v.founded, v.year)}.${now}${height}${remembered}${world}`; }
     return `Founded in ${fy(v.founded)}, ${span(v.founded, v.year)} ago.${now}${height}${remembered}`;
   }
   const ordinal = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
@@ -92,7 +93,8 @@ window.EPILOGUE = (function () {
     const s = S(), f = figures(v), LG = window.LEGACY, P = LG ? LG.PATHS : [];
     const end = v.alive ? v.year : (v.fell ? v.fell[0] : v.year);
     $('ep-date').textContent = `${s.fmtYear(v.founded)} – ${v.alive && mode !== 'end' ? 'now' : s.fmtYear(end)} · ${span(v.founded, end)}`;
-    $('ep-title').textContent = v.name;
+    $('ep-title').textContent = cap1(v.name);
+    { const who = ctx.face ? ctx.face($('ep-face'), v.civ) : false; $('ep-seal').hidden = !who; $('ep-who').textContent = who ? (v.alive ? who : 'Its last ruler, ' + who) : ''; }
     $('ep-kicker').textContent = mode === 'fall' ? 'The end of a people' : mode === 'end' ? 'The end of the Holocene' : 'The story so far';
     $('ep-text').textContent = opening(v, f);
     const art = ctx.artOf ? ctx.artOf('era' + Math.min(9, v.era)) : ''; const fig = $('ep-fig'); fig.hidden = !art; $('epi').querySelector('.epilogue').classList.toggle('noart', !art); $('epi').querySelector('.epilogue').classList.toggle('fell', !v.alive);
@@ -114,7 +116,7 @@ window.EPILOGUE = (function () {
       const e = m.k === 'age' ? Math.max(0, AGE_RE.findIndex((r) => r.test(m.x))) : ageAt(m.y);
       if (e !== lastAge) { html += `<h4 class="ep-age" style="--m:${METAL[e]}"><span>${esc(AGES[e])}</span>${m.k === 'age' ? `<span class="ep-y">${esc(s.fmtYear(m.y))}</span>` : ''}</h4>`; lastAge = e; }
       if (m.k === 'age') continue;
-      html += `<div class="ep-m ep-${m.k}"><span class="ep-y">${esc(s.fmtYear(m.y))}</span><span class="ep-i" aria-hidden="true">${ICON[m.k] || '·'}</span><span class="ep-x">${esc(cap1(m.x))}</span></div>`;
+      html += `<div class="ep-m ep-${m.k}"><span class="ep-y">${esc(s.fmtYear(m.y))}</span><svg class="ep-i" viewBox="0 0 24 24" aria-hidden="true">${(ctx.icons && ctx.icons[ICON[m.k]]) || ''}</svg><span class="ep-x">${esc(cap1(m.x))}</span></div>`;
     }
     $('ep-story').innerHTML = html;
     // what it is remembered for

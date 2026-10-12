@@ -429,6 +429,13 @@
     if (document.body.dataset.age !== String(c.era)) document.body.dataset.age = c.era;      // (the interface is set in the metal of the player's age)
     renderSeal(c);
   }
+  // a ruler's face on a canvas, as the seal has it (the epilogue's last ruler too: a fallen realm's culture is asked for as it can be)
+  function faceOf(cv, c) {
+    const r = c && c.ruler; if (!r || !window.PORTRAIT) return false; const D = sim.dynasty, p = D && r.pid ? D.of(r.pid) : null, H = p && p.h ? D.houses.get(p.h) : null;
+    const age = p ? sim.year - p.b : (sim.year - r.since) + 22 + ((r.seed || 0) % 24); let cul = 0; try { cul = TOWN.civCulture(sim, c); } catch (e) {}
+    PORTRAIT.draw(cv, { seed: r.seed || (r.name.length * 7919), culture: TOWN.CULTURES[cul], era: c.era, fem: !!r.fem, trait: p && age < 16 ? 'steward' : r.trait, color: c.color, age, house: H ? H.seed : 0, child: !!p && age < 16 });
+    return `${r.title} ${r.name}`;
+  }
   // the seal: the ruler's face, as the court and the realm's card have it, and who rules
   let sealKey = '';
   function renderSeal(c) {
@@ -1204,7 +1211,7 @@
     $('lensbtn').addEventListener('click', () => { $('lensmenu').hidden = !$('lensmenu').hidden; });
     $('opt-stories').checked = settings.stories !== false; $('opt-stories').addEventListener('change', (e) => { settings.stories = e.target.checked; if (sim && sim.setStories) sim.setStories(settings.stories); applySettings(); });
     TALES.init({ sim: () => sim, toast, afterAct: () => { refreshAll(true); updateTurnButton(); }, onClose: () => updateTurnButton(), artOf });
-    if (window.EPILOGUE) EPILOGUE.init({ sim: () => sim, artOf, onNew: () => { goHomeScreen(true); chooseMode(); }, onMenu: () => goHomeScreen(true), onClose: () => updateTurnButton() });
+    if (window.EPILOGUE) EPILOGUE.init({ sim: () => sim, artOf, icons: FEED_ICON, face: (cv, c) => faceOf(cv, c), onNew: () => { goHomeScreen(true); chooseMode(); }, onMenu: () => goHomeScreen(true), onClose: () => updateTurnButton() });
     $('chron-story').addEventListener('click', () => { $('chron').close(); if (window.EPILOGUE && !EPILOGUE.open(sim.playerCiv() ? 'story' : 'fall')) toast('Found your people first: their story begins then'); });
     $('opt-continuous').checked = settings.continuous; $('opt-continuous').addEventListener('change', (e) => { settings.continuous = e.target.checked; if (turnRun.active) endTurn('stopped'); paused = true; applySettings(); updateTurnButton(); updateClock(); });
     attachTip($('date'), () => `<b>${sim.fmtYear(sim.year)}</b>${fmtInt(sim.year + 10000)} years since the first spring.`);
