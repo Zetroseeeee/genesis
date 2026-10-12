@@ -65,6 +65,8 @@
       let PP = this.palMode === 'people' && sim.people ? { map: sim.people.ppl, list: sim.people.list, rgbOf: sim.people.rgbOf } : this.palMode === 'faith' && sim.faith ? { map: sim.faith.fth, list: sim.faith.list, rgbOf: sim.faith.rgbOf } : null;
       // (under the lens of the harvest every place is painted by this year's harvest there, in bands, an ordinary year unpainted: climate.js)
       if (this.palMode === 'harvest' && sim.climate && window.CLIMATE) { const CL = sim.climate, B = window.CLIMATE.BANDS; if (!this.hrvMap || this.hrvMap.length !== W * H) this.hrvMap = new Uint16Array(W * H); const m = this.hrvMap; for (const i of sim.LI) m[i] = CL.bandOf(i); PP = { map: m, list: B, rgbOf: (p) => B[p].rgb }; }
+      // (under the lens of the woods by how much of nature's woods stands there, and where they grow back: woods.js)
+      if (this.palMode === 'woods' && sim.woods && window.WOODS) { const X = sim.woods, B = window.WOODS.BANDS; if (!this.hrvMap || this.hrvMap.length !== W * H) this.hrvMap = new Uint16Array(W * H); const m = this.hrvMap; for (const i of sim.LI) m[i] = X.bandOf(i); PP = { map: m, list: B, rgbOf: (p) => B[p].rgb }; }
       const pcents = this.pcentroids = PP ? new Map() : null;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const i = y * W + x, j = i * 4; const o = owner[i]; const c = o >= 0 ? civs[o] : null;

@@ -702,6 +702,14 @@ function createSim(world, seed) {
   //  the people and the land as they stand - for a world just loaded, before a year has passed)
   function fillUse() { for (const cv of civs) if (cv) { landRow(cv); fmOf[cv.id] = fmNow(cv); } for (const i of LI) { const o = owner[i], c = o >= 0 ? civs[o] : null; if (!c) { useA[i] = 0; continue; } const K = capacity(i, c), p = pop[i]; useA[i] = p >= K ? 255 : (255 * p / Math.max(K, 0.01)) | 0; } }
   function cultivationOf(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 0; const c = civs[o]; const K = capacity(i, c); const farm = Math.min(1, Math.max(0, (c.tech - 0.025) / 0.1)); return K > 0.01 ? Math.min(1, pop[i] / K) * farm * (level[i] ? 1 : 0.6) : 0; }
+  // the player's woods, once a decade: told when a quarter, a half or three quarters of what would stand by nature are gone, and when
+  // they come back above a half (calm news: the woods go over generations)
+  function woodsNews() {
+    const cv = civs[player]; if (!cv) return; const w = woods.of(player); if (w.nature < 2000) return;
+    const b = w.share >= 0.75 ? 0 : w.share >= 0.5 ? 1 : w.share >= 0.25 ? 2 : 3, W0 = cv.woods || (cv.woods = { k: 'clear' }), was = W0.b === undefined ? b : W0.b; W0.b = b;
+    if (b > was) logEvent(cv, b === 1 ? `A quarter of the woods of ${fullName(cv)} are gone: fields and pasture where the wildwood stood` : b === 2 ? `Half the woods of ${fullName(cv)} are gone: the land is fields and pasture with woods between` : `Three quarters of the woods of ${fullName(cv)} are gone: timber comes dear, and from abroad`, false, 'state', cv.capital, true);
+    else if (b < was && b <= 1) logEvent(cv, `The woods of ${fullName(cv)} are growing back: ${Math.round(w.share * 100)} in a hundred of what would stand by nature`, false, 'state', cv.capital, true);
+  }
   // a decade's great flow of people: the player hears where his own went and whence newcomers came; the world of the greatest
   function migrationNews(a, b, v) {
     const A = civs[a], B = civs[b]; if (!A || !B) return; const k = v * 1000, n = k >= 1e6 ? (k / 1e6).toFixed(1) + ' million' : Math.round(k / 1000) * 1000 >= 1000 ? (Math.round(k / 1000) * 1000).toLocaleString() : Math.max(10, Math.round(k / 10) * 10).toLocaleString();
@@ -1030,7 +1038,7 @@ function createSim(world, seed) {
     for (let c = 0; c < MAXC; c++) if (civs[c]) mightOf[c] = strength(civs[c], popOf[c], mines[c]);
     diplo.tick();      // (who trades with whom; what tribute changes hands this year)
     if (migOn) mig.step();      // (who leaves, and for where: the land pass of next year moves them)
-    if (woods !== null && landOn) woods.step();      // (a fifth of the land: cleared toward what its fields need, grown back where they need less)
+    if (woods !== null && landOn) { woods.step(); if (year % 10 === 0 && player >= 0) woodsNews(); }      // (a fifth of the land: cleared toward what its fields need, grown back where they need less)
     for (let c = 0; c < MAXC; c++) {
       const cv = civs[c]; if (!cv) continue;
       if (cellsOf[c] === 0) { diplo.fell(cv); killCiv(cv, 'its last lands were lost'); continue; }

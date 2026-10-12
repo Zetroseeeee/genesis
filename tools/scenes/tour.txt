@@ -356,6 +356,11 @@ faiths_late  | tools/scenes/peoples.js | {years:11500,lon:40,lat:35,alt:7500,len
 mig_tab      | tools/scenes/migrate.js | {years:11880} | | 200
 mig_globe    | tools/scenes/migrate.js | {years:11880,look:'globe',lon:-35,lat:30,alt:11000000} | | 210
 mig_stream   | tools/scenes/migrate.js | {years:11880,look:'globe',alt:5000000,tilt:0.45} | | 210
+wds_europe   | tools/scenes/woods.js | {years:11300,look:'lens',lon:12,lat:50,alt:4500000} | | 200
+wds_world    | tools/scenes/woods.js | {years:11950,look:'lens',lon:20,lat:25,alt:12000000} | | 210
+wds_tab      | tools/scenes/woods.js | {years:11300,as:[2.35,48.85]} | | 200
+wds_fields   | tools/scenes/woods.js | {years:11300,look:'ground',lon:2.2,lat:48.3,alt:90000,tilt:0.85,heading:0.3} | | 230
+wds_wild     | tools/scenes/woods.js | {years:0,look:'ground',lon:2.2,lat:48.3,alt:90000,tilt:0.85,heading:0.3} | | 90
 faiths_near  | tools/scenes/peoples.js | {years:11000,lon:35,lat:38,alt:2200,tilt:0.3,lens:'fth'} | | 160
 faith_found  | tools/scenes/faithpage.js | {years:9800,lon:35.2,lat:31.8,page:'new'} | | 150
 faith_page   | tools/scenes/faithpage.js | {years:11200,lon:12.5,lat:41.9,page:'mine'} | | 170

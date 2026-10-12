@@ -11,7 +11,7 @@
 // slowly and less, a little less food, the nobles' hunting grounds), or planted (from the Industrial age: woods grow back fast on
 // land nobody farms, for a share of the realm's income).
 // Everything is flat arrays a region long; a fifth of the land is looked at each year (LAP).
-//   WOODS.create(h) -> { pot, cover, step, cleared, woodF, foodF, incF, policy, setPolicy, of, stats, save, load, settle } for one world.
+//   WOODS.create(h) -> { pot, cover, step, cleared, woodF, foodF, incF, policy, setPolicy, of, bandOf, stats, save, load, settle } for one world.
 window.WOODS = (function () {
   'use strict';
   // what share of a region's land stands in wood by nature, by its kind of land (land.js CLASSES: sea, ice, tundra, boreal, desert,
@@ -45,14 +45,15 @@ window.WOODS = (function () {
   const PK = {}; POLICY.forEach((p, k) => { PK[p[0]] = k; });
   const PLANT_ERA = 6;      // (forestry: from the Industrial age)
   const LAP = 5, Q = 250;   // (a fifth of the land a year; cover and pot in steps of 1/250)
+  const MINW = 25;          // (woods worth the name: a tenth of a region's land and more)
   const CELL_KM2 = 3086;    // (a region at the equator is half a degree square)
   // the lens of the woods: how much of nature's woods stands, place by place (land with next to no wood by nature unpainted)
   const BANDS = [
     { key: 'none', name: 'Little wood by nature', css: 'transparent', rgb: [0, 0, 0] },
-    { key: 'wild', name: 'Wildwood (nine tenths of nature\'s and more)', css: '#1f4d2b', rgb: [0.12, 0.3, 0.17] },
+    { key: 'wild', name: 'Wildwood (nine tenths and more)', css: '#1f4d2b', rgb: [0.12, 0.3, 0.17] },
     { key: 'woods', name: 'Woods with clearings (six to nine tenths)', css: '#4a7a3c', rgb: [0.29, 0.48, 0.24] },
     { key: 'thin', name: 'Thinned (three to six tenths)', css: '#a59f4e', rgb: [0.65, 0.62, 0.31] },
-    { key: 'cleared', name: 'Cleared for fields and pasture (under three tenths)', css: '#c98f55', rgb: [0.79, 0.56, 0.33] },
+    { key: 'cleared', name: 'Cleared for fields (under three tenths)', css: '#c98f55', rgb: [0.79, 0.56, 0.33] },
     { key: 'regrow', name: 'Growing back', css: '#86c27a', rgb: [0.53, 0.76, 0.48] },
   ];
   const BK = {}; BANDS.forEach((b, k) => { b.id = k; BK[b.key] = k; });
@@ -77,14 +78,22 @@ window.WOODS = (function () {
       const p = Math.max(tree, POT[kind]); pot[i] = Math.round(p * Q); need[i] = Math.round(Math.min(1, farm + PAST_CLEAR * past) * Q);
       if (iced(i)) { cover[i] = 0; wild[i] = 1; } else cover[i] = pot[i];
     }
+    // (the regions that have woods worth the name by nature, a tenth of their land and more: the only ones that are cleared and grow
+    // back - the steppe's few trees, the desert's and the tundra's are as nature has them, and their fields are their people's; and
+    // every region's square kilometres in a step of 1/Q, in the order of the land)
+    const WL = Int32Array.from(LI.filter((i) => pot[i] >= MINW)), LA = new Float32Array(LI.length); for (let k = 0; k < LI.length; k++) LA[k] = rowA[(LI[k] / W) | 0];
     function policy(cv) { const w = cv && cv.woods; return w && PK[w.k] !== undefined ? PK[w.k] : 0; }
     const farms = (cv) => clamp((cv.tech - 0.025) / 0.1, 0, 1);      // (as the simulation's cultivation: a band that does not farm clears nothing)
     // (where people live on it: a region its people use to the half and more counts whole, an empty one not at all)
     const here = (i) => (use[i] >= 128 ? 1 : use[i] / 128);
-    // every LAP years: how much of each realm's land can be farmed where its people live, and the share of it they need (so much
-    // land a head, by the age)
-    function tally() {
-      sup.fill(0); for (let k = 0; k < LI.length; k++) { const i = LI[k], o = owner[i]; if (o >= 0) sup[o] += need[i] * rowA[(i / W) | 0] * here(i); }
+    // how much of each realm's land can be farmed where its people live (its square kilometres, in steps of 1/Q), over a piece of the
+    // land: a fifth of it is counted each year and the sum is taken once all five are in (supAcc), the whole at once after a load
+    const supAcc = new Float32Array(MAXC); let partial = true;
+    function scan(k0, k1, into) { for (let k = k0; k < k1; k++) { const o = owner[LI[k]]; if (o >= 0) { const i = LI[k]; into[o] += need[i] * LA[k] * here(i); } } }
+    function tally() { sup.fill(0); scan(0, LI.length, sup); rates(); }
+    // every LAP years: the share of its land each realm's people need (so much land a head, by the age), and what they clear, how
+    // fast, and how fast the woods grow back on it, by its age and its word
+    function rates() {
       for (let c = 0; c < MAXC; c++) {
         const cv = civs[c]; wantK[c] = 0; rateK[c] = 0; growK[c] = 1; if (!cv) { fr[c] = 0; continue; }
         const e = clamp(cv.era | 0, 0, 8), pol = cv.player ? POLICY[policy(cv)] : POLICY[0];
@@ -98,11 +107,13 @@ window.WOODS = (function () {
     // they need less
     function step() {
       const t0 = typeof performance !== 'undefined' ? performance.now() : 0; stats.years++;
-      lap = (lap + 1) % LAP; if (lap === 0) tally();
-      for (let k = lap; k < LI.length; k += LAP) {
-        const i = LI[k], P = pot[i]; if (P === 0) continue;
+      lap = (lap + 1) % LAP; scan(Math.floor(LI.length * lap / LAP), Math.floor(LI.length * (lap + 1) / LAP), supAcc);
+      if (lap === LAP - 1) { if (partial) { sup.fill(0); scan(0, LI.length, sup); partial = false; } else sup.set(supAcc); supAcc.fill(0); rates(); }
+      for (let k = Math.floor(WL.length * lap / LAP), k1 = Math.floor(WL.length * (lap + 1) / LAP); k < k1; k++) {      // (a fifth of the land in one piece: the arrays are read in order)
+        const i = WL[k], P = pot[i], o = owner[i];
+        if (cover[i] === P && (o < 0 || wantK[o] === 0)) continue;      // (woods nobody clears: nothing to do - most of the world, most of the time; never under the ice, where nothing stands)
         if (ice !== null && ice[i] !== 0) { cover[i] = 0; wild[i] = 1; continue; }
-        const o = owner[i]; let tgt = P, rate = 0, grow = wild[i] ? GROW_ICE : GROW;
+        let tgt = P, rate = 0, grow = wild[i] ? GROW_ICE : GROW;
         if (o >= 0) { const w = need[i] * here(i) * wantK[o]; if (w > 0) { tgt = w >= P ? 0 : P - w; rate = rateK[o]; } grow *= growK[o]; }
         const c = cover[i];
         if (c > tgt + 0.5) { const d = (c - tgt) * Math.min(1, rate * LAP); if (d > 0) { const n = Math.max(0, Math.round(c - Math.max(d, 0.5))); stats.cleared += c - n; cover[i] = n; } }
@@ -112,21 +123,51 @@ window.WOODS = (function () {
     }
     // how far a region's woods are cleared, against nature's (0: wildwood, 1: none left); where nature has next to no wood, how far
     // its people use the land (the picture's fields)
-    function cleared(i) { const P = pot[i]; return P >= 13 ? 1 - cover[i] / P : h.cult(i); }
+    // (the land the ice has left is bare because its woods have not come yet, not because anybody cleared it: its fields are its
+    // people's, as before)
+    function cleared(i) { const P = pot[i]; return P >= MINW && wild[i] === 0 ? 1 - cover[i] / P : h.cult(i); }
     // the timber a region yields against what its woods would yield by nature: hedgerows, coppices and orchards keep a quarter
-    function woodF(i) { const P = pot[i]; return P >= 13 ? 0.25 + 0.75 * cover[i] / P : 1; }
+    function woodF(i) { const P = pot[i]; return P >= MINW ? 0.25 + 0.75 * cover[i] / P : 1; }
     // what the player's word costs: food (royal forests), income (planting)
     function foodF(cv) { return cv && cv.player ? POLICY[policy(cv)][6] : 1; }
     function incF(c) { const cv = civs[c]; return cv && cv.player ? POLICY[policy(cv)][7] : 1; }
-    function setPolicy(cv, key) { if (PK[key] === undefined) return 'No such word'; if (key === 'plant' && (cv.era | 0) < PLANT_ERA) return 'Needs the Industrial age'; (cv.woods || (cv.woods = { k: 'clear' })).k = key; tally(); return null; }
+    function setPolicy(cv, key) { if (PK[key] === undefined) return 'No such word'; if (key === 'plant' && (cv.era | 0) < PLANT_ERA) return 'Needs the Industrial age'; (cv.woods || (cv.woods = { k: 'clear' })).k = key; rates(); return null; }
     // a realm's woods: how much of its land stands in wood and how much would by nature (in square kilometres), and the share
-    function of(c) { let w = 0, n = 0; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] !== c) continue; const a = rowA[(i / W) | 0]; w += cover[i] * a; n += pot[i] * a; } return { now: w, nature: n, share: n > 0 ? w / n : 1 }; }
-    // saved: the woods of the land, region by region (one byte each, the land's regions in order)
-    function save() { let s = ''; const b = new Uint8Array(LI.length); for (let k = 0; k < LI.length; k++) b[k] = cover[LI[k]]; for (let k = 0; k < b.length; k += 8192) s += String.fromCharCode.apply(null, b.subarray(k, k + 8192)); return { lap, c: btoa(s) }; }
-    function load(s) { tally(); if (!s || !s.c) return false; const t = atob(s.c); if (t.length !== LI.length) return false; lap = s.lap | 0; for (let k = 0; k < LI.length; k++) cover[LI[k]] = Math.min(pot[LI[k]], t.charCodeAt(k)); wild.fill(0); for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (iced(i)) { cover[i] = 0; wild[i] = 1; } } return true; }
+    function of(c) { let w = 0, n = 0; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] !== c) continue; const a = LA[k]; w += cover[i] * a; n += pot[i] * a; } return { now: w, nature: n, share: n > 0 ? w / n : 1 }; }
+    // every realm's woods at once, in square kilometres (one pass over the land): { now, nature } a realm long
+    function realms() { const now = new Float64Array(MAXC), nat = new Float64Array(MAXC); for (let k = 0; k < LI.length; k++) { const i = LI[k], o = owner[i]; if (o < 0) continue; const a = LA[k]; now[o] += cover[i] * a; nat[o] += pot[i] * a; } return { now, nature: nat }; }
+    // the world's woods and one realm's, by the bands of the lens (in square kilometres of nature's woods: how much of the woods
+    // that would stand is wildwood, thinned, cleared or growing back), and what stands against what would
+    function census(me) {
+      const n = new Float64Array(BANDS.length), mine = new Float64Array(BANDS.length); let now = 0, nat = 0, mNow = 0, mNat = 0;
+      for (let k = 0; k < LI.length; k++) { const i = LI[k], P = pot[i]; if (P === 0) continue; const a = LA[k], b = bandOf(i), v = P * a; n[b] += v; now += cover[i] * a; nat += v; if (owner[i] === me) { mine[b] += v; mNow += cover[i] * a; mNat += v; } }
+      return { n, mine, now, nature: nat, meNow: mNow, meNature: mNat };
+    }
+    // the lens of the woods: how much of nature's woods stands in a region (BANDS), and whether they are growing back - where the
+    // woods are short of what its people leave standing, by a twelfth and more
+    function bandOf(i) {
+      const P = pot[i]; if (P < MINW || iced(i)) return BK.none;
+      const c = cover[i], f = c / P;
+      if (f < 0.9) { const o = owner[i]; let tgt = P; if (o >= 0) { const w = want(i, o); if (w > 0) tgt = w >= P ? 0 : P - w; } if (c < tgt - Math.max(2, P / 12)) return BK.regrow; }
+      return f >= 0.9 ? BK.wild : f >= 0.6 ? BK.woods : f >= 0.3 ? BK.thin : BK.cleared;
+    }
+    // saved: the woods of the land, region by region (one byte each, the land's regions in order), and which of them are the land the
+    // ice has left, growing its first woods (a bit each)
+    const pack = (b) => { let s = ''; for (let k = 0; k < b.length; k += 8192) s += String.fromCharCode.apply(null, b.subarray(k, k + 8192)); return btoa(s); };
+    function save() {
+      const b = new Uint8Array(LI.length), wb = new Uint8Array((LI.length + 7) >> 3); let any = false;
+      for (let k = 0; k < LI.length; k++) { const i = LI[k]; b[k] = cover[i]; if (wild[i]) { wb[k >> 3] |= 1 << (k & 7); any = true; } }
+      return { lap, c: pack(b), w: any ? pack(wb) : undefined };
+    }
+    function load(s) {
+      tally(); partial = true; supAcc.fill(0); if (!s || !s.c) return false; const t = atob(s.c); if (t.length !== LI.length) return false; lap = s.lap | 0;
+      const wt = s.w ? atob(s.w) : ''; wild.fill(0);
+      for (let k = 0; k < LI.length; k++) { const i = LI[k]; cover[i] = Math.min(pot[i], t.charCodeAt(k)); if (wt.length > k >> 3 && (wt.charCodeAt(k >> 3) >> (k & 7)) & 1) wild[i] = 1; if (iced(i)) { cover[i] = 0; wild[i] = 1; } }
+      return true;
+    }
     // a world saved before the woods: as much wood as its people's fields leave, nature's wherever nobody farms
-    function settle() { tally(); for (let k = 0; k < LI.length; k++) { const i = LI[k], P = pot[i], o = owner[i]; if (iced(i)) { cover[i] = 0; continue; } const w = o >= 0 ? want(i, o) : 0; cover[i] = w >= P ? 0 : Math.round(P - w); } }
-    return { pot, cover, need, step, cleared, woodF, foodF, incF, policy, setPolicy, of, stats, save, load, settle };
+    function settle() { tally(); for (let k = 0; k < LI.length; k++) { const i = LI[k], P = pot[i], o = owner[i]; if (iced(i)) { cover[i] = 0; continue; } const w = o >= 0 && P >= MINW ? want(i, o) : 0; cover[i] = w >= P ? 0 : Math.round(P - w); } }
+    return { pot, cover, need, wild, step, cleared, woodF, foodF, incF, policy, setPolicy, of, realms, census, bandOf, stats, save, load, settle };
   }
-  return { create, POT, EXT, HA, CLEAR, GROW, POLICY, PK, PLANT_ERA, Q };
+  return { create, POT, EXT, HA, CLEAR, GROW, POLICY, PK, PLANT_ERA, Q, BANDS, BK };
 })();

@@ -481,7 +481,7 @@
               if (ddm < F * 1.3) density *= smooth(R * 0.9, R * 1.25, ddm) * (0.06 + 0.94 * smooth(F * 0.9, F * 1.25, ddm));
               if (density > 0 && ddm < R * 2.8 && townKeepsClear(tw.L, (lon - tw.sLon) * D2R * tw.cl * R_M, (lat - tw.sLat) * D2R * R_M, 3 * tw.k)) density = 0;
               const kTown = tw.k; if (kTown > kEff) kEff = Math.max(kEff, kTier + (kTown - kTier) * (1 - smooth(R * 1.4, R * 2.8, ddm))); }
-            if (sim.owner[i] >= 0 && !sim.level[i]) density *= 1 - 0.35 * sim.cultivation(i);
+            if (!sim.level[i]) { const cl = sim.woods ? sim.woods.cleared(i) : sim.owner[i] >= 0 ? sim.cultivation(i) : 0; density *= 1 - 0.35 * cl; }      // (the woods that stand: woods.js)
           }
           density *= Math.min(1, Math.pow(kTier / kEff, 1.7));       // bigger trees, fewer of them: the canopy covers as much ground as before
           if (h1 > density) continue;

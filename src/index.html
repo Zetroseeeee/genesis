@@ -1242,6 +1242,7 @@
           <button class="btn" id="v-ren" title="How renowned each realm is for its age, and who is in a golden age (Shift+Z)">Renown</button>
           <button class="btn" id="v-sick" title="Where pestilence burns, and who is spared it (Shift+P)">Sickness</button>
           <button class="btn" id="v-hrv" title="This year's harvest, place by place: droughts, good years, the ice and the green lands (Shift+H)">Harvest</button>
+          <button class="btn" id="v-wds" title="How much of nature's woods still stands, place by place, and where they grow back (Shift+W)">Woods</button>
         </div>
       </div>
     </div>
@@ -1312,13 +1313,14 @@
 <dialog id="gov"><div class="modal panel" tabindex="-1">
   <div class="phead"><h2 class="display">Laws</h2><span class="micro" id="gv-sub"></span><span id="gv-auth"></span><button class="btn icon ghost" id="gv-close" title="Close (Esc)">✕</button></div>
   <div class="gv-now" id="gv-now"></div>
-  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button><button data-gtab="folk">Peoples</button><button data-gtab="court">Court</button></div>
+  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button><button data-gtab="folk">Peoples</button><button data-gtab="land">Land</button><button data-gtab="court">Court</button></div>
   <div class="gv-body">
     <section data-gpane="laws" class="gv-split"><div class="gv-list" id="gv-laws"></div><aside class="gv-info" id="gv-info"></aside></section>
     <section data-gpane="form" class="gv-split" hidden><div class="gv-list" id="gv-forms"></div><aside class="gv-info" id="gv-finfo"></aside></section>
     <section data-gpane="estates" id="gv-estates" hidden></section>
     <section data-gpane="faith" class="gv-split" hidden><div class="gv-list" id="gv-faiths"></div><aside class="gv-info" id="gv-fthinfo"></aside></section>
     <section data-gpane="folk" class="gv-split" hidden><div class="gv-list" id="gv-folk"></div><aside class="gv-info" id="gv-fkinfo"></aside></section>
+    <section data-gpane="land" class="gv-split" hidden><div class="gv-list" id="gv-land"></div><aside class="gv-info" id="gv-lainfo"></aside></section>
     <section data-gpane="court" class="gv-split" hidden><div class="gv-list" id="gv-court"></div><aside class="gv-info" id="gv-ctinfo"></aside></section>
   </div>
 </div></dialog>
@@ -1467,6 +1469,7 @@
 <script src="works.js"></script>
 <script src="court.js"></script>
 <script src="folk.js"></script>
+<script src="country.js"></script>
 <script src="tales.js"></script>
 <script src="troops.js"></script>
 <script src="main.js"></script>

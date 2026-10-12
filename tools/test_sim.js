@@ -61,6 +61,7 @@ function invariants(sim, tag) {
   check(sim.ruins.size <= 1500, `${tag}: ruins unbounded (${sim.ruins.size})`);
   check(sim.fires.length <= 120 && sim.floods.length <= 60 && sim.quakes.length <= 60 && sim.battles.length <= 400 && sim.plagues.length <= 400, `${tag}: living-world lists unbounded (${sim.fires.length}/${sim.floods.length}/${sim.quakes.length}/${sim.battles.length}/${sim.plagues.length})`);
   for (const [i, ru] of sim.ruins) check(i >= 0 && i < N && ru.R > 0 && isFinite(ru.R), `${tag}: bad ruin ${i}`);
+  if (sim.woods) { let bad = 0, iced = 0; for (const i of sim.LI) { if (sim.woods.cover[i] > sim.woods.pot[i]) bad++; if (sim.iced(i) && sim.climate.ice[i] === 1 && sim.woods.cover[i] > 0) iced++; } check(bad === 0 && iced === 0, `${tag}: ${bad} regions with more wood than nature gives, ${iced} with woods under the ice`); }
 }
 
 // How fast this machine is at the kind of work a year of the simulation is (floats over a quarter of a million cells, a neighbour looked
@@ -1589,6 +1590,57 @@ log('24. people on the move');
     check(s3.foodTable === 0 && s4.foodTable === 39 && again.food === 39 && s5.foodTable === 39, `and keeps the table of food it was saved under, through further saves (${s4.foodMult(0.92).toFixed(2)} at the Information Age, not ${s3.foodMult(0.92).toFixed(2)})`); }
   // the cost
   { let ms0 = M.stats.ms, y0 = M.stats.years; for (let k = 0; k < 100; k++) sim.tick(); const ms = (M.stats.ms - ms0) / Math.max(1, M.stats.years - y0); log(`   a year of migration takes ${ms.toFixed(3)} ms`); check(ms < 0.25, `people on the move are quick enough (${ms.toFixed(3)} ms a year)`); }
+}
+}
+if (want(25)) {
+log('25. the woods');
+{
+  const WD = window.WOODS, Q = WD.Q; const at = (lon, lat) => Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
+  const paris = at(2.35, 48.85), churchill = at(-94, 58.8), sahara = at(18.5, 21), amazon = at(-62, -4);
+  const sim = createSim(wd, 2501), X = sim.woods;
+  // 10,000 BC: the woods are nature's; nothing stands under the ice
+  check(!!X && X.cover[paris] === X.pot[paris] && X.pot[paris] > 0.6 * Q && X.cover[amazon] > 0.85 * Q && X.pot[sahara] < 0.05 * Q, `in 10,000 BC the woods are nature's (the Paris basin ${Math.round(100 * X.pot[paris] / Q)}% wood, the Amazon ${Math.round(100 * X.pot[amazon] / Q)}%, the Sahara ${Math.round(100 * X.pot[sahara] / Q)}%)`);
+  check(X.pot[churchill] > 0.5 * Q && X.cover[churchill] === 0 && X.wild[churchill] === 1 && WD.BANDS[X.bandOf(churchill)].key === 'none', 'nothing stands under the ice of Hudson Bay, and the lens leaves it unpainted');
+  { let bad = 0; for (const i of sim.LI) if (X.cover[i] > X.pot[i]) bad++; check(bad === 0, `no region has more wood than nature gives it (${bad})`); }
+  // a farming kingdom of the Middle Ages clears the Paris basin for its fields and pasture, at the pace of its tools
+  const P = sim.setPlayer(paris, 'Parisii'); P.tech = sim.ERAS[4][1] + 0.01; P.era = 4; teach(sim, P, 4); P.aggression = 0; if (P.dip) P.dip.think = 1e12; sim.setStories(false);
+  for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) { const i = paris + dx + dy * W; if (sim.land[i] && sim.owner[i] < 0) sim.claim(i, P, paris); }
+  sim.touchAll(); sim.recount();
+  const mine = () => sim.LI.filter((i) => sim.owner[i] === P.id), fill = () => { for (const i of mine()) sim.pop[i] = sim.capacity(i, P); sim.recount(); };
+  const s0 = JSON.parse(JSON.stringify(sim.save()));      // (the kingdom before it has felled a tree: for the royal forests below)
+  const w0 = X.of(P.id).share; fill(); for (let y = 0; y < 60; y++) { sim.tick(); if (y % 5 === 0) fill(); }
+  const w1 = X.of(P.id);
+  check(w0 > 0.99 && w1.share < 0.6, `in sixty years the kingdom clears its woods: ${Math.round(w0 * 100)}% of nature's, then ${Math.round(w1.share * 100)}% (${Math.round(w1.now)} km² of ${Math.round(w1.nature)})`);
+  check(X.cleared(paris) > 0.3 && sim.cleared(paris) === X.cleared(paris) && ['thin', 'cleared', 'woods'].includes(WD.BANDS[X.bandOf(paris)].key), `the picture and the lens show it (${Math.round(X.cleared(paris) * 100)}% cleared: ${WD.BANDS[X.bandOf(paris)].name.toLowerCase()})`);
+  check(X.woodF(paris) < 0.85 && X.woodF(paris) >= 0.25, `and its woods yield less timber (${Math.round(X.woodF(paris) * 100)}% of what they would)`);
+  check(P.events.some((e) => /woods of .* are gone/.test(e.text) && e.calm), `the player is told, as news that does not stop his turn: "${(P.events.find((e) => /woods of .* are gone/.test(e.text)) || { text: '-' }).text}"`);
+  // where people leave the land the woods grow back, half in some sixty years
+  { const cells = mine(), gap0 = cells.reduce((a, i) => a + X.pot[i] - X.cover[i], 0); const own = cells.map((i) => sim.owner[i]); for (const i of cells) sim.owner[i] = -1;
+    for (let y = 0; y < 60; y++) X.step(); const gap1 = cells.reduce((a, i) => a + X.pot[i] - X.cover[i], 0);
+    check(gap1 < gap0 * 0.6 && gap1 > gap0 * 0.35 && WD.BANDS[X.bandOf(paris)].key === (X.cover[paris] < 0.9 * X.pot[paris] ? 'regrow' : 'wild'), `on land nobody farms the woods grow back: ${Math.round(100 * gap1 / Math.max(1, gap0))}% of what was felled is still wanting after sixty years, and the lens says they grow back`);
+    cells.forEach((i, k) => { sim.owner[i] = own[k]; }); }
+  // the land the ice leaves grows its first woods over centuries, and is no field in the picture
+  { const I = sim.climate.ice; I[churchill] = 0; for (let y = 0; y < 100; y++) X.step(); const f = X.cover[churchill] / X.pot[churchill];
+    check(f > 0.1 && f < 0.4 && X.cleared(churchill) === 0 && WD.BANDS[X.bandOf(churchill)].key === 'regrow', `where the ice has gone the trees come back over centuries (${Math.round(f * 100)}% of nature's woods after a hundred years), and the picture has no fields there`); I[churchill] = 1; X.cover[churchill] = 0; }
+  // the player's word: royal forests are cleared more slowly and less; planting waits for the machine age
+  { const run = (k) => { const s2 = createSim(wd, 1); s2.load(JSON.parse(JSON.stringify(s0))); const P2 = s2.playerCiv(); const why = s2.woodsPolicy(k); const m2 = () => s2.LI.filter((i) => s2.owner[i] === P2.id);
+      const f2 = () => { for (const i of m2()) s2.pop[i] = s2.capacity(i, P2); s2.recount(); }; f2(); for (let y = 0; y < 60; y++) { s2.tick(); if (y % 5 === 0) f2(); } return { why, share: s2.woods.of(P2.id).share, s2, P2 }; };
+    const a = run('clear'), b = run('keep');
+    check(!a.why && !b.why && b.share > a.share + 0.1, `kept for the crown, the woods last: ${Math.round(b.share * 100)}% of nature's after sixty years, against ${Math.round(a.share * 100)}%`);
+    const R = b.s2.rule, EK = window.RULE.EK; const nob = R.times(b.P2.id, b.P2, EK.nobles), far = R.times(b.P2.id, b.P2, EK.farmers);
+    check(nob.some(([t, v]) => /Royal forests/.test(t) && v > 0) && far.some(([t, v]) => /royal forests/.test(t) && v < 0) && b.s2.woods.foodF(b.P2) < 1, 'the nobles hunt in them and the farmers are kept out, and the land feeds a little less');
+    check(b.s2.woodsPolicy('plant') === 'Needs the Industrial age' && b.s2.woodsPolicy('nonsense') !== null && b.s2.woods.policy(b.P2) === WD.PK.keep, 'planting waits for the Industrial age'); }
+  // saved and loaded: the woods go with the world; a world from before the woods has as many as its fields leave; one from before the land, none
+  { const sv = JSON.parse(JSON.stringify(sim.save())); check(!!sv.woods && typeof sv.woods.c === 'string', `a world saves its woods (${Math.round(sv.woods.c.length / 1024)} KB)`);
+    const s3 = createSim(wd, 1); s3.load(sv); let diff = 0; for (const i of sim.LI) if (s3.woods.cover[i] !== X.cover[i] || s3.woods.wild[i] !== X.wild[i]) diff++;
+    check(diff === 0, `and has them again when loaded (${diff} regions differ)`);
+    const old = JSON.parse(JSON.stringify(sv)); delete old.woods; const s4 = createSim(wd, 1); s4.load(old); const P4 = s4.playerCiv(), sh4 = s4.woods.of(P4.id).share;
+    check(sh4 < 0.95 && s4.woods.cover[amazon] === s4.woods.pot[amazon], `a world saved before the woods has as much wood as its fields leave (the kingdom ${Math.round(sh4 * 100)}% of nature's), and nature's where nobody farms`);
+    const none = JSON.parse(JSON.stringify(sv)); delete none.woods; delete none.land; const s5 = createSim(wd, 1); s5.load(none); for (let k = 0; k < 3; k++) s5.tick();
+    check(s5.woods === null && s5.cleared(paris) === s5.cultivation(paris), 'one saved before the land had kinds keeps no woods: its fields are who farms them'); }
+  // the cost
+  { const t = []; for (let k = 0; k < 100; k++) { const ms0 = X.stats.ms; sim.tick(); t.push(X.stats.ms - ms0); } t.sort((a, b) => a - b); const ms = t.slice(0, 95).reduce((a, v) => a + v, 0) / 95;      // (the dearest twentieth left out: a collector's pause from the worlds made above lands in some year)
+    log(`   a year of the woods takes ${ms.toFixed(3)} ms`); check(ms < 0.25, `the woods are quick enough (${ms.toFixed(3)} ms a year)`); }
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);
