@@ -24,7 +24,7 @@ for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.dat
 { const sp = PNG.sync.read(fs.readFileSync(path.join(root, 'data/soil.png'))); wd.soil = new Uint8Array(N * 3); for (let i = 0; i < N; i++) { wd.soil[i * 3] = sp.data[i * 4]; wd.soil[i * 3 + 1] = sp.data[i * 4 + 1]; wd.soil[i * 3 + 2] = sp.data[i * 4 + 2]; } }      // (what the land feeds: land.js)
 for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'dynasty', 'story', 'legacy', 'intrigue', 'disease', 'land', 'climate', 'migrate', 'woods', 'sim']) (0, eval)(fs.readFileSync(path.join(root, 'src/' + f + '.js'), 'utf8'));
 const DATES = [-8000, -6000, -4000, -3000, -2000, -1000, -500, 0, 500, 1000, 1400, 1600, 1800, 1900, 1950, 2000, 2050].filter((y) => y <= last);
-const sum = new Float64Array(9), wsum = new Float64Array(9);
+const NA = window.KNOW.NE; const sum = new Float64Array(NA), wsum = new Float64Array(NA);      // (an age without realms in it takes the one before's)
 for (const seed of seeds) {
   const sim = window.createSim(wd, seed); const F = sim.faith;
   { let placed = 0, tries = 0; const homes = []; while (placed < 25 && tries < 20000) { tries++; const i = sim.LI[Math.floor(sim.rnd() * sim.LI.length)]; const f = sim.homeOf(i); if (f < 0.45 || sim.owner[i] >= 0) continue; if (sim.rnd() > f * f * ((sim.flags[i] & 2) ? 1.6 : 1)) continue; let ok = true; for (const h of homes) { const dy = Math.abs(((i / W) | 0) - ((h / W) | 0)); let dx = Math.abs((i % W) - (h % W)); if (dx > W / 2) dx = W - dx; if (dx * dx + dy * dy < 22 * 22) { ok = false; break; } } if (!ok) continue; if (sim.spawnTribe(i, { tech: 0.018 + sim.rnd() * 0.017 })) { homes.push(i); placed++; } } sim.recount(); }
@@ -45,6 +45,6 @@ for (const seed of seeds) {
   const holy = []; for (const f of F.list) if (f && f.n > 0 && f.pop > 0) holy.push(f); holy.sort((a, b) => b.pop - a.pop);
   console.log('  the largest faiths and their holy cities:'); for (const f of holy.slice(0, 8)) { const o = sim.owner[f.home], cv = o >= 0 ? sim.civs[o] : null; console.log(`    ${f.name}${f.world ? ' (for all peoples)' : ''}, founded ${sim.fmtYear(f.born)} at ${sim.cellName.get(f.home) || '?'}; ${f.tenets.map((t) => F.TK[t].name).join(' and ')}; holy city held by ${cv ? sim.fullName(cv) + (F.state[o] === f.id ? ' (of the faith)' : ' (of another faith)') : 'nobody'}${f.parent ? '; a church of ' + F.nameOf(f.parent) : ''}`); }
 }
-const table = []; for (let e = 0; e < 9; e++) table.push(wsum[e] > 0 ? +(sum[e] / wsum[e]).toFixed(3) : (e ? table[e - 1] : 0));
+const table = []; for (let e = 0; e < NA; e++) table.push(wsum[e] > 0 ? +(sum[e] / wsum[e]).toFixed(3) : (e ? table[e - 1] : 0));
 console.log(`\nwhat each age's realms hold of other faiths (now, and what the file holds):\n  ${table.map((v) => v.toFixed(3).padStart(7)).join('')}\n  ${window.FAITH.NORM.map((v) => v.toFixed(3).padStart(7)).join('')}`);
 if (write) { const p = path.join(root, 'src/faith.js'); const s = fs.readFileSync(p, 'utf8'); const a = s.indexOf('// NORM-BEGIN'), z = s.indexOf('// NORM-END'); if (a < 0 || z < 0) throw new Error('no NORM marks in src/faith.js'); fs.writeFileSync(p, s.slice(0, a) + '// NORM-BEGIN\n  const NORM = [' + table.join(', ') + '];\n  ' + s.slice(z)); console.log('written to src/faith.js'); }

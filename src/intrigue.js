@@ -34,7 +34,7 @@ window.INTRIGUE = (function () {
   // what a network is made of: each of these known adds one to it
   const NET = ['writing', 'envoys', 'letters', 'embassies', 'telegraph', 'radio', 'computers', 'networks'];
   const TRAIT_NET = { tyrant: [1, 'A ruler who trusts nobody'], scholar: [0.5, 'A ruler who reads every letter'], merchant: [0.5, 'A ruler with friends in every port'] };
-  const PACE = [200, 100, 50, 50, 40, 20, 10, 5, 5];
+  const PACE = [200, 100, 50, 50, 40, 20, 10, 5, 5, 5];
   const WAR_TURNS = 3;      // (how long a scheme found out is a reason for war)
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -44,7 +44,7 @@ window.INTRIGUE = (function () {
     const news = [];      // for the player: { kind: 'done' | 'failed' | 'caught' | 'foiled' | 'struck', key, on, by, year, text }
     let rs = ((h.seed || 1) ^ 0x51ed270b) >>> 0;
     const rnd = () => { rs = (rs + 0x6D2B79F5) >>> 0; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    const turnOf = (cv) => PACE[Math.max(0, Math.min(8, cv.era | 0))];
+    const turnOf = (cv) => PACE[Math.max(0, Math.min(9, cv.era | 0))];
     // a realm's own record: the scheme its agents are on (s), when it next thinks of one (the autopilot), the foreign agents it caught
     const I = (cv) => cv.intrigue || (cv.intrigue = { s: null, next: year() + Math.round(turnOf(cv) * (2 + rnd() * 4)), found: [] });
     // (the year's round touches a realm only when its agents are at work or it is due to think of a scheme: what is on the realm is

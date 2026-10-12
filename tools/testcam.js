@@ -71,6 +71,13 @@ window.__T.costsTrees = function () {
   __T.cost([['all (' + Tr.modelCount.join(' ') + ')', () => {}], ['no undergrowth', () => { show(3, false); }], ['and edges by the pixel', () => { Tr.coverOff = true; }], ['and no far trees', () => { show(1, false); show(2, false); }],
     ['no trees at all', () => { show(0, false); }], ['all again', () => { for (let t = 0; t < 4; t++) show(t, true); Tr.coverOff = false; }], ['no undergrowth again', () => { show(3, false); }], ['all a third time', () => { show(3, true); }]], 3, 1500);
 };
+// what a great city costs (0.42: clusters of houses, gardens with trees in them): its houses and its trees, each left out and put back,
+// turn and turn about (the kit's houses are the buildings' group; the trees all four tiers)
+window.__T.costsCity = function () {
+  const Tr = __G.trees, W = __G.world; const show = (on) => { if (Tr) for (let t = 0; t < 4; t++) for (const I of Tr.imps[t].values()) I.visible = on; };
+  __T.cost([['all (' + W.buildingCount + ' placed)', () => {}], ['no houses', () => { W.buildingGroup.visible = false; }], ['houses, no trees', () => { W.buildingGroup.visible = true; show(false); }],
+    ['neither', () => { W.buildingGroup.visible = false; }], ['all again', () => { W.buildingGroup.visible = true; show(true); }], ['no houses again', () => { W.buildingGroup.visible = false; }], ['all a third time', () => { W.buildingGroup.visible = true; }]], 3, 1500);
+};
 // how many ways the ground's materials need be looked at where the ground runs away from the eye (the card's own filtering:
 // 16 as the game has them, then 8 and 4), twice over
 window.__T.costsAniso = function () {

@@ -81,7 +81,8 @@ server.listen(0, async () => {
   await scenario('intro: random river start', async (check) => {
     await ev(() => document.getElementById('btn-random').click()); await wait(500); await page.waitForFunction(() => !__G.mapcam.fly, null, { timeout: 320000 }); await frames(5); // the flight is paced by frame dt (capped), so wait for it rather than the clock
     const s = await state(); check(s.mode === 'play' && s.player >= 0, 'random start enters play');
-    const cap = await ev(() => { const c = __G.sim.playerCiv(); const i = c.capital; return { river: !!(__G.sim.flags[i] & 2), fert: __G.sim.fert[i] }; }); check(cap.fert > 0.3, 'random start on decent land (fert ' + cap.fert.toFixed(2) + ')');
+    // (by what the land gives the first farmers, as the random start chooses it: the old greenness, fert, is low along the rivers of the dry lands)
+    const cap = await ev(() => { const c = __G.sim.playerCiv(); const i = c.capital; return { river: !!(__G.sim.flags[i] & 2), fert: __G.sim.fert[i], home: __G.sim.homeOf(i) }; }); check(cap.home > 0.4, 'random start on good land for the first farmers (home ' + cap.home.toFixed(2) + ', greenness ' + cap.fert.toFixed(2) + (cap.river ? ', on a river' : '') + ')');
     check(s.dist < 0.006, 'camera flew in to town height (dist ' + s.dist.toFixed(5) + ')');
   });
 
@@ -93,7 +94,7 @@ server.listen(0, async () => {
     await ev(() => document.getElementById('turn').click()); await frames(3);
     r = await ev(() => { const cards = [...document.querySelectorAll('#kn-canvas .kn-card')]; const sc = document.getElementById('kn-scroll'); return { open: document.getElementById('know').open, cards: cards.length, nd: KNOW.ND, eras: document.querySelectorAll('#kn-canvas .kn-era').length, brs: document.querySelectorAll('#kn-canvas .kn-br').length, lines: document.querySelectorAll('#kn-canvas .kn-lines path').length, openN: cards.filter(b => b.classList.contains('open')).length, later: cards.filter(b => b.classList.contains('later')).length, wide: sc.scrollWidth > sc.clientWidth * 2, now: document.getElementById('kn-now').textContent, rate: document.getElementById('kn-rate').textContent, info: document.querySelector('#kn-info h3') ? document.querySelector('#kn-info h3').textContent : '',
       overlap: (() => { const rs = cards.map(b => b.getBoundingClientRect()); let n = 0; for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) if (rs[i].left < rs[j].right - 1 && rs[j].left < rs[i].right - 1 && rs[i].top < rs[j].bottom - 1 && rs[j].top < rs[i].bottom - 1) n++; return n; })() }; });
-    check(r.open, 'a click on the turn button opens the tree'); check(r.cards === r.nd && r.eras === 9 && r.brs === 6 && r.lines > 150, `every discovery has its card: ${r.cards} cards, ${r.eras} ages, ${r.brs} branches, ${r.lines} lines`); check(r.overlap === 0, `no two cards overlap (${r.overlap})`);
+    check(r.open, 'a click on the turn button opens the tree'); check(r.cards === r.nd && r.eras === 10 && r.brs === 6 && r.lines > 150, `every discovery has its card: ${r.cards} cards, ${r.eras} ages, ${r.brs} branches, ${r.lines} lines`); check(r.overlap === 0, `no two cards overlap (${r.overlap})`);
     check(r.openN >= 10 && r.later > 100 && r.wide, `the first age is open to study, the later ones dimmed, and the tree scrolls through the ages (${r.openN} open, ${r.later} later)`); check(/await your word/.test(r.now) && /1,000 insight unspent/.test(r.now), 'the strip says nothing is being studied: ' + r.now); check(/insight a year/.test(r.rate) && r.info.length > 2, `the pace of learning is shown (${r.rate.trim()}), and a discovery's page (${r.info})`);
     // what the people hold already pays for is marked; the keyboard is on the chosen card, and the arrows walk the tree
     r = await ev(() => { const cards = [...document.querySelectorAll('#kn-canvas .kn-card.open')]; const a = document.activeElement; return { once: cards.filter(b => /at once/.test(b.querySelector('.st').textContent)).length, open: cards.length, focus: a ? (a.id || a.className) : '', sel: document.querySelector('.kn-card.sel').dataset.k }; });
@@ -230,14 +231,18 @@ server.listen(0, async () => {
   await scenario('turn: new era interrupt and green state', async (check) => {
     await ev(() => { const S = __G.sim; const c = S.playerCiv(); document.getElementById('turn').click(); setTimeout(() => { c.tech = 0.09; }, 300); });
     await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 60000 }); await frames(2);
-    const s = await state(); check(/state-good/.test(s.turn) && s.t1 === 'New era', 'green New era state: ' + s.turn + ' ' + s.t1);
-    await ev(() => document.getElementById('turn').click()); await frames(2); check((await state()).t1 === 'Advance', 'back to Advance after acknowledging');
+    // (a warning that came in the same turn - a drought's hunger, say - outranks the new age on the button; the age is then next in line)
+    const s = await state(); const eraQ = await ev(() => __G.attention().map((a) => a.id)); check((/state-good/.test(s.turn) && s.t1 === 'New era') || (/state-warn/.test(s.turn) && eraQ.includes('era')), 'green New era state, or the age next after a warning: ' + s.turn + ' ' + s.t1 + ' [' + eraQ.join(' ') + ']');
+    for (let k = 0; k < 4 && (await state()).t1 !== 'Advance'; k++) { await ev(() => { document.getElementById('turn').click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (window.TALES && TALES.isOpen()) TALES.close(); }); await frames(2); }
+    check((await state()).t1 === 'Advance', 'back to Advance after acknowledging');
     check((await ev(() => document.getElementById('id-era').textContent)).includes('BRONZE') || /Bronze/i.test(await ev(() => document.getElementById('id-era').textContent)), 'identity strip shows Bronze Age');
   });
   await scenario('turn: disaster on your land interrupts with an amber alert', async (check) => {
     // a disaster counts once the turn's first year has run: it is struck from inside the page, on the first frame after
     // that year (asked for from out here it sometimes arrived after the whole turn had run, and interrupted nothing)
-    await ev(() => new Promise((res) => { const S = __G.sim; const y0 = S.year; document.getElementById('turn').click(); const f = () => { if (S.year > y0) { const c = S.playerCiv(); S.logEvent(c, 'An earthquake shakes the land in ' + S.fullName(c), true, 'disaster', c.capital); S.quakes.push({ i: c.capital, year: S.year, mag: 7.5 }); S.rubble.set(c.capital, S.year); res(); } else requestAnimationFrame(f); }; requestAnimationFrame(f); }));
+    // (nothing may wait on the button first: it would open that and the turn would never run - the year never comes, and the page waited for ever)
+    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (window.TALES && TALES.isOpen()) TALES.close(); }); await frames(2);
+    await ev(() => new Promise((res) => { const S = __G.sim; const y0 = S.year; const t0 = performance.now(); document.getElementById('turn').click(); const f = () => { if (S.year > y0) { const c = S.playerCiv(); S.logEvent(c, 'An earthquake shakes the land in ' + S.fullName(c), true, 'disaster', c.capital); S.quakes.push({ i: c.capital, year: S.year, mag: 7.5 }); S.rubble.set(c.capital, S.year); res(); } else if (performance.now() - t0 > 90000) res(); else requestAnimationFrame(f); }; requestAnimationFrame(f); }));      // (and gives up after a minute and a half: the checks below then say what went wrong)
     await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 60000 }); await frames(2);
     const s = await state(); check(/state-warn/.test(s.turn) && s.t1 === 'Disaster', 'amber Disaster state: ' + s.turn + ' ' + s.t1);
     await ev(() => document.getElementById('turn').click()); await wait(500); await frames(2); check((await state()).t1 !== 'Disaster', 'acknowledged');
@@ -388,7 +393,7 @@ server.listen(0, async () => {
     await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-new').click(); }); await frames(3);
     const h = await ev(() => ({ mode: document.body.dataset.mode, intro: !document.getElementById('intro').hidden, cont: !document.getElementById('btn-load').hidden, line: document.getElementById('home-save').textContent, ticks: document.querySelectorAll('#home-eras i').length, now: [...document.querySelectorAll('#home-eras i')].findIndex((i) => i.classList.contains('now')), first: (document.querySelector('.home-menu .hm.first:not([hidden])') || {}).id, version: document.getElementById('home-version').textContent, status: document.getElementById('home-status').hidden, quit: document.getElementById('btn-quit').hidden, upd: document.getElementById('update').hidden, pol: __G.globals.uPolitical.value, locked: __G.mapcam.locked, saved: !!localStorage.getItem('genesis-save-v2'), hud: getComputedStyle(document.getElementById('tl')).display }));
     check(h.mode === 'intro' && h.intro, 'the main menu is shown'); check(h.saved, 'the world was saved on the way'); check(h.cont && h.first === 'btn-load', 'Continue is the first entry'); check(h.line.includes(before.name) && /BC|AD/.test(h.line), 'it names the realm and the year: ' + h.line);
-    check(h.ticks === 9 && h.now === before.era, `nine ages, this one marked (${h.ticks}, ${h.now} against ${before.era})`); check(/Holocene \d+\.\d+\.\d+/.test(h.version), 'the version is shown: ' + h.version);
+    check(h.ticks === 10 && h.now === before.era, `ten ages, this one marked (${h.ticks}, ${h.now} against ${before.era})`); check(/Holocene \d+\.\d+\.\d+/.test(h.version), 'the version is shown: ' + h.version);
     check(h.status && h.quit && h.upd, 'no update line, no Quit and no update note in a browser'); check(h.pol === 0 && h.locked && h.hud === 'none', 'no realm tints, no HUD, the globe is not steered');
     // keys: down, down, up; Enter with nothing chosen takes the first entry
     await page.keyboard.press('ArrowDown'); const f1 = await ev(() => document.activeElement.id); await page.keyboard.press('ArrowDown'); const f2 = await ev(() => document.activeElement.id); await page.keyboard.press('ArrowUp'); const f3 = await ev(() => document.activeElement.id);
@@ -866,6 +871,12 @@ server.listen(0, async () => {
     // a new age: the court is asked what the last one leaves, and what it chose is carried
     await ev(() => { const S = __G.sim, c = S.playerCiv(); S.setStories(true); if (c.story) c.story.q = null; const e = Math.min(8, c.era + 1); c.tech = Math.max(c.tech, S.ERAS[e][1] + 0.01); c.era = S.eraOf(c.tech); __T.teach(c); __G.run(1); });
     await frames(2); await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    // (a story of the family may come in the same year - a birth is told when it happens - and the age's question then waits behind it)
+    for (let k = 0; k < 4; k++) {
+      const t = await ev(() => TALES.isOpen() ? document.getElementById('tl-title').textContent : ''); if (!t || /leaves?$/.test(t)) break;
+      const i = await ev(() => { const b = [...document.querySelectorAll('#tl-choices .tl-choice')].find((x) => !x.getAttribute('aria-disabled')); return b ? +b.dataset.tl : -1; }); if (i < 0) break;
+      await page.click(`#tl-choices [data-tl="${i}"]`); await frames(1); await page.click('#tl-done'); await frames(2); await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    }
     q = await ev(() => ({ open: TALES.isOpen(), title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | ') }));
     check(q.open && /leaves?$/.test(q.title) && q.n === 3 && /until the next age/.test(q.chips), `a new age asks what the last one leaves: "${q.title}" (${q.chips.slice(0, 120)})`);
     await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2);

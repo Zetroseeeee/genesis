@@ -6,8 +6,13 @@
   const W = 720, H = 360;
   function hash(i, k) { let h = (i * 374761393 + k * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
-  const CAPS = { car: 900, cart: 300, ship: 160, boat: 200, plane: 120, train: 80 };
+  const CAPS = { car: 900, cart: 300, ship: 160, boat: 200, plane: 120, train: 80, rocketbody: 24 };
   const TRAIL_N = 36, TRAIL_DT = 0.35;
+  // rockets of the Space Age, from the spaceports town.js lays beyond a capital of the age: each pad's round goes by the clock
+  // (the flight, then the pad empty, then the next rocket stood on it), so every pad keeps its own time and a rocket seen
+  // rising is rising wherever the eye has come from. RK_ACC is the drawn rocket's thrust (m/s^2); RK_TURN how far it climbs
+  // as it turns over toward the east.
+  const PADS = 12, RTRAIL = 120, RK_DT = 0.2, RK_LIFE = 24, RK_PERIOD = 150, RK_FLY = 80, RK_EMPTY = 104, RK_ACC = 18, RK_TURN = 24000;
   const MAXPEOPLE = 3000;
   const ROAD_K = 8, SHIP_K = 6;   // carts, cars and trains on the long roads, and ships at sea, are drawn this many times life size
   // clothes by era band: earthy early, dyed later, everything in the modern age
@@ -99,6 +104,23 @@
   const C_FRAG = `
     precision mediump float; uniform float uDay; varying float vAge;
     void main() { float r = length(gl_PointCoord - 0.5) * 2.0; float a = smoothstep(1.0, 0.2, r) * (1.0 - vAge) * 0.55 * (0.3 + 0.7 * uDay); if (a < 0.02) discard; gl_FragColor = vec4(vec3(0.97), a); }`;
+  // a rocket's smoke: puffs where it has been, swelling and thinning, lit from above by day and by its flame at night
+  const RS_VERT = `
+    attribute float aAge, aSize; uniform float uFovK; varying float vAge;
+    void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vAge = aAge; float sz = aSize / ${R_M.toFixed(1)} * uFovK / max(-mv.z, 1e-7); gl_PointSize = clamp(sz, 1.0, 256.0); gl_Position = projectionMatrix * mv; }`;
+  const RS_FRAG = `
+    precision mediump float; uniform float uDay; varying float vAge;
+    void main() { vec2 q = gl_PointCoord - 0.5; float r = length(q) * 2.0; float a = smoothstep(1.0, 0.35, r) * pow(1.0 - vAge, 1.6) * 0.8; if (a < 0.02) discard;
+      vec3 c = mix(vec3(0.95, 0.95, 0.97), vec3(0.6, 0.61, 0.65), smoothstep(-0.25, 0.45, q.y)) * (0.22 + 0.78 * uDay) + vec3(1.0, 0.52, 0.18) * (1.0 - uDay) * smoothstep(0.1, 0.0, vAge);
+      gl_FragColor = vec4(c, a); }`;
+  // its flame: a white heart (brighter than white where the picture can hold it) in an orange glow, added to what is behind
+  const RF_VERT = `
+    attribute float aSize; uniform float uFovK;
+    void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); float sz = aSize / ${R_M.toFixed(1)} * uFovK / max(-mv.z, 1e-7); gl_PointSize = clamp(sz, 2.0, 160.0); gl_Position = projectionMatrix * mv; }`;
+  const RF_FRAG = `
+    precision mediump float; uniform float uGlow;
+    void main() { float r = length(gl_PointCoord - 0.5) * 2.0; float core = smoothstep(0.42, 0.0, r), halo = smoothstep(1.0, 0.1, r);
+      gl_FragColor = vec4(vec3(1.0, 0.7, 0.38) * halo * halo * 0.7 + vec3(1.0, 0.94, 0.82) * core * (1.0 + 2.5 * uGlow), 1.0); }`;
 
   class Movers {
     constructor({ scene, terrain, world }) {
@@ -127,6 +149,16 @@
       this.cuni = { uFovK: { value: 1000 }, uDay: { value: 1 } };
       this.contrails = new THREE.Points(cg, new THREE.ShaderMaterial({ uniforms: this.cuni, vertexShader: C_VERT, fragmentShader: C_FRAG, transparent: true, depthWrite: false })); this.contrails.frustumCulled = false; this.contrails.renderOrder = 6; scene.add(this.contrails);
       this.planes = []; this.lastPlanes = { lon: 999, lat: 999, t: -1e9 }; this.trailT = 0;
+      // rockets' smoke and flames
+      { const NR = PADS * RTRAIL; const g = new THREE.BufferGeometry();
+        this.rpos = new Float32Array(NR * 3); this.rage = new Float32Array(NR); this.rsize = new Float32Array(NR);
+        g.setAttribute('position', new THREE.BufferAttribute(this.rpos, 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('aAge', new THREE.BufferAttribute(this.rage, 1).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('aSize', new THREE.BufferAttribute(this.rsize, 1).setUsage(THREE.DynamicDrawUsage)); g.setDrawRange(0, 0);
+        this.smoke = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: this.cuni, vertexShader: RS_VERT, fragmentShader: RS_FRAG, transparent: true, depthWrite: false })); this.smoke.frustumCulled = false; this.smoke.renderOrder = 6; scene.add(this.smoke);
+        const fg = new THREE.BufferGeometry(); this.fpos = new Float32Array(PADS * 3); this.fsize = new Float32Array(PADS);
+        fg.setAttribute('position', new THREE.BufferAttribute(this.fpos, 3).setUsage(THREE.DynamicDrawUsage)); fg.setAttribute('aSize', new THREE.BufferAttribute(this.fsize, 1).setUsage(THREE.DynamicDrawUsage)); fg.setDrawRange(0, 0);
+        this.funi = { uFovK: this.cuni.uFovK, uGlow: world.bUniforms.uGlow || { value: 0 } };
+        this.flames = new THREE.Points(fg, new THREE.ShaderMaterial({ uniforms: this.funi, vertexShader: RF_VERT, fragmentShader: RF_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); this.flames.frustumCulled = false; this.flames.renderOrder = 7; scene.add(this.flames);
+        this.pads = []; this.lastPads = { lon: 999, lat: 999, t: -1e9 }; this.clock = 0; }
       this.agents = []; this.walkers = []; this.last = { lon: 999, lat: 999, t: -1e9, dist: 0 }; this.lastShips = { lon: 999, lat: 999, t: -1e9 }; this.ships = [];
       this.enabled = true; this.stats = { agents: 0, walkers: 0, ships: 0 };
       this._m = new THREE.Matrix4();
@@ -242,6 +274,20 @@
       }
       this.planes = planes;
     }
+    // the pads of the spaceports near the eye (three beyond a capital of the Space Age); a pad that stays in view keeps its smoke
+    respawnPads(cam, sim, decal) {
+      const pads = []; const T = this.terrain; const rad = 4; const cy0 = Math.floor((90 - cam.lat) / 180 * H), cx0 = Math.floor((cam.lon + 180) / 360 * W);
+      const vc = this._vc || (this._vc = new Map());
+      for (let dy = -rad; dy <= rad && pads.length < PADS; dy++) { const y = cy0 + dy; if (y < 0 || y >= H) continue; for (let dx = -rad; dx <= rad && pads.length < PADS; dx++) {
+        const x = ((cx0 + dx) % W + W) % W; const i = y * W + x; if (sim.level[i] < 3 || sim.owner[i] < 0) continue; const c = sim.civs[sim.owner[i]]; if (!c || c.capital !== i || c.era < 9) continue;
+        const L = TOWN.layout(sim, i, c, {}); if (!L || !L.items) continue; const [cLon, cLat] = TOWN.siteOf(sim, i, c, T, decal); const cl = Math.max(0.15, Math.cos(cLat * D2R)); let k = 0;      // (where the world draws the town: a site moved off a river, as the streets' traffic has it)
+        for (const it of L.items) { if (it.as !== 'spaceport' || pads.length >= PADS) continue; const lon = cLon + it.x / (R_M * cl * D2R), lat = cLat + it.z / (R_M * D2R);
+          pads.push({ key: i * 8 + k, lon, lat, cl: Math.max(0.15, Math.cos(lat * D2R)), hg: Math.max(0, T.meshHeightAt(lon, lat, vc)), w: it.w, h: it.h, ph: hash(i, 9500 + k) * RK_PERIOD, k: L.k || 1, trail: new Float32Array(RTRAIL * 3), tAge: new Float32Array(RTRAIL).fill(1), tSize: new Float32Array(RTRAIL), head: 0, puffT: 0 }); k++; }
+      } }
+      const old = new Map(); for (const p of this.pads) old.set(p.key, p);
+      for (let j = 0; j < pads.length; j++) { const o = old.get(pads[j].key); if (o) { o.hg = pads[j].hg; pads[j] = o; } }
+      this.pads = pads;
+    }
     respawnShips(cam, sim) {
       const ships = []; const T = this.terrain;
       const rad = 10; const cy0 = Math.floor((90 - cam.lat) / 180 * H), cx0 = Math.floor((cam.lon + 180) / 360 * W);
@@ -268,10 +314,13 @@
       if (movedS || now - this.lastShips.t > 15000) { this.lastShips = { lon: cam.lon, lat: cam.lat, t: now }; this.respawnShips(cam, sim); }
       const movedP = GEO.distKm(cam.lon, cam.lat, this.lastPlanes.lon, this.lastPlanes.lat) > 400;
       if (movedP || now - this.lastPlanes.t > 12000) { this.lastPlanes = { lon: cam.lon, lat: cam.lat, t: now }; this.respawnPlanes(cam, sim); }
+      const movedR = GEO.distKm(cam.lon, cam.lat, this.lastPads.lon, this.lastPads.lat) > 80;
+      if (movedR || now - this.lastPads.t > 10000) { this.lastPads = { lon: cam.lon, lat: cam.lat, t: now }; this.respawnPads(cam, sim, decal); }
+      this.clock = now / 1000;
       this.cuni.uDay.value = day; this.cuni.uFovK.value = viewportH / (2 * Math.tan(fovDeg * 0.5 * D2R));
       this.animate(dt, sim);
     }
-    clear() { if (this.stats.agents || this.stats.walkers || this.stats.ships || this.stats.planes) { for (const k in this.inst) this.inst[k].mesh.count = 0; this.people.count = 0; this.pshadow.count = 0; this.contrails.geometry.setDrawRange(0, 0); this.agents = []; this.walkers = []; this.ships = []; this.planes = []; this.stats = { agents: 0, walkers: 0, ships: 0, planes: 0 }; } }
+    clear() { if (this.stats.agents || this.stats.walkers || this.stats.ships || this.stats.planes || this.stats.pads) { for (const k in this.inst) this.inst[k].mesh.count = 0; this.people.count = 0; this.pshadow.count = 0; this.contrails.geometry.setDrawRange(0, 0); this.smoke.geometry.setDrawRange(0, 0); this.flames.geometry.setDrawRange(0, 0); this.pads = []; this.agents = []; this.walkers = []; this.ships = []; this.planes = []; this.stats = { agents: 0, walkers: 0, ships: 0, planes: 0, pads: 0 }; } }
     // place one instance: lon/lat/height in metres, yaw from east toward north
     placeAt(kind, lon, lat, hg, yaw, w, h, d, color, era, krep) {
       const I = this.inst[kind]; if (!I) return; const idx = this.counts[kind] || 0; if (idx >= CAPS[kind]) return;
@@ -285,6 +334,20 @@
       const rr = 1 + (Math.max(hg, 0) * this.exag) / R_M; el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
       I.mesh.setMatrixAt(idx, this._m); const ca = I.mesh.instanceColor.array; ca[idx * 3] = ((color >> 16) & 255) / 255; ca[idx * 3 + 1] = ((color >> 8) & 255) / 255; ca[idx * 3 + 2] = (color & 255) / 255;
       I.info.setXYZW(idx, era, (idx % 97) / 97, TOWN.packStyle(kind === 'cart' || kind === 'boat' ? 7 : kind === 'plane' ? 1 : 4, kind === 'cart' || kind === 'boat' ? 6 : 4, 0, kind === 'cart' || kind === 'boat' ? 64 : 0), krep || 1); this.counts[kind] = idx + 1;
+    }
+    // as placeAt, its up leaning by pitch toward its heading (a rocket turning over toward the east)
+    placeTilt(kind, lon, lat, hg, yaw, pitch, w, h, d, color, era, krep) {
+      const I = this.inst[kind]; if (!I) return; const idx = this.counts[kind] || 0; if (idx >= CAPS[kind]) return;
+      const lo = lon * D2R, la = lat * D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
+      const Ex = -slo, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw); const Fx = cy * Ex + sy * Nx, Fy = sy * Ny, Fz = cy * Ez + sy * Nz;
+      const cp = Math.cos(pitch), sp = Math.sin(pitch); const ws = w / R_M, hs = h / R_M, ds = d / R_M; const el = this._m.elements;
+      el[0] = (Fx * cp - Ux * sp) * ws; el[1] = (Fy * cp - Uy * sp) * ws; el[2] = (Fz * cp - Uz * sp) * ws; el[3] = 0;
+      el[4] = (Ux * cp + Fx * sp) * hs; el[5] = (Uy * cp + Fy * sp) * hs; el[6] = (Uz * cp + Fz * sp) * hs; el[7] = 0;
+      el[8] = (sy * Ex - cy * Nx) * ds; el[9] = (-cy * Ny) * ds; el[10] = (sy * Ez - cy * Nz) * ds; el[11] = 0;
+      const rr = 1 + (Math.max(hg, 0) * this.exag) / R_M; el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
+      I.mesh.setMatrixAt(idx, this._m); const ca = I.mesh.instanceColor.array; ca[idx * 3] = ((color >> 16) & 255) / 255; ca[idx * 3 + 1] = ((color >> 8) & 255) / 255; ca[idx * 3 + 2] = (color & 255) / 255;
+      I.info.setXYZW(idx, era, (idx % 97) / 97, TOWN.packStyle(1, 4, 0, 64), krep || 1); this.counts[kind] = idx + 1;      // (painted, a thing: no door or windows)
     }
     animate(dt, sim) {
       for (const k in this.inst) this.counts[k] = 0;
@@ -337,6 +400,40 @@
         for (let k = 0; k < TRAIL_N; k++) { const ag = s.trailAge[k]; if (ag >= 1) continue; cp[ci * 3] = s.trail[k * 3]; cp[ci * 3 + 1] = s.trail[k * 3 + 1]; cp[ci * 3 + 2] = s.trail[k * 3 + 2]; cag[ci] = ag; cs[ci] = 600 + 2600 * ag; ci++; }
       }
       { const g = this.contrails.geometry; GEO.touch(g.attributes.position, ci); GEO.touch(g.attributes.aAge, ci); GEO.touch(g.attributes.aSize, ci); g.setDrawRange(0, ci); }
+      // rockets: stood on their pads, rising (straight up, then turning over toward the east), gone; a flame at the tail, smoke
+      // left where they have been (a cloud of it about the pad at the start). Puffs swell and thin as they hang.
+      { let ri = 0, fi = 0; const rp = this.rpos, ra = this.rage, rs = this.rsize, fp = this.fpos, fs = this.fsize; const t = this.clock;
+        const at = window.__launchAt; let jP = 0;      // (for pictures: __launchAt = performance.now() of the first launch, the other pads 7 s apart)
+        for (const p of this.pads) {
+          let tau = ((t + p.ph) % RK_PERIOD + RK_PERIOD) % RK_PERIOD; if (at !== undefined) { tau = t - at / 1000 - 7 * jP; tau = tau < 0 ? RK_PERIOD - 1 : tau % RK_PERIOD; } jP++;
+          // (the rocket stands on the pad's deck, a tenth of its height up, and the kit sinks the pad into the ground as world.setInst does a building)
+          const wR = p.w * 0.16, hR = p.h * 0.8, base = (p.h * 0.1 - Math.min(p.h * 0.3, 0.35 + 0.06 * p.w)) / exag;
+          for (let k = 0; k < RTRAIL; k++) if (p.tAge[k] < 1) p.tAge[k] = Math.min(1, p.tAge[k] + dt / RK_LIFE);
+          if (tau >= RK_EMPTY) this.placeTilt('rocketbody', p.lon, p.lat, p.hg + base, 0, 0, wR, hR, wR, 0xeef0f3, 9, p.k);
+          else if (tau < RK_FLY) {
+            const sA = 0.5 * RK_ACC * tau * tau, q = sA / RK_TURN, TM = 1.25; let x, y, th;
+            if (q <= TM) { x = RK_TURN * (1 - Math.cos(q)); y = RK_TURN * Math.sin(q); th = q; } else { x = RK_TURN * (1 - Math.cos(TM)) + (sA - RK_TURN * TM) * Math.sin(TM); y = RK_TURN * Math.sin(TM) + (sA - RK_TURN * TM) * Math.cos(TM); th = TM; }
+            const lon = p.lon + x / (R_M * p.cl * D2R), hg = p.hg + base + y;
+            const thV = Math.atan2(Math.sin(th), exag * Math.cos(th));      // (heights are drawn exag times as tall: it leans as its drawn path does)
+            this.placeTilt('rocketbody', lon, p.lat, hg, 0, thV, wR, hR, wR, 0xeef0f3, 9, p.k);
+            // its tail, a little below the rocket's foot along its axis
+            const tx = x - Math.sin(thV) * hR * 0.06, ty = y - Math.cos(thV) * hR * 0.06 / exag; const tLon = p.lon + tx / (R_M * p.cl * D2R), tH = p.hg + base + ty;
+            const lo = tLon * D2R, la = p.lat * D2R, rr = 1 + Math.max(tH, 0) * exag / R_M; const vx = Math.cos(la) * Math.cos(lo) * rr, vy = Math.sin(la) * rr, vz = -Math.cos(la) * Math.sin(lo) * rr;
+            const lit = Math.min(1, tau / 2.5);
+            fp[fi * 3] = vx; fp[fi * 3 + 1] = vy; fp[fi * 3 + 2] = vz; fs[fi] = wR * (2.4 + 0.5 * Math.sin(t * 37 + p.ph) + 0.3 * Math.sin(t * 61)) * lit * (1 + Math.min(2, y / 8000)); fi++;
+            p.puffT += dt;
+            while (p.puffT >= RK_DT) { p.puffT -= RK_DT; if (tau > 62) continue;
+              const low = Math.max(0, 1 - y / (hR * 4)); const j = p.head; p.head = (j + 1) % RTRAIL;
+              // near the ground the smoke rolls out along it: puffs thrown off to the sides
+              const a = hash(p.key, Math.floor(t * 50) + j) * 6.2832, d = low * hR * (0.6 + 1.6 * hash(p.key, Math.floor(t * 50) + j + 7)), ox = Math.cos(a) * d, oz = Math.sin(a) * d;
+              const pl = tLon + ox / (R_M * p.cl * D2R), pa = p.lat + oz / (R_M * D2R), ph = Math.max(p.hg + base * 0.5, tH - low * hR * 0.3), r2 = 1 + Math.max(ph, 0) * exag / R_M;
+              p.trail[j * 3] = Math.cos(pa * D2R) * Math.cos(pl * D2R) * r2; p.trail[j * 3 + 1] = Math.sin(pa * D2R) * r2; p.trail[j * 3 + 2] = -Math.cos(pa * D2R) * Math.sin(pl * D2R) * r2;
+              p.tAge[j] = 0; p.tSize[j] = wR * (2.2 + 2.5 * low) * lit; }
+          } else p.puffT = 0;
+          for (let k = 0; k < RTRAIL; k++) { const ag = p.tAge[k]; if (ag >= 1) continue; rp[ri * 3] = p.trail[k * 3]; rp[ri * 3 + 1] = p.trail[k * 3 + 1]; rp[ri * 3 + 2] = p.trail[k * 3 + 2]; ra[ri] = ag; rs[ri] = p.tSize[k] * (1 + 6 * Math.sqrt(ag)); ri++; }
+        }
+        const g = this.smoke.geometry; GEO.touch(g.attributes.position, ri); GEO.touch(g.attributes.aAge, ri); GEO.touch(g.attributes.aSize, ri); g.setDrawRange(0, ri);
+        const f = this.flames.geometry; GEO.touch(f.attributes.position, fi); GEO.touch(f.attributes.aSize, fi); f.setDrawRange(0, fi); }
       for (const k in this.inst) { const I = this.inst[k]; const c = this.counts[k] || 0; I.mesh.count = c; GEO.touch(I.mesh.instanceMatrix, c); GEO.touch(I.mesh.instanceColor, c); GEO.touch(I.info, c); }
       // people
       // people: each figure stands on the ground at life size on its town's scale, facing the way it walks
@@ -359,7 +456,7 @@
         pc[n * 3] = ((a.color >> 16) & 255) / 255; pc[n * 3 + 1] = ((a.color >> 8) & 255) / 255; pc[n * 3 + 2] = (a.color & 255) / 255; ph[n] = a.phase; n++;
       }
       pm.count = n; GEO.touch(pm.instanceMatrix, n); GEO.touch(pm.instanceColor, n); GEO.touch(this.pphase, n); this.pshadow.count = n;
-      this.stats = { agents: this.agents.length, walkers: n, ships: this.ships.length, planes: this.planes.length };
+      this.stats = { agents: this.agents.length, walkers: n, ships: this.ships.length, planes: this.planes.length, pads: this.pads.length };
     }
   }
   window.MOVERS = { Movers, SHADOW_VERT: PS_VERT, SHADOW_FRAG: PS_FRAG };      // (troops.js gives its soldiers the same streak)

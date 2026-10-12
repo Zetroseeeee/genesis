@@ -27,23 +27,23 @@
   'use strict';
   // how fast the state carries its faith into a region of its realm, a year, by age (among regions that hold it already
   // two and a half times as fast as alone; faster in towns and beside a temple, faster among the old ways)
-  const CONV = [0.002, 0.0035, 0.0045, 0.005, 0.005, 0.005, 0.004, 0.003, 0.002];
+  const CONV = [0.002, 0.0035, 0.0045, 0.005, 0.005, 0.005, 0.004, 0.003, 0.002, 0.0015];
   // how fast those who preach a faith for all peoples carry it to a neighbouring region, a year, by age (a people's faith
   // among its own people at half of it, among others hardly)
-  const PREACH = [0.001, 0.002, 0.003, 0.005, 0.005, 0.005, 0.004, 0.003, 0.002];
+  const PREACH = [0.001, 0.002, 0.003, 0.005, 0.005, 0.005, 0.004, 0.003, 0.002, 0.0015];
   // how readily a ruler of the old ways takes up the faith of a neighbour, every five years, for each neighbour that holds one
-  const ADOPT = [0.02, 0.03, 0.04, 0.04, 0.04, 0.035, 0.03, 0.02, 0.015];
+  const ADOPT = [0.02, 0.03, 0.04, 0.04, 0.04, 0.035, 0.03, 0.02, 0.015, 0.012];
   // how readily the merchants of a realm of a faith for all peoples plant it in a partner's harbour or capital, every five years
-  const MISSION = [0, 0, 0.04, 0.1, 0.12, 0.14, 0.12, 0.08, 0.05];
+  const MISSION = [0, 0, 0.04, 0.1, 0.12, 0.14, 0.12, 0.08, 0.05, 0.04];
   // how restless other faiths make a realm, by age: their share of its people (weighed: see weight) times this
-  const RESTLESS = [0.03, 0.05, 0.07, 0.09, 0.1, 0.1, 0.08, 0.06, 0.04];
+  const RESTLESS = [0.03, 0.05, 0.07, 0.09, 0.1, 0.1, 0.08, 0.06, 0.04, 0.03];
   // what share of their people realms of each age usually hold of other faiths (tools/faith/probe.js --write measures it):
   // a realm is restless only for what it holds beyond its age's way, and a little steadier for less
   // NORM-BEGIN
-  const NORM = [0, 0.039, 0.021, 0.087, 0.074, 0.079, 0.109, 0.161, 0.212];
+  const NORM = [0, 0.039, 0.021, 0.087, 0.074, 0.079, 0.109, 0.161, 0.212, 0.212];
   // NORM-END
   // a faith held farther from its holy city than this, in regions, by age, may split
-  const SPLIT = [24, 26, 28, 30, 32, 34, 40, 50, 60];
+  const SPLIT = [24, 26, 28, 30, 32, 34, 40, 50, 60, 70];
   // the tenets a faith is founded on: what each does (preach: how readily it is carried over to a region; adopt: how readily
   // a ruler takes it up; conv: how fast its state carries it; minor: how restless other faiths are where it is the state's;
   // hate: what its realms think of realms of other faiths; sword: a holy war is always just to it; holy: how much its
@@ -97,7 +97,7 @@
     let rs = ((h.seed || 1) ^ 0x3a5f1c2b) >>> 0;
     const rnd = () => { rs += 0x6D2B79F5; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const pick = (a) => a[Math.floor(rnd() * a.length)];
-    const eraOf = (cv) => Math.min(8, Math.max(0, cv ? cv.era | 0 : 0));
+    const eraOf = (cv) => Math.min(9, Math.max(0, cv ? cv.era | 0 : 0));
 
     // ---------- names ----------
     // a faith is named in the tongue of the people of its holy city (people.js), or of its realm's kind of names

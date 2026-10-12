@@ -9,7 +9,7 @@
 //   DISEASE.create(h) -> { step, seed, view, lens, incF, setQ, save, load, ... } for one world.
 window.DISEASE = (function () {
   'use strict';
-  const PACE = [200, 100, 50, 50, 40, 20, 10, 5, 5];
+  const PACE = [200, 100, 50, 50, 40, 20, 10, 5, 5, 5];
   // the kinds: the age in which one can first arise (from), how readily it passes (spread), the share of those who catch it that it
   // kills before medicine (dead), the share of a realm that catches it (attack), the years it burns in a realm (burn), the turns those
   // who lived through it are spared (keep), how much worse among a people that never had it (virgin), in towns (towns), on ships and
@@ -30,10 +30,10 @@ window.DISEASE = (function () {
   ];
   const KK = {}; KINDS.forEach((k, i) => { k.id = i; KK[k.key] = k; }); const NK = KINDS.length;
   // how much less a sickness kills as the ages learn to fight it (a realm's own medicine is measured against this, as every edge is)
-  const AGE = [1, 1, 0.95, 0.9, 0.8, 0.65, 0.35, 0.12, 0.05];
+  const AGE = [1, 1, 0.95, 0.9, 0.8, 0.65, 0.35, 0.12, 0.05, 0.03];
   // and how much less readily it gets in (the quarantines of the ports from the Renaissance, sanitation and vaccination, public health):
   // what the realm it would go to has learned. Before, a modern pestilence lingered for decades in a hundred realms at once
-  const PASS = [1, 1, 1, 1, 1, 0.85, 0.6, 0.4, 0.3];
+  const PASS = [1, 1, 1, 1, 1, 0.85, 0.6, 0.4, 0.3, 0.25];
   // (from the age a kind is fought by name - vaccines, sewers, rat-catching - it arises a third as often)
   const FADE = { pox: 7, measles: 7, plague: 6, typhus: 7, flu: 9, cholera: 7 };
   const NAMES = { pox: ['the Speckled Monster', 'the Red Pox', 'the Spotted Death'], measles: ['the Red Rash', 'the Morbilli', 'the Spotted Fever'],
@@ -48,7 +48,7 @@ window.DISEASE = (function () {
     const civs = h.civs, MAXC = h.MAXC, year = h.year;
     let rs = ((h.seed || 1) ^ 0x7a3c19e5) >>> 0;
     const rnd = () => { rs = (rs + 0x6D2B79F5) >>> 0; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    const turnOf = (cv) => PACE[clamp(cv.era | 0, 0, 8)];
+    const turnOf = (cv) => PACE[clamp(cv.era | 0, 0, 9)];
     const NEVER = -1e9;
     const killF = new Float32Array(MAXC); let anyKill = false;      // (the share of each realm's people the year's sickness takes)      // (a year BC is negative: "spared until nought" would be spared through all of them)
     const imm = new Float64Array(MAXC * NK).fill(NEVER);      // (the year until which a realm's people are spared a kind)
@@ -80,7 +80,7 @@ window.DISEASE = (function () {
     // the share of a realm's people it takes in a year at full height (what the realm's medicine, its towns and its past make of it)
     function deadly(o, cv, b) {
       const K = KINDS[o.k], c = cv.id; const towns = 1 + (K.towns - 1) * h.urban(c); const w = had[c * NK + o.k]; const seen = w >= 3 ? K.endemic : K.virgin * Math.pow(K.endemic / K.virgin, w / 3);
-      return clamp(K.dead * K.attack * towns * seen * AGE[clamp(cv.era | 0, 0, 8)] / h.health(c), 0, 0.85) * o.cure[c] / (b || burnOf(o, cv));
+      return clamp(K.dead * K.attack * towns * seen * AGE[clamp(cv.era | 0, 0, 9)] / h.health(c), 0, 0.85) * o.cure[c] / (b || burnOf(o, cv));
     }
     // ----- a year -----
     function step() {
@@ -133,7 +133,7 @@ window.DISEASE = (function () {
       stats.ms = performance.now() - t0;
     }
     // it goes from realm c to realm d with chance p, unless d has it, is spared it, or is shut against it
-    function go(o, c, d, p, yr) { if (d === c || o.inf[d] > 0) return; const dv = civs[d]; if (!dv || imm[d * NK + o.k] > yr) return; if (rnd() < p * (1 - h.shut(dv)) * PASS[clamp(dv.era | 0, 0, 8)]) infect(o, d); }
+    function go(o, c, d, p, yr) { if (d === c || o.inf[d] > 0) return; const dv = civs[d]; if (!dv || imm[d * NK + o.k] > yr) return; if (rnd() < p * (1 - h.shut(dv)) * PASS[clamp(dv.era | 0, 0, 9)]) infect(o, d); }
     // ----- the player's hand, and the god's -----
     function seed(cell, kind) { const o0 = h.ownerOf(cell); if (o0 < 0 || !civs[o0]) return 'Nobody lives there'; const k = kind !== undefined ? (typeof kind === 'string' ? KK[kind].id : kind) : (KK.plague.id); if (out.length >= MAXO + 2) return 'The world has sickness enough'; const o = begin(k, o0, cell); return o ? null : 'Nothing happened'; }
     // a new realm: what its people have had is what the realm it came from had, or the land about it
@@ -153,7 +153,7 @@ window.DISEASE = (function () {
     // what a realm does against an outbreak in it (physicians, the bedding burned, the gates shut): its dead are so many times fewer
     function cure(cv, oid, f) { const o = out.find((q) => q.id === oid); if (!o || !cv) return 'It is over'; o.cure[cv.id] = Math.min(o.cure[cv.id], f); return null; }
     // the fear an outbreak brings: a share off the realm's stability while it burns, as deadly as the age lets it be
-    function unrest(c) { let f = 0; for (const o of out) if (o.inf[c] > f) f = o.inf[c]; const cv = civs[c]; return f > 0 && cv ? -0.05 * f * AGE[clamp(cv.era | 0, 0, 8)] : 0; }
+    function unrest(c) { let f = 0; for (const o of out) if (o.inf[c] > f) f = o.inf[c]; const cv = civs[c]; return f > 0 && cv ? -0.05 * f * AGE[clamp(cv.era | 0, 0, 9)] : 0; }
     // ----- what the player sees -----
     function view(c) {
       const cv = civs[c]; const yr = year();

@@ -30,7 +30,7 @@ window.ENVOYS = (function () {
   let ctx = null, tab = 'realms', sel = -1, filter = 'all', lastSig = '', cause = '', picked = false;      // (cause: the reason a war would be given; picked: the player chose it himself - else it is the best there is)
   const S = () => ctx.sim(); const DP = () => window.DIPLO; const DK = () => S().diplo;
   const me = () => { const s = S(); return s ? s.playerCiv() : null; };
-  const pace = (c) => DP().PACE[Math.max(0, Math.min(8, c.era | 0))];
+  const pace = (c) => DP().PACE[Math.max(0, Math.min(9, c.era | 0))];
   const turns = (years, c) => { const n = Math.max(1, Math.round(years / pace(c))); return n + (n === 1 ? ' turn' : ' turns'); };
   const upto = (y, c) => { const s = S(); return `until ${s.fmtYear(y)} <span class="mk-dim">(${turns(y - s.year, c)})</span>`; };
   const nm = (b) => esc(S().fullName(b));

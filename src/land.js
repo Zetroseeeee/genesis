@@ -9,13 +9,13 @@
 // without farming it find their food where game, fish and nuts are: the savanna, the grassland, the temperate woods, coasts
 // and rivers. Pure data; the simulation (sim.js) asks it once a year for each realm and keeps the answers in flat arrays.
 window.LAND = (() => {
-  // the shape of each kind's farming through the ages (Stone .. Information), as a share of what it gives in the Renaissance
+  // the shape of each kind's farming through the ages (Stone .. Space), as a share of what it gives in the Renaissance
   const CURVES = {
-    old: [0.3, 0.6, 0.8, 0.9, 1, 1, 1.2, 1.6, 1.8],              // the first farmland: irrigated valleys, the Mediterranean, the highlands of the tropics
-    wood: [0.15, 0.25, 0.45, 0.55, 0.85, 1, 1.2, 1.6, 1.8],      // the wooded north: cleared with iron axes, its clay opened by the heavy plough
-    grass: [0.1, 0.12, 0.15, 0.15, 0.2, 0.25, 0.8, 1.6, 1.8],    // grass and steppe: herds, until the steel plough and the railway
-    tropic: [0.2, 0.3, 0.45, 0.5, 0.55, 0.6, 0.8, 1.5, 1.8],     // the wet and dry tropics of Africa and the Americas: the hoe, then fertiliser
-    tasia: [0.2, 0.3, 0.6, 0.7, 0.8, 0.9, 1.1, 1.6, 1.8],        // the wet tropics of Asia: paddies from the Iron Age
+    old: [0.3, 0.6, 0.8, 0.9, 1, 1, 1.2, 1.6, 1.8, 1.8],              // the first farmland: irrigated valleys, the Mediterranean, the highlands of the tropics
+    wood: [0.15, 0.25, 0.45, 0.55, 0.85, 1, 1.2, 1.6, 1.8, 1.8],      // the wooded north: cleared with iron axes, its clay opened by the heavy plough
+    grass: [0.1, 0.12, 0.15, 0.15, 0.2, 0.25, 0.8, 1.6, 1.8, 1.8],    // grass and steppe: herds, until the steel plough and the railway
+    tropic: [0.2, 0.3, 0.45, 0.5, 0.55, 0.6, 0.8, 1.5, 1.8, 1.8],     // the wet and dry tropics of Africa and the Americas: the hoe, then fertiliser
+    tasia: [0.2, 0.3, 0.6, 0.7, 0.8, 0.9, 1.1, 1.6, 1.8, 1.8],        // the wet tropics of Asia: paddies from the Iron Age
   };
   // how intensely each kind's farmland is farmed (people a unit of it feeds in the Renaissance, against the others) and what it gives
   // people who do not farm. Measured, not chosen: tools/people/landfit.js runs the world and moves these until each of history's
@@ -43,7 +43,7 @@ window.LAND = (() => {
     K('cowood', 'Continental woods', 0.2, 'wood', 'Long winters and a short year to grow in: rye, oats and the forest.'),
     K('tasia', 'Tropical Asia', 0.1, 'tasia', 'Heat and rain all year: paddies in the valleys, gardens and groves under the palms.'),
   ];
-  const NC = CLASSES.length, NA = 9;
+  const NC = CLASSES.length, NA = 10;
   // the table the simulation reads: [class * NA + age]: what a unit of farmland gives in that age, against the first farmland (the
   // simulation's table of food, by knowledge, is how farming as a whole grows: these say only how each kind keeps pace with it)
   const TAB = new Float32Array(NC * NA); CLASSES.forEach((K, k) => { for (let a = 0; a < NA; a++) TAB[k * NA + a] = K.I * CURVES[K.curve][a] / CURVES.old[a]; });

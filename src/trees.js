@@ -206,6 +206,29 @@
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); return g;
   }
 
+  // The gardens of a city's houses (town.js: on a modern city's plots the kit's clusters of houses, flats round their courts, towers
+  // of flats in rows): where in such a block a tree may stand, by where its houses leave room, in the block's own unit square. A
+  // tree stands in a back garden, a court, the green between towers; never on a roof.
+  const GARDEN = {
+    homes: (x, z) => Math.abs(z) < 0.15, homes4: (x, z) => Math.abs(z) < 0.09 || Math.abs(x) < 0.06, walled: (x, z) => Math.abs(z) < 0.07 || Math.abs(x) < 0.07,
+    perimeter: (x, z) => Math.abs(x) < 0.22 && Math.abs(z) < 0.22, perimold: (x, z) => Math.abs(x) < 0.21 && Math.abs(z) < 0.21, compound: (x, z) => Math.abs(z) < 0.09 && Math.abs(x) < 0.46,
+  };
+  function gardenAt(L, x, z) {
+    let G = L._gard;
+    if (!G || G.n !== L.items.length) {
+      G = L._gard = { n: L.items.length, cell: 1, map: new Map() }; let big = 0;
+      for (const it of L.items) if (GARDEN[it.kind]) big = Math.max(big, it.w, it.d);
+      G.cell = Math.max(1, big);
+      for (let q = 0; q < L.items.length; q++) { const it = L.items[q]; if (!GARDEN[it.kind]) continue; const key = Math.floor(it.x / G.cell) * 65536 + Math.floor(it.z / G.cell); let a = G.map.get(key); if (!a) G.map.set(key, a = []); a.push(q); }
+    }
+    if (!G.map.size) return 0;
+    const cx = Math.floor(x / G.cell), cz = Math.floor(z / G.cell);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const a = G.map.get((cx + dx) * 65536 + cz + dz); if (!a) continue;
+      for (const q of a) { const it = L.items[q]; const c = Math.cos(it.yaw), sn = Math.sin(it.yaw), ox = x - it.x, oz = z - it.z; const lx = (ox * c + oz * sn) / it.w, lz = (ox * sn - oz * c) / it.d;
+        if (Math.abs(lx) > 0.5 || Math.abs(lz) > 0.5) continue;
+        return GARDEN[it.kind](lx, lz) ? (it.kind === 'homes' || it.kind === 'homes4' ? 2 : 1) : -1; } }
+    return 0;
+  }
   // What a town keeps clear of trees: the line of its wall, and whatever stands or runs at its edge and beyond (the
   // outermost houses, a harbour, a mine, building sites, the lanes out of the gates). No tree grows through a palisade
   // or out of a roof. x, z: drawn metres east and north of the town's centre; m: how far a trunk keeps off, metres.
@@ -221,7 +244,8 @@
     }
     for (let q = 0; q < O.items.length; q++) {
       const it = O.items[q]; if (it.off) continue; const hw = (it.fw || it.w) * 0.5 + m + O.yard[q], hd = (it.fd || it.d) * 0.5 + m + O.yard[q]; const dx = x - it.x, dz = z - it.z; if (dx * dx + dz * dz > hw * hw + hd * hd) continue;
-      const yaw = it.fyaw === undefined ? it.yaw : it.fyaw; const c = Math.cos(yaw), sn = Math.sin(yaw); if (Math.abs(dx * c + dz * sn) < hw && Math.abs(dx * sn - dz * c) < hd) return true;
+      const yaw = it.fyaw === undefined ? it.yaw : it.fyaw; const c = Math.cos(yaw), sn = Math.sin(yaw); const ax = dx * c + dz * sn, az = dx * sn - dz * c;
+      if (Math.abs(ax) < hw && Math.abs(az) < hd) { const gf = GARDEN[it.kind]; if (gf && Math.abs(ax) < it.w * 0.5 && Math.abs(az) < it.d * 0.5 && gf(ax / it.w, az / it.d)) continue; return true; }      // (a block of houses keeps its gardens)
     }
     for (const st of O.streets) {
       const ax = st[2] - st[0], az = st[3] - st[1]; let t = ((x - st[0]) * ax + (z - st[1]) * az) / (ax * ax + az * az || 1); t = t < 0 ? 0 : t > 1 ? 1 : t;
@@ -477,8 +501,14 @@
               if (tw === undefined) { const c = sim.civs[sim.owner[j]]; if (c) { const [sLon, sLat] = TOWN.siteOf(sim, j, c, T, null); tw = { sLon, sLat, R: TOWN.radiusM(sim, j, c), F: TOWN.fieldsM(sim, j, c), k: TOWN.scaleOf(TOWN.radiusTrue(sim, j, c)), L: TOWN.layout(sim, j, c, { coarse: false }), cl: Math.max(0.15, Math.cos((90 - (y2 + 0.5) / H * 180) * D2R)) }; } else tw = null; towns.set(j, tw); }
               if (!tw) continue; const R = tw.R, F = tw.F;
               const ddm = GEO.distKm(lon, lat, tw.sLon, tw.sLat) * 1000; if (ddm > Math.max(F * 1.3, R * 2.8)) continue;
+              // (a park in the middle of a city: grass and trees on a block of the grid - L.parks, town.js)
+              let park = false; const PK = tw.L.parks;
+              if (PK && PK.length && ddm < R * 1.05) { const px = (lon - tw.sLon) * D2R * tw.cl * R_M, pz = (lat - tw.sLat) * D2R * R_M, ca = Math.cos(tw.L.axis), sa = Math.sin(tw.L.axis);
+                for (let q = 0; q < PK.length; q++) { const dx = px - PK[q][0], dz = pz - PK[q][1], hw = PK[q][2] * 0.86; if (Math.abs(dx * ca + dz * sa) < hw && Math.abs(dz * ca - dx * sa) < hw) { park = true; break; } } }
               // (within the town's fields only the odd tree is left standing - a tree by a town is drawn at the town's scale, and a quarter of a forest of those would still be a wood)
               if (ddm < F * 1.3) density *= smooth(R * 0.9, R * 1.25, ddm) * (0.06 + 0.94 * smooth(F * 0.9, F * 1.25, ddm));
+              if (park) density = Math.max(density, 0.7);
+              else if (tw.L.era >= 6 && ddm < R * 1.05) { const gd = gardenAt(tw.L, (lon - tw.sLon) * D2R * tw.cl * R_M, (lat - tw.sLat) * D2R * R_M); if (gd > 0) density = Math.max(density, gd === 2 ? 0.42 : 0.3); }      // (a tree in a garden or a court)
               if (density > 0 && ddm < R * 2.8 && townKeepsClear(tw.L, (lon - tw.sLon) * D2R * tw.cl * R_M, (lat - tw.sLat) * D2R * R_M, 3 * tw.k)) density = 0;
               const kTown = tw.k; if (kTown > kEff) kEff = Math.max(kEff, kTier + (kTown - kTier) * (1 - smooth(R * 1.4, R * 2.8, ddm))); }
             if (!sim.level[i]) { const cl = sim.woods ? sim.woods.cleared(i) : sim.owner[i] >= 0 ? sim.cultivation(i) : 0; density *= 1 - 0.35 * cl; }      // (the woods that stand: woods.js)
