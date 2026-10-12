@@ -51,9 +51,29 @@
       if (uHasN > 0.5) n = bump(n, vView, vUv, texture2D(uNormalMap, vUv).xyz * 2.0 - 1.0);
       float rough = 0.88, metal = 0.0;
       if (uHasOrm > 0.5) { vec3 orm = texture2D(uOrmMap, vUv).rgb; rough = clamp(orm.g, 0.08, 1.0); metal = orm.b; }
-      // repeats of one model should not read as copies: a little tone and warmth per building
+      // repeats of one model should not read as copies: a little tone and warmth per building, and a lived-in house its
+      // own walls and roof, by its people's ways (flags / 2 - 1: med, north, east, mena, africa, sasia, easia, seasia,
+      // america, namerica): washed with lime or ochre, or the bare clay; timber fresh, tarred or gone silver; plaster; a
+      // roof newly laid (lighter, warmer), old (greyer, darker) or, where it rains, mossed. The openings stay dark.
       float t1 = fract(seed * 7.31), t2 = fract(seed * 13.7);
-      col *= (0.90 + 0.18 * t1) * mix(vec3(1.03, 1.0, 0.96), vec3(0.97, 1.0, 1.03), t2);
+      col *= (0.91 + 0.16 * t1) * mix(vec3(1.03, 1.0, 0.96), vec3(0.97, 1.0, 1.03), t2);
+      if (uFoliage < 0.5 && uHome > 0.5 && flags >= 2.0) {
+        float cu = floor(flags * 0.5) - 1.0, t3 = fract(seed * 29.37 + 0.13), t4 = fract(seed * 61.13 + 0.71);
+        float up = dot(ng, uUpV); float roofish = smoothstep(0.3, 0.6, up), wallish = 1.0 - smoothstep(0.12, 0.38, up);
+        float lum = dot(col, vec3(0.3, 0.6, 0.1)), solid = smoothstep(0.07, 0.18, lum0), plast = smoothstep(0.3, 0.5, lum0);
+        // (a wash goes on plaster, the light of a wall: mode 0; tar and weather on wood, the rest: mode 1; earth on all of it: 2)
+        vec3 wash = vec3(0.0); float wk = 0.0, mode = 2.0;
+        bool limes = cu == 0.0 || cu == 3.0 || cu == 5.0, frames = (cu == 1.0 || cu == 2.0) && era >= 4.0;
+        if (limes || frames) { if (t3 < 0.34) { wash = vec3(0.9, 0.88, 0.82); wk = 0.55; mode = 0.0; } else if (t3 < 0.5) { wash = vec3(0.86, 0.7, 0.46); wk = 0.45; mode = 0.0; }
+          else if (frames && t3 < 0.66) { wash = vec3(0.3, 0.24, 0.2); wk = 0.4; mode = 1.0; } }      // lime and ochre; the beams of a timber frame tarred
+        else if (cu == 1.0 || cu == 2.0 || cu == 7.0 || cu == 9.0) { if (t3 < 0.25) { wash = vec3(0.34, 0.27, 0.22); wk = 0.35; mode = 1.0; } else if (t3 < 0.45) { wash = vec3(0.62, 0.6, 0.57); wk = 0.35; mode = 1.0; } }      // timber tarred, or gone silver
+        else if (cu == 6.0) { if (t3 < 0.3) { wash = vec3(0.86, 0.84, 0.8); wk = 0.45; mode = 0.0; } else if (t3 < 0.5) { wash = vec3(0.5, 0.49, 0.48); wk = 0.3; mode = 0.0; } }      // plaster, white or grey
+        else { if (t3 < 0.25) { wash = vec3(0.62, 0.38, 0.26); wk = 0.3; } else if (t3 < 0.45) { wash = vec3(0.84, 0.78, 0.66); wk = 0.35; } }      // red earth, or a pale clay
+        float on = mode == 0.0 ? plast : mode == 1.0 ? 1.0 - 0.7 * plast : 1.0;
+        col = mix(col, wash * clamp(0.55 + lum * 1.1, 0.5, 1.2), wk * wallish * solid * on);
+        if (t4 < 0.3) col = mix(col, col * vec3(1.09, 1.04, 0.95), roofish);
+        else if (t4 < 0.62) { vec3 old = vec3(lum) * vec3(0.9, 0.87, 0.82); if (t4 > 0.5 && (cu == 1.0 || cu == 2.0 || cu == 6.0 || cu == 7.0)) old = mix(old, vec3(0.27, 0.33, 0.2) * (0.6 + lum), 0.45); col = mix(col, old, 0.5 * roofish); }
+      }
       // a tree: its leaves turn in autumn and go in winter (vInfo.x: how far into autumn; flags: how bare, in 31 steps of two)
       if (uFoliage > 0.5) {
         float fall = clamp(vInfo.x, 0.0, 1.0), bare = floor(flags * 0.5) / 31.0;
@@ -137,6 +157,7 @@
         // where a model is used: its own kinds, eras and cultures, plus any further uses of the same mesh (also: [{ kinds, eras, cultures }])
         const use = (kinds, eras, cultures) => { for (const kind of kinds) (M.byKind[kind] = M.byKind[kind] || []).push({ def, eras, cultures }); };
         use(def.kinds, def.eras, def.cultures); for (const u of e.also || []) use(u.kinds || [], u.eras || def.eras, u.cultures === undefined ? def.cultures : u.cultures);
+        for (const u of ALSO[id] || []) use(u.kinds, u.eras, u.cultures);
       }
       M.ready = Object.keys(M.defs).length > 0;
       // the two coarsest steps of every model are a few kilobytes each: fetch them all now (coarsest first), so no town
@@ -145,6 +166,14 @@
       for (const id in M.defs) { const d = M.defs[id]; if (d.lods.length > 1 && !d.tree) request(d, d.lods[d.lods.length - 2], false); }
     } catch (e) { console.warn('models unavailable', e); M.failed = true; }
     return M;
+  };
+  // Further uses of models, beside the manifest's: where neighbouring peoples built alike, their houses stand in each other's
+  // towns too (a town of one model of house reads as a pattern from the air; with two or three it reads as a town). The
+  // Bronze Age's mud brick on stone, one storey or two, from the Aegean to the Indus.
+  const ALSO = {
+    stone_mudbrick_a: [{ kinds: ['adobe'], eras: [1, 2], cultures: ['med'] }],
+    stone_mudbrick_b: [{ kinds: ['adobe'], eras: [1, 2], cultures: ['med'] }],
+    bronze_med_house_a: [{ kinds: ['adobe'], eras: [1, 2], cultures: ['mena', 'sasia'] }],
   };
   // the model for a kit kind in a culture and era, or null. seed in [0,1) picks among variants.
   const CULT = ['med', 'north', 'east', 'mena', 'africa', 'sasia', 'easia', 'seasia', 'america', 'namerica'];
