@@ -193,6 +193,15 @@
         if (q === 5) { ms.push(box(0.3, 0.5, 0.3, x, 0, z), dome(0.13, x, 0.5, z, 0.9)); continue; }
         ms.push(box(0.32, h, 0.11, x, 0, z + 0.105), box(0.32, h, 0.11, x, 0, z - 0.105), box(0.11, h * 0.92, 0.1, x - 0.105, 0, z)); }
       g.medina = merge(ms); }
+    // the Space Age (town.js plans them: garden towers about a city's middle, arcologies, vertical farms, solar fields at its edge,
+    // a spaceport beyond it, and in a capital that raised it the space elevator). The garden flag (128) greens what lies flat on them.
+    { const ms = []; for (let k = 0; k < 14; k++) { const b = new THREE.BoxGeometry(0.72, 0.071, 0.72); b.rotateY(k * 0.105); b.translate(0, 0.0355 + k * 0.071, 0); ms.push(b); } ms.push(cyl(0.006, 0.02, 0.06, 6, 0, 0.994 - 0.06, 0)); g.twist = merge(ms); }      // a tower that turns as it rises
+    { const ms = [box(0.56, 1, 0.56)]; for (let k = 0; k < 9; k++) { const y = 0.08 + k * 0.105, o = k % 2 ? 0.07 : -0.07; ms.push(box(0.78, 0.025, 0.74, o, y, -o * 0.6)); } g.greentower = merge(ms); }      // flats with a garden on every few floors, terraces turning about the tower
+    g.vertfarm = merge([box(1, 1, 1), box(0.86, 0.04, 0.86, 0, 1), box(0.2, 0.08, 0.2, 0.25, 1.04, -0.2)]);      // a farm forty floors high, its glass lit green
+    { const ms = []; const T = [[1, 0.17], [0.82, 0.16], [0.65, 0.15], [0.49, 0.15], [0.34, 0.14], [0.2, 0.13]]; let y = 0; for (const [w, h] of T) { ms.push(box(w, h, w, 0, y, 0)); y += h; } ms.push(cyl(0.01, 0.05, 0.1, 8, 0, y, 0)); g.arcology = merge(ms); }      // a city in one building: terraces of gardens to a crown
+    g.elevator = merge([ring(0.5, 0.34, 0.012, 24), box(0.26, 0.016, 0.26, 0, 0.012, 0), cyl(0.0035, 0.008, 0.97, 6, 0, 0.028, 0)]);      // the space elevator: its anchor and the cable into the sky
+    g.rocket = merge([box(1, 0.04, 1), box(0.08, 0.7, 0.08, 0.24, 0.04, 0), box(0.12, 0.03, 0.04, 0.16, 0.5, 0), cyl(0.07, 0.07, 0.6, 12, 0, 0.04, 0), cone(0.07, 0.16, 12, 0, 0.64, 0), cyl(0.035, 0.035, 0.2, 8, 0.1, 0.04, 0.07), cyl(0.035, 0.035, 0.2, 8, -0.1, 0.04, 0.07)]);      // a launch pad, its tower and a rocket on it
+    { const ms = []; for (let k = 0; k < 6; k++) { const b = new THREE.BoxGeometry(1, 0.03, 0.12); b.rotateX(-0.6); b.translate(0, 0.35, -0.42 + k * 0.168); ms.push(b, box(0.02, 0.32, 0.02, -0.45, 0, -0.42 + k * 0.168), box(0.02, 0.32, 0.02, 0.45, 0, -0.42 + k * 0.168)); } g.solar = merge(ms); }      // a field of panels turned to the sun
     return g;
   }
 
@@ -246,6 +255,7 @@
     float roofLayer(float mat, float cul, float era, float landmark, float seed) {
       if (mat == 0.0) return (cul == 7.0 || cul == 4.0 || cul == 8.0) ? 12.0 : 0.0;                         // straw or palm thatch
       if (mat == 1.0) { if (cul == 1.0 || cul == 2.0 || cul == 9.0) return 8.0; if (cul == 0.0 && era <= 3.0) return 13.0; return 1.0; }   // plain tile in the north, Roman tile in antiquity, pan tile elsewhere
+      if (era >= 9.0 && (mat == 2.0 || mat == 3.0) && seed > 0.45) return 10.0;                                // the Space Age: solar tiles on half its roofs
       if (mat == 2.0) return (cul == 0.0 && era >= 4.0 && seed > 0.6) ? 15.0 : 2.0;                         // slate, zinc on some mansards
       if (mat == 3.0) { if (era >= 8.0 && seed > 0.8) return 10.0; return era >= 5.0 ? 3.0 : 9.0; }           // flat: packed earth, then bitumen, then (from the Information Age, on some) solar panels
       if (mat == 4.0) return 4.0;
@@ -264,6 +274,7 @@
       float pick = vPick;      // which of a material's variants this building gets (its seed runs past 1, so it cannot be used for that as it is)
       float wallMat = mod(style, 8.0); float roofMat = mod(floor(style / 8.0), 8.0); float culture = mod(floor(style / 64.0), 16.0); float flags = floor(style / 1024.0);
       float isBlock = mod(floor(flags / 2.0), 2.0), isNeon = mod(floor(flags / 4.0), 2.0), isLandmark = mod(flags, 2.0), isRuin = mod(floor(flags / 16.0), 2.0), isSite = mod(floor(flags / 32.0), 2.0), isThing = mod(floor(flags / 64.0), 2.0);   // thing: a cart or a boat, not a building (no door, no windows, no roof of its own)
+      float isGarden = mod(floor(flags / 128.0), 2.0);      // (planted: the Space Age's roofs and terraces)
       float roof = smoothstep(0.22, 0.4, vLN.y) * (1.0 - isThing);      // sloped and flat tops
       float bottom = step(vLN.y, -0.5);
       // face coordinates in metres
@@ -337,6 +348,9 @@
       }
       #endif
       if (isBlock > 0.5) { rc *= 0.8 + 0.36 * hr; rc = mix(rc, vCol * 0.7, step(0.78, hr) * 0.55); }
+      // planted: what lies flat on it is green (beds, lawns, young trees); a farm's glass is lit green from within
+      if (isGarden > 0.5) { vec3 leaf = mix(vec3(0.24, 0.36, 0.16), vec3(0.4, 0.52, 0.22), vnoise(fuv * 0.35 + seed * 7.0)) * (0.8 + 0.35 * vnoise(fuv * 1.7 + seed)); rc = mix(rc, leaf, 0.85);
+        if (wallMat == 6.0) col = mix(col, vec3(0.36, 0.62, 0.38), 0.35); }
       col = mix(col, rc, roof);
       // winter where winters are white: snow lies on the roofs
       if (uSnow > 0.01) col = mix(col, vec3(0.9, 0.92, 0.96), uSnow * roof * 0.92 * smoothstep(0.25, 0.55, vnoise(ruv * 0.35 + seed * 9.0) + uSnow * 0.5));
@@ -344,6 +358,12 @@
       if (isSite > 0.5) { col = mix(col, vec3(0.62, 0.56, 0.47), 0.45 + 0.45 * roof) * (0.9 + 0.2 * vnoise(fuv * 1.3 + seed * 4.0)); col *= 1.0 - 0.15 * smoothstep(0.3, 0.0, vLocal.y); }
       // ruins: weathered, mossy at the foot, roofs gone to the same stone
       if (isRuin > 0.5) { float moss = smoothstep(0.5, 0.0, vLocal.y) * vnoise(fuv * 0.6 + seed) * 0.6; col = mix(col, vec3(0.42, 0.4, 0.34), 0.5 + 0.3 * vnoise(fuv * 0.3 + seed * 2.0)); col = mix(col, vec3(0.3, 0.38, 0.2), moss); }
+      // a field of solar panels (a thing in glass): dark cells on what faces the sky, the frame grey
+      if (isThing > 0.5 && wallMat == 6.0) { float top = smoothstep(0.3, 0.6, vLN.y); vec3 pc = vec3(0.1, 0.14, 0.24) * (0.85 + 0.3 * lines(ruv.x, 1.0, 0.06, px));
+        #ifdef USE_TEXARR
+        pc = mix(pc, texture(uRoofTex, vec3(ruv / uRoofM[10], 10.0)).rgb, uTexMix);
+        #endif
+        col = mix(vec3(0.42, 0.44, 0.46), pc, top); }
       // ---------- cheap ambient occlusion: dark under the eaves, dark at the foot ----------
       float ao = 1.0 - 0.28 * (1.0 - roof) * smoothstep(0.86, 1.0, vLocal.y) - 0.18 * smoothstep(0.08, 0.0, vLocal.y);
       // ---------- lighting ----------
@@ -371,6 +391,6 @@
     }`;
 
   // instance caps: enough for the biggest city in view plus its neighbours
-  const MAXI = { scaffold: 4000, hut: 6000, tipi: 2500, longhouse: 4000, stilt: 4000, adobe: 9000, pueblo: 2500, courtyard: 6000, courtyardc: 5000, domehouse: 2500, gable: 12000, hip: 7000, curved: 7000, halftimber: 5000, townhouse: 6000, mansard: 2500, palazzo: 1500, terrace: 7000, tenement: 6000, block: 12000, blockold: 8000, tower: 4000, skyscraper: 1000, granary: 1200, chimney: 1200, barn: 1500, warehouse: 800, windmill: 400, turbine: 500, lamp: 2500, stall: 800, well: 200, fountain: 200, statue: 300, obelisk: 200, pier: 400, boat: 400, ship: 300, crane: 300, menhirs: 300, ziggurat: 300, pyramid: 200, steppyramid: 300, temple: 500, colosseum: 150, cathedral: 300, church: 500, basilica: 200, mosque: 400, tajmosque: 100, mudmosque: 300, onion: 300, hall: 400, pagoda: 400, stupa: 300, shikhara: 300, stepped: 300, mound: 200, palace: 300, keep: 800, roundtower: 2500, gatehouse: 600, wall: 5000, palisade: 3000, bastion: 500, station: 200, crystal: 100, irontower: 100, stadium: 150, spire: 200, lighthouse: 200, factory: 1200, slab: 6000, podium: 2500, cyltower: 1200, taper: 400, villa: 9000, bungalow: 6000, mill: 600, gasometer: 300, mall: 300, lawn: 1500, homes: 16000, homes4: 6000, rows: 6000, perimold: 6000, perimeter: 6000, compound: 9000, shacks: 8000, walled: 8000, oldtown: 4000, medina: 3000, car: 200, cart: 100, plane: 100, train: 100, rubble: 6000, wallstub: 3000, pillars: 600, tent: 2500, bigtent: 400, catapult: 300, cannon: 400 };
+  const MAXI = { scaffold: 4000, hut: 6000, tipi: 2500, longhouse: 4000, stilt: 4000, adobe: 9000, pueblo: 2500, courtyard: 6000, courtyardc: 5000, domehouse: 2500, gable: 12000, hip: 7000, curved: 7000, halftimber: 5000, townhouse: 6000, mansard: 2500, palazzo: 1500, terrace: 7000, tenement: 6000, block: 12000, blockold: 8000, tower: 4000, skyscraper: 1000, granary: 1200, chimney: 1200, barn: 1500, warehouse: 800, windmill: 400, turbine: 500, lamp: 2500, stall: 800, well: 200, fountain: 200, statue: 300, obelisk: 200, pier: 400, boat: 400, ship: 300, crane: 300, menhirs: 300, ziggurat: 300, pyramid: 200, steppyramid: 300, temple: 500, colosseum: 150, cathedral: 300, church: 500, basilica: 200, mosque: 400, tajmosque: 100, mudmosque: 300, onion: 300, hall: 400, pagoda: 400, stupa: 300, shikhara: 300, stepped: 300, mound: 200, palace: 300, keep: 800, roundtower: 2500, gatehouse: 600, wall: 5000, palisade: 3000, bastion: 500, station: 200, crystal: 100, irontower: 100, stadium: 150, spire: 200, lighthouse: 200, factory: 1200, slab: 6000, podium: 2500, cyltower: 1200, taper: 400, villa: 9000, bungalow: 6000, mill: 600, gasometer: 300, mall: 300, lawn: 1500, homes: 16000, homes4: 6000, rows: 6000, perimold: 6000, perimeter: 6000, compound: 9000, shacks: 8000, walled: 8000, oldtown: 4000, medina: 3000, twist: 300, greentower: 5000, vertfarm: 2000, arcology: 40, elevator: 10, rocket: 60, solar: 400, car: 200, cart: 100, plane: 100, train: 100, rubble: 6000, wallstub: 3000, pillars: 600, tent: 2500, bigtent: 400, catapult: 300, cannon: 400 };
   window.BKIT = { makeKit, VERT, FRAG, MAXI };
 })();

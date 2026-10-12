@@ -15,7 +15,7 @@
   // ---------- materials (decoded by the building shader) ----------
   const WALL = { adobe: 0, plaster: 1, timber: 2, stone: 3, brick: 4, concrete: 5, glass: 6, wood: 7 };
   const ROOF = { thatch: 0, tile: 1, slate: 2, flat: 3, metal: 4, glazed: 5, shingle: 6, copper: 7 };
-  const FLAG = { landmark: 1, block: 2, neon: 4, wonder: 8, ruin: 16, site: 32, thing: 64 };
+  const FLAG = { landmark: 1, block: 2, neon: 4, wonder: 8, ruin: 16, site: 32, thing: 64, garden: 128 };      // (garden: what lies flat on it is planted)
   const packStyle = (wall, roof, culture, flags) => wall + roof * 8 + culture * 64 + (flags || 0) * 1024;
 
   // ---------- cultures: where a people first settled decides how they build ----------
@@ -42,18 +42,18 @@
 
   // palettes: wall colours by culture and era band (0 stone, 1 bronze/iron, 2 classical, 3 medieval, 4 renaissance, 5 industrial, 6 modern, 7 information)
   const PAL = {
-    med: [['#b9a583', '#a89470', '#c4b08c'], ['#dcc9a5', '#e6d6b4', '#cdb88f'], ['#efe6d2', '#f2ebdc', '#e3cfa6', '#e8dcc4'], ['#b8ab92', '#c9bda4', '#a89b82', '#e7dcc4'], ['#efe1c6', '#e9d3b0', '#f3e9d6', '#d9b98c', '#e6c9a8'], ['#d9c9ad', '#c8a882', '#b98a6a', '#e4d6bd'], ['#d6d2c8', '#c7c2b8', '#e2ddd3', '#b9b4aa'], ['#cfd6dc', '#dfe4e8', '#b7c3cc', '#e6e9ec']],
-    north: [['#7a6547', '#6e5a3f', '#86704f'], ['#8a7452', '#9b8462', '#7d6a4a'], ['#d9cdb4', '#c9bc9f', '#e3d8c1'], ['#e9e2d0', '#e2d8c2', '#d7ccb2', '#cbbf9f'], ['#a0563f', '#b46a4d', '#e9e2d0', '#8f4a3a', '#d8cbb0'], ['#8f4a3a', '#7d4033', '#a35a45', '#6f6a66'], ['#b8bcc2', '#c9ccd0', '#a29d95', '#d2c8b6'], ['#c5ccd3', '#dde2e6', '#a9b6c1', '#eef0f2']],
-    east: [['#6e5537', '#7d6142', '#5f4a30'], ['#7d6142', '#8b6d4b', '#6a5238'], ['#8b6d4b', '#9a7b55', '#7a5f42'], ['#8b6d4b', '#a08252', '#e4d3b8', '#7a5f42'], ['#e4d3b8', '#efe1c8', '#d8c29c', '#c98d6a'], ['#b06e4e', '#c48159', '#a29a8c', '#e4d3b8'], ['#a9adb2', '#bfc3c7', '#d3cdc0', '#8f9398'], ['#c2c9d0', '#d9dee2', '#aab5bf', '#eef0f2']],
-    mena: [['#b8956a', '#a8865c', '#c4a274'], ['#c9a878', '#d7b98a', '#b5905e', '#cbb28a'], ['#d7b98a', '#e2cba2', '#c9a878', '#efe8d8'], ['#efe8d8', '#e8dcc4', '#d9c39a', '#f2ede2'], ['#efe8d8', '#e6d4b0', '#f4efe4', '#d2b98f'], ['#d8c9ad', '#c9b493', '#e6dccb', '#b79a72'], ['#d8d2c4', '#e4dfd3', '#c6bfaf', '#efece4'], ['#dfe3e6', '#eef0f2', '#c8d2da', '#f3f4f5']],
-    africa: [['#a6764a', '#b8845a', '#96683f'], ['#a6764a', '#b8845a', '#c39466', '#8f6440'], ['#b8845a', '#c39466', '#a6764a'], ['#b8845a', '#c9a26e', '#a6764a', '#d6b986'], ['#c9a26e', '#d6b986', '#b8845a', '#e3cfa4'], ['#cfc0a3', '#c3aa80', '#d9cbb0', '#b0885e'], ['#cfc7b8', '#dcd5c8', '#bfb5a4', '#e9e3d8'], ['#d6dbe0', '#e8ecef', '#c1cad2', '#f0f2f4']],
-    sasia: [['#a67c56', '#b48a62', '#97704c'], ['#a8664a', '#b77356', '#9a5b41', '#c78a68'], ['#e9dcc0', '#dcc8a2', '#a8664a', '#f0ece2'], ['#e9dcc0', '#d9c39a', '#c9a26e', '#f0ece2'], ['#f0ece2', '#e9dcc0', '#f4e4c6', '#d8b98a'], ['#d8c9ad', '#e9dcc0', '#c99a76', '#efe6d4'], ['#dcd8cc', '#e8e4da', '#c9c3b6', '#f1eee8'], ['#d9dfe4', '#e9edf0', '#c3ccd4', '#f2f4f6']],
-    easia: [['#7a6446', '#8b7350', '#6c583d'], ['#b89a76', '#c4a884', '#a88a68', '#d9cbb0'], ['#d9cbb0', '#e2d6bf', '#b89a76', '#e6e2da'], ['#e6e2da', '#d9cbb0', '#b89a76', '#c9bda4'], ['#e6e2da', '#efeae0', '#d9cbb0', '#a8a094'], ['#c9c2b4', '#d7d1c4', '#b3ab9c', '#e6e2da'], ['#c9ccd0', '#d9dbde', '#b0b4b9', '#e6e8ea'], ['#c8d0d8', '#dfe5ea', '#aab7c3', '#eef1f3']],
-    seasia: [['#8a6a44', '#9b784e', '#79593a'], ['#8a6a44', '#9b784e', '#a88a62'], ['#9b784e', '#a88a62', '#8a6a44', '#c9a878'], ['#a88a62', '#c9a878', '#9b784e', '#b5905e'], ['#c9a878', '#d9c39a', '#a88a62', '#efe6d4'], ['#d9c39a', '#c9b493', '#e6dccb', '#a88a62'], ['#d8d2c4', '#e4dfd3', '#c6bfaf', '#efece4'], ['#d9e0e5', '#eaeef1', '#c3ced6', '#f2f4f6']],
-    america: [['#a67c56', '#b48a62', '#97704c'], ['#c48f5f', '#d19d6d', '#b58153', '#dcb283'], ['#c48f5f', '#9a9184', '#d19d6d', '#efe4cc'], ['#9a9184', '#a89f90', '#c48f5f', '#8c8376'], ['#efe4cc', '#f1d9a6', '#e6c9a0', '#dcb283'], ['#f1d9a6', '#e7c48f', '#efe4cc', '#c98d6a'], ['#d9d2c4', '#e6dfd2', '#c8c0b1', '#efeae0'], ['#d6dde3', '#e8edf0', '#bfcad3', '#f1f3f5']],
-    namerica: [['#8a6b4c', '#9a7a58', '#7a5d40'], ['#8a6b4c', '#9a7a58', '#a88a62'], ['#9a7a58', '#a88a62', '#c9b48c', '#8a6b4c'], ['#c48f5f', '#d19d6d', '#b58153', '#9a7a58'], ['#dfd8c8', '#c9c2b2', '#e9e3d5', '#b9b0a0'], ['#dfd8c8', '#c9c2b2', '#a9b7c4', '#8f4a3a'], ['#dfd8c8', '#c9c2b2', '#a9b7c4', '#e9e3d5'], ['#d3dbe2', '#e6ebef', '#b9c6d0', '#f0f3f5']],
+    med: [['#b9a583', '#a89470', '#c4b08c'], ['#dcc9a5', '#e6d6b4', '#cdb88f'], ['#efe6d2', '#f2ebdc', '#e3cfa6', '#e8dcc4'], ['#b8ab92', '#c9bda4', '#a89b82', '#e7dcc4'], ['#efe1c6', '#e9d3b0', '#f3e9d6', '#d9b98c', '#e6c9a8'], ['#d9c9ad', '#c8a882', '#b98a6a', '#e4d6bd'], ['#d6d2c8', '#c7c2b8', '#e2ddd3', '#b9b4aa'], ['#cfd6dc', '#dfe4e8', '#b7c3cc', '#e6e9ec'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    north: [['#7a6547', '#6e5a3f', '#86704f'], ['#8a7452', '#9b8462', '#7d6a4a'], ['#d9cdb4', '#c9bc9f', '#e3d8c1'], ['#e9e2d0', '#e2d8c2', '#d7ccb2', '#cbbf9f'], ['#a0563f', '#b46a4d', '#e9e2d0', '#8f4a3a', '#d8cbb0'], ['#8f4a3a', '#7d4033', '#a35a45', '#6f6a66'], ['#b8bcc2', '#c9ccd0', '#a29d95', '#d2c8b6'], ['#c5ccd3', '#dde2e6', '#a9b6c1', '#eef0f2'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    east: [['#6e5537', '#7d6142', '#5f4a30'], ['#7d6142', '#8b6d4b', '#6a5238'], ['#8b6d4b', '#9a7b55', '#7a5f42'], ['#8b6d4b', '#a08252', '#e4d3b8', '#7a5f42'], ['#e4d3b8', '#efe1c8', '#d8c29c', '#c98d6a'], ['#b06e4e', '#c48159', '#a29a8c', '#e4d3b8'], ['#a9adb2', '#bfc3c7', '#d3cdc0', '#8f9398'], ['#c2c9d0', '#d9dee2', '#aab5bf', '#eef0f2'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    mena: [['#b8956a', '#a8865c', '#c4a274'], ['#c9a878', '#d7b98a', '#b5905e', '#cbb28a'], ['#d7b98a', '#e2cba2', '#c9a878', '#efe8d8'], ['#efe8d8', '#e8dcc4', '#d9c39a', '#f2ede2'], ['#efe8d8', '#e6d4b0', '#f4efe4', '#d2b98f'], ['#d8c9ad', '#c9b493', '#e6dccb', '#b79a72'], ['#d8d2c4', '#e4dfd3', '#c6bfaf', '#efece4'], ['#dfe3e6', '#eef0f2', '#c8d2da', '#f3f4f5'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    africa: [['#a6764a', '#b8845a', '#96683f'], ['#a6764a', '#b8845a', '#c39466', '#8f6440'], ['#b8845a', '#c39466', '#a6764a'], ['#b8845a', '#c9a26e', '#a6764a', '#d6b986'], ['#c9a26e', '#d6b986', '#b8845a', '#e3cfa4'], ['#cfc0a3', '#c3aa80', '#d9cbb0', '#b0885e'], ['#cfc7b8', '#dcd5c8', '#bfb5a4', '#e9e3d8'], ['#d6dbe0', '#e8ecef', '#c1cad2', '#f0f2f4'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    sasia: [['#a67c56', '#b48a62', '#97704c'], ['#a8664a', '#b77356', '#9a5b41', '#c78a68'], ['#e9dcc0', '#dcc8a2', '#a8664a', '#f0ece2'], ['#e9dcc0', '#d9c39a', '#c9a26e', '#f0ece2'], ['#f0ece2', '#e9dcc0', '#f4e4c6', '#d8b98a'], ['#d8c9ad', '#e9dcc0', '#c99a76', '#efe6d4'], ['#dcd8cc', '#e8e4da', '#c9c3b6', '#f1eee8'], ['#d9dfe4', '#e9edf0', '#c3ccd4', '#f2f4f6'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    easia: [['#7a6446', '#8b7350', '#6c583d'], ['#b89a76', '#c4a884', '#a88a68', '#d9cbb0'], ['#d9cbb0', '#e2d6bf', '#b89a76', '#e6e2da'], ['#e6e2da', '#d9cbb0', '#b89a76', '#c9bda4'], ['#e6e2da', '#efeae0', '#d9cbb0', '#a8a094'], ['#c9c2b4', '#d7d1c4', '#b3ab9c', '#e6e2da'], ['#c9ccd0', '#d9dbde', '#b0b4b9', '#e6e8ea'], ['#c8d0d8', '#dfe5ea', '#aab7c3', '#eef1f3'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    seasia: [['#8a6a44', '#9b784e', '#79593a'], ['#8a6a44', '#9b784e', '#a88a62'], ['#9b784e', '#a88a62', '#8a6a44', '#c9a878'], ['#a88a62', '#c9a878', '#9b784e', '#b5905e'], ['#c9a878', '#d9c39a', '#a88a62', '#efe6d4'], ['#d9c39a', '#c9b493', '#e6dccb', '#a88a62'], ['#d8d2c4', '#e4dfd3', '#c6bfaf', '#efece4'], ['#d9e0e5', '#eaeef1', '#c3ced6', '#f2f4f6'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    america: [['#a67c56', '#b48a62', '#97704c'], ['#c48f5f', '#d19d6d', '#b58153', '#dcb283'], ['#c48f5f', '#9a9184', '#d19d6d', '#efe4cc'], ['#9a9184', '#a89f90', '#c48f5f', '#8c8376'], ['#efe4cc', '#f1d9a6', '#e6c9a0', '#dcb283'], ['#f1d9a6', '#e7c48f', '#efe4cc', '#c98d6a'], ['#d9d2c4', '#e6dfd2', '#c8c0b1', '#efeae0'], ['#d6dde3', '#e8edf0', '#bfcad3', '#f1f3f5'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
+    namerica: [['#8a6b4c', '#9a7a58', '#7a5d40'], ['#8a6b4c', '#9a7a58', '#a88a62'], ['#9a7a58', '#a88a62', '#c9b48c', '#8a6b4c'], ['#c48f5f', '#d19d6d', '#b58153', '#9a7a58'], ['#dfd8c8', '#c9c2b2', '#e9e3d5', '#b9b0a0'], ['#dfd8c8', '#c9c2b2', '#a9b7c4', '#8f4a3a'], ['#dfd8c8', '#c9c2b2', '#a9b7c4', '#e9e3d5'], ['#d3dbe2', '#e6ebef', '#b9c6d0', '#f0f3f5'], ['#e9ece6', '#dfe6dd', '#f2f3ef', '#cfd9d2']],
   };
-  const bandOf = (era) => era === 0 ? 0 : era <= 2 ? 1 : era === 3 ? 2 : era === 4 ? 3 : era === 5 ? 4 : era === 6 ? 5 : era === 7 ? 6 : 7;
+  const bandOf = (era) => era === 0 ? 0 : era <= 2 ? 1 : era === 3 ? 2 : era === 4 ? 3 : era === 5 ? 4 : era === 6 ? 5 : era === 7 ? 6 : era === 8 ? 7 : 8;
 
   // house kinds by culture and era: [kind, weight, wallMat, roofMat]
   const HOUSES = {
@@ -66,6 +66,7 @@
       [['tenement', 4, WALL.plaster, ROOF.tile], ['terrace', 3, WALL.brick, ROOF.tile], ['townhouse', 2, WALL.plaster, ROOF.tile]],
       [['block', 5, WALL.concrete, ROOF.flat], ['tenement', 3, WALL.plaster, ROOF.tile], ['hip', 2, WALL.plaster, ROOF.tile]],
       [['block', 4, WALL.concrete, ROOF.flat], ['tower', 2, WALL.glass, ROOF.flat], ['hip', 2, WALL.plaster, ROOF.tile], ['tenement', 2, WALL.plaster, ROOF.tile]],
+      [['block', 4, WALL.concrete, ROOF.flat], ['tower', 2, WALL.glass, ROOF.flat], ['hip', 2, WALL.plaster, ROOF.tile], ['tenement', 2, WALL.plaster, ROOF.tile]],
     ],
     north: [
       [['longhouse', 4, WALL.wood, ROOF.thatch], ['hut', 3, WALL.wood, ROOF.thatch]],
@@ -75,6 +76,7 @@
       [['townhouse', 4, WALL.brick, ROOF.slate], ['halftimber', 3, WALL.timber, ROOF.tile], ['mansard', 2, WALL.plaster, ROOF.slate], ['gable', 2, WALL.brick, ROOF.tile]],
       [['terrace', 6, WALL.brick, ROOF.slate], ['tenement', 3, WALL.brick, ROOF.slate], ['townhouse', 2, WALL.brick, ROOF.slate]],
       [['block', 4, WALL.concrete, ROOF.flat], ['terrace', 4, WALL.brick, ROOF.slate], ['gable', 3, WALL.brick, ROOF.slate], ['tower', 1, WALL.concrete, ROOF.flat]],
+      [['block', 3, WALL.concrete, ROOF.flat], ['tower', 2, WALL.glass, ROOF.flat], ['terrace', 3, WALL.brick, ROOF.slate], ['gable', 3, WALL.brick, ROOF.slate]],
       [['block', 3, WALL.concrete, ROOF.flat], ['tower', 2, WALL.glass, ROOF.flat], ['terrace', 3, WALL.brick, ROOF.slate], ['gable', 3, WALL.brick, ROOF.slate]],
     ],
     east: [
@@ -86,6 +88,7 @@
       [['tenement', 4, WALL.brick, ROOF.slate], ['gable', 3, WALL.wood, ROOF.shingle], ['terrace', 2, WALL.brick, ROOF.slate]],
       [['block', 6, WALL.concrete, ROOF.flat], ['tenement', 2, WALL.brick, ROOF.slate], ['gable', 2, WALL.wood, ROOF.shingle]],
       [['block', 5, WALL.concrete, ROOF.flat], ['tower', 2, WALL.glass, ROOF.flat], ['gable', 2, WALL.wood, ROOF.shingle]],
+      [['block', 5, WALL.concrete, ROOF.flat], ['tower', 2, WALL.glass, ROOF.flat], ['gable', 2, WALL.wood, ROOF.shingle]],
     ],
     mena: [
       [['hut', 4, WALL.adobe, ROOF.thatch], ['adobe', 3, WALL.adobe, ROOF.flat]],
@@ -95,6 +98,7 @@
       [['courtyard', 4, WALL.plaster, ROOF.flat], ['adobe', 3, WALL.plaster, ROOF.flat], ['domehouse', 2, WALL.plaster, ROOF.flat], ['palazzo', 1, WALL.plaster, ROOF.flat]],
       [['tenement', 3, WALL.plaster, ROOF.flat], ['courtyard', 3, WALL.plaster, ROOF.flat], ['adobe', 3, WALL.adobe, ROOF.flat]],
       [['block', 5, WALL.concrete, ROOF.flat], ['courtyard', 2, WALL.plaster, ROOF.flat], ['tenement', 2, WALL.plaster, ROOF.flat]],
+      [['block', 3, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['skyscraper', 1, WALL.glass, ROOF.flat], ['courtyard', 2, WALL.plaster, ROOF.flat]],
       [['block', 3, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['skyscraper', 1, WALL.glass, ROOF.flat], ['courtyard', 2, WALL.plaster, ROOF.flat]],
     ],
     africa: [
@@ -106,6 +110,7 @@
       [['adobe', 3, WALL.plaster, ROOF.flat], ['terrace', 3, WALL.brick, ROOF.metal], ['gable', 2, WALL.plaster, ROOF.metal]],
       [['block', 4, WALL.concrete, ROOF.flat], ['gable', 3, WALL.plaster, ROOF.metal], ['adobe', 2, WALL.plaster, ROOF.flat]],
       [['block', 4, WALL.concrete, ROOF.flat], ['tower', 2, WALL.glass, ROOF.flat], ['gable', 3, WALL.plaster, ROOF.metal]],
+      [['block', 4, WALL.concrete, ROOF.flat], ['tower', 2, WALL.glass, ROOF.flat], ['gable', 3, WALL.plaster, ROOF.metal]],
     ],
     sasia: [
       [['hut', 6, WALL.adobe, ROOF.thatch]],
@@ -115,6 +120,7 @@
       [['courtyard', 4, WALL.plaster, ROOF.flat], ['palazzo', 1, WALL.plaster, ROOF.flat], ['adobe', 3, WALL.plaster, ROOF.flat]],
       [['tenement', 3, WALL.plaster, ROOF.flat], ['courtyard', 3, WALL.plaster, ROOF.flat], ['terrace', 2, WALL.brick, ROOF.tile]],
       [['block', 5, WALL.concrete, ROOF.flat], ['tenement', 3, WALL.plaster, ROOF.flat], ['courtyard', 2, WALL.plaster, ROOF.flat]],
+      [['block', 4, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['tenement', 2, WALL.plaster, ROOF.flat]],
       [['block', 4, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['tenement', 2, WALL.plaster, ROOF.flat]],
     ],
     easia: [
@@ -126,6 +132,7 @@
       [['curved', 3, WALL.plaster, ROOF.glazed], ['terrace', 3, WALL.brick, ROOF.glazed], ['tenement', 2, WALL.brick, ROOF.flat]],
       [['block', 6, WALL.concrete, ROOF.flat], ['curved', 2, WALL.plaster, ROOF.glazed], ['tenement', 2, WALL.concrete, ROOF.flat]],
       [['block', 4, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['skyscraper', 1, WALL.glass, ROOF.flat], ['curved', 1, WALL.plaster, ROOF.glazed]],
+      [['block', 4, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['skyscraper', 1, WALL.glass, ROOF.flat], ['curved', 1, WALL.plaster, ROOF.glazed]],
     ],
     seasia: [
       [['stilt', 5, WALL.wood, ROOF.thatch], ['hut', 2, WALL.wood, ROOF.thatch]],
@@ -135,6 +142,7 @@
       [['stilt', 3, WALL.wood, ROOF.thatch], ['curved', 3, WALL.plaster, ROOF.glazed], ['gable', 2, WALL.wood, ROOF.tile]],
       [['terrace', 3, WALL.plaster, ROOF.tile], ['stilt', 2, WALL.wood, ROOF.metal], ['gable', 3, WALL.wood, ROOF.metal]],
       [['block', 5, WALL.concrete, ROOF.flat], ['gable', 3, WALL.plaster, ROOF.metal], ['stilt', 1, WALL.wood, ROOF.metal]],
+      [['block', 4, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['gable', 2, WALL.plaster, ROOF.metal]],
       [['block', 4, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['gable', 2, WALL.plaster, ROOF.metal]],
     ],
     america: [
@@ -146,6 +154,7 @@
       [['hip', 4, WALL.plaster, ROOF.tile], ['terrace', 3, WALL.plaster, ROOF.tile], ['tenement', 2, WALL.brick, ROOF.tile]],
       [['block', 5, WALL.concrete, ROOF.flat], ['hip', 3, WALL.plaster, ROOF.tile], ['tenement', 2, WALL.plaster, ROOF.flat]],
       [['block', 4, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['hip', 2, WALL.plaster, ROOF.tile]],
+      [['block', 4, WALL.concrete, ROOF.flat], ['tower', 3, WALL.glass, ROOF.flat], ['hip', 2, WALL.plaster, ROOF.tile]],
     ],
     namerica: [
       [['tipi', 4, WALL.wood, ROOF.thatch], ['longhouse', 3, WALL.wood, ROOF.thatch], ['hut', 2, WALL.wood, ROOF.thatch]],
@@ -156,36 +165,37 @@
       [['gable', 5, WALL.wood, ROOF.shingle], ['terrace', 2, WALL.brick, ROOF.slate], ['tenement', 2, WALL.brick, ROOF.flat]],
       [['gable', 6, WALL.wood, ROOF.slate], ['block', 3, WALL.concrete, ROOF.flat], ['tower', 1, WALL.concrete, ROOF.flat]],
       [['gable', 5, WALL.wood, ROOF.slate], ['tower', 3, WALL.glass, ROOF.flat], ['skyscraper', 1, WALL.glass, ROOF.flat], ['block', 2, WALL.concrete, ROOF.flat]],
+      [['gable', 5, WALL.wood, ROOF.slate], ['tower', 3, WALL.glass, ROOF.flat], ['skyscraper', 1, WALL.glass, ROOF.flat], ['block', 2, WALL.concrete, ROOF.flat]],
     ],
   };
   // the building every town gathers around, by culture and era band; wonders are the outsized version a capital earns
   const LANDMARK = {
-    med: ['menhirs', 'ziggurat', 'temple', 'cathedral', 'basilica', 'station', 'stadium', 'spire'],
-    north: ['menhirs', 'menhirs', 'temple', 'cathedral', 'palace', 'station', 'stadium', 'spire'],
-    east: ['menhirs', 'menhirs', 'hall', 'onion', 'onion', 'station', 'stadium', 'spire'],
-    mena: ['menhirs', 'ziggurat', 'ziggurat', 'mosque', 'mosque', 'station', 'stadium', 'spire'],
-    africa: ['menhirs', 'menhirs', 'stepped', 'mudmosque', 'mudmosque', 'station', 'stadium', 'spire'],
-    sasia: ['menhirs', 'stupa', 'stupa', 'shikhara', 'mosque', 'station', 'stadium', 'spire'],
-    easia: ['menhirs', 'hall', 'pagoda', 'pagoda', 'hall', 'station', 'stadium', 'spire'],
-    seasia: ['menhirs', 'hall', 'stepped', 'stepped', 'stupa', 'station', 'stadium', 'spire'],
-    america: ['menhirs', 'steppyramid', 'steppyramid', 'steppyramid', 'basilica', 'station', 'stadium', 'spire'],
-    namerica: ['menhirs', 'mound', 'mound', 'pueblo', 'church', 'station', 'stadium', 'spire'],
+    med: ['menhirs', 'ziggurat', 'temple', 'cathedral', 'basilica', 'station', 'stadium', 'spire', 'arcology'],
+    north: ['menhirs', 'menhirs', 'temple', 'cathedral', 'palace', 'station', 'stadium', 'spire', 'arcology'],
+    east: ['menhirs', 'menhirs', 'hall', 'onion', 'onion', 'station', 'stadium', 'spire', 'arcology'],
+    mena: ['menhirs', 'ziggurat', 'ziggurat', 'mosque', 'mosque', 'station', 'stadium', 'spire', 'arcology'],
+    africa: ['menhirs', 'menhirs', 'stepped', 'mudmosque', 'mudmosque', 'station', 'stadium', 'spire', 'arcology'],
+    sasia: ['menhirs', 'stupa', 'stupa', 'shikhara', 'mosque', 'station', 'stadium', 'spire', 'arcology'],
+    easia: ['menhirs', 'hall', 'pagoda', 'pagoda', 'hall', 'station', 'stadium', 'spire', 'arcology'],
+    seasia: ['menhirs', 'hall', 'stepped', 'stepped', 'stupa', 'station', 'stadium', 'spire', 'arcology'],
+    america: ['menhirs', 'steppyramid', 'steppyramid', 'steppyramid', 'basilica', 'station', 'stadium', 'spire', 'arcology'],
+    namerica: ['menhirs', 'mound', 'mound', 'pueblo', 'church', 'station', 'stadium', 'spire', 'arcology'],
   };
   const WONDER = {
-    med: ['menhirs', 'pyramid', 'temple', 'colosseum', 'cathedral', 'basilica', 'irontower', 'stadium', 'spire'],      // (Iron Age: a great temple in stone, as at Ephesus and Samos)
-    north: ['menhirs', 'menhirs', 'menhirs', 'colosseum', 'cathedral', 'palace', 'crystal', 'stadium', 'spire'],
-    east: ['menhirs', 'menhirs', 'hall', 'hall', 'onion', 'palace', 'irontower', 'stadium', 'spire'],
-    mena: ['menhirs', 'pyramid', 'ziggurat', 'lighthouse', 'mosque', 'mosque', 'crystal', 'stadium', 'spire'],
-    africa: ['menhirs', 'pyramid', 'pyramid', 'stepped', 'mudmosque', 'mudmosque', 'crystal', 'stadium', 'spire'],
-    sasia: ['menhirs', 'stupa', 'stupa', 'stupa', 'shikhara', 'tajmosque', 'crystal', 'stadium', 'spire'],
-    easia: ['menhirs', 'hall', 'hall', 'pagoda', 'pagoda', 'hall', 'irontower', 'stadium', 'spire'],
-    seasia: ['menhirs', 'hall', 'stepped', 'stepped', 'stepped', 'stupa', 'crystal', 'stadium', 'spire'],
-    america: ['menhirs', 'steppyramid', 'steppyramid', 'steppyramid', 'steppyramid', 'basilica', 'irontower', 'stadium', 'spire'],
-    namerica: ['menhirs', 'mound', 'mound', 'mound', 'pueblo', 'church', 'irontower', 'stadium', 'spire'],
+    med: ['menhirs', 'pyramid', 'temple', 'colosseum', 'cathedral', 'basilica', 'irontower', 'stadium', 'spire', 'elevator'],      // (Iron Age: a great temple in stone, as at Ephesus and Samos)
+    north: ['menhirs', 'menhirs', 'menhirs', 'colosseum', 'cathedral', 'palace', 'crystal', 'stadium', 'spire', 'elevator'],
+    east: ['menhirs', 'menhirs', 'hall', 'hall', 'onion', 'palace', 'irontower', 'stadium', 'spire', 'elevator'],
+    mena: ['menhirs', 'pyramid', 'ziggurat', 'lighthouse', 'mosque', 'mosque', 'crystal', 'stadium', 'spire', 'elevator'],
+    africa: ['menhirs', 'pyramid', 'pyramid', 'stepped', 'mudmosque', 'mudmosque', 'crystal', 'stadium', 'spire', 'elevator'],
+    sasia: ['menhirs', 'stupa', 'stupa', 'stupa', 'shikhara', 'tajmosque', 'crystal', 'stadium', 'spire', 'elevator'],
+    easia: ['menhirs', 'hall', 'hall', 'pagoda', 'pagoda', 'hall', 'irontower', 'stadium', 'spire', 'elevator'],
+    seasia: ['menhirs', 'hall', 'stepped', 'stepped', 'stepped', 'stupa', 'crystal', 'stadium', 'spire', 'elevator'],
+    america: ['menhirs', 'steppyramid', 'steppyramid', 'steppyramid', 'steppyramid', 'basilica', 'irontower', 'stadium', 'spire', 'elevator'],
+    namerica: ['menhirs', 'mound', 'mound', 'mound', 'pueblo', 'church', 'irontower', 'stadium', 'spire', 'elevator'],
   };
   // walls by era: what a fortified town surrounds itself with. The timber countries kept the palisade long after the
   // mud-brick lands had walls of brick: the north and east of Europe, the forests of south-east Asia, the Americas.
-  const WALLSTYLE = ['palisade', 'mud', 'mud', 'stone', 'stone', 'bastion', 'none', 'none', 'none'];
+  const WALLSTYLE = ['palisade', 'mud', 'mud', 'stone', 'stone', 'bastion', 'none', 'none', 'none', 'none'];
   const TIMBER_UNTIL = [0, 4, 4, 0, 0, 0, 0, 2, 2, 4];               // by culture: the last era whose wall is still a palisade (the timber-and-earth ramparts of the north and the wooden strongholds of the east lasted through the middle ages)
   // The old ways last. Where people went on building as their forebears had, a town of a later age is still built in
   // the Iron Age manner - the same houses, walls, holy places and lanes: the timber north and the steppe until the
@@ -200,9 +210,9 @@
   // ---------- size ----------
   // Towns are planned at true scale (metres), then drawn at a representational scale, the way a strategy map does it:
   // a village is drawn ~19x life size so it reads from region height, a metropolis ~3x so it still fits its region.
-  const APC = [250, 150, 130, 110, 90, 100, 120, 200, 200];          // built-up m² per person
-  const PPB = [6, 7, 8, 10, 12, 14, 24, 60, 90];                       // people per building
-  const BUILD_T = [14, 12, 11, 10, 9, 8, 6, 4, 3];                     // years a new ring of houses takes to go up, by era
+  const APC = [250, 150, 130, 110, 90, 100, 120, 200, 200, 190];          // built-up m² per person
+  const PPB = [6, 7, 8, 10, 12, 14, 24, 60, 90, 110];                       // people per building
+  const BUILD_T = [14, 12, 11, 10, 9, 8, 6, 4, 3, 3];                     // years a new ring of houses takes to go up, by era
   const ERA_T = 50;                                                     // years over which a town rebuilds itself in a new age
   const SCALE0 = 20, SCALE_R0 = 1200;
   const scaleOf = (Rt) => SCALE0 / (1 + Rt / SCALE_R0);
@@ -290,7 +300,7 @@
     const plaza = Math.max(14, Math.min(90, R * (planned ? 0.13 : 0.1)));
     const nTarget = Math.min(coarse ? 3000 : 9000, Math.round(people / PPB[era] * (0.85 + rnd(4) * 0.3) * (walled(era, cul) ? 1.5 : 1)));      // (small households under one roof each, wall to wall)
     let s = Math.sqrt(Math.PI * R * R * 0.62 / Math.max(8, nTarget));    // slot spacing (m)
-    s = clamp(s, [7, 8, 8, 9, 8, 9, 11, 14, 16][era], 90);
+    s = clamp(s, [7, 8, 8, 9, 8, 9, 11, 14, 16, 18][era], 90);
     const blockN = planned ? 3 : 0;                                   // slots per block side before a street
     const street = planned ? s * (era >= 7 ? 0.36 : era >= 6 ? 0.5 : 0.6) : 0;      // (a city street is fifteen to thirty metres across, its pavements and verges beside it)
     const wallWork = workProg('walls'); const wallLvl = wallsL || (wallWork >= 0 ? 1 : 0);
@@ -330,6 +340,8 @@
         if (!have && prog < 0) continue; if (sl >= 0) used.add(sl);
         dist['ind_' + kind] = { a: sl >= 0 ? slotAngle(i, axis, sl) : axis + 0.9 + q * 0.55, r: kind === 'factory' || kind === 'refinery' || kind === 'lab' ? R * 0.9 : distR * 0.98, prog, ind: kind };
       } }
+    if (era >= 9 && lvl >= 3) { const nA = lvl >= 4 ? 3 : 1; for (let k = 0; k < nA; k++) dist['arco' + k] = { a: axis + 0.6 + k * 2.1 + (rnd(70 + k) - 0.5) * 0.4, r: R * (0.42 + 0.1 * k), prog: 1 }; }      // (cities in one building, about a great city's middle)
+    if (era >= 9 && lvl >= 3 && isCap) dist.spaceport = { a: axis + 3.9 + (rnd(73) - 0.5) * 0.5, r: R * 1.2, prog: 1 };      // (and beyond a capital its spaceport)
     if (oldTown && era >= 6) dist.station = { a: axis + 0.75 * Math.PI + (rnd(67) - 0.5) * 0.5, r: R * (oldR + 0.05), prog: 1 };      // (an old city's railway came to the edge of its old town; its stadium went up at the edge of the city)
     if (oldTown && era >= 7 && lvl >= 3) dist.stadium = { a: axis + 4.2 + (rnd(68) - 0.5) * 0.4, r: R * 0.74, prog: 1 };
     if (era >= 6 && lvl >= 2) dist.industry = { a: axis + Math.PI / 4 + 3.6 + rnd(63) * 0.4, r: R * 0.85, prog: 1 };
@@ -340,16 +352,16 @@
     if (portProg >= 0) { const y = (i / W) | 0, x = i - y * W; let best = null, bd = 9; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const yy = y + dy, xx = ((x + dx) % W + W) % W; if (yy >= 0 && yy < H && !sim.land[yy * W + xx]) { const d = Math.hypot(dx, dy); if (d < bd) { bd = d; best = Math.atan2(-dy, dx); } } } if (best !== null) coast = best; else coast = axis; dist.harbour = { a: coast, r: R * 1.02, prog: portProg }; if (dist.ind_shipyard) { dist.ind_shipyard.a = coast + 0.42; dist.ind_shipyard.r = R * 1.0; } }
     const near = (x, z, dd) => Math.hypot(x - dd.x, z - dd.z);
     const ore = !sim.goods || !sim.goods[i] || !sim.GOODS || !!sim.GOODS[sim.goods[i]].mine;      // what is worked here comes out of the ground (else it grows or grazes: an estate, not a pit)
-    for (const k in dist) { const d = dist[k]; d.x = Math.cos(d.a) * d.r; d.z = Math.sin(d.a) * d.r; d.rad = d.ind ? (d.ind === 'factory' || d.ind === 'refinery' || d.ind === 'lab' ? Math.min(Math.max(30, R * 0.2), 90) : Math.min(Math.max(10, R * 0.07), 17)) : k === 'stadium' ? 115 : k === 'station' ? 44 : k === 'industry' ? Math.min(R * 0.3, 160) : k === 'palace' ? Math.min(plaza * 1.2, 60) : k === 'harbour' ? Math.min(R * 0.35, 120) : k === 'market' ? Math.max(plaza * 0.7, 30) : k === 'mine' ? (ore ? Math.min(Math.max(24, R * 0.2), 70) : Math.min(Math.max(12, R * 0.08), 19)) : Math.min(Math.max(18, R * 0.16), 48); }
+    for (const k in dist) { const d = dist[k]; d.x = Math.cos(d.a) * d.r; d.z = Math.sin(d.a) * d.r; d.rad = d.ind ? (d.ind === 'factory' || d.ind === 'refinery' || d.ind === 'lab' ? Math.min(Math.max(30, R * 0.2), 90) : Math.min(Math.max(10, R * 0.07), 17)) : k === 'stadium' ? 115 : k === 'station' ? 44 : k.startsWith('arco') ? 250 : k === 'spaceport' ? 220 : k === 'industry' ? Math.min(R * 0.3, 160) : k === 'palace' ? Math.min(plaza * 1.2, 60) : k === 'harbour' ? Math.min(R * 0.35, 120) : k === 'market' ? Math.max(plaza * 0.7, 30) : k === 'mine' ? (ore ? Math.min(Math.max(24, R * 0.2), 70) : Math.min(Math.max(12, R * 0.08), 19)) : Math.min(Math.max(18, R * 0.16), 48); }
 
     // --- landmark at the plaza edge, facing in; a wonder rises there over decades ---
     const wonderProg = (sp & 16) ? 1 : workProg('wonder');
-    const wEra = styleEra(Math.min(8, (sp & 16) ? (sp >> 5) & 15 : eraReal), cul);       // a wonder keeps the form of the age that raised it
+    const wEra = styleEra(Math.min(9, (sp & 16) ? (sp >> 5) & 15 : eraReal), cul);       // a wonder keeps the form of the age that raised it
     const lmKind = wonderProg >= 0 ? WONDER[cname][wEra] : timberTown(era, cul) ? 'hall' : oldTown ? LANDMARK[cname][3] : LANDMARK[cname][band];      // (a timber town gathers round its great hall; an old city round its cathedral or mosque still)
     const lmAngle = axis + Math.PI * 0.9; const lmR = plaza * 0.9;
     const landmarkSize = (kind, big) => {
-      const S = { menhirs: [plaza * 1.4, 3.5, plaza * 1.4], ziggurat: [46, 22, 46], pyramid: [110, 70, 110], steppyramid: [44, 26, 44], temple: [34, 17, 58], colosseum: [150, 45, 120], cathedral: [44, 60, 96], church: [16, 22, 34], basilica: [60, 55, 90], mosque: [50, 40, 50], tajmosque: [60, 55, 60], mudmosque: [36, 18, 36], onion: [24, 34, 40], hall: [48, 18, 26], pagoda: [22, 42, 22], stupa: [40, 26, 40], shikhara: [26, 42, 34], stepped: [60, 34, 60], mound: [70, 12, 70], pueblo: [40, 12, 30], palace: [110, 22, 40], keep: [26, 30, 26], station: [70, 18, 30], crystal: [120, 30, 60], irontower: [60, 300, 60], stadium: [190, 40, 150], spire: [70, 600, 70], lighthouse: [16, 55, 16], granary: [10, 8, 10] }[kind] || [30, 15, 30];
-      const m = big ? (kind === 'menhirs' ? 2.2 : kind === 'irontower' || kind === 'spire' ? 1.3 : 1.9) : 1;
+      const S = { menhirs: [plaza * 1.4, 3.5, plaza * 1.4], ziggurat: [46, 22, 46], pyramid: [110, 70, 110], steppyramid: [44, 26, 44], temple: [34, 17, 58], colosseum: [150, 45, 120], cathedral: [44, 60, 96], church: [16, 22, 34], basilica: [60, 55, 90], mosque: [50, 40, 50], tajmosque: [60, 55, 60], mudmosque: [36, 18, 36], onion: [24, 34, 40], hall: [48, 18, 26], pagoda: [22, 42, 22], stupa: [40, 26, 40], shikhara: [26, 42, 34], stepped: [60, 34, 60], mound: [70, 12, 70], pueblo: [40, 12, 30], palace: [110, 22, 40], keep: [26, 30, 26], station: [70, 18, 30], crystal: [120, 30, 60], irontower: [60, 300, 60], stadium: [190, 40, 150], spire: [70, 600, 70], lighthouse: [16, 55, 16], granary: [10, 8, 10] , arcology: [180, 140, 180], elevator: [300, 12000, 300] }[kind] || [30, 15, 30];
+      const m = big ? (kind === 'menhirs' ? 2.2 : kind === 'irontower' || kind === 'spire' ? 1.3 : kind === 'elevator' ? 1 : 1.9) : 1;      // (the space elevator's cable is as long as it is)
       if (kind === 'spire' && !big) S[1] = 120 + 480 * tallK;      // (a town's mast stands as high as its towers; the great ones are a capital's wonder)
       return [S[0] * m, S[1] * m, S[2] * m];
     };
@@ -365,7 +377,7 @@
     const n = Math.ceil(R * 1.3 / s);
     const heightOf = (kind, cent) => {
       const base = { hut: 4, tipi: 5, longhouse: 5, stilt: 6, adobe: 4.5, pueblo: 7, courtyard: 5.5, courtyardc: 5.5, domehouse: 6, gable: 7.5, hip: 7, curved: 6.5, halftimber: 10, townhouse: 12, mansard: 16, palazzo: 16, terrace: 8.5, tenement: 18, block: 16, tower: 60, skyscraper: 160, granary: 5, villa: 7.5, bungalow: 5.5, slab: 30, podium: 80, cyltower: 120, taper: 300, mill: 18, mall: 11 }[kind] || 6;
-      const cap = [7, 9, 10, 14, 18, 22, 28, 320, 520][era];
+      const cap = [7, 9, 10, 14, 18, 22, 28, 320, 520, 900][era];
       let h = base * (0.85 + rnd(7) * 0.3);
       if (kind === 'block') h = (10 + 18 * cent) * (0.7 + rnd(8) * 0.6);
       if (kind === 'tower') h = (35 + 90 * cent * (lvl >= 3 ? 1.6 : 1)) * (0.7 + rnd(9) * 0.6);
@@ -415,6 +427,8 @@
         case 'tenement': return ['tenement', WALL.plaster, ROOF.flat, s * (0.8 + q2 * 0.14), s * (0.76 + q3 * 0.16), 14 + 8 * q2, 0, pal];
         case 'shophouse': return ['terrace', WALL.plaster, ROOF.flat, s * 0.97, s * (0.6 + 0.14 * q3), 10 + 4 * q2, 0, HOMEPAL];
         case 'mall': return ['mall', WALL.concrete, ROOF.flat, s * 0.96, s * 0.96, 10 + 3 * q2, 0, FLATPAL];
+        case 'greentower': return ['greentower', q3 < 0.5 ? WALL.glass : WALL.concrete, ROOF.flat, s * (0.56 + 0.12 * q3), s * (0.56 + 0.12 * q2), Math.min(capH, 50 + (30 + 120 * tallK) * q2), FLAG.garden, q3 < 0.5 ? GLASS : FLATPAL];
+        case 'vertfarm': return ['vertfarm', WALL.glass, ROOF.flat, s * (0.6 + 0.16 * q3), s * (0.6 + 0.16 * q2), Math.min(capH, 40 + 60 * q2), FLAG.garden, ['#9fc4a8', '#a9cdb0', '#94b89c']];
       }
       return null;
     };
@@ -432,6 +446,12 @@
       amer: [[['block', 4], ['slab', 2], ['flats', 2], ['homes', 2]], [['homes', 9], ['block', 1]], [['homes', 9.7], ['mall', 0.3]]],
     }[CK];
     const OLD = ['old'];
+    // the Space Age: everyone housed (the self-built edges rebuilt), gardens on every roof and up the towers, farms in towers among them
+    const dry = CK === 'mena' || CK === 'latin' || CK === 'afr' || CK === 'sasia';
+    const Z9 = [[['greentower', 4], ['perimeter', 3], [CK === 'easia' || CK === 'seasia' ? 'compound' : 'slab', 2], ['flats', 1]],
+      [['greentower', 2.5], ['vertfarm', 1.2], ['perimeter', 2.5], [CK === 'easia' || CK === 'seasia' ? 'compound' : 'slab', 2], ['homes', 1.8]],
+      [['homes', 7], ['walled', dry ? 3 : 0.5], ['vertfarm', 0.4]]];
+    const GREEN = { perimeter: 1, slab: 1, compound: 1, flats: 1, walled: 1 };
     // the kind of a plot in the city: a spec as above; OLD where the old town stands (its houses are the Renaissance's); null where
     // the people's own houses stand (the Industrial age's edge)
     const urban = (x, z, rr, k) => {
@@ -445,12 +465,14 @@
       }
       if (biz) { const dd = Math.hypot(x - biz.x, z - biz.z) / biz.r; if (dd < 1) {
         const g = Math.exp(-1.6 * dd * dd) * (0.25 + 0.75 * Math.pow(q, 1.8)) * (q2 > 0.95 ? 1.45 : 1);      // (the tallest in the middle, falling away, a few standing out above the rest)
-        const H = era >= 8 ? 40 + (10 + 520 * tallK) * g : 30 + (10 + 330 * tallK) * g;
+        const H = era >= 9 ? 50 + (20 + 650 * tallK) * g : era >= 8 ? 40 + (10 + 520 * tallK) * g : 30 + (10 + 330 * tallK) * g;
         const glass = q3 < (era >= 8 ? 0.8 : 0.45);
-        const kind = era >= 8 ? (g > 0.72 && tallK > 0.6 && q2 > 0.55 ? 'taper' : q2 < 0.22 ? 'cyltower' : q2 < 0.55 ? 'podium' : 'tower') : (tallK > 0.4 && q2 < 0.3 ? 'skyscraper' : q2 < 0.62 ? 'podium' : 'tower');
-        const wd = kind === 'taper' ? s * 0.96 : kind === 'podium' ? s * (0.86 + 0.1 * q3) : s * (0.58 + 0.26 * q3);
-        return [kind, glass ? WALL.glass : kind === 'skyscraper' ? WALL.stone : WALL.concrete, ROOF.flat, wd, kind === 'podium' || kind === 'taper' || kind === 'cyltower' ? wd : wd * (0.75 + 0.25 * q2), Math.min(capH, H), 0, glass ? GLASS : FLATPAL]; } }
+        const kind = era >= 9 ? (g > 0.6 && tallK > 0.5 && q2 > 0.82 ? 'twist' : g > 0.72 && tallK > 0.6 && q2 > 0.6 ? 'taper' : q2 < 0.3 ? 'greentower' : q2 < 0.45 ? 'cyltower' : q2 < 0.62 ? 'podium' : 'tower')
+          : era >= 8 ? (g > 0.72 && tallK > 0.6 && q2 > 0.55 ? 'taper' : q2 < 0.22 ? 'cyltower' : q2 < 0.55 ? 'podium' : 'tower') : (tallK > 0.4 && q2 < 0.3 ? 'skyscraper' : q2 < 0.62 ? 'podium' : 'tower');
+        const wd = kind === 'taper' ? s * 0.96 : kind === 'podium' ? s * (0.86 + 0.1 * q3) : kind === 'twist' ? s * 0.9 : s * (0.58 + 0.26 * q3);
+        return [kind, glass ? WALL.glass : kind === 'skyscraper' ? WALL.stone : WALL.concrete, ROOF.flat, wd, kind === 'podium' || kind === 'taper' || kind === 'cyltower' || kind === 'twist' ? wd : wd * (0.75 + 0.25 * q2), Math.min(capH, H), kind === 'greentower' ? FLAG.garden : 0, glass ? GLASS : FLATPAL]; } }
       const zone = rr < innerR ? 0 : rr < subR ? 1 : 2;
+      if (era >= 9) { const o = spec(pickZ(Z9[zone], q), q, q2, q3); if (o && GREEN[o[0]]) o[6] |= FLAG.garden; return o; }
       if (zone === 2 && CK !== 'amer' && q < 0.02 && rr < 0.92 && lvl >= 2) return spec('mall', q, q2, q3);
       return spec(pickZ(Z[zone], q), q, q2, q3);
     };
@@ -541,10 +563,10 @@
     if (lvl >= 2 || era === 0 || isCap) {
       const [lw, lh, ld] = landmarkSize(lmKind, wonderProg >= 0);
       const lx = Math.cos(lmAngle) * (lmR + ld * 0.5), lz = Math.sin(lmAngle) * (lmR + ld * 0.5);
-      const lmWall = ['menhirs', 'mound'].includes(lmKind) ? WALL.stone : lmKind === 'mudmosque' || lmKind === 'stepped' && cul === 4 ? WALL.adobe : lmKind === 'irontower' ? WALL.brick : lmKind === 'crystal' || lmKind === 'spire' ? WALL.glass : lmKind === 'station' ? WALL.brick : ['hall', 'pagoda', 'onion'].includes(lmKind) ? WALL.wood : lmKind === 'stadium' ? WALL.concrete : ['mosque', 'tajmosque', 'basilica', 'palace', 'stupa'].includes(lmKind) ? WALL.plaster : WALL.stone;
+      const lmWall = lmKind === 'arcology' ? WALL.glass : lmKind === 'elevator' ? WALL.concrete : ['menhirs', 'mound'].includes(lmKind) ? WALL.stone : lmKind === 'mudmosque' || lmKind === 'stepped' && cul === 4 ? WALL.adobe : lmKind === 'irontower' ? WALL.brick : lmKind === 'crystal' || lmKind === 'spire' ? WALL.glass : lmKind === 'station' ? WALL.brick : ['hall', 'pagoda', 'onion'].includes(lmKind) ? WALL.wood : lmKind === 'stadium' ? WALL.concrete : ['mosque', 'tajmosque', 'basilica', 'palace', 'stupa'].includes(lmKind) ? WALL.plaster : WALL.stone;
       const lmRoof = ['hall', 'pagoda'].includes(lmKind) ? ROOF.glazed : ['onion', 'basilica', 'mosque', 'tajmosque', 'stupa'].includes(lmKind) ? ROOF.copper : lmKind === 'cathedral' || lmKind === 'church' || lmKind === 'station' ? ROOF.slate : lmKind === 'temple' || lmKind === 'palace' ? ROOF.tile : ROOF.flat;
-      const lmCol = { menhirs: 0x8b857a, pyramid: 0xe7d9b0, ziggurat: 0xcdb082, steppyramid: 0xb9b0a0, temple: 0xf1ebdd, colosseum: 0xe6dcc4, cathedral: 0xc9c2b3, church: 0xd6cfc0, basilica: 0xebe3d0, mosque: 0xf3efe6, tajmosque: 0xf7f4ee, mudmosque: 0xb8845a, onion: 0xf1ede2, hall: 0xb3462f, pagoda: 0xa64534, stupa: 0xf3efe6, shikhara: 0xd8c39a, stepped: 0xa39a88, mound: 0x6f7f4a, pueblo: 0xc48f5f, palace: 0xf1e6cf, keep: 0x8c8478, station: 0x9a5a48, crystal: 0xd9e6ee, irontower: 0x6b5a4a, stadium: 0xd8dbdf, spire: 0xcbd7e0, lighthouse: 0xf2efe8 }[lmKind] || 0xd9d2c2;
-      const lmIt = push(lmKind, lx, lz, lw, lh, ld, lmAngle - Math.PI / 2, lmCol, packStyle(lmWall, lmRoof, cul, wonderProg >= 0 ? FLAG.wonder | FLAG.landmark : FLAG.landmark), 0, wonderProg >= 0 ? wonderProg : 1); lmIt.tag = 'landmark'; if (wonderProg >= 0) lmIt.era = wEra;
+      const lmCol = { menhirs: 0x8b857a, pyramid: 0xe7d9b0, ziggurat: 0xcdb082, steppyramid: 0xb9b0a0, temple: 0xf1ebdd, colosseum: 0xe6dcc4, cathedral: 0xc9c2b3, church: 0xd6cfc0, basilica: 0xebe3d0, mosque: 0xf3efe6, tajmosque: 0xf7f4ee, mudmosque: 0xb8845a, onion: 0xf1ede2, hall: 0xb3462f, pagoda: 0xa64534, stupa: 0xf3efe6, shikhara: 0xd8c39a, stepped: 0xa39a88, mound: 0x6f7f4a, pueblo: 0xc48f5f, palace: 0xf1e6cf, keep: 0x8c8478, station: 0x9a5a48, crystal: 0xd9e6ee, irontower: 0x6b5a4a, stadium: 0xd8dbdf, spire: 0xcbd7e0, lighthouse: 0xf2efe8 , arcology: 0xe9ece6, elevator: 0xdfe6ee }[lmKind] || 0xd9d2c2;
+      const lmIt = push(lmKind, lx, lz, lw, lh, ld, lmAngle - Math.PI / 2, lmCol, packStyle(lmWall, lmRoof, cul, (wonderProg >= 0 ? FLAG.wonder | FLAG.landmark : FLAG.landmark) | (lmKind === 'arcology' ? FLAG.garden : lmKind === 'elevator' ? FLAG.neon : 0)), 0, wonderProg >= 0 ? wonderProg : 1); lmIt.tag = 'landmark'; if (wonderProg >= 0) lmIt.era = wEra;
       // plaza furniture
       const propKind = era === 0 ? null : era <= 2 || timberTown(era, cul) ? 'well' : era <= 5 ? 'fountain' : 'statue';      // (a well, not a fountain, on the square of a northern market town)
       if (propKind && !coarse) push(propKind, Math.cos(lmAngle + Math.PI) * plaza * 0.25, Math.sin(lmAngle + Math.PI) * plaza * 0.25, propKind === 'well' ? 3 : propKind === 'statue' ? 4 : 8, propKind === 'well' ? 2.5 : propKind === 'statue' ? 9 : 4, propKind === 'well' ? 3 : propKind === 'statue' ? 4 : 8, 0, 0xbfb6a6, packStyle(WALL.stone, ROOF.flat, cul, 0));
@@ -563,7 +585,7 @@
       return head;
     };
     const oldHoly = era <= 2 || timberTown(era, cul);      // holy places of the old kind: a shrine, not a temple of dressed stone
-    if (dist.temple) { const tk = oldHoly ? (cul === 3 || cul === 5 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'stepped') : era === 3 ? 'temple' : LANDMARK[cname][band] === 'menhirs' ? 'temple' : (['cathedral', 'basilica', 'onion', 'station', 'stadium', 'spire', 'palace'].includes(LANDMARK[cname][band]) ? (cul === 3 || cul === 5 && era >= 5 ? 'mosque' : 'church') : LANDMARK[cname][band]); const sz = landmarkSize(tk, false); const th = quarter(dist.temple, tk, [sz[0] * 0.7, sz[1] * 0.8, sz[2] * 0.7], tk === 'church' ? 0xd6cfc0 : tk === 'temple' ? 0xf1ebdd : 0xe6dcc4, tk === 'mosque' ? WALL.plaster : WALL.stone, tk === 'church' ? ROOF.slate : tk === 'mosque' ? ROOF.copper : ROOF.tile, null, 8); th.tag = 'temple'; if (oldHoly) th.as = 'shrine'; }
+    if (dist.temple) { const tk = oldHoly ? (cul === 3 || cul === 5 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'stepped') : era === 3 ? 'temple' : LANDMARK[cname][band] === 'menhirs' ? 'temple' : (['cathedral', 'basilica', 'onion', 'station', 'stadium', 'spire', 'palace', 'arcology'].includes(LANDMARK[cname][band]) ? (cul === 3 || cul === 5 && era >= 5 ? 'mosque' : 'church') : LANDMARK[cname][band]); const sz = landmarkSize(tk, false); const th = quarter(dist.temple, tk, [sz[0] * 0.7, sz[1] * 0.8, sz[2] * 0.7], tk === 'church' ? 0xd6cfc0 : tk === 'temple' ? 0xf1ebdd : 0xe6dcc4, tk === 'mosque' ? WALL.plaster : WALL.stone, tk === 'church' ? ROOF.slate : tk === 'mosque' ? ROOF.copper : ROOF.tile, null, 8); th.tag = 'temple'; if (oldHoly) th.as = 'shrine'; }
     if (dist.academy) quarter(dist.academy, era >= 6 ? 'palazzo' : era >= 3 ? 'temple' : 'courtyard', era >= 6 ? [36, 16, 22] : [26, 11, 34], 0xe7e0d2, era >= 6 ? WALL.brick : WALL.stone, era >= 6 ? ROOF.slate : ROOF.tile, null, 8).as = 'academy';
     if (dist.palace) (quarter(dist.palace, era <= 2 ? (cul === 6 ? 'hall' : cul === 3 ? 'ziggurat' : cul === 8 ? 'steppyramid' : 'palace') : era <= 4 ? (cul === 6 ? 'hall' : 'keep') : era <= 5 ? (cul === 6 ? 'hall' : 'palace') : 'palace', era <= 2 ? [30, 10, 24] : era <= 4 ? [24, 26, 24] : [60, 18, 26], era >= 5 ? 0xf1e6cf : 0xd9cba8, WALL.stone, cul === 6 ? ROOF.glazed : ROOF.tile, null, coarse ? 0 : 4)).as = 'palace';
     if (dist.keep) { push('keep', dist.keep.x, dist.keep.z, 22, 28, 22, axis, 0x8c8478, packStyle(WALL.stone, ROOF.flat, cul, FLAG.landmark)); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; push('roundtower', dist.keep.x + Math.cos(a) * 19, dist.keep.z + Math.sin(a) * 19, 7, 20, 7, 0, 0x85807a, packStyle(WALL.stone, ROOF.slate, cul, 0)); } }
@@ -595,6 +617,11 @@
       else if (kind === 'refinery') { const [x0, z0] = at(-16, 0); push('factory', x0, z0, 30, 9, 20, yaw, 0x8c9096, packStyle(WALL.concrete, ROOF.metal, cul, FLAG.landmark), 0, pr); for (let k = 0; k < 3; k++) { const [x, z] = at(8 + k * 9, 6); push('chimney', x, z, 3, 30 + k * 6, 3, 0, 0x9a9690, packStyle(WALL.concrete, ROOF.flat, cul, 0), 0, pr); } for (let k = 0; k < 3; k++) { const [x, z] = at(6 + k * 11, -10); push('granary', x, z, 10, 9, 10, 0, 0xd8dbdf, packStyle(WALL.concrete, ROOF.metal, cul, 0), 0, pr); } }
       else if (kind === 'lab') { for (let k = 0; k < 2; k++) { const [x, z] = at((k - 0.5) * 40, 0); push('factory', x, z, 46, 9, 30, yaw, 0xcfd9e2, packStyle(WALL.glass, ROOF.flat, cul, k ? 0 : FLAG.landmark), 0, pr); } }
     }
+    for (const key in dist) if (key.startsWith('arco')) { const d = dist[key]; push('arcology', d.x, d.z, 430, 240 + 140 * tallK, 430, axis, 0xe9ece6, packStyle(WALL.glass, ROOF.flat, cul, FLAG.landmark | FLAG.garden)).as = 'arcology'; }
+    if (dist.spaceport && !coarse) { const d = dist.spaceport, yaw = d.a - Math.PI / 2, ox = Math.cos(d.a + Math.PI / 2), oz = Math.sin(d.a + Math.PI / 2), rx = Math.cos(d.a), rz = Math.sin(d.a);
+      for (let k = 0; k < 3; k++) push('rocket', d.x + ox * (k - 1) * 130 + rx * 60, d.z + oz * (k - 1) * 130 + rz * 60, 90, 120, 90, yaw, 0xe8ecef, packStyle(WALL.concrete, ROOF.flat, cul, FLAG.landmark)).as = 'spaceport';
+      push('warehouse', d.x - rx * 70, d.z - rz * 70, 150, 34, 80, yaw, 0xd8dbdf, packStyle(WALL.concrete, ROOF.metal, cul, 0)); push('tower', d.x - rx * 70 + ox * 110, d.z - rz * 70 + oz * 110, 22, 46, 22, yaw, 0xcfd9e2, packStyle(WALL.glass, ROOF.flat, cul, 0)); }
+    if (!coarse && era >= 9 && lvl >= 2) for (let k = 0; k < 5; k++) { const a = rnd(1080 + k) * Math.PI * 2; const rr = R * (1.35 + rnd(1090 + k) * 0.7) + 60; push('solar', Math.cos(a) * rr, Math.sin(a) * rr, 170, 5, 120, axis + rnd(1100 + k) * 0.6, 0x9aa3ad, packStyle(WALL.glass, ROOF.flat, cul, FLAG.thing)); }      // (fields of panels turned to the sun)
     if (dist.station) { const d = dist.station; push('station', d.x, d.z, 70, 18, 30, d.a - Math.PI / 2, 0x9a5a48, packStyle(WALL.brick, ROOF.slate, cul, FLAG.landmark)).as = 'station'; }
     if (dist.stadium) { const d = dist.stadium; push('stadium', d.x, d.z, 190, 40, 150, d.a, 0xd8dbdf, packStyle(WALL.concrete, ROOF.flat, cul, FLAG.landmark)).as = 'stadium'; }
     if (dist.industry && !coarse && era >= 6 && era <= 7) { const d = dist.industry; for (let k = 0; k < (lvl >= 3 ? 2 : 1); k++) { const a = d.a + 1.9 + k * 0.45; push('gasometer', d.x + Math.cos(a) * R * 0.14, d.z + Math.sin(a) * R * 0.14, 32, 28, 32, 0, 0x5f6a70, packStyle(WALL.concrete, ROOF.flat, cul, 0)); } }      // (the gasholders by the works)
@@ -678,7 +705,7 @@
         streets.push([u * ca - (-half) * sa, u * sa + (-half) * ca, u * ca - half * sa, u * sa + half * ca, hw]);      // along v
         streets.push([(-half) * ca - u * sa, (-half) * sa + u * ca, half * ca - u * sa, half * sa + u * ca, hw]); }     // along u
     } else {
-      const hw = Math.max(1.0, Math.min(s * 0.26, [1.3, 1.6, 2, 3, 2.6, 3.5, 5, 7, 8][era]));   // footpaths between huts, lanes in a town, streets in a city
+      const hw = Math.max(1.0, Math.min(s * 0.26, [1.3, 1.6, 2, 3, 2.6, 3.5, 5, 7, 8, 8][era]));   // footpaths between huts, lanes in a town, streets in a city
       for (const a of lanes) { const r1 = R * 1.12; streets.push([Math.cos(a) * plaza * 0.85, Math.sin(a) * plaza * 0.85, Math.cos(a) * r1, Math.sin(a) * r1, hw]); }
       if (era >= 1) for (let rr = plaza + ringStep; rr < R * 0.98; rr += ringStep) { const n = Math.max(16, Math.round(rr / 12)); for (let k = 0; k < n; k++) { const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2; streets.push([Math.cos(a0) * rr, Math.sin(a0) * rr, Math.cos(a1) * rr, Math.sin(a1) * rr, hw * 0.9]); } }
     }
@@ -741,7 +768,7 @@
     // the line of the old wall, broken
     if (ru.era <= 5 && rnd(11) < 0.7) { const segs = Math.round(R * 2 * Math.PI / 24); for (let k = 0; k < segs; k++) { if (rnd(k + 2000) < 0.35 + decay * 0.4) continue; const a = k / segs * Math.PI * 2, a2 = (k + 1) / segs * Math.PI * 2; const x1 = Math.cos(a) * R * 1.06, z1 = Math.sin(a) * R * 1.06, x2 = Math.cos(a2) * R * 1.06, z2 = Math.sin(a2) * R * 1.06; push('wallstub', (x1 + x2) / 2, (z1 + z2) / 2, Math.hypot(x2 - x1, z2 - z1) * 1.04, (3 + rnd(k + 2100) * 4) * (1 - decay * 0.6), 3, Math.atan2(z2 - z1, x2 - x1), stoneCol, WALL.stone, ROOF.flat); } }
     if (styleEra(ru.era, cul) >= 3 && rnd(7) < 0.6) push('pillars', Math.cos(rnd(8) * 6) * R * 0.3, Math.sin(rnd(8) * 6) * R * 0.3, 26, 9 * (1 - decay * 0.5), 8, rnd(9) * 3, 0xd9d0c0, WALL.stone, ROOF.flat, FLAG.landmark);
-    if (ru.wonder) { const kind = WONDER[cname][styleEra(Math.min(8, ru.wonder - 1), cul)]; const S = { menhirs: [40, 4, 40], ziggurat: [80, 36, 80], pyramid: [200, 130, 200], steppyramid: [80, 48, 80], temple: [60, 28, 100], colosseum: [280, 80, 230], cathedral: [84, 110, 180], church: [16, 22, 34], basilica: [110, 100, 170], mosque: [95, 76, 95], tajmosque: [110, 100, 110], mudmosque: [68, 34, 68], onion: [45, 64, 76], hall: [90, 34, 50], pagoda: [42, 80, 42], stupa: [76, 50, 76], shikhara: [50, 80, 64], stepped: [114, 64, 114], mound: [150, 26, 150], pueblo: [76, 23, 57], palace: [200, 42, 76], irontower: [78, 390, 78], crystal: [228, 57, 114], stadium: [360, 76, 285], spire: [91, 780, 91], lighthouse: [30, 104, 30] }[kind] || [60, 30, 60]; const keep = kind === 'pyramid' || kind === 'steppyramid' || kind === 'ziggurat' || kind === 'stepped' || kind === 'mound' ? 0.92 : 0.45 + 0.3 * (1 - decay); push(kind, 0, 0, S[0], S[1] * keep, S[2], rnd(10) * 3, stoneCol, WALL.stone, ROOF.flat, FLAG.landmark | FLAG.wonder); }
+    if (ru.wonder) { const kind = WONDER[cname][styleEra(Math.min(9, ru.wonder - 1), cul)]; const S = { menhirs: [40, 4, 40], ziggurat: [80, 36, 80], pyramid: [200, 130, 200], steppyramid: [80, 48, 80], temple: [60, 28, 100], colosseum: [280, 80, 230], cathedral: [84, 110, 180], church: [16, 22, 34], basilica: [110, 100, 170], mosque: [95, 76, 95], tajmosque: [110, 100, 110], mudmosque: [68, 34, 68], onion: [45, 64, 76], hall: [90, 34, 50], pagoda: [42, 80, 42], stupa: [76, 50, 76], shikhara: [50, 80, 64], stepped: [114, 64, 114], mound: [150, 26, 150], pueblo: [76, 23, 57], palace: [200, 42, 76], irontower: [78, 390, 78], crystal: [228, 57, 114], stadium: [360, 76, 285], spire: [91, 780, 91], lighthouse: [30, 104, 30] }[kind] || [60, 30, 60]; const keep = kind === 'pyramid' || kind === 'steppyramid' || kind === 'ziggurat' || kind === 'stepped' || kind === 'mound' ? 0.92 : 0.45 + 0.3 * (1 - decay); push(kind, 0, 0, S[0], S[1] * keep, S[2], rnd(10) * 3, stoneCol, WALL.stone, ROOF.flat, FLAG.landmark | FLAG.wonder); }
     for (const it of items) { it.x *= kS; it.z *= kS; it.w *= kS; it.d *= kS; it.h *= kH; }
     const out = { key, items, R: R * kS, k: kS }; ruinCache.set(i, out); if (ruinCache.size > 300) ruinCache.delete(ruinCache.keys().next().value); return out;
   }
