@@ -410,7 +410,12 @@ Conventions that matter:
   across (`street`). Trees stand in the gardens and courts of those blocks (`GARDEN`, `gardenAt` in `trees.js`) and in the
   parks. A plot not yet rebuilt in a new age keeps a block of the age before. A city of millions is some twenty thousand plots
   (`maxN`), drawn one by one to 0.95 of its radius (`coarseFrom`). `node tools/towns/census.js` says what each city is made
-  of; look at `city_*` on the Mac after touching any of it.
+  of; look at `city_*` on the Mac after touching any of it. *What it costs* (the build Mac, turn and turn about in one page:
+  `costb_*`, `__T.costsCity()`): nothing that can be measured - London of the Information Age from 4 km, twelve thousand plots
+  placed, 12.1 to 12.3 frames a second with its houses and its trees, without either and without both; Chicago 16 to 18 every
+  way. The frame there is the ground's. (Two starts of the app, the same views with the blocks the cities had before, measured
+  12 to 18 against 16 to 22: what two starts are worth. A cluster is five to twenty times a block's triangles - `homes` 156,
+  `rows` 276, `medina` 510 - and none of it shows.)
   *The Space Age* (style era 9, since 0.43) houses everyone (the self-built edges are rebuilt): towers with gardens on every few
   floors (`greentower`), farms forty floors high (`vertfarm`, their glass lit green), flats round planted courts, houses under
   solar tiles (half the slate and flat roofs of the age: `roofLayer`); a downtown of turning towers (`twist`) and needles; one to
