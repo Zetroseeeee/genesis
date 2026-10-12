@@ -1626,7 +1626,7 @@
         if (farUp > 0.001) { vec4 nz = noise2(gc(0.6)); float pts = smoothstep(0.35, 0.95, nz.r * 0.6 + nz.g * 0.6); lit += mix(vec3(1.0, 0.6, 0.24), vec3(1.0, 0.8, 0.48), sim.g) * light * light * (0.3 + 1.9 * pts) * night * landW * farUp * 1.1; }
       }
       // closer in, the built-up ground itself glows softly under the lamps and hearths
-      lit += mix(vec3(1.0, 0.62, 0.25), vec3(1.0, 0.9, 0.7), sim.g) * smoothstep(0.08, 0.3, dec.b) * night * (1.0 - highUp) * (0.02 + 0.26 * sim.g) * landW;      // (a town without lamps is dark but for its fires; and none of it on the water: the town's ground reaches over a lake beside it, which was a sheet of brown at night)
+      lit += mix(vec3(1.0, 0.62, 0.25), vec3(1.0, 0.9, 0.7), sim.g) * smoothstep(0.08, 0.3, dec.b) * night * (1.0 - highUp) * (0.02 + 0.26 * sim.g) * (1.0 - max(seaW, lakeW));      // (a town without lamps is dark but for its fires; and none of it on the water, sea or lake: the town's ground reaches over a lake beside it, which was a sheet of brown at night)
       lit += col * night * 0.045;
       // fresh fire glows through the night
       float front = smoothstep(0.08, 0.5, dec2.g) * (1.0 - smoothstep(0.7, 0.97, dec2.g));    // the fire front: the fringe of what is burning now
