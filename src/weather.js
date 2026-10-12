@@ -80,7 +80,7 @@
       const idx = []; for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
       bg.setAttribute('position', new THREE.BufferAttribute(this.boltPos, 3).setUsage(THREE.DynamicDrawUsage)); bg.setAttribute('aW', new THREE.BufferAttribute(w, 1)); bg.setIndex(idx);
       this.boltU = { uOn: { value: 0 }, uGlow: { value: 0 }, uRM: { value: R_M } };
-      this.bolt = new THREE.Mesh(bg, new THREE.ShaderMaterial({ uniforms: this.boltU, vertexShader: BOLT_VERT, fragmentShader: BOLT_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      this.bolt = new THREE.Mesh(bg, new THREE.ShaderMaterial({ uniforms: this.boltU, vertexShader: BOLT_VERT, fragmentShader: BOLT_FRAG, transparent: true, depthWrite: true, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));      // (it writes its depth: the rain's murk is reckoned at the bolt, not at the sky behind it)
       this.bolt.frustumCulled = false; this.bolt.visible = false; this.bolt.renderOrder = 8; scene.add(this.bolt);
       // what is happening: cover (0..1 cloud overhead), rain and snow (0..1, how hard), storm (0..1), wet (the ground), flash (0..)
       this.state = { cover: 0, rain: 0, snow: 0, storm: 0, wet: 0, flash: 0, murk: 0, near: 0 };
@@ -100,7 +100,9 @@
         let kc = 0, arid = 0, cold = 0, lying = 0, hgt = 0;
         if (o.trees && o.trees.ready) { kc = o.trees.climateAt(cam.lon, cam.lat); const T = window.TREES && TREES.Trees; arid = T ? T.ARID[kc] || 0 : 0; cold = T ? T.COLD[kc] || 0 : 0; hgt = o.terrain ? Math.max(0, o.terrain.heightAt(cam.lon, cam.lat)) : 0; const cy = o.globals ? (cam.lat >= 0 ? o.globals.uBare.value.z : o.globals.uBare.value.w) : 0.5; lying = o.trees.lyingAt(cam.lon, cam.lat, cy, hgt); }
         const wet = 1 - 0.85 * arid;
-        let rain = smooth(0.58, 0.88, cover) * wet * clamp(0.55 + 0.7 * wander(t, cam.lon * 0.1), 0, 1);
+        // (and as the year is there, climate.js: a drought holds the rain off whatever the clouds, a good year brings it more often)
+        const CL = sim.climate, ci = clamp(Math.floor((90 - cam.lat) / 180 * 360), 0, 359) * 720 + ((Math.floor((cam.lon + 180) / 360 * 720) % 720) + 720) % 720, hv = CL && CL.hv ? (CL.ice && CL.ice[ci] ? 1 : CL.hv[ci]) : 1;      // (over the ice the harvest is nought, and it snows there all the same)
+        let rain = smooth(0.58, 0.88, cover) * wet * clamp(0.55 + 0.7 * wander(t, cam.lon * 0.1), 0, 1) * smooth(0.62, 0.95, hv || 0) * (hv > 1.05 ? 1.2 : 1);
         let snow = smooth(0.2, 0.5, lying);      // (it snows where snow is lying, or as good as)
         const ph = ((o.season || 0.45) + (cam.lat < 0 ? 0.5 : 0)) % 1, summer = 0.5 - 0.5 * Math.cos(ph * Math.PI * 2);
         let storm = (kc >= 1 && kc <= 4 ? 1 : kc === 9 || kc === 15 || kc === 18 || kc === 22 || kc === 26 ? smooth(0.6, 0.9, summer) : 0) * smooth(0.55, 0.85, rain) * (1 - snow);
@@ -112,11 +114,11 @@
       this.wet += (this.rain > this.wet ? (this.rain - this.wet) * (1 - Math.exp(-dt / 6)) : (this.rain - this.wet) * (1 - Math.exp(-dt / 60))); S.wet = this.wet * (1 - S.snow);
       // what is seen of it: the streaks or flakes about the eye while it is under the clouds' base
       const near = 1 - lsm(1800, 5000, agl); S.near = near;
-      const amount = this.rain * near, N = Math.round(MAX * clamp(amount * 1.15, 0, 1) * (S.snow > 0.5 ? 0.8 : 1));
+      const amount = this.rain * near, N = Math.round(MAX * clamp(amount * 1.15, 0, 1));
       this.mesh.geometry.instanceCount = N; this.mesh.visible = N > 20;
       if (this.mesh.visible) {
         const B = clamp(dist * 0.12, 8, 260); U.uBox.value = B; U.uSnow.value = S.snow > 0.5 ? 1 : 0;
-        U.uFall.value = S.snow > 0.5 ? B * 0.12 : B * 1.15; U.uLen.value = B * 0.05 * (0.7 + 0.5 * this.rain); U.uWid.value = B * (S.snow > 0.5 ? 0.0016 : 0.0016);
+        U.uFall.value = S.snow > 0.5 ? B * 0.12 : B * 1.15; U.uLen.value = B * 0.05 * (0.7 + 0.5 * this.rain); U.uWid.value = B * (S.snow > 0.5 ? 0.0009 : 0.0016);
         // the wind slants the rain: from the west in the middle latitudes, from the east in the trades (as the surf has it), stronger in a storm
         const aLat = Math.abs(cam.lat), west = aLat > 30 && aLat < 62 ? 1 : aLat < 28 ? -1 : 0.3, ws = (2 + 6 * S.storm) * B / 9; U.uWind.value.set(west * ws, ws * 0.3 * Math.sin(t * 0.05));
         // the frame: east, up and north at the point looked at, as the view turns them; the eye's place in it, wrapped by the box
@@ -128,7 +130,7 @@
         U.uOff.value.set(wrap((cp.x * f.east.x + cp.y * f.east.y + cp.z * f.east.z) * R_M), wrap((cp.x * f.up.x + cp.y * f.up.y + cp.z * f.up.z) * R_M), wrap((cp.x * f.north.x + cp.y * f.north.y + cp.z * f.north.z) * R_M));
         // the colour of rain against the light it falls in: pale in the day, dark at night, lit by the lightning
         const day = o.day !== undefined ? o.day : 1, fl = Math.min(1, this.flash);
-        if (S.snow > 0.5) { U.uCol.value.setRGB(0.6 + 0.35 * day + fl * 0.3, 0.62 + 0.35 * day + fl * 0.3, 0.66 + 0.33 * day + fl * 0.3); U.uAlpha.value = 0.6; }
+        if (S.snow > 0.5) { U.uCol.value.setRGB(0.6 + 0.35 * day + fl * 0.3, 0.62 + 0.35 * day + fl * 0.3, 0.66 + 0.33 * day + fl * 0.3); U.uAlpha.value = 0.5; }
         else { U.uCol.value.setRGB(0.22 + 0.5 * day + fl * 0.5, 0.24 + 0.52 * day + fl * 0.5, 0.28 + 0.55 * day + fl * 0.5); U.uAlpha.value = 0.2 + 0.14 * this.rain; }
       }
       // the murk: what is far fades into the grey of the falling rain (post.js), while the eye is down in it

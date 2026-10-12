@@ -1627,7 +1627,7 @@
       float snowAll = max(max(max(snow, ice * 0.95), snowCov) * landW, sheet) * day;      // (an ice sheet over the sea is snow to the light, as it is over the land)
       ambC *= mix(vec3(1.0), vec3(1.55, 1.75, 2.15), snowAll * (1.0 - 0.6 * diff));
       // rain: wet ground is darker, and under the rain the sun's light is mostly gone (weather.js)
-      if (uWet > 0.002) { col *= 1.0 - 0.24 * uWet * landW * (1.0 - snowAll) * (1.0 - wetAll); diff *= 1.0 - 0.4 * uWet; }
+      if (uWet > 0.002) { col *= 1.0 - 0.24 * uWet * landW * (1.0 - snowAll) * (1.0 - wetAll); diff *= 1.0 - 0.65 * uWet; }
       vec3 lit = col * (ambC + diff * (1.05 - 0.16 * snowAll) * sunCol * mix(1.0, 0.5, seaW * 0.3 * (1.0 - sheet)));
       // ---------- what the water mirrors ----------
       // Still water is a mirror, dark looked down into and bright along the eye's level (Fresnel): it shows the sky that
