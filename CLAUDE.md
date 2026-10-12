@@ -941,8 +941,8 @@ Conventions that matter:
   keep a quarter where they are gone; in `yieldsOf`), **measured against the age** as every edge is - over what the woods the
   world's people live in yield on the whole (`wfK`, counted with the rest a fifth a year): the world has the timber it always had and
   the market's yields stand as they were measured, but a realm that has cleared its woods has less of it than one that kept them (laid
-  on without it, the yields measured again doubled timber everywhere to make up for the cleared ages, and the wildwood of the first
-  ages was a timber yard: a world fought a sixth fewer wars); and the picture - the ground's fields (`uSim.b`, `sim.cleared`) and the trees
+  on without it, the yields measured again doubled timber everywhere to make up for the cleared ages, the wildwood of the first ages
+  was a timber yard, and one world fought a sixth fewer wars); and the picture - the ground's fields (`uSim.b`, `sim.cleared`) and the trees
   (`trees.js`) are the woods that stand, not who farms this year: a field stays where a wood was felled until the wood grows back.
   The player's word on his woods (`POLICY`, on the realm as `civ.woods.k`): cleared as the farmers will; kept for the crown (the royal
   forests: three quarters as much cleared, at half the pace; the land feeds three in a hundred less; the nobles hunt in them and the

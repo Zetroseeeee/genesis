@@ -31,6 +31,11 @@
 // more). Measured then over 12345 and 777 (0.39 in brackets): wars begun in a whole history 4,371 and 4,897 (4,425 and 4,760);
 // realms in AD 2000 225 and 265 (235 and 233); people in AD 2000 6,404 and 5,738 million (6,155 and 6,333); wars a realm begins
 // in a century at the dates above 0.15 0.26 0.33 0.41 0.48 0.40 and 0.12 0.30 0.33 0.41 0.58 0.46.
+// Since 0.41 the woods are cleared and grow back (woods.js), and timber comes from the woods that stand, measured against the age
+// (laid on without that, the market's yields measured again doubled timber everywhere and seed 777 fought 4,083 wars). Measured then
+// over 12345 and 777 (0.40 in brackets): wars begun in a whole history 4,401 and 5,244 (4,371 and 4,897); realms in AD 2000 228 and
+// 249 (225 and 265); people in AD 2000 7,053 and 5,764 million (6,404 and 5,738); wars a realm begins in a century at the dates
+// above 0.15 0.27 0.30 0.43 0.44 0.44 and 0.13 0.35 0.36 0.46 0.55 0.66.
 // If wars fall off, look at the line "appetite": pacts and fear should leave a realm somebody to fight about half the time.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;
