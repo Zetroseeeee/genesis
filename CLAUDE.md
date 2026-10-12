@@ -938,7 +938,11 @@ Conventions that matter:
   are their people's (`h.cult`, the old cultivation). A fifth of the land is gone over each year, in one piece (`LAP`), most of it
   woods nobody clears and passed over at once; the land a realm can farm is counted a fifth a year and summed when all five are in
   (`scan`; whole after a load). What it gives: timber at the market by the woods that stand (`woodF`: hedgerows, coppices and orchards
-  keep a quarter where they are gone; in `yieldsOf`), and the picture - the ground's fields (`uSim.b`, `sim.cleared`) and the trees
+  keep a quarter where they are gone; in `yieldsOf`), **measured against the age** as every edge is - over what the woods the
+  world's people live in yield on the whole (`wfK`, counted with the rest a fifth a year): the world has the timber it always had and
+  the market's yields stand as they were measured, but a realm that has cleared its woods has less of it than one that kept them (laid
+  on without it, the yields measured again doubled timber everywhere to make up for the cleared ages, and the wildwood of the first
+  ages was a timber yard: a world fought a sixth fewer wars); and the picture - the ground's fields (`uSim.b`, `sim.cleared`) and the trees
   (`trees.js`) are the woods that stand, not who farms this year: a field stays where a wood was felled until the wood grows back.
   The player's word on his woods (`POLICY`, on the realm as `civ.woods.k`): cleared as the farmers will; kept for the crown (the royal
   forests: three quarters as much cleared, at half the pace; the land feeds three in a hundred less; the nobles hunt in them and the

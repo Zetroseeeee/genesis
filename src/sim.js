@@ -697,7 +697,7 @@ function createSim(world, seed) {
     atWar: (cv, d) => cv.wars[d] !== undefined, news: migrationNews, teach: (d, x) => { const dv = civs[d]; if (dv && x > 0) dv.tech = Math.min(1, dv.tech + x); } }) : null;
   // the world's woods (woods.js): cleared toward what its people's fields, pasture and fallow take, at the pace of their tools,
   // grown back where they leave; timber by the woods that stand; the player's word on his woods
-  woods = WOODS && LM ? WOODS.create({ N, W, H, LI, MAXC, soil, owner, use: useA, civs, popOf: (c) => popOf[c], ice: ICE, year: () => year, cult: (i) => cultivationOf(i) }) : null;
+  woods = WOODS && LM ? WOODS.create({ N, W, H, LI, MAXC, soil, owner, use: useA, civs, popOf: (c) => popOf[c], ice: ICE, year: () => year, cult: (i) => cultivationOf(i), pop, wood, goods, gTimber: G_TIMBER }) : null;
   // (how far a realm uses a region's land: its people against what it feeds, as far as they farm; and of every region, worked out from
   //  the people and the land as they stand - for a world just loaded, before a year has passed)
   function fillUse() { for (const cv of civs) if (cv) { landRow(cv); fmOf[cv.id] = fmNow(cv); } for (const i of LI) { const o = owner[i], c = o >= 0 ? civs[o] : null; if (!c) { useA[i] = 0; continue; } const K = capacity(i, c), p = pop[i]; useA[i] = p >= K ? 255 : (255 * p / Math.max(K, 0.01)) | 0; } }

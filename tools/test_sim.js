@@ -1612,7 +1612,7 @@ log('25. the woods');
   const w1 = X.of(P.id);
   check(w0 > 0.99 && w1.share < 0.6, `in sixty years the kingdom clears its woods: ${Math.round(w0 * 100)}% of nature's, then ${Math.round(w1.share * 100)}% (${Math.round(w1.now)} km² of ${Math.round(w1.nature)})`);
   check(X.cleared(paris) > 0.3 && sim.cleared(paris) === X.cleared(paris) && ['thin', 'cleared', 'woods'].includes(WD.BANDS[X.bandOf(paris)].key), `the picture and the lens show it (${Math.round(X.cleared(paris) * 100)}% cleared: ${WD.BANDS[X.bandOf(paris)].name.toLowerCase()})`);
-  check(X.woodF(paris) < 0.85 && X.woodF(paris) >= 0.25, `and its woods yield less timber (${Math.round(X.woodF(paris) * 100)}% of what they would)`);
+  check(X.woodOwn(paris) < 0.85 && X.woodOwn(paris) >= 0.25 && X.woodF(paris) < X.woodF(amazon) && X.wfK >= 1, `and its woods yield less timber: ${Math.round(X.woodOwn(paris) * 100)}% of what they would, against a wildwood's ${Math.round(100 * X.woodF(amazon) / X.wfK)}% (the age's woods yield ${(1 / X.wfK).toFixed(2)} of nature's)`);
   check(P.events.some((e) => /woods of .* are gone/.test(e.text) && e.calm), `the player is told, as news that does not stop his turn: "${(P.events.find((e) => /woods of .* are gone/.test(e.text)) || { text: '-' }).text}"`);
   // where people leave the land the woods grow back, half in some sixty years
   { const cells = mine(), gap0 = cells.reduce((a, i) => a + X.pot[i] - X.cover[i], 0); const own = cells.map((i) => sim.owner[i]); for (const i of cells) sim.owner[i] = -1;
