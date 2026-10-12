@@ -956,8 +956,10 @@ Conventions that matter:
   its people leave standing), its key with the world's woods and the player's, and the word. Saved with the world (`save().woods`: a
   byte a region of the land in its order, a bit for the land the ice has left) and the realm (`civ.woods`: the word, the band last told);
   a world saved before the woods has as much wood as its fields leave (`settle`), one saved before the land had kinds none (its fields
-  are who farms them, as before). The module throws no dice. WOODS_NUMBERS
-  Look at the Mac's `wds_*` after touching it, and run `tools/woods/probe.js` over 12345 and 777.
+  are who farms them, as before). The module throws no dice. Measured over 12345 and 777 (`tools/woods/probe.js`, whose header says what to hold it to): the
+  world keeps 0.86 of nature's woods in 1700 and 0.8 in 2000; the heartland of western Europe a fifth to two fifths by 1300 and a
+  fifth in 1850, growing back since; India a third by 2000. A year of it is a tenth to a fifth of a millisecond (test section 25).
+  Look at the Mac's `wds_*` after touching it, and run the probe over 12345 and 777, then the war-and-peace probe.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by

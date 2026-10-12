@@ -3,9 +3,17 @@
 // year of it takes.
 //   node tools/woods/probe.js [seed[,seed...]] [last year]
 // What to hold it to (Williams, Deforesting the Earth, 2003; Kaplan et al. 2009; FAO): the world keeps nine tenths of its woods
-// to 1700, some four fifths in 1850 and two thirds in 2000; western Europe a half by AD 1000, a fifth to a third by 1300 and
-// about a fifth in 1850, more again by 2000; China about half by AD 1, under a quarter by 1900; the Americas' woods growing back
-// after the sicknesses of the sixteenth century and cleared again in the nineteenth; the tropics cleared last.
+// to 1700, some four fifths in 1850 and two thirds in 2000; the heartland of western Europe (heart: France, the Low Countries,
+// Germany and England - Maddison's western Europe takes in Scandinavia and the Alps, which kept their woods) a half by AD 1000, a
+// fifth to a third by 1300 and about a fifth in 1850, more again by 2000; China about half by AD 1, under a quarter by 1900; the
+// Americas' woods growing back after the sicknesses of the sixteenth century and cleared again in the nineteenth; the tropics
+// cleared last.
+// Measured for 0.41 over 12345 and 777: the world 0.93 and 0.94 of nature's woods in AD 1, 0.86 in 1700, 0.83 and 0.84 in 1850,
+// 0.79 and 0.80 in 2000 (the tropics are cleared less than ours were); the heart 0.56 and 0.78 in AD 1, 0.35 and 0.46 in 1000, 0.22
+// and 0.42 in 1300, 0.20 and 0.19 in 1850, 0.29 and 0.28 in 2000; China 0.60 and 0.61 in AD 1, 0.53 in 1900 (its plain is steppe by
+// its kind of land, and few woods are counted there by nature); India 0.50 and 0.59 in AD 1, 0.31 in 2000; the Western Offshoots
+// 0.99 to 1600, 0.86 and 0.84 in 2000; Africa 0.66 and 0.76 in 2000. A year of it 0.08 to 0.2 ms (the second world in a run
+// measures up to twice that).
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 global.performance = global.performance || require('perf_hooks').performance;
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;
