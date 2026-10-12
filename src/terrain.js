@@ -280,6 +280,7 @@
     }
     uniform sampler2D uWater; uniform vec4 uWaterRect, uWaterP;      // the water's edge (data/w): P = 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; for 2 the distance and the kind
     uniform float uDLon, uDLat, uLevel;
+    uniform float uWet;      // how wet the ground is under the rain (weather.js)
     uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix, uYearPh; uniform vec4 uSeason; uniform vec4 uBare; uniform vec4 uIceCold;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
     uniform sampler2D uOwner, uPal, uSim, uNoise;
     // (the planet's own maps travel as one texture of two layers where they could be made one: info.png, and what grows there by
@@ -1625,6 +1626,8 @@
       //  of paper with no hills in it)
       float snowAll = max(max(max(snow, ice * 0.95), snowCov) * landW, sheet) * day;      // (an ice sheet over the sea is snow to the light, as it is over the land)
       ambC *= mix(vec3(1.0), vec3(1.55, 1.75, 2.15), snowAll * (1.0 - 0.6 * diff));
+      // rain: wet ground is darker, and under the rain the sun's light is mostly gone (weather.js)
+      if (uWet > 0.002) { col *= 1.0 - 0.24 * uWet * landW * (1.0 - snowAll) * (1.0 - wetAll); diff *= 1.0 - 0.4 * uWet; }
       vec3 lit = col * (ambC + diff * (1.05 - 0.16 * snowAll) * sunCol * mix(1.0, 0.5, seaW * 0.3 * (1.0 - sheet)));
       // ---------- what the water mirrors ----------
       // Still water is a mirror, dark looked down into and bright along the eye's level (Fresnel): it shows the sky that

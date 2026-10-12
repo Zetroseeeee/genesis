@@ -418,6 +418,19 @@
         t += R() < 0.15 ? 0.01 + R() * 0.04 : -Math.log(1 - R() * 0.999) / 7;
       }
     },
+    // rain: a hiss of many drops far and near, and the patter of the near ones, each a tick through its own resonance
+    rain(S, len) {
+      const R = S.R, ctx = S.ctx;
+      for (let ch = 0; ch < 2; ch++) { const n = ctx.createBufferSource(); n.buffer = S.white; n.loop = true; const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000; const g = ctx.createGain(); g.gain.value = 0.35; n.connect(hp); hp.connect(lp); lp.connect(g); g.connect(S.pan(ch ? 0.7 : -0.7, 1)); n.start(0, R()); n.stop(len); }
+      let t = 0.01;
+      while (t < len - 0.03) {
+        const out = S.pan(R() * 1.8 - 0.9, 0.08 + 0.5 * Math.pow(R(), 2)), n = ctx.createBufferSource(); n.buffer = S.white;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800 + R() * 5000; bp.Q.value = 2 + R() * 6;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.001); g.gain.exponentialRampToValueAtTime(0.001, t + 0.012 + R() * 0.02);
+        n.connect(bp); bp.connect(g); g.connect(out); n.start(t, R() * 2); n.stop(t + 0.04);
+        t += -Math.log(1 - R() * 0.999) / 70;
+      }
+    },
     // a battle far off: a roar of men, the clash of arms
     din(S, len) {
       const R = S.R, ctx = S.ctx;
@@ -578,8 +591,9 @@
     X.sea = [bed(E.pink, [lp(800, 0.5), hp(70)], -0.45), bed(E.pink, [lp(800, 0.5), hp(70)], 0.45)];
     X.high = bed(E.brown, [lp(240, 0.6), pk(110, 1.5, 5)], 0);
     X.rush = bed(E.pink, [bp(900, 0.5)], 0);
+    X.downpour = [bed(E.pink, [lp(1400, 0.6), hp(120)], -0.5), bed(E.pink, [lp(1400, 0.6), hp(120)], 0.5)];      // (the roar of heavy rain, under the patter)
     X.tex = {};      // the textures as they come: rendered once the sound is first heard (a page nobody listens to renders nothing)
-    const want = { crickets: 16, frogs: 18, cicadas: 22, murmur: 20, fire: 12, din: 14 };
+    const want = { crickets: 16, frogs: 18, cicadas: 22, murmur: 20, fire: 12, din: 14, rain: 9 };
     X.load = () => X.ready || (X.ready = Object.keys(want).reduce((p, k) => p.then(() => E.texture(k, want[k], (S, len) => TEX[k](S, len)).then((buf) => { if (buf) X.tex[k] = bed(buf, [], 0, k === 'murmur' || k === 'din' ? 0.25 : 0.1); })), Promise.resolve()));
 
     // set a bed's level (smoothly: tc seconds)
@@ -631,8 +645,14 @@
       L.murmur = play * tk * (0.25 + 0.75 * day) * (tw && tw.era >= 7 ? 0.5 : 1) * 0.24;
       L.fire = play * tk * smooth(0.35, 0.8, night) * (tw && tw.style <= 5 ? 1 : 0) * 0.25;
       L.din = play * sc.battle * 0.36;
+      // rain: the patter and hiss while it falls about the eye, the roar of a downpour under it; birds and insects keep quiet
+      const rn = sc.rain || 0;
+      L.rain = play * rn * (0.35 + 0.65 * (1 - lsm(400, 6000, agl))) * 0.55;
+      L.downpour = play * smooth(0.5, 1, rn) * (1 - lsm(800, 8000, agl)) * 0.12;
+      for (const b of X.downpour) set(b, L.downpour * solo('downpour'), 1.5);
+      L.crickets *= 1 - rn; L.frogs *= 1 - 0.5 * rn; L.cicadas *= 1 - rn;
       if (X.solo) for (const k in L) if (!X.solo.has(k)) L[k] = 0;
-      for (const k of ['crickets', 'frogs', 'cicadas', 'murmur', 'fire', 'din']) set(X.tex[k], L[k], k === 'din' ? 0.6 : 1.5);
+      for (const k of ['crickets', 'frogs', 'cicadas', 'murmur', 'fire', 'din', 'rain']) set(X.tex[k], L[k], k === 'din' ? 0.6 : 1.5);
       if (!play) { X.singers.length = 0; X.night.length = 0; X.beasts.length = 0; return; }
 
       // ---- spots
@@ -646,7 +666,7 @@
       const zone = sc.zone, list0 = (SINGERS[zone] || []).filter((it) => it[3] === 'all' || (it[3] === 'spring' ? sc.spring > 0.35 : sc.summerish > 0.3));
       const list = sc.america ? list0.map((it) => [NEW_WORLD[it[0]] || it[0], it[1], it[2], it[3]]) : list0;
       const habitat = (it) => it[1] * (it[2] === 'w' ? sc.woods + 0.15 : it[2] === 'o' ? sc.grass + sc.farm * 0.8 + 0.1 : 1);
-      const birdy = near * day * (0.25 + 0.75 * sc.summerish) * (1 + 1.8 * sc.dawn) * (1 - sc.snow * 0.7) * (sc.woods + sc.grass * 0.7 + sc.farm * 0.4) * (1 - sc.water * 0.7) * (tk > 0.4 ? 0.6 : 1);
+      const birdy = near * day * (0.25 + 0.75 * sc.summerish) * (1 + 1.8 * sc.dawn) * (1 - sc.snow * 0.7) * (1 - 0.85 * (sc.rain || 0)) * (sc.woods + sc.grass * 0.7 + sc.farm * 0.4) * (1 - sc.water * 0.7) * (tk > 0.4 ? 0.6 : 1);
       tend(X.singers, Math.round(clamp(birdy * 7, 0, 6)) * solo('birds'), list, habitat, (s, at) => sing(s, at, BIRD[s.kind], 0.36 * near), sc);
       // night birds
       const nlist = (NIGHT[zone] || []).filter((it) => (it[2] === 'all' || (it[2] === 'spring' ? sc.spring > 0.35 : sc.summerish > 0.3)) && (it[3] !== 'water' || sc.fresh > 0.3 || sc.wet > 0.3));
@@ -787,6 +807,15 @@
     Object.assign(SOUND.vol, v || {}); const E = SOUND.E; if (!E) return; const t = E.ctx.currentTime, V = SOUND.vol;
     E.master.gain.setTargetAtTime(Math.pow(clamp(V.master, 0, 1), 1.6) * 1.1, t, 0.05); E.world.gain.setTargetAtTime(Math.pow(clamp(V.world, 0, 1), 1.6), t, 0.05); E.ui.gain.setTargetAtTime(Math.pow(clamp(V.ui, 0, 1), 1.6), t, 0.05); E.music.gain.setTargetAtTime(Math.pow(clamp(V.music, 0, 1), 1.6), t, 0.05);
   };
+  // thunder: after the flash, by how far away the strike was (metres: sound goes 343 m a second, here never more than nine seconds
+  // late); near, a crack first; then the roll, lower and longer the further off
+  SOUND.thunder = function (dist, bolt) {
+    const E = SOUND.E; if (!E || E.ctx.state !== 'running') return;
+    const t = E.ctx.currentTime + Math.min(9, dist / 343) * (bolt ? 1 : 0.7), k = Math.max(0.15, 1 - dist / 12000), o = E.place(0.9 * k, Math.random() * 1.2 - 0.6, Math.min(dist, 1500), 0.4), R = E.R;
+    if (dist < 3500) { const n = E.src(E.white, t, 0.3), h = E.filt('highpass', 1200, 0.7), g = E.ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.9 * k, t + 0.008); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25); n.connect(h); h.connect(g); g.connect(o); }
+    const d = 3 + dist / 2500 + R() * 2, f = 90 + 260 * k;
+    for (let i = 0, u = t + 0.05; i < 3 + (R() * 3 | 0) && u < t + d; i++) { const dd = 0.8 + R() * 1.6; E.rumble(o, u, dd * 1.6, f * (0.8 + R() * 0.4), (0.6 + 0.6 * R()) * (1 - i * 0.12)); u += dd * (0.4 + R() * 0.5); }
+  };
   SOUND.ui = function (kind) { if (SOUND.V && SOUND.E.ctx.state === 'running') SOUND.V.ui(kind); };
   SOUND.sting = function (kind) {
     if (!SOUND.V || SOUND.E.ctx.state !== 'running') return;
@@ -798,7 +827,7 @@
   const cellOf = (lon, lat) => clamp(Math.floor((90 - lat) / 180 * 360), 0, 359) * 720 + ((Math.floor((lon + 180) / 360 * 720) % 720) + 720) % 720;      // (the simulation's grid: 720 by 360)
   function sceneOf(dtS) {
     const cam = G.cam, T = G.terrain, sim = G.sim && G.sim(), RM = window.GEO ? GEO.R_M : 6371000;
-    const sc = { mode: G.mode ? G.mode() : 'play', agl: 1e7, hgt: 0, lon: 0, lat: 0, day: 1, dawn: 0, spring: 0, summerish: 0.5, warmth: 0.5, heat: 0, cold: 0, snow: 0, leafy: 1, woods: 0, grass: 0, farm: 0, water: 0, shore: 1e9, open: 0, fresh: 0, wet: 0, zone: 'temperate', america: false, windy: 0.5, speed: 0, town: null, battle: 0, battleEra: 0, herds: [], era: 0, key: '' };
+    const sc = { mode: G.mode ? G.mode() : 'play', agl: 1e7, hgt: 0, lon: 0, lat: 0, day: 1, dawn: 0, spring: 0, summerish: 0.5, warmth: 0.5, heat: 0, cold: 0, snow: 0, leafy: 1, woods: 0, grass: 0, farm: 0, water: 0, shore: 1e9, open: 0, fresh: 0, wet: 0, zone: 'temperate', america: false, windy: 0.5, speed: 0, town: null, battle: 0, battleEra: 0, herds: [], era: 0, key: '', rain: 0, snowing: 0 };
     if (!cam || !T) return sc;
     sc.agl = (cam.agl || cam.alt || 1) * RM; sc.lon = cam.lon; sc.lat = cam.lat; sc.hgt = Math.max(0, T.heightAt ? T.heightAt(cam.lon, cam.lat) : 0);
     // how fast the eye moves against how high it is (the rush of air when it flies)
@@ -856,6 +885,8 @@
       for (const b of sim.battles) { if (sim.year - b.year > 2) continue; const lo = ((b.i % 720) + 0.5) / 720 * 360 - 180, la = 90 - (((b.i / 720) | 0) + 0.5) / 360 * 180; const dM = GEO.distKm(cam.lon, cam.lat, lo, la) * 1000, k = (1 - lsm(8000, 45000, Math.sqrt(dM * dM + sc.agl * sc.agl))); if (k > bb) { bb = k; const c = sim.civs[b.a]; era = c ? c.era : 0; } }
       sc.battle = bb; sc.battleEra = era;
     }
+    // the weather (weather.js): rain about the eye
+    const Wt = G.weather && G.weather(); if (Wt && Wt.state) { sc.rain = Wt.state.rain * Wt.state.near * (Wt.state.snow > 0.5 ? 0.15 : 1); sc.snowing = Wt.state.snow > 0.5 ? Wt.state.rain : 0; }
     // the herds near by (fauna.js)
     if (G.fauna && G.fauna.near && sc.agl < 5000) sc.herds = G.fauna.near(cam.lon, cam.lat, 3000);
     const me = sim && sim.playerCiv ? sim.playerCiv() : null; sc.era = me ? me.era : (sim ? 0 : 0);
