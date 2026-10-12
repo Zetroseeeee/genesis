@@ -275,12 +275,12 @@
       this.planes = planes;
     }
     // the pads of the spaceports near the eye (three beyond a capital of the Space Age); a pad that stays in view keeps its smoke
-    respawnPads(cam, sim) {
+    respawnPads(cam, sim, decal) {
       const pads = []; const T = this.terrain; const rad = 4; const cy0 = Math.floor((90 - cam.lat) / 180 * H), cx0 = Math.floor((cam.lon + 180) / 360 * W);
       const vc = this._vc || (this._vc = new Map());
       for (let dy = -rad; dy <= rad && pads.length < PADS; dy++) { const y = cy0 + dy; if (y < 0 || y >= H) continue; for (let dx = -rad; dx <= rad && pads.length < PADS; dx++) {
         const x = ((cx0 + dx) % W + W) % W; const i = y * W + x; if (sim.level[i] < 3 || sim.owner[i] < 0) continue; const c = sim.civs[sim.owner[i]]; if (!c || c.capital !== i || c.era < 9) continue;
-        const L = TOWN.layout(sim, i, c, {}); if (!L || !L.items) continue; const [cLon, cLat] = TOWN.siteOf(sim, i, c, T, null); const cl = Math.max(0.15, Math.cos(cLat * D2R)); let k = 0;
+        const L = TOWN.layout(sim, i, c, {}); if (!L || !L.items) continue; const [cLon, cLat] = TOWN.siteOf(sim, i, c, T, decal); const cl = Math.max(0.15, Math.cos(cLat * D2R)); let k = 0;      // (where the world draws the town: a site moved off a river, as the streets' traffic has it)
         for (const it of L.items) { if (it.as !== 'spaceport' || pads.length >= PADS) continue; const lon = cLon + it.x / (R_M * cl * D2R), lat = cLat + it.z / (R_M * D2R);
           pads.push({ key: i * 8 + k, lon, lat, cl: Math.max(0.15, Math.cos(lat * D2R)), hg: Math.max(0, T.meshHeightAt(lon, lat, vc)), w: it.w, h: it.h, ph: hash(i, 9500 + k) * RK_PERIOD, k: L.k || 1, trail: new Float32Array(RTRAIL * 3), tAge: new Float32Array(RTRAIL).fill(1), tSize: new Float32Array(RTRAIL), head: 0, puffT: 0 }); k++; }
       } }
@@ -315,7 +315,7 @@
       const movedP = GEO.distKm(cam.lon, cam.lat, this.lastPlanes.lon, this.lastPlanes.lat) > 400;
       if (movedP || now - this.lastPlanes.t > 12000) { this.lastPlanes = { lon: cam.lon, lat: cam.lat, t: now }; this.respawnPlanes(cam, sim); }
       const movedR = GEO.distKm(cam.lon, cam.lat, this.lastPads.lon, this.lastPads.lat) > 80;
-      if (movedR || now - this.lastPads.t > 10000) { this.lastPads = { lon: cam.lon, lat: cam.lat, t: now }; this.respawnPads(cam, sim); }
+      if (movedR || now - this.lastPads.t > 10000) { this.lastPads = { lon: cam.lon, lat: cam.lat, t: now }; this.respawnPads(cam, sim, decal); }
       this.clock = now / 1000;
       this.cuni.uDay.value = day; this.cuni.uFovK.value = viewportH / (2 * Math.tan(fovDeg * 0.5 * D2R));
       this.animate(dt, sim);
@@ -406,7 +406,8 @@
         const at = window.__launchAt; let jP = 0;      // (for pictures: __launchAt = performance.now() of the first launch, the other pads 7 s apart)
         for (const p of this.pads) {
           let tau = ((t + p.ph) % RK_PERIOD + RK_PERIOD) % RK_PERIOD; if (at !== undefined) { tau = t - at / 1000 - 7 * jP; tau = tau < 0 ? RK_PERIOD - 1 : tau % RK_PERIOD; } jP++;
-          const wR = p.w * 0.16, hR = p.h * 0.8, base = p.h * 0.04;
+          // (the rocket stands on the pad's deck, a tenth of its height up, and the kit sinks the pad into the ground as world.setInst does a building)
+          const wR = p.w * 0.16, hR = p.h * 0.8, base = (p.h * 0.1 - Math.min(p.h * 0.3, 0.35 + 0.06 * p.w)) / exag;
           for (let k = 0; k < RTRAIL; k++) if (p.tAge[k] < 1) p.tAge[k] = Math.min(1, p.tAge[k] + dt / RK_LIFE);
           if (tau >= RK_EMPTY) this.placeTilt('rocketbody', p.lon, p.lat, p.hg + base, 0, 0, wR, hR, wR, 0xeef0f3, 9, p.k);
           else if (tau < RK_FLY) {

@@ -141,12 +141,12 @@
       float along = dot(p, uSun), off = length(p - uSun * along); vLit = along > 0.0 ? 1.0 : smoothstep(0.985, 1.02, off);
       vKind = aKind; vPh = aOrb.z;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-      gl_PointSize = (aKind > 0.5 ? 3.4 : 1.7) * uPx;
+      gl_PointSize = (aKind > 0.5 ? 4.2 : 2.6) * uPx;      // (a point under two pixels falls between the pixels' centres more often than not, and is gone)
     }`;
   // (from far out, where the whole swarm is the point, what is in the Earth's shadow keeps a faint light of its own - uOwn: the
   //  game's licence, so that the night side shows what people have put round it; from the ground they go dark, as they do)
   SKY.ORBIT_F = `uniform float uAlpha, uTime, uOwn; varying float vLit, vKind, vPh;
-    void main() { vec2 q = gl_PointCoord - 0.5; float a = exp(-dot(q, q) * 13.0) - 0.04; if (a <= 0.0) discard;
+    void main() { vec2 q = gl_PointCoord - 0.5; float a = exp(-dot(q, q) * 8.0) - 0.135; if (a <= 0.0) discard;
       vec3 c = vKind > 0.5 ? vec3(0.92, 0.96, 1.0) * (1.4 * vLit + 0.3 * uOwn) + vec3(1.0, 0.3, 0.22) * step(0.86, fract(uTime * 0.6 + vPh)) : vec3(1.0, 0.97, 0.9) * (0.6 * vLit + 0.16 * uOwn);
       gl_FragColor = vec4(c * a * uAlpha, 1.0); }`;
   class Orbits {
