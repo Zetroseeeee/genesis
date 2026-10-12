@@ -12,7 +12,7 @@
   // population deltas arrive in thousands; show them in the unit that reads best
   const fmtDeltaK = (dk) => { const a = Math.abs(dk); const s = dk >= 0 ? '+' : '−'; return a >= 1000 ? s + (a / 1000).toFixed(1) + ' m' : a >= 10 ? s + Math.round(a) + ' k' : a >= 1 ? s + a.toFixed(1) + ' k' : s + Math.round(a * 1000); };
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
-  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
   const SPEEDS = [1, 3, 10, 30, 100, 300, 1000];
 
   // ---------- state ----------
@@ -795,7 +795,7 @@
   // ---------- generated art and materials ----------
   const TEX_URL = window.GENESIS_TEX_URL || 'data/tex/atlas.json';
   const artOf = (key) => (window.TEX && TEX.art(key)) || '';
-  const eraArt = (era) => artOf('era' + Math.max(0, Math.min(8, era | 0)));
+  const eraArt = (era) => artOf('era' + Math.max(0, Math.min(9, era | 0))) || artOf('era8');      // (a pack made before the Space Age had a picture: the Information Age's)
   function reportArt(reason, events) {
     if (reason === 'era') { const c = sim.playerCiv(); return eraArt(c ? c.era : 0); }
     if (reason === 'war') return artOf('ev_war');

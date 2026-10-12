@@ -124,6 +124,61 @@
     update(camPos, turn, deep) { const p = this.points; p.matrix.copy(turn).setPosition(camPos); p.matrixWorld.copy(p.matrix); this.uniforms.uDeep.value = deep; const k = Math.max(0, Math.ceil((deep + 1.5) * 2)); p.geometry.setDrawRange(0, k < this.count.length ? this.count[k] : this.n); }
   }
 
+  // ---------- what people have put in orbit ----------
+  // From the world's first spaceflight, satellites: points of light on circular orbits some hundreds of kilometres up (drawn
+  // twice as high, as the ground is drawn twice as tall), round the Earth in two minutes of play and more the higher they go,
+  // lit by the sun unless the Earth's shadow is on them (from the ground they cross the sky for an hour or two after dusk, as
+  // they do). With orbital industry, stations: brighter, with a light that blinks. How many is the world's (Orbits.update).
+  SKY.ORBIT_V = `
+    attribute vec4 aOrb;      // inclination, the longitude of the ascending node, where it was at nought, how high (in Earth radii, as drawn)
+    attribute float aKind;    // 0 a satellite, 1 a station
+    uniform float uTime, uPx; uniform vec3 uSun; varying float vLit, vKind, vPh;
+    void main() {
+      float r = 1.0 + aOrb.w, a = aOrb.z + uTime * 0.05236 / (r * sqrt(r));
+      vec3 p = vec3(cos(a), 0.0, -sin(a));
+      float ci = cos(aOrb.x), si = sin(aOrb.x); p = vec3(p.x, -p.z * si, p.z * ci);
+      float cn = cos(aOrb.y), sn = sin(aOrb.y); p = vec3(p.x * cn + p.z * sn, p.y, -p.x * sn + p.z * cn) * r;
+      float along = dot(p, uSun), off = length(p - uSun * along); vLit = along > 0.0 ? 1.0 : smoothstep(0.985, 1.02, off);
+      vKind = aKind; vPh = aOrb.z;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      gl_PointSize = (aKind > 0.5 ? 4.2 : 2.6) * uPx;      // (a point under two pixels falls between the pixels' centres more often than not, and is gone)
+    }`;
+  // (from far out, where the whole swarm is the point, what is in the Earth's shadow keeps a faint light of its own - uOwn: the
+  //  game's licence, so that the night side shows what people have put round it; from the ground they go dark, as they do)
+  SKY.ORBIT_F = `uniform float uAlpha, uTime, uOwn; varying float vLit, vKind, vPh;
+    void main() { vec2 q = gl_PointCoord - 0.5; float a = exp(-dot(q, q) * 8.0) - 0.135; if (a <= 0.0) discard;
+      vec3 c = vKind > 0.5 ? vec3(0.92, 0.96, 1.0) * (1.4 * vLit + 0.3 * uOwn) + vec3(1.0, 0.3, 0.22) * step(0.86, fract(uTime * 0.6 + vPh)) : vec3(1.0, 0.97, 0.9) * (0.6 * vLit + 0.16 * uOwn);
+      gl_FragColor = vec4(c * a * uAlpha, 1.0); }`;
+  class Orbits {
+    constructor(scene) {
+      const NS = 12, NT = 3600, n = NS + NT; const orb = new Float32Array(n * 4), kind = new Float32Array(n), pos = new Float32Array(n * 3);
+      let s = 0x9E3779B9; const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      for (let i = 0; i < n; i++) {
+        const st = i < NS, u = rnd();
+        // (stations go as the great ones of our day do; satellites in the shells they crowd: the stations' slope, the poles' (sun-synchronous), low slopes)
+        const inc = st ? 0.9 + (rnd() - 0.5) * 0.3 : u < 0.4 ? 0.93 + (rnd() - 0.5) * 0.12 : u < 0.75 ? 1.71 + (rnd() - 0.5) * 0.06 : 0.3 + rnd() * 0.7;
+        const alt = st ? 0.13 + rnd() * 0.04 : u < 0.4 ? 0.17 + rnd() * 0.02 : u < 0.75 ? 0.24 + rnd() * 0.06 : 0.12 + rnd() * 0.25;
+        orb[i * 4] = inc; orb[i * 4 + 1] = rnd() * TAU; orb[i * 4 + 2] = rnd() * TAU; orb[i * 4 + 3] = alt; kind[i] = st ? 1 : 0;
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aOrb', new THREE.BufferAttribute(orb, 4)); g.setAttribute('aKind', new THREE.BufferAttribute(kind, 1)); g.setDrawRange(0, 0);
+      this.uniforms = { uTime: { value: 0 }, uPx: { value: 1 }, uSun: { value: new THREE.Vector3(1, 0, 0) }, uAlpha: { value: 1 }, uOwn: { value: 0 } };
+      this.points = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: this.uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, vertexShader: SKY.ORBIT_V, fragmentShader: SKY.ORBIT_F }));
+      this.points.frustumCulled = false; this.points.renderOrder = 8; scene.add(this.points); this.NS = NS; this.NT = NT; this.n = 0;
+    }
+    // how many: thirty a year after the world's first spaceflight (to 1,600), and with orbital industry forty more a year (to 2,000) and the stations
+    update(sim, time, sun, px, alpha, alt) {
+      let nt = 0, st = false; const K = sim && sim.know;
+      if (K && K.ID && K.first) { const y = sim.year, f0 = K.first[K.ID.spaceflight], f1 = K.first[K.ID.orbital];
+        if (f0) nt = Math.min(1600, Math.max(40, (y - Math.max(f0.y, y - 400)) * 30));
+        if (f1) { nt += Math.min(2000, Math.max(150, (y - Math.max(f1.y, y - 400)) * 40)); st = true; } }
+      if (window.__orbits !== undefined) { nt = Math.min(this.NT, window.__orbits); st = window.__orbits > 1600; }      // (for pictures)
+      const g = this.points.geometry; g.setDrawRange(st ? 0 : this.NS, Math.min(this.NT, nt) + (st ? this.NS : 0)); this.n = nt + (st ? this.NS : 0);
+      const U = this.uniforms; U.uTime.value = time; U.uSun.value.copy(sun); U.uPx.value = px; U.uAlpha.value = alpha === undefined ? 1 : alpha;      // (as the stars are: none in a daylit sky)
+      U.uOwn.value = Math.min(1, Math.max(0, ((alt || 0) - 0.05) / 0.25));
+      this.points.visible = this.n > 0 && U.uAlpha.value > 0.004;
+    }
+  }
+
   // ---------- the Milky Way and the Moon, for the sky's own shader (world.js) ----------
   // milky(dir): the light of the faint stars along a line of sight (the world's frame): the pack's picture, which holds the
   // root of 1 - exp(-4 x), looked up where the line points among the stars. moonDisc(dir, sun): the Moon's light there and how
@@ -371,7 +426,7 @@
   }
   // (the cloud over a country that is being ruled: `less` in the clouds' shader)
   SKY.less = function (c, near) { const t = Math.min(1, Math.max(0, (c - 0.3) / 0.7)); return c + (t * t * (3 - 2 * t) - c) * near; };
-  SKY.Stars = Stars; SKY.Clouds = Clouds;
+  SKY.Stars = Stars; SKY.Clouds = Clouds; SKY.Orbits = Orbits;
   // (read again into a page that is running - tools/live.js, then __T.resky() - it keeps what the page has fetched)
   if (window.SKY) for (const k of ['ready', 'index', 'soft', 'starData', 'milky', 'moon', 'cloudSmall', 'cloudHalves', 'cloudMap', 'grain', 'onPiece']) if (window.SKY[k] !== undefined) SKY[k] = window.SKY[k];
   window.SKY = SKY;

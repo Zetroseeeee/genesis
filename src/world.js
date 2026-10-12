@@ -394,6 +394,7 @@
       // The stars (sky.js): a third of a million points round the camera, each where it stands and as bright as it is, drawn at the
       // far plane (so anything at all hides them), turning as the sky turns: with the hour, the time of year and the year itself.
       this.starField = new SKY.Stars(scene); this.stars = this.starField.points; this.starUniforms = this.starField.uniforms;
+      this.orbits = SKY.Orbits ? new SKY.Orbits(scene) : null;      // (what people have put in orbit: satellites from the first spaceflight, stations of the Space Age)
       this.skyTurn = new THREE.Matrix4(); this.seasonPhase = 0.45; this.viewH = 1000; this._moon = new THREE.Vector3(0, 1, 0);
       // The clouds (sky.js): the Earth's own, on a shell a little above the highest ground, white in the sun, the colours of the
       // sun's light along the edge of night and dark after it, behind the same air as everything else; seen from under, too.
@@ -491,6 +492,7 @@
         // (how faint a star is shown: more of them from out in space than through the air, and more where a screen's pixels are small enough to hold them apart)
         this.starField.update(cam.camera.position, turn, SKY.soft ? 6.5 : 8.7 - 1.5 * skyA + 0.9 * Math.log2(Math.max(1, su.uPx.value)));
         this.stars.visible = su.uAlpha.value > 0.004; }
+      if (this.orbits) this.orbits.update(this.sim, time, sun, this.starUniforms.uPx.value, this.starUniforms.uAlpha.value, cam.alt);
       // lights follow the sun; hemisphere dims at night for the camera's local sun elevation
       this.sunLight.position.copy(sun).multiplyScalar(10); this.sunLight.target.position.set(0, 0, 0);
       const camUp = cam.camera.position.clone().normalize(); const sunUp = camUp.dot(sun);

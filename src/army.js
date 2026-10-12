@@ -13,14 +13,14 @@
 //    towns, and fights the hosts it meets. Where no road runs by land, his fleet carries it over the sea.
 (function () {
   // what a host is called, by age
-  const KIND = ['war band', 'host', 'host', 'army', 'army', 'army', 'army', 'army', 'force'];
+  const KIND = ['war band', 'host', 'host', 'army', 'army', 'army', 'army', 'army', 'force', 'force'];
   // the share of a realm's people a campaign puts under arms, by age (every hunter of a band; few of a kingdom's peasants;
   // the mass armies of the nineteenth and twentieth centuries; few and professional at the end)
-  const MOB = [0.06, 0.03, 0.025, 0.02, 0.012, 0.015, 0.025, 0.02, 0.006];
+  const MOB = [0.06, 0.03, 0.025, 0.02, 0.012, 0.015, 0.025, 0.02, 0.006, 0.004];
   // regions a host marches in a year through land it may cross, and how many of the enemy's it can take in one
-  const SPEED = [3, 4, 4, 5, 5, 6, 9, 14, 18], STORM = [1, 1, 1, 1, 1, 2, 2, 3, 3];
+  const SPEED = [3, 4, 4, 5, 5, 6, 9, 14, 18, 24], STORM = [1, 1, 1, 1, 1, 2, 2, 3, 3, 3];
   // sea regions a fleet sails in a year, and the men a ship carries
-  const SAIL = [5, 7, 9, 11, 13, 18, 26, 36, 44], CARRY = [20, 40, 60, 80, 100, 200, 600, 1500, 2000];
+  const SAIL = [5, 7, 9, 11, 13, 18, 26, 36, 44, 60], CARRY = [20, 40, 60, 80, 100, 200, 600, 1500, 2000, 3000];
   const GARRISON = 0.04, GARRISON_WALLED = 0.08;      // the share of a region's people that holds it against an assault, or a siege
   const FOCUS_OWN = 2.0, FOCUS_FOE = 0.4, FOCUS_R = 2;      // where a host stands (within FOCUS_R regions): its realm's attacks succeed so much more often, the enemy's so much less
   const BROKEN = 0.2;      // a host with fewer men than this share of those it was raised with is broken, and goes home
@@ -40,7 +40,7 @@
     // and half as many in 2000 AD, as a world one throw apart may be)
     let rs = ((h.seed || 1) ^ 0x5bd1e995) >>> 0;
     const rnd = () => { rs += 0x6D2B79F5; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    const eraOf = (c) => Math.min(8, Math.max(0, c.era | 0));
+    const eraOf = (c) => Math.min(9, Math.max(0, c.era | 0));
     const cellLL = (i) => { const y = (i / W) | 0, x = i - y * W; return [(x + 0.5) / W * 360 - 180, 90 - (y + 0.5) / H * 180]; };
 
     // ---------- who may march where ----------

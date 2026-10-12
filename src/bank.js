@@ -33,7 +33,7 @@ window.BANK = (function () {
     if (c0) ctx = c0; if (el) lastEl = el; el = lastEl; if (!el || !ctx) return;
     if (bound !== el) { el.addEventListener('click', onClick); bound = el; }
     const s = S(), c = me(); if (!s || !c) { el.innerHTML = '<div class="hint">You hold no realm.</div>'; return; }
-    const K = F(), id = c.id, k = s.know, knows = (key) => k.has[id * k.ND + window.KNOW.ID[key]] === 1, e = Math.min(8, c.era | 0);
+    const K = F(), id = c.id, k = s.know, knows = (key) => k.has[id * k.ND + window.KNOW.ID[key]] === 1, e = Math.min(9, c.era | 0);
     const g = Math.max(1e-3, c.gross || c.income || 1), debt = K.debt[id], room = K.room(id), r = K.rateOf[id] || K.rate(id), canB = K.canBorrow(id);
     const T = K.TURN[e] || 50, yr = s.year, recentDef = K.lastDef[id] > -1e8 && yr - K.lastDef[id] < 3 * T;
     // ----- the head: debts, the coin, the world's money -----
