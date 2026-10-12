@@ -79,7 +79,7 @@
         const p = pop[i]; let light = 0;
         if (p > 0.2) { const t = c ? c.tech : 0; light = Math.min(1, Math.log10(p + 1) * (0.12 + t * 0.55)); if (t < 0.12) light *= 0.35; }
         // (green: how far along a people is, for the look of its ground - paving comes with the Classical age, but not where the old ways last)
-        sd[j] = light * 255; sd[j + 1] = (c ? (TOWN.styleEra(c.era, TOWN.civCulture(sim, c)) < c.era ? Math.min(c.tech, 0.25) : c.tech) : 0) * 255; sd[j + 2] = c ? Math.round(sim.cultivation(i) * 255 * (sim.level[i] ? 1 : 0.6)) : 0;
+        sd[j] = light * 255; sd[j + 1] = (c ? (TOWN.styleEra(c.era, TOWN.civCulture(sim, c)) < c.era ? Math.min(c.tech, 0.25) : c.tech) : 0) * 255; sd[j + 2] = sim.woods ? Math.round(sim.woods.cleared(i) * 255) : c ? Math.round(sim.cultivation(i) * 255 * (sim.level[i] ? 1 : 0.6)) : 0;      // (blue: how far the land is cleared - the woods that stand, woods.js, or else who farms it this year)
       }
       // (each realm in its own colour; or, under the lens of government, in the colour of the kind of rule it lives under)
       // (or, under the lens of relations, in the colour of how it stands with the player's realm: diplo.js STAND)

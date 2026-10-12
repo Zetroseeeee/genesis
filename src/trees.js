@@ -301,7 +301,7 @@
       const nMid = [this.noiseAt(gx, gy, 1200, 0), this.noiseAt(gx, gy, 1200, 1), this.noiseAt(gx, gy, 1200, 3)];
       const nMic = [this.noiseAt(gx, gy, 9000, 0), this.noiseAt(gx, gy, 9000, 1), this.noiseAt(gx, gy, 9000, 3)];
       // the wildwood (as in the terrain shader): green land that is not dry is forest wherever nobody farms it
-      let cult = 0, wetC = 0; if (this.sim) { const ci = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W); cult = this.sim.owner[ci] >= 0 ? this.sim.cultivation(ci) * (this.sim.level[ci] ? 1 : 0.6) : 0;
+      let cult = 0, wetC = 0; if (this.sim) { const ci = Math.min(H - 1, Math.max(0, Math.floor((90 - lat) / 180 * H))) * W + ((Math.floor((lon + 180) / 360 * W) % W + W) % W); cult = this.sim.woods ? this.sim.woods.cleared(ci) : this.sim.owner[ci] >= 0 ? this.sim.cultivation(ci) * (this.sim.level[ci] ? 1 : 0.6) : 0;      // (the woods that stand, woods.js: cleared for fields, grown back where people left)
         // (the weather, climate.js: no tree on the ice sheets that still lie over the north; in the wet centuries the dry lands are steppe and savanna)
         const CL = this.sim.climate; if (CL) { if (CL.ice[ci]) return { f: 0, g: 0 }; wetC = CL.wet[ci];
           // (nor on the land the ice has just left, nor along its edge, nor under Mega-Chad: as the ground's shader has them, by the same sums)
