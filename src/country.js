@@ -50,7 +50,7 @@ window.COUNTRY = (function () {
   // the realm's word on its woods: what each does and costs, the planting from the Industrial age
   function word(s, c, X, WD, share) {
     const on = X.policy(c), plantOk = (c.era | 0) >= WD.PLANT_ERA;
-    const opt = WD.POLICY.map(([k, name, text], i) => { const off = k === 'plant' && !plantOk; return `<button class="gv-tenet${i === on ? ' on' : ''}" data-woods="${k}"${off ? ' disabled' : ''}><b>${esc(name)}</b><small>${esc(text)}${off ? ` From the ${esc(s.ERAS[WD.PLANT_ERA][0])}.` : ''}</small></button>`; }).join('');
+    const opt = WD.POLICY.map(([k, name, text], i) => { const off = k === 'plant' && !plantOk; return `<button class="gv-tenet${i === on ? ' on' : ''}" data-woods="${k}"${off ? ' disabled' : ''}><b>${esc(name)}</b><small>${esc(text)}${off ? ` From the ${esc(s.ERAS[WD.PLANT_ERA][0])} age.` : ''}</small></button>`; }).join('');
     return `<div class="gv-head"><span class="ic">${svg(TREE)}</span><div><h3>The woods</h3><div class="micro">${esc(s.fullName(c))} · ${pct(share)} of nature's woods stand</div></div></div>
       <p class="gv-text">Where people farm they clear the woods for fields, pasture and fallow, so much land a head as their age farms it, as fast as their tools allow: fire and stone axes first, iron axes and the plough, at last machines. Where they leave, the woods grow back, half in some sixty years. A realm that has cleared its woods buys its timber from those that kept theirs.</p>
       <div class="gv-sect"><div class="micro">Your word on your woods</div><div class="gv-tenets">${opt}</div><div class="gv-state">Royal forests please the nobles, who hunt in them, and anger the farmers kept out of them.</div></div>`;
