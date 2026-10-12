@@ -394,7 +394,7 @@ Conventions that matter:
   plot it is one house of the sort. The plots beside a street come up to it, and a city street is fifteen to thirty metres
   across (`street`). Trees stand in the gardens and courts of those blocks (`GARDEN`, `gardenAt` in `trees.js`) and in the
   parks. A plot not yet rebuilt in a new age keeps a block of the age before. A city of millions is some twenty thousand plots
-  (`maxN`), drawn one by one to 0.85 of its radius (`coarseFrom`). `node tools/towns/census.js` says what each city is made
+  (`maxN`), drawn one by one to 0.95 of its radius (`coarseFrom`). `node tools/towns/census.js` says what each city is made
   of; look at `city_*` on the Mac after touching any of it.
 - **The market** (`econ.js`; `sim.market`). 63 goods: 42 the land yields (a cell has one, `sim.goods[i]`, and the age
   in which that place begins to yield it, `sim.gera[i]`: cocoa is old in Mesoamerica and came to West Africa with the
