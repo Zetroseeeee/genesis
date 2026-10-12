@@ -4,6 +4,7 @@
 //   pop: thousands of people in the capital  walls: wall level (0 none)   special: works bitmask (1 port, 2 academy, 4 temple, 8 market, 16 wonder, 512 mine)
 //   ind: the town's workshops, one plot (1..) for each of sim.IND in order (workshop, weaver, smithy, brewery, granary, warehouse, shipyard, factory, refinery, lab); 0 = none
 //   grow: newest ring of houses still going up   settled: the age has been here long enough for every house to be rebuilt
+//   clear: the share of nature's woods felled about the capital (0..1), so that its farmland shows
 //   alt (m), tilt (rad), out (fraction of the wall radius the camera looks at; 0 = the square), turn (rad), gate (index)
 //   sun: [height, bearing] in radians (default an afternoon sun from the west, so shadows show from most angles), null = let the day run
 //   season: 0..1 through the year (0 midwinter in the north, 0.5 midsummer, 0.82 the height of autumn); unset = let the year run
@@ -19,6 +20,8 @@
   const S = G.sim, c = S.playerCiv(), cap = c.capital;
   c.tech = P.tech; c.era = S.eraOf(c.tech); if (window.__T && __T.teach) __T.teach(c, undefined, true); S.pop[cap] = P.pop; S.walls[cap] = P.walls; if (P.special) S.special[cap] |= P.special;
   if (P.ind) S.ind.set(cap, Uint8Array.from(P.ind));
+  // clear: the share of nature's woods felled about the capital (woods.js), so that its farmland shows as an old country's would
+  if (P.clear && S.woods) { const X = S.woods, W0 = S.W, y0 = (cap / W0) | 0, x0 = cap % W0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const i = (y0 + dy) * W0 + ((x0 + dx + W0) % W0); if (X.pot[i]) X.cover[i] = Math.round(X.pot[i] * (1 - P.clear)); } }
   G.run(3);
   if (P.settled) c.eraSince = S.year - 200;
   if (P.grow) { S.gPrev[cap] = Math.max(0, S.gBand[cap] - 2); S.gYear[cap] = S.year - 4; }
