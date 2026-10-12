@@ -647,10 +647,10 @@
       L.din = play * sc.battle * 0.36;
       // rain: the patter and hiss while it falls about the eye, the roar of a downpour under it; birds and insects keep quiet
       const rn = sc.rain || 0;
-      L.rain = play * rn * (0.35 + 0.65 * (1 - lsm(400, 6000, agl))) * 0.55;
-      L.downpour = play * smooth(0.5, 1, rn) * (1 - lsm(800, 8000, agl)) * 0.12;
+      L.rain = play * rn * (0.35 + 0.65 * (1 - lsm(400, 6000, agl))) * 0.15;
+      L.downpour = play * smooth(0.5, 1, rn) * (1 - lsm(800, 8000, agl)) * 0.22;
       for (const b of X.downpour) set(b, L.downpour * solo('downpour'), 1.5);
-      L.crickets *= 1 - rn; L.frogs *= 1 - 0.5 * rn; L.cicadas *= 1 - rn;
+      L.crickets *= 1 - rn; L.frogs *= 1 - 0.5 * rn; L.cicadas *= 1 - rn; L.murmur *= 1 - 0.4 * rn;      // (and in the rain fewer are out in the street)
       if (X.solo) for (const k in L) if (!X.solo.has(k)) L[k] = 0;
       for (const k of ['crickets', 'frogs', 'cicadas', 'murmur', 'fire', 'din', 'rain']) set(X.tex[k], L[k], k === 'din' ? 0.6 : 1.5);
       if (!play) { X.singers.length = 0; X.night.length = 0; X.beasts.length = 0; return; }
@@ -684,7 +684,7 @@
       // the town's work
       if (tw && tk > 0.05 && day > 0.25 && solo('work') && t + 0.3 >= X.workAt) {
         const W = WORK[clamp(tw.style, 0, 9)], it = choose(W, (x) => x[1]), at = Math.max(t + 0.05, X.workAt), rate = W.reduce((a, x) => a + x[1], 0) / 60 * (0.5 + tw.size);
-        work(it[0], at, tk, tw); X.workAt = at - Math.log(1 - R() * 0.99) / rate;
+        work(it[0], at, tk * (1 - 0.6 * (sc.rain || 0)), tw); X.workAt = at - Math.log(1 - R() * 0.99) / rate;
       }
       // a battle's clash
       if (sc.battle > 0.05 && solo('clash') && t + 0.3 >= X.battleAt) { const at = Math.max(t + 0.05, X.battleAt); clash(at, sc.battle, sc.battleEra); X.battleAt = at + 0.25 + R() * 1.4; }
@@ -785,6 +785,12 @@
     return V;
   }
 
+  function thunder(E, dist, bolt) {
+    const t = E.ctx.currentTime + Math.min(9, dist / 343) * (bolt ? 1 : 0.7), k = Math.max(0.15, 1 - dist / 12000), o = E.place(0.9 * k, Math.random() * 1.2 - 0.6, Math.min(dist, 1500), 0.4), R = E.R;
+    if (dist < 3500) { const n = E.src(E.white, t, 0.3), h = E.filt('highpass', 1200, 0.7), g = E.ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.9 * k, t + 0.008); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25); n.connect(h); h.connect(g); g.connect(o); }
+    const d = 3 + dist / 2500 + R() * 2, f = 90 + 260 * k;
+    for (let i = 0, u = t + 0.05; i < 3 + (R() * 3 | 0) && u < t + d; i++) { const dd = 0.8 + R() * 1.6; E.rumble(o, u, dd * 1.6, f * (0.8 + R() * 0.4), (0.6 + 0.6 * R()) * (1 - i * 0.12)); u += dd * (0.4 + R() * 0.5); }
+  }
   // ---------------------------------------------------------------------------------------------------------------------------------
   // The game, heard: SOUND.init(game) once; SOUND.update(dt) every frame (the scene is worked out four times a second)
   const SOUND = {
@@ -809,13 +815,7 @@
   };
   // thunder: after the flash, by how far away the strike was (metres: sound goes 343 m a second, here never more than nine seconds
   // late); near, a crack first; then the roll, lower and longer the further off
-  SOUND.thunder = function (dist, bolt) {
-    const E = SOUND.E; if (!E || E.ctx.state !== 'running') return;
-    const t = E.ctx.currentTime + Math.min(9, dist / 343) * (bolt ? 1 : 0.7), k = Math.max(0.15, 1 - dist / 12000), o = E.place(0.9 * k, Math.random() * 1.2 - 0.6, Math.min(dist, 1500), 0.4), R = E.R;
-    if (dist < 3500) { const n = E.src(E.white, t, 0.3), h = E.filt('highpass', 1200, 0.7), g = E.ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.9 * k, t + 0.008); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25); n.connect(h); h.connect(g); g.connect(o); }
-    const d = 3 + dist / 2500 + R() * 2, f = 90 + 260 * k;
-    for (let i = 0, u = t + 0.05; i < 3 + (R() * 3 | 0) && u < t + d; i++) { const dd = 0.8 + R() * 1.6; E.rumble(o, u, dd * 1.6, f * (0.8 + R() * 0.4), (0.6 + 0.6 * R()) * (1 - i * 0.12)); u += dd * (0.4 + R() * 0.5); }
-  };
+  SOUND.thunder = function (dist, bolt) { const E = SOUND.E; if (E && E.ctx.state === 'running') thunder(E, dist, bolt); };
   SOUND.ui = function (kind) { if (SOUND.V && SOUND.E.ctx.state === 'running') SOUND.V.ui(kind); };
   SOUND.sting = function (kind) {
     if (!SOUND.V || SOUND.E.ctx.state !== 'running') return;
@@ -950,7 +950,7 @@
     const step = 0.1; const marks = [];
     for (let t = 0.1; t < secs - 0.2; t += step) marks.push(t);
     const errs = [];
-    for (const t of marks) ctx.suspend(t).then(() => { try { X.update(sc, step); for (const [ts, k] of o.stings || []) if (ts >= t - step && ts < t) V.sting(k); for (const [ts, k] of o.ui || []) if (ts >= t - step && ts < t) V.ui(k); for (const [ts, k] of o.calls || []) if (ts >= t - step && ts < t) (BIRD[k] || BEAST[k])(E, E.place(0.5, 0, 40), ts + 0.05, rng(k.length * 31 + 7)); } catch (e) { if (errs.length < 3) errs.push(String(e && e.stack || e)); } ctx.resume(); });
+    for (const t of marks) ctx.suspend(t).then(() => { try { X.update(sc, step); for (const [ts, k] of o.stings || []) if (ts >= t - step && ts < t) V.sting(k); for (const [ts, k] of o.ui || []) if (ts >= t - step && ts < t) V.ui(k); for (const [ts, k] of o.calls || []) if (ts >= t - step && ts < t) (BIRD[k] || BEAST[k])(E, E.place(0.5, 0, 40), ts + 0.05, rng(k.length * 31 + 7)); for (const [ts, d, bolt] of o.thunder || []) if (ts >= t - step && ts < t) thunder(E, d, bolt); } catch (e) { if (errs.length < 3) errs.push(String(e && e.stack || e)); } ctx.resume(); });
     const buf = await ctx.startRendering();
     if (errs.length) throw new Error(errs.join('\n'));
     return { buf, stats: E.stats, levels: X.lv };

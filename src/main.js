@@ -1620,9 +1620,9 @@
     // the weather where the eye looks (weather.js): rain or snow about the eye, the ground wet, the distance in murk, lightning
     if (weather) {
       if (mode === 'play' && settings.quality === 'high') {
-        const W = weather.update(mapcam, sim, now, dt, { trees, world, globals, terrain, season: seasonPhase, day: world.bUniforms.uDay.value, glow: globals.uGlow.value > 0.5 });
+        const W = weather.update(mapcam, sim, now, real, { trees, world, globals, terrain, season: seasonPhase, day: world.bUniforms.uDay.value, glow: globals.uGlow.value > 0.5 });
         globals.uWet.value = W.wet * (1 - smooth01(0.02, 0.06, mapcam.alt)); world.rainShade = 0.45 * W.rain * W.near;
-        if (window.POST && POST.weather) { const P = POST.weather, d = world.bUniforms.uDay.value; P.uMurk.value.set(0.06 + 0.46 * d, 0.07 + 0.48 * d, 0.09 + 0.5 * d, W.murk); P.uMurkD.value = Math.max(mapcam.dist * 1.6, 1800 / GEO.R_M); P.uFlash.value = W.flash * 0.55; }
+        if (window.POST && POST.weather) { const P = POST.weather, d = world.bUniforms.uDay.value; P.uMurk.value.set(0.06 + 0.46 * d, 0.07 + 0.48 * d, 0.09 + 0.5 * d, W.murk); P.uMurkD.value = Math.max(mapcam.dist * 1.2, 1200 / GEO.R_M); P.uFlash.value = W.flash * 0.55; }
       } else { weather.clear(); globals.uWet.value = 0; world.rainShade = 0; if (window.POST && POST.weather) { POST.weather.uMurk.value.w = 0; POST.weather.uFlash.value = 0; } }
     }
     if (fx && mode === 'play') { fx.update(mapcam, sim, now, dt, world.bUniforms.uDay.value, devH, camera.fov); if (fx.shake > 0.001) { const a = fx.shake * fx.shake * mapcam.dist * 0.02; camera.position.x += (Math.random() - 0.5) * a; camera.position.y += (Math.random() - 0.5) * a; camera.position.z += (Math.random() - 0.5) * a; camera.updateMatrixWorld(); } }

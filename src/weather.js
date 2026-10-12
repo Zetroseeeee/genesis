@@ -11,7 +11,7 @@
 // Snow falls where it is cold enough to lie (trees.js: lyingAt).
 (() => {
   'use strict';
-  const R_M = 6371000, D2R = Math.PI / 180, MAX = 6000;
+  const R_M = 6371000, D2R = Math.PI / 180, MAX = 9000;
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const lsm = (a, b, x) => smooth(Math.log(a), Math.log(b), Math.log(Math.max(x, 1e-9)));
@@ -116,7 +116,7 @@
       this.mesh.geometry.instanceCount = N; this.mesh.visible = N > 20;
       if (this.mesh.visible) {
         const B = clamp(dist * 0.12, 8, 260); U.uBox.value = B; U.uSnow.value = S.snow > 0.5 ? 1 : 0;
-        U.uFall.value = S.snow > 0.5 ? B * 0.14 : B * 1.15; U.uLen.value = B * 0.06 * (0.7 + 0.5 * this.rain); U.uWid.value = B * (S.snow > 0.5 ? 0.0035 : 0.0022);
+        U.uFall.value = S.snow > 0.5 ? B * 0.12 : B * 1.15; U.uLen.value = B * 0.05 * (0.7 + 0.5 * this.rain); U.uWid.value = B * (S.snow > 0.5 ? 0.0016 : 0.0016);
         // the wind slants the rain: from the west in the middle latitudes, from the east in the trades (as the surf has it), stronger in a storm
         const aLat = Math.abs(cam.lat), west = aLat > 30 && aLat < 62 ? 1 : aLat < 28 ? -1 : 0.3, ws = (2 + 6 * S.storm) * B / 9; U.uWind.value.set(west * ws, ws * 0.3 * Math.sin(t * 0.05));
         // the frame: east, up and north at the point looked at, as the view turns them; the eye's place in it, wrapped by the box
@@ -128,8 +128,8 @@
         U.uOff.value.set(wrap((cp.x * f.east.x + cp.y * f.east.y + cp.z * f.east.z) * R_M), wrap((cp.x * f.up.x + cp.y * f.up.y + cp.z * f.up.z) * R_M), wrap((cp.x * f.north.x + cp.y * f.north.y + cp.z * f.north.z) * R_M));
         // the colour of rain against the light it falls in: pale in the day, dark at night, lit by the lightning
         const day = o.day !== undefined ? o.day : 1, fl = Math.min(1, this.flash);
-        if (S.snow > 0.5) { U.uCol.value.setRGB(0.6 + 0.35 * day + fl * 0.3, 0.62 + 0.35 * day + fl * 0.3, 0.66 + 0.33 * day + fl * 0.3); U.uAlpha.value = 0.75; }
-        else { U.uCol.value.setRGB(0.22 + 0.5 * day + fl * 0.5, 0.24 + 0.52 * day + fl * 0.5, 0.28 + 0.55 * day + fl * 0.5); U.uAlpha.value = 0.22 + 0.16 * this.rain; }
+        if (S.snow > 0.5) { U.uCol.value.setRGB(0.6 + 0.35 * day + fl * 0.3, 0.62 + 0.35 * day + fl * 0.3, 0.66 + 0.33 * day + fl * 0.3); U.uAlpha.value = 0.6; }
+        else { U.uCol.value.setRGB(0.22 + 0.5 * day + fl * 0.5, 0.24 + 0.52 * day + fl * 0.5, 0.28 + 0.55 * day + fl * 0.5); U.uAlpha.value = 0.2 + 0.14 * this.rain; }
       }
       // the murk: what is far fades into the grey of the falling rain (post.js), while the eye is down in it
       S.murk = this.rain * (1 - lsm(2500, 9000, agl)) * (S.snow > 0.5 ? 0.85 : 0.7);
@@ -144,11 +144,11 @@
       return S;
     }
     // a strike: the sky flashes twice; one in three comes down within sight as a bolt; its thunder is heard after it
-    strike(cam, o) {
+    strike(cam, o, bolt) {
       this.strikes++;
       const d = 1500 + Math.random() * 9000, a = Math.random() * Math.PI * 2;
-      this.flash = 0.9 + Math.random() * 0.6; setTimeout(() => { this.flash = Math.max(this.flash, 0.7 + Math.random() * 0.5); }, 110 + Math.random() * 120);
-      if (Math.random() < 0.4 && cam.dist * R_M < 30000) {
+      this.flash = 0.9 + Math.random() * 0.6; this.last = { d, at: performance.now(), flash: this.flash }; setTimeout(() => { this.flash = Math.max(this.flash, 0.7 + Math.random() * 0.5); }, 110 + Math.random() * 120);
+      if ((bolt || Math.random() < 0.4) && cam.dist * R_M < 30000) {
         // the bolt stands toward where the eye looks, a few kilometres off, from the cloud's base (some 2 km up) to the ground
         const cl = Math.max(0.2, Math.cos(cam.lat * D2R)), dd = Math.min(d, Math.max(800, cam.dist * R_M * 0.9)), fwd = cam.heading || 0;
         const lon = cam.lon + Math.sin(fwd + (Math.random() - 0.5) * 1.2) * dd / (R_M * cl * D2R), lat = cam.lat + Math.cos(fwd + (Math.random() - 0.5) * 1.2) * dd / (R_M * D2R);

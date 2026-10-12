@@ -138,7 +138,9 @@ window.POST = (function () {
       }
       c += texture2D(tGlow, vUv).rgb * uGlow;
       // rain: what is far goes into the grey of the falling rain (all of the sky, at the far plane), and the lightning lights everything
-      if (uMurk.a > 0.0) { float z = viewZ(vUv); c = mix(c, uMurk.rgb, uMurk.a * (1.0 - exp(-z / uMurkD))); }
+      // (and under it the light is flat and grey: colour goes out of everything, near as well as far)
+      if (uMurk.a > 0.0) { float z = viewZ(vUv); c = mix(c, uMurk.rgb, min(1.0, uMurk.a * (1.0 - exp(-z / uMurkD)) * (z > uProj.w * 0.9 ? 1.4 : 1.0)));
+        float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c = mix(c, vec3(l) * vec3(0.96, 0.99, 1.04), 0.45 * uMurk.a) * (1.0 - 0.12 * uMurk.a); }
       c *= 1.0 + uFlash;
       // develop: contrast about a middle grey, a little more colour, the shoulder, the corners, the grain
       vec3 g = (c - 0.30) * (1.0 + 0.09 * uDevelop) + 0.30 + 0.012 * uDevelop; g = max(g, 0.0);      // (about a dark grey: the shadows stay where they were, what is lit gains)
