@@ -78,6 +78,12 @@ window.__T.costsCity = function () {
   __T.cost([['all (' + W.buildingCount + ' placed)', () => {}], ['no houses', () => { W.buildingGroup.visible = false; }], ['houses, no trees', () => { W.buildingGroup.visible = true; show(false); }],
     ['neither', () => { W.buildingGroup.visible = false; }], ['all again', () => { W.buildingGroup.visible = true; show(true); }], ['no houses again', () => { W.buildingGroup.visible = false; }], ['all a third time', () => { W.buildingGroup.visible = true; }]], 3, 1500);
 };
+// what the beasts and birds cost: as they are, without the beasts, without the birds, without either, turn and turn about
+window.__T.costsFauna = function () {
+  const F = __G.fauna, B = __G.birds; const on = (f, b) => () => { if (F) F.enabled = f; if (B) B.enabled = b; };
+  __T.cost([['all (' + (F ? F.stats.beasts : 0) + ' beasts, ' + (B ? B.stats.birds : 0) + ' birds)', on(true, true)], ['no beasts', on(false, true)], ['no birds', on(true, false)], ['neither', on(false, false)],
+    ['all again', on(true, true)], ['neither again', on(false, false)], ['all a third time', on(true, true)]], 3, 1500);
+};
 // how many ways the ground's materials need be looked at where the ground runs away from the eye (the card's own filtering:
 // 16 as the game has them, then 8 and 4), twice over
 window.__T.costsAniso = function () {
