@@ -369,6 +369,7 @@ Conventions that matter:
   local +z: at `yaw = a - π/2` a building standing at angle `a` from the centre faces the centre. Great buildings
   are never turned to fit their plot (their front stays on the square); houses may be.
 - **Eras** 0–9: Stone, Bronze, Iron, Classical, Medieval, Renaissance, Industrial, Modern, Information, Space.
+  **Cultures** 0–9: med, north, east, mena, africa, sasia, easia, seasia, america, namerica.
 - **The Space Age** (era 9, since 0.43): what comes after our own day, the game's guess in the spirit of what is being worked on
   now. It begins where the Information Age ends (`tech` 1.0, history's AD 2030) and ends at 1.15 (`TMAX` in `sim.js`, the last of
   `KNOW.ERA_AT`; `HIST` holds the realms in front to 2150): sixteen discoveries (fusion, general intelligence, genetic medicine,
@@ -380,8 +381,10 @@ Conventions that matter:
   short gives `undefined`, and that is NaN in everything downstream** (`node tools/space/probe.js` runs a world to 2150 and looks
   for it). The tables measured by the probes (`NORM` in `rule.js`, `culture.js`, `faith.js`, `people.js`) took the Information Age's
   values for it until measured; the probes count every age (`KNOW.NE`) and an age no realm reached takes the one before's. After
-  the last discovery a realm learns without end (`KNOW.FUTURE`), as before.
-  **Cultures** 0–9: med, north, east, mena, africa, sasia, easia, seasia, america, namerica.
+  the last discovery a realm learns without end (`KNOW.FUTURE`), as before. *Small families* (`FAMILY`, `familyOf` in `sim.js`): in
+  the Space Age people come to fill less of what their land could feed, all of it as the age begins and seven tenths at its end
+  (the growth's logistic aims at `K x famF`; famine still answers to `K`), so where they are more their numbers fall slowly, as the
+  old outlive the young. The table of food ends at 1.0, as it did: the last age is fed as the one before.
 - **The old ways last.** A town is planned in the manner of `TOWN.styleEra(era, culture)`, not always of its own era:
   where people went on building as their forebears had (`OLD_UNTIL` in `town.js`: the north and the steppe through
   the Classical era, the mud-brick lands, India and China likewise, Africa and south-east Asia until the Renaissance,

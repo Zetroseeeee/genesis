@@ -3,8 +3,10 @@
 // the Space Age and how it is governed; the save, loaded again and run on.
 //   node tools/space/probe.js [seed] [last year]
 // Run it after touching any table by age (a table one short gives undefined, and that is NaN in everything downstream). Measured for
-// 0.43 over 12345: 26 realms in the Space Age in 2030, 194 of 227 by 2050; the leader at 1.15 in 2150, every discovery of the age
-// learned, governed by machine; people 9.8 billion in 2030, 12.0 in 2050, 15.4 in 2150; no NaN; a save of 4 MB.
+// 0.43 over 12345: 26 realms in the Space Age in 2030, 196 of 229 by 2050; the leader at 1.15 in 2150, every discovery of the age
+// learned; people 9.8 billion in 2030, 11.8 in 2050, 12.9 in 2075 (the most there ever are: small families, FAMILY in sim.js),
+// 12.7 in 2100, 10.7 in 2150 (without small families 14.3 in 2100 and 14.0 in 2150); no NaN; a save of 4 MB; four and a half
+// minutes.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
 global.performance = global.performance || require('perf_hooks').performance;
 const fs = require('fs'); const path = require('path'); const root = path.join(__dirname, '..', '..'); const PNG = require(path.join(root, 'node_modules/pngjs')).PNG;

@@ -152,6 +152,12 @@ function createSim(world, seed) {
   const foodMult = (t) => lerpTable(foodTab, t);
   // per-civ food multiplier, refreshed every tick (tech only changes between ticks)
   const fmOf = new Float32Array(MAXC).fill(lerpTable(FOOD, 0.02)); let FM0 = lerpTable(FOOD, 0); const growR = new Float32Array(MAXC);      // (what a realm's land feeds, and how fast its people grow, this year)
+  // In the Space Age families are small: people come to fill less of what their land could feed, all of it as the age begins and
+  // seven tenths by its end, and where they are more than that their numbers fall as the old outlive the young - slowly, as the
+  // age goes on, and with no famine in it: the land feeds what it did (the world's people peak about 2070 and fall, as the
+  // demographers expect of ours; without it they filled the land, fourteen billion by 2100)
+  const FAMILY = 0.3; const famF = new Float32Array(MAXC).fill(1);
+  const familyOf = (t) => t <= 1 ? 1 : 1 - FAMILY * Math.min(1, (t - 1) / (TMAX - 1));
   // knowledge gained in a year, by age, before what a realm adds to it (towns, academies, scholars, what it knows).
   // Set by tools/know/pace.js so that the realms in front keep history's dates: bronze about 3300 BC, iron 1200 BC,
   // the classical world 500 BC, the middle ages AD 500, 1400, 1760, 1900, 1970.
@@ -990,7 +996,7 @@ function createSim(world, seed) {
     // in each realm - its granaries, what its market can bring in, the bread the court gives out
     const weather = climate && landOn; if (weather) { climate.step(); for (const i of climate.risen()) drown(i); if (wetVer !== climate.wetVer) applyWet(); climateNews(); }
     if (weather) for (let c = 0; c < MAXC; c++) { const cv = civs[c]; hvSum[c] = 0; hvPop[c] = 0; starved[c] = 0; if (!cv) continue; const sat = market.sat[c * NC + CAT.food]; relief[c] = Math.min(0.85, 0.6 * (1 - keep[c]) + 0.4 * clamp01((sat - 0.6) / 0.4) + (cv.clim && cv.clim.until > year ? cv.clim.f : 0)); }
-    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; strengthOf[c] = strength(cv, 0, 0); fmOf[c] = fmNow(cv); growR[c] = growOf(cv.tech) * (1 - (cv.policy.tax - 1) * 0.15) * (0.7 + cv.stability * 0.3) * KF[c * NKF + KK.grow] * RF[c * NRF + RK.grow]; techSum += cv.tech; techN++; if (cv.tech > frontTech) frontTech = cv.tech; }
+    for (let c = 0; c < MAXC; c++) { const cv = civs[c]; if (!cv) continue; strengthOf[c] = strength(cv, 0, 0); fmOf[c] = fmNow(cv); growR[c] = growOf(cv.tech) * (1 - (cv.policy.tax - 1) * 0.15) * (0.7 + cv.stability * 0.3) * KF[c * NKF + KK.grow] * RF[c * NRF + RK.grow]; famF[c] = familyOf(cv.tech); techSum += cv.tech; techN++; if (cv.tech > frontTech) frontTech = cv.tech; }
     meanTech = techN ? techSum / techN : 0.02;
     // pass 1: growth + accumulate (order-independent); the dead of last year's sickness are taken first (disease.js: a share of each realm)
     const sick = disease && disease.dying() ? disease.killF : null;
@@ -1005,7 +1011,7 @@ function createSim(world, seed) {
       if (p > 0 || c) {
         const K = capacity(i, c);
         const r = c ? growR[o] : 0.006;
-        p += r * p * Math.max(-10, 1 - p / Math.max(K, 0.01)); // overfull land empties by at most ~a quarter a year
+        p += r * p * Math.max(-10, 1 - p / Math.max(c ? K * famF[o] : K, 0.01)); // overfull land empties by at most ~a quarter a year (small families: famF)
         // (a famine: in a bad year those the land no longer feeds die, a share of them a year, fewer where something softens it)
         if (weather && p > K) { const hv = HV[i]; if (hv < 0.97) { const d = (p - K) * FAMINE * (c ? 1 - relief[o] : 1); p -= d; if (c) starved[o] += d; } }
         // (people on the move, as migrate.js reckoned them last year)
