@@ -106,7 +106,7 @@
         float g = (1.0 - walk) * (0.62 + 0.38 * smoothstep(-0.3, 0.6, sin(uTime * 0.55 + aWalk.x * 23.0))); float a = aGrz * g + 0.06 * sin(ph) * walk;
         vec2 piv = vec2(aPart.z, aPart.y); p.xy = piv + turn(p.xy - piv, a); n.xy = turn(n.xy, a);
       }
-      p.y += abs(sin(ph)) * 0.035 * walk * aPart.y;
+      p.y += abs(sin(ph)) * 0.04 * walk;      // (the whole beast rises a little with each stride)
       vShade = aPart.w; vCol = instanceColor; vLocal = position;
       vec4 mv = modelViewMatrix * instanceMatrix * vec4(p, 1.0); vView = mv.xyz;
       vN = normalize(normalMatrix * (mat3(instanceMatrix) * n));
@@ -204,13 +204,13 @@
     return [['deer', 0.4]];
   }
   // what a people keeps: by its land, its continent, what it knows (herding; horses once tamed) and whether the old world's beasts
-  // have come to it (the Americas from the Industrial age, as the ships brought them)
-  function keptOf(cls, ct, horse, era) {
+  // have come to it (the Americas and Australia once their people have met the old world, as the land's crops and beasts do: land.js)
+  function keptOf(cls, ct, horse, era, met) {
     const H = horse ? 0.45 : 0;
-    if (ct === 4) return era >= 6 ? [['sheep', 1], ['cattle', 0.6]] : null;
+    if (ct === 4) return met ? [['sheep', 1], ['cattle', 0.6]] : null;
     if (ct === 2 || ct === 3) {
-      if (cls === L_HIGH || cls === L_PLATEAU) return era >= 6 ? [['llama', 1], ['sheep', 0.5], ['cattle', 0.4]] : [['llama', 1]];
-      return era >= 6 ? [['cattle', 1], ['horse', 0.4], ['sheep', 0.4]] : null;
+      if (cls === L_HIGH || cls === L_PLATEAU) return met ? [['llama', 1], ['sheep', 0.5], ['cattle', 0.4]] : ct === 3 ? [['llama', 1]] : null;
+      return met ? [['cattle', 1], ['horse', 0.4], ['sheep', 0.4]] : null;
     }
     if (cls === L_TUNDRA || cls === L_BOREAL) return [['reindeer', 1], ['cattle', cls === L_BOREAL ? 0.3 : 0]];
     if (cls === L_DESERT) return era >= 2 ? [['camel', 1], ['goat', 0.6], ['sheep', 0.4]] : [['goat', 1], ['sheep', 0.6]];
@@ -263,7 +263,7 @@
           // keepers: a realm that herds, where its people live; the wild: where few do
           const knows = cv && KH >= 0 && sim.know.has[o * sim.know.ND + KH];
           let kind = null, kept = false;
-          if (knows && p > 0.3 && hash(key, 31) < clamp(p / 4, 0.25, 0.85)) { kind = pick(keptOf(cls, ct, KHo >= 0 && sim.know.has[o * sim.know.ND + KHo], cv.era | 0), hash(key, 37)); kept = !!kind; }
+          if (knows && p > 0.3 && hash(key, 31) < clamp(p / 4, 0.25, 0.85)) { kind = pick(keptOf(cls, ct, KHo >= 0 && sim.know.has[o * sim.know.ND + KHo], cv.era | 0, ct < 2 || !!(sim.disease && sim.disease.met && sim.disease.met(o))), hash(key, 37)); kept = !!kind; }
           if (!kind) { const wildP = (1 - clamp(p / 3, 0, 1)) * (cv ? (cv.era >= 6 ? 0.15 : cv.era >= 3 ? 0.5 : 0.8) : 1); if (hash(key, 41) < wildP) kind = pick(wildOf(cls, ct, yr), hash(key, 43)); }
           if (!kind) continue;
           // not in a town: the built-up ground of the region's town and its neighbours'
