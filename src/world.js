@@ -2,6 +2,8 @@
 (function () {
   const R_M = 6371000, KM = 1 / 6371;
   const W = 720, H = 360;
+  // what is never made a little larger or smaller than its fellows (see placeModel)
+  const NOVARY = new Set(['pier', 'boat', 'ship', 'well', 'mine', 'stall', 'lamp', 'menhirs']);
   function hash(i, k) { let h = (i * 374761393 + k * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 
   class World {
@@ -176,7 +178,7 @@
             let fitTo = null;
             if (def && prog < 1 && def.site && MODELS.defs[def.site]) { staged = true; if (prog < 0.72) { fitTo = def; def = MODELS.defs[def.site]; mprog = Math.min(1, prog / 0.3); } else mprog = 1; }
             if (cut && !(def && (def.fit === 'run' || def.fit === 'gate'))) continue;
-            this._cut = cut;
+            this._cut = cut; this._vi = i; this._vk = k; this._cul = cul;
             const nPut = def ? this.placeModel(def, it, lon, lat, hg, era, seed + k * 0.013, mprog, kRep, camPos, pxPerRad, cl, fitTo) : 0;
             this._cut = false;
             if (nPut) {
@@ -367,8 +369,13 @@
         if (!this.putModel(def, lon, lat, hg, yaw, us, us, us, era, seed, mf, prog, camPos, pxPerRad)) return 0;
         md[0] = B.w * u; md[1] = def.h * us; md[2] = B.d * u; md[3] = it.yaw + (turn ? Math.PI / 2 : 0); return 1;
       }
-      if (!this.putModel(def, lon, lat, hg, yaw, u, u, u, era, seed, mf, prog, camPos, pxPerRad)) return 0;
-      md[0] = def.w * u; md[1] = def.h * u; md[2] = def.d * u; md[3] = yaw; return 1;
+      // no two houses alike: one a little narrower or shorter than the next, one a storey's worth lower or higher (great
+      // buildings, open monuments and things keep their size; a house never grows past the ground fitHouses gave it), and
+      // the shader is told the town's people (mflags / 2 - 1), whose ways of washing a wall and keeping a roof it follows
+      let ux = u, uy = u, uz = u;
+      if (!landmark && !(flags & 8) && !it.as && !it.tag && !def.open && !NOVARY.has(it.kind)) { const i = this._vi | 0, k = this._vk | 0; ux = u * (0.9 + 0.12 * hash(i, 9001 + k * 3)); uz = u * (0.9 + 0.12 * hash(i, 9002 + k * 3)); uy = u * (0.84 + 0.32 * hash(i, 9003 + k * 3)); }
+      if (!this.putModel(def, lon, lat, hg, yaw, ux, uy, uz, era, seed, mf + 2 * ((this._cul | 0) + 1), prog, camPos, pxPerRad)) return 0;
+      md[0] = def.w * ux; md[1] = def.h * uy; md[2] = def.d * uz; md[3] = yaw; return 1;
     }
     // one instance matrix at lon/lat on ground height hg (metres): size w,h,d in drawn metres, krep = drawn/true scale for the shader's patterns
     setInst(im, idx, lon, lat, hg, wM, hM, dM, yaw, color, era, seed, style, krep, infoAttr) {
