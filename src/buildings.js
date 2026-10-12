@@ -141,6 +141,58 @@
     g.spire = merge([box(1, 0.6, 1), box(0.7, 0.2, 0.7, 0, 0.6), box(0.42, 0.1, 0.42, 0, 0.8), cyl(0.005, 0.12, 0.1, 6, 0, 0.9)]);
     g.lighthouse = merge([cyl(0.28, 0.5, 0.8, 10), cyl(0.34, 0.3, 0.04, 10, 0, 0.8), cyl(0.2, 0.2, 0.12, 8, 0, 0.84), cone(0.26, 0.04, 8, 0, 0.96)]);
     g.factory = merge([box(1, 0.7, 1), gableRoof(0.34, 0.3, 1.04, -0.33, 0.7), gableRoof(0.34, 0.3, 1.04, 0, 0.7), gableRoof(0.34, 0.3, 1.04, 0.33, 0.7)]);
+    // the cities of the machine age and after (town.js plans them by zone: towers in the middle, flats about them, houses with
+    // gardens at the edge, parks between)
+    g.slab = merge([box(1, 0.96, 1), box(0.24, 0.04, 0.5, -0.28, 0.96, 0), box(0.1, 0.05, 0.14, 0.3, 0.96, 0.18)]);      // a block of flats, long and thin: its lift house and a water tank on the roof
+    g.podium = merge([box(1, 0.14, 1), box(0.58, 0.83, 0.58, 0.08, 0.14, -0.06), box(0.3, 0.03, 0.3, 0.08, 0.97, -0.06)]);      // an office tower on its base of shops
+    g.cyltower = merge([cyl(0.5, 0.5, 0.96, 20), cyl(0.44, 0.46, 0.02, 20, 0, 0.96), cyl(0.2, 0.2, 0.02, 12, 0, 0.98)]);      // round, in glass
+    g.taper = merge([box(1, 0.3, 1), box(0.84, 0.24, 0.84, 0, 0.3), box(0.68, 0.18, 0.68, 0, 0.54), box(0.5, 0.12, 0.5, 0, 0.72), box(0.32, 0.07, 0.32, 0, 0.84), box(0.18, 0.04, 0.18, 0, 0.91), cyl(0.01, 0.04, 0.05, 6, 0, 0.95)]);      // the tallest of a skyline: setback upon setback to a needle
+    g.villa = merge([box(0.62, 0.56, 0.68, -0.15, 0, -0.12), hipRoof(0.7, 0.3, 0.76, 0.17, -0.15, 0.56, -0.12), box(0.36, 0.38, 0.44, 0.3, 0, 0.22), box(0.38, 0.04, 0.46, 0.3, 0.38, 0.22), box(0.08, 0.18, 0.08, -0.32, 0.74, -0.28)]);      // a house with its garage beside it
+    g.bungalow = merge([box(1, 0.52, 0.78), hipRoof(1.08, 0.26, 0.86, 0.3, 0, 0.52), box(0.3, 0.06, 0.2, -0.2, 0.0, 0.47)]);
+    g.mill = merge([box(1, 0.74, 1), box(1.03, 0.04, 1.03, 0, 0.74), box(0.2, 0.2, 0.32, 0.38, 0.78, 0), cyl(0.05, 0.08, 1.35, 8, -0.44, 0, 0.44)]);      // a mill of five floors and its chimney
+    { const ms = [cyl(0.46, 0.46, 0.84, 20)]; for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; ms.push(cyl(0.018, 0.022, 1, 4, Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5)); } ms.push(ring(0.52, 0.48, 0.03, 20, 0, 0.97)); g.gasometer = merge(ms); }      // a gasholder in its frame
+    g.mall = merge([box(1, 0.66, 1), box(0.42, 0.34, 0.3, 0.2, 0.66, -0.12), box(0.24, 0.12, 0.24, -0.26, 0.66, 0.24)]);
+    g.lawn = merge([box(1, 0.5, 1, 0, -0.48, 0)]);      // a park's grass (its trees are trees.js's): lies just above the ground, reaches down into it
+    // What a great city's plot holds where one drawn building stands for many (town.js: a plot of a city of millions is a block of
+    // ninety metres): its houses together, each its own size and roof, with the gardens between. They carry the block flag, and
+    // the shader gives every house of them a colour of its own.
+    { const ms = []; let q = 0;      // six detached houses in two rows, back to back, the gardens between them; a garage by some
+      for (const sz of [-1, 1]) for (const cx of [-0.335, 0, 0.335]) { q++; const two = q % 3 !== 1, w = two ? 0.2 : 0.25, d = two ? 0.2 : 0.17, h = two ? 0.6 : 0.42, x = cx + (q % 2 ? 0.02 : -0.02), z = sz * (0.31 - (q % 4 === 0 ? 0.03 : 0));
+        ms.push(box(w, h, d, x, 0, z)); ms.push(q % 2 ? hipRoof(w * 1.12, two ? 0.3 : 0.24, d * 1.14, w * 0.3, x, h, z) : gableRoof(w * 1.1, two ? 0.32 : 0.26, d * 1.12, x, h, z));
+        if (q % 3 !== 0) ms.push(box(0.08, 0.28, 0.11, x + (q % 2 ? 0.15 : -0.15), 0, z + sz * 0.02)); }
+      g.homes = merge(ms); }
+    { const ms = [];      // four houses about a shared garden, for a smaller city's plot
+      for (const sz of [-1, 1]) for (const sx of [-1, 1]) { const k = (sz + 1) + (sx + 1) / 2, w = k % 2 ? 0.34 : 0.3, h = k === 2 ? 0.44 : 0.6, x = sx * 0.25, z = sz * 0.27;
+        ms.push(box(w, h, 0.3, x, 0, z)); ms.push(k % 2 ? hipRoof(w * 1.1, 0.3, 0.34, w * 0.28, x, h, z) : gableRoof(w * 1.08, 0.32, 0.34).rotateY(k === 0 ? Math.PI / 2 : 0).translate(x, h, z)); }
+      g.homes4 = merge(ms); }
+    { const ms = [];      // terraced houses in two rows back to back, chimney stacks along the ridges, a back extension to each pair
+      for (const sz of [-1, 1]) { ms.push(box(1, 0.6, 0.27, 0, 0, sz * 0.32), gableRoof(1.02, 0.34, 0.3, 0, 0.6, sz * 0.32)); for (let k = 0; k < 5; k++) ms.push(box(0.05, 0.16, 0.08, -0.4 + k * 0.2, 0.84, sz * 0.32), box(0.09, 0.42, 0.12, -0.4 + k * 0.2, 0, sz * 0.13)); }
+      g.rows = merge(ms); }
+    // a block of flats round its court, as the cities of the nineteenth century built them: wings of five or six floors under
+    // pitched roofs; and the plain one of later years, flat-roofed, a wing higher than the rest
+    g.perimold = merge([box(1, 0.76, 0.26, 0, 0, 0.37), hipRoof(1.0, 0.22, 0.26, 0.13, 0, 0.76, 0.37), box(1, 0.72, 0.26, 0, 0, -0.37), hipRoof(1.0, 0.2, 0.26, 0.13, 0, 0.72, -0.37), box(0.26, 0.74, 0.5, 0.37, 0, 0), hipRoof(0.5, 0.2, 0.26, 0.0, 0, 0, 0).rotateY(Math.PI / 2).translate(0.37, 0.74, 0), box(0.26, 0.78, 0.5, -0.37, 0, 0), hipRoof(0.5, 0.2, 0.26, 0.0, 0, 0, 0).rotateY(Math.PI / 2).translate(-0.37, 0.78, 0), box(0.06, 0.08, 0.06, 0.3, 0.92, 0.37), box(0.06, 0.08, 0.06, -0.3, 0.88, -0.37)]);
+    g.perimeter = merge([box(1, 0.86, 0.24, 0, 0, 0.38), box(1, 0.78, 0.24, 0, 0, -0.38), box(0.24, 1, 0.52, 0.38, 0, 0), box(0.24, 0.82, 0.52, -0.38, 0, 0), box(0.12, 0.06, 0.16, 0.38, 1, 0.05), box(0.1, 0.05, 0.1, -0.2, 0.86, 0.38)]);
+    { const ms = [box(1, 0.06, 0.12, 0, 0, 0.44)];      // towers of flats in rows on their block, as the cities of East Asia build them, shops along the street
+      for (const sz of [-1, 1]) for (const cx of [-0.32, 0, 0.32]) { const hh = 0.82 + 0.18 * ((cx + 0.32) / 0.64) * (sz > 0 ? 1 : 0.7); ms.push(box(0.17, hh, 0.21, cx, 0, sz * 0.22), box(0.08, 0.03, 0.08, cx, hh, sz * 0.22)); }
+      g.compound = merge(ms); }
+    { const ms = []; let q = 0;      // the self-built houses of a fast-growing city's edge: cramped, a floor or three, flat roofs and tin
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) { q++; const r1 = ((q * 37) % 11) / 11, r2 = ((q * 53) % 13) / 13, w = 0.18 + 0.06 * r1, d = 0.17 + 0.07 * r2, h = 0.3 + 0.55 * ((q * 29 % 7) / 6) * ((q * 29 % 7) / 6), x = -0.37 + a * 0.245 + (r2 - 0.5) * 0.04, z = -0.37 + b * 0.245 + (r1 - 0.5) * 0.04;
+        ms.push(box(w, h, d, x, 0, z)); if (q % 3 === 0) ms.push(box(w * 0.45, 0.16, d * 0.5, x + w * 0.2, h, z - d * 0.2)); }
+      g.shacks = merge(ms); }
+    { const ms = [];      // flat-roofed houses behind their compound walls (the dry south, the Middle East, the Americas): a roof terrace, a stair house
+      for (const sz of [-1, 1]) for (const sx of [-1, 1]) { const x = sx * 0.25, z = sz * 0.25, k = (sz + 1) + (sx + 1) / 2, h = k % 3 === 0 ? 0.62 : 0.86;
+        ms.push(box(0.29, h, 0.27, x - sx * 0.03, 0, z - sz * 0.04), box(0.31, 0.06, 0.29, x - sx * 0.03, h, z - sz * 0.04), box(0.09, 0.14, 0.09, x - sx * 0.1, h, z - sz * 0.1));
+        ms.push(box(0.46, 0.22, 0.02, x, 0, z + sz * 0.22), box(0.02, 0.22, 0.46, x + sx * 0.22, 0, z)); }
+      g.walled = merge(ms); }
+    { const ms = []; let q = 0;      // the old town a modern city kept: nine houses of three to five floors wall to wall, their roofs every way
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { q++; const x = -0.335 + a * 0.335, z = -0.335 + b * 0.335, h = 0.5 + 0.22 * (((q * 7) % 5) / 4), w = 0.31 + (q % 2) * 0.02;
+        ms.push(box(w, h, 0.32, x, 0, z)); ms.push((q * 5) % 3 === 0 ? hipRoof(w * 1.04, 0.26, 0.34, 0.1, x, h, z) : gableRoof(w * 1.04, 0.26, 0.34).rotateY((q * 3) % 2 ? Math.PI / 2 : 0).translate(x, h, z)); }
+      g.oldtown = merge(ms); }
+    { const ms = []; let q = 0;      // an old medina: houses of two or three floors about their courts, roof terraces, a dome
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { q++; const x = -0.335 + a * 0.335, z = -0.335 + b * 0.335, h = 0.48 + 0.4 * (((q * 7) % 5) / 4);
+        if (q === 5) { ms.push(box(0.3, 0.5, 0.3, x, 0, z), dome(0.13, x, 0.5, z, 0.9)); continue; }
+        ms.push(box(0.32, h, 0.11, x, 0, z + 0.105), box(0.32, h, 0.11, x, 0, z - 0.105), box(0.11, h * 0.92, 0.1, x - 0.105, 0, z)); }
+      g.medina = merge(ms); }
     return g;
   }
 
@@ -195,7 +247,7 @@
       if (mat == 0.0) return (cul == 7.0 || cul == 4.0 || cul == 8.0) ? 12.0 : 0.0;                         // straw or palm thatch
       if (mat == 1.0) { if (cul == 1.0 || cul == 2.0 || cul == 9.0) return 8.0; if (cul == 0.0 && era <= 3.0) return 13.0; return 1.0; }   // plain tile in the north, Roman tile in antiquity, pan tile elsewhere
       if (mat == 2.0) return (cul == 0.0 && era >= 4.0 && seed > 0.6) ? 15.0 : 2.0;                         // slate, zinc on some mansards
-      if (mat == 3.0) { if (era >= 7.0 && seed > 0.7) return 10.0; return era >= 5.0 ? 3.0 : 9.0; }           // flat: packed earth, then bitumen, then solar
+      if (mat == 3.0) { if (era >= 8.0 && seed > 0.8) return 10.0; return era >= 5.0 ? 3.0 : 9.0; }           // flat: packed earth, then bitumen, then (from the Information Age, on some) solar panels
       if (mat == 4.0) return 4.0;
       if (mat == 5.0) return (landmark > 0.5) ? 11.0 : 5.0;                                                  // glazed tile: green on temples, grey tube tile on houses
       if (mat == 6.0) return 6.0;
@@ -261,6 +313,9 @@
       float door = step(abs(fuv.x - 0.9), 0.55) * step(yM, 2.1) * (1.0 - roof) * flatWall * step(abs(faceId - 3.0), 0.5) * step(2.6, vScale.x) * step(era, 6.5) * (1.0 - smoothstep(0.4, 1.2, px)) * (1.0 - isSite) * (1.0 - isThing);
       col = mix(col, vec3(0.13, 0.1, 0.08), win * 0.88 * (1.0 - isRuin * 0.6));
       col = mix(col, vec3(0.16, 0.11, 0.07), door);
+      // a block of many houses (the kit's clusters, a far town's block): every house of it a paint and a roof of its own
+      vec2 hc = floor(vLocal.xz * 3.2 + 7.0); float hv = h21(hc + seed * 3.7), hr = h21(hc.yx + seed * 9.3);
+      if (isBlock > 0.5) col *= (0.84 + 0.3 * hv) * mix(vec3(1.0), vec3(1.1, 0.97, 0.86), h21(hc + seed * 5.1));
       // ---------- roofs ----------
       vec3 rc;
       if (roofMat == 0.0) { rc = vec3(0.55, 0.44, 0.26) * (0.82 + 0.28 * vnoise(vec2(ruv.x * 2.2, ruv.y * 0.5) + seed) + 0.12 * vnoise(vec2(ruv.x * 9.0, ruv.y * 1.5) + seed * 3.0)); rc *= 0.94 + 0.12 * step(0.5, fract(ruv.y / 0.9 + 0.3 * vnoise(vec2(ruv.x * 4.0, 0.0)))) * (1.0 - smoothstep(0.3, 1.0, px)); }            // thatch: streaks down the slope, ragged courses
@@ -281,7 +336,7 @@
         rc = mix(rc, trc, uTexMix);
       }
       #endif
-      if (isBlock > 0.5) { float sub = step(0.55, vnoise(fuv * 0.12 + seed * 3.0)); rc = mix(rc * 0.9, vCol * 0.7, sub * 0.6); }
+      if (isBlock > 0.5) { rc *= 0.8 + 0.36 * hr; rc = mix(rc, vCol * 0.7, step(0.78, hr) * 0.55); }
       col = mix(col, rc, roof);
       // winter where winters are white: snow lies on the roofs
       if (uSnow > 0.01) col = mix(col, vec3(0.9, 0.92, 0.96), uSnow * roof * 0.92 * smoothstep(0.25, 0.55, vnoise(ruv * 0.35 + seed * 9.0) + uSnow * 0.5));
@@ -316,6 +371,6 @@
     }`;
 
   // instance caps: enough for the biggest city in view plus its neighbours
-  const MAXI = { scaffold: 4000, hut: 6000, tipi: 2500, longhouse: 4000, stilt: 4000, adobe: 9000, pueblo: 2500, courtyard: 6000, courtyardc: 5000, domehouse: 2500, gable: 12000, hip: 7000, curved: 7000, halftimber: 5000, townhouse: 6000, mansard: 2500, palazzo: 1500, terrace: 7000, tenement: 6000, block: 12000, blockold: 8000, tower: 4000, skyscraper: 1000, granary: 1200, chimney: 1200, barn: 1500, warehouse: 800, windmill: 400, turbine: 500, lamp: 2500, stall: 800, well: 200, fountain: 200, statue: 300, obelisk: 200, pier: 400, boat: 400, ship: 300, crane: 300, menhirs: 300, ziggurat: 300, pyramid: 200, steppyramid: 300, temple: 500, colosseum: 150, cathedral: 300, church: 500, basilica: 200, mosque: 400, tajmosque: 100, mudmosque: 300, onion: 300, hall: 400, pagoda: 400, stupa: 300, shikhara: 300, stepped: 300, mound: 200, palace: 300, keep: 800, roundtower: 2500, gatehouse: 600, wall: 5000, palisade: 3000, bastion: 500, station: 200, crystal: 100, irontower: 100, stadium: 150, spire: 200, lighthouse: 200, factory: 1200, car: 200, cart: 100, plane: 100, train: 100, rubble: 6000, wallstub: 3000, pillars: 600, tent: 2500, bigtent: 400, catapult: 300, cannon: 400 };
+  const MAXI = { scaffold: 4000, hut: 6000, tipi: 2500, longhouse: 4000, stilt: 4000, adobe: 9000, pueblo: 2500, courtyard: 6000, courtyardc: 5000, domehouse: 2500, gable: 12000, hip: 7000, curved: 7000, halftimber: 5000, townhouse: 6000, mansard: 2500, palazzo: 1500, terrace: 7000, tenement: 6000, block: 12000, blockold: 8000, tower: 4000, skyscraper: 1000, granary: 1200, chimney: 1200, barn: 1500, warehouse: 800, windmill: 400, turbine: 500, lamp: 2500, stall: 800, well: 200, fountain: 200, statue: 300, obelisk: 200, pier: 400, boat: 400, ship: 300, crane: 300, menhirs: 300, ziggurat: 300, pyramid: 200, steppyramid: 300, temple: 500, colosseum: 150, cathedral: 300, church: 500, basilica: 200, mosque: 400, tajmosque: 100, mudmosque: 300, onion: 300, hall: 400, pagoda: 400, stupa: 300, shikhara: 300, stepped: 300, mound: 200, palace: 300, keep: 800, roundtower: 2500, gatehouse: 600, wall: 5000, palisade: 3000, bastion: 500, station: 200, crystal: 100, irontower: 100, stadium: 150, spire: 200, lighthouse: 200, factory: 1200, slab: 6000, podium: 2500, cyltower: 1200, taper: 400, villa: 9000, bungalow: 6000, mill: 600, gasometer: 300, mall: 300, lawn: 1500, homes: 16000, homes4: 6000, rows: 9000, perimold: 6000, perimeter: 6000, compound: 9000, shacks: 8000, walled: 8000, oldtown: 4000, medina: 3000, car: 200, cart: 100, plane: 100, train: 100, rubble: 6000, wallstub: 3000, pillars: 600, tent: 2500, bigtent: 400, catapult: 300, cannon: 400 };
   window.BKIT = { makeKit, VERT, FRAG, MAXI };
 })();

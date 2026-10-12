@@ -81,7 +81,8 @@ server.listen(0, async () => {
   await scenario('intro: random river start', async (check) => {
     await ev(() => document.getElementById('btn-random').click()); await wait(500); await page.waitForFunction(() => !__G.mapcam.fly, null, { timeout: 320000 }); await frames(5); // the flight is paced by frame dt (capped), so wait for it rather than the clock
     const s = await state(); check(s.mode === 'play' && s.player >= 0, 'random start enters play');
-    const cap = await ev(() => { const c = __G.sim.playerCiv(); const i = c.capital; return { river: !!(__G.sim.flags[i] & 2), fert: __G.sim.fert[i] }; }); check(cap.fert > 0.3, 'random start on decent land (fert ' + cap.fert.toFixed(2) + ')');
+    // (by what the land gives the first farmers, as the random start chooses it: the old greenness, fert, is low along the rivers of the dry lands)
+    const cap = await ev(() => { const c = __G.sim.playerCiv(); const i = c.capital; return { river: !!(__G.sim.flags[i] & 2), fert: __G.sim.fert[i], home: __G.sim.homeOf(i) }; }); check(cap.home > 0.4, 'random start on good land for the first farmers (home ' + cap.home.toFixed(2) + ', greenness ' + cap.fert.toFixed(2) + (cap.river ? ', on a river' : '') + ')');
     check(s.dist < 0.006, 'camera flew in to town height (dist ' + s.dist.toFixed(5) + ')');
   });
 
@@ -866,6 +867,12 @@ server.listen(0, async () => {
     // a new age: the court is asked what the last one leaves, and what it chose is carried
     await ev(() => { const S = __G.sim, c = S.playerCiv(); S.setStories(true); if (c.story) c.story.q = null; const e = Math.min(8, c.era + 1); c.tech = Math.max(c.tech, S.ERAS[e][1] + 0.01); c.era = S.eraOf(c.tech); __T.teach(c); __G.run(1); });
     await frames(2); await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    // (a story of the family may come in the same year - a birth is told when it happens - and the age's question then waits behind it)
+    for (let k = 0; k < 4; k++) {
+      const t = await ev(() => TALES.isOpen() ? document.getElementById('tl-title').textContent : ''); if (!t || /leaves?$/.test(t)) break;
+      const i = await ev(() => { const b = [...document.querySelectorAll('#tl-choices .tl-choice')].find((x) => !x.getAttribute('aria-disabled')); return b ? +b.dataset.tl : -1; }); if (i < 0) break;
+      await page.click(`#tl-choices [data-tl="${i}"]`); await frames(1); await page.click('#tl-done'); await frames(2); await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    }
     q = await ev(() => ({ open: TALES.isOpen(), title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | ') }));
     check(q.open && /leaves?$/.test(q.title) && q.n === 3 && /until the next age/.test(q.chips), `a new age asks what the last one leaves: "${q.title}" (${q.chips.slice(0, 120)})`);
     await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2);

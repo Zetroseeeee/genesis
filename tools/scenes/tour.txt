@@ -92,6 +92,24 @@ medieval_med | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.45,pop:14,wall
 renaissance_seasia | tools/scenes/town.js | {lon:104,lat:14,tech:0.58,pop:10,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 industrial_north | tools/scenes/town.js | {lon:10,lat:52,tech:0.7,pop:40,walls:0,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 modern_med   | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.85,pop:120,walls:0,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+city_ind     | tools/scenes/town.js | {lon:-2.24,lat:53.48,tech:0.72,pop:400,walls:0,special:14,alt:1700,tilt:1.15,out:0.9} | setTimeout(() => __sceneLook('town',0.6,1.15,0.4), 7000); | 45
+city_ind_rows | tools/scenes/town.js | {lon:-2.24,lat:53.48,tech:0.72,pop:400,walls:0,special:14,alt:1700,tilt:1.15,out:0.9} | setTimeout(() => __sceneLook('rows',4,1.0,0.9), 7000); | 45
+city_us      | tools/scenes/town.js | {lon:-87.63,lat:41.88,tech:0.86,pop:2500,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.6,1.15,0.6), 7000); | 50
+city_us_down | tools/scenes/town.js | {lon:-87.63,lat:41.88,tech:0.86,pop:2500,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.16,1.22,2.2), 7000); | 50
+city_us_homes | tools/scenes/town.js | {lon:-87.63,lat:41.88,tech:0.86,pop:2500,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('homes',3.5,1.05,0.4), 7000); | 50
+city_us_night | tools/scenes/town.js | {lon:-87.63,lat:41.88,tech:0.86,pop:2500,walls:0,special:14,alt:4000,tilt:1.1,out:1.0,sun:[-0.2,4.6]} | setTimeout(() => __sceneLook('town',0.35,1.15,0.6), 7000); | 50
+city_eu      | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:0.96,pop:6000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.55,1.15,0.9), 7000); | 55
+city_eu_old  | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:0.96,pop:6000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('oldtown',3,1.05,0.3), 7000); | 55
+city_med     | tools/scenes/town.js | {lon:12.5,lat:41.9,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.55,1.15,0.9), 7000); | 55
+city_asia    | tools/scenes/town.js | {lon:121.47,lat:31.23,tech:0.96,pop:6000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.5,1.15,0.3), 7000); | 55
+city_asia_close | tools/scenes/town.js | {lon:121.47,lat:31.23,tech:0.96,pop:6000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('compound',3,1.05,0.8), 7000); | 55
+city_asia_far | tools/scenes/town.js | {lon:121.47,lat:31.23,tech:0.96,pop:6000,walls:0,special:14,alt:22000,tilt:0.8,out:0} | | 55
+city_latam   | tools/scenes/town.js | {lon:-99.13,lat:19.43,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.5,1.15,0.3), 7000); | 55
+city_latam_edge | tools/scenes/town.js | {lon:-99.13,lat:19.43,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('shacks',3.5,1.05,0.8), 7000); | 55
+city_mena    | tools/scenes/town.js | {lon:31.24,lat:30.04,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.5,1.15,0.3), 7000); | 55
+city_soviet  | tools/scenes/town.js | {lon:37.62,lat:55.75,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.5,1.15,0.3), 7000); | 55
+costb_city   | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:0.96,pop:6000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => { __sceneLook('town',0.55,1.15,0.9); }, 7000); setTimeout(() => { __T.costsCity(); }, 30000); | 70
+costb_suburb | tools/scenes/town.js | {lon:-87.63,lat:41.88,tech:0.86,pop:2500,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => { __sceneLook('town',0.6,1.15,0.6); }, 7000); setTimeout(() => { __T.costsCity(); }, 30000); | 70
 # --- shrines and wonders that are models ---
 mena_temple  | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('temple', 5, 1.05, 0.3), 7000); | 32
 iron_med_wonder | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.2,pop:10,walls:2,special:94} | setTimeout(() => __sceneLook('town', 0.9, 1.0, 0.3), 7000); | 32
