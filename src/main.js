@@ -16,7 +16,7 @@
   const SPEEDS = [1, 3, 10, 30, 100, 300, 1000];
 
   // ---------- state ----------
-  let sim = null, terrain = null, world = null, mapcam = null, decal = null, trees = null, life = null, movers = null, fx = null, troops = null, fauna = null, birds = null;
+  let sim = null, terrain = null, world = null, mapcam = null, decal = null, trees = null, life = null, movers = null, fx = null, troops = null, fauna = null, birds = null, fallTold = false;
   let mode = 'intro', tool = null, speedIdx = 3, paused = true, selected = -1, selectedCiv = -1, hoverCell = -1, pendingFound = null;
   // turn system: the world stands still between presses of the big button
   const turnRun = { active: false, start: 0, target: 0, evIdx: 0, capital: -1, wars: '', era: 0, towns: 0, townSet: null, reason: '' };
@@ -203,7 +203,7 @@
 
   // ---------- game flow ----------
   function newWorld(seed) {
-    sim = createSim(worldData, seed); world.setSim(sim); previewing = false; if (sim.setStories) sim.setStories(settings.stories !== false);
+    sim = createSim(worldData, seed); world.setSim(sim); previewing = false; fallTold = false; if (sim.setStories) sim.setStories(settings.stories !== false);
     deselect(); feedIdx = 0; seen.wars.clear(); seen.ack.clear(); seen.era = -1; seen.turns = 0; turnRun.active = false; turnRun.townSet = null; turnRun.capital = -1; paused = true; $('report').hidden = true; lastSample.year = -1e9;
     refreshAll(true);
   }
@@ -577,6 +577,13 @@
     if (reason === 'story') setTimeout(() => { if (!turnRun.active && mode === 'play') TALES.show(() => updateTurnButton()); }, 380);      // (the story is read as soon as the turn has stopped)
   }
   function deselectTool() { if (tool) setTool(null); }
+  // the end of a people's story (epilogue.js): when the player's realm falls, and when the Holocene ends in AD 2150 (once: the world
+  // may be played on). A world loaded after its fall is not told it again: the Chronicle's 'Your story' tells it.
+  function epilogueWatch() {
+    if (!window.EPILOGUE || !sim || EPILOGUE.isOpen()) return; const c = sim.playerCiv();
+    if (!c) { if (!fallTold && sim.fallen) { fallTold = true; paused = true; updateClock(); updateTurnButton(); setTimeout(() => EPILOGUE.open('fall'), 700); } return; }
+    if (sim.year >= 2150 && !c.epilogue) { c.epilogue = sim.year; if (turnRun.active) endTurn('end'); paused = true; updateClock(); updateTurnButton(); setTimeout(() => EPILOGUE.open('end'), 700); }
+  }
   // interrupts: things that should stop the clock so you can react
   function checkInterrupts() {
     const c = sim.playerCiv(); if (!c) { endTurn('gone'); return; }
@@ -639,7 +646,7 @@
     const c = sim.playerCiv(); const box = $('report'); if (!c) { box.hidden = true; return; }
     const ev = sim.worldEvents.slice(turnRun.evIdx); const mine = ev.filter(e => e.mine).map(e => { e._s = scoreEvent(e); return e; }).sort((a, b) => b._s - a._s).slice(0, 5).sort((a, b) => a.year - b.year); const others = ev.filter(e => !e.mine).map(e => { e._s = scoreEvent(e); return e; }).sort((a, b) => b._s - a._s).slice(0, 3).sort((a, b) => a.year - b.year);
     const list = [...mine, ...others];
-    const why = { war: 'War declared on you', capital: 'Your capital changed', era: 'A new era', stab: 'Unrest', split: 'A province broke away', stopped: 'Stopped early', gone: 'Your people are gone', disaster: 'Disaster strikes your lands', study: 'A discovery: your scholars await your word', demand: 'An estate of your realm makes a demand', rising: 'An estate of your realm has risen', envoy: 'Envoys wait on your answer', story: (() => { const v = window.TALES && TALES.waiting(); return v ? 'A story: ' + v.title : 'A story before your court'; })(), host: (() => { const N = sim.army.news; return N.length ? N[N.length - 1].text : 'News of your host'; })() }[turnRun.reason] || '';
+    const why = { end: 'The Holocene ends', war: 'War declared on you', capital: 'Your capital changed', era: 'A new era', stab: 'Unrest', split: 'A province broke away', stopped: 'Stopped early', gone: 'Your people are gone', disaster: 'Disaster strikes your lands', study: 'A discovery: your scholars await your word', demand: 'An estate of your realm makes a demand', rising: 'An estate of your realm has risen', envoy: 'Envoys wait on your answer', story: (() => { const v = window.TALES && TALES.waiting(); return v ? 'A story: ' + v.title : 'A story before your court'; })(), host: (() => { const N = sim.army.news; return N.length ? N[N.length - 1].text : 'News of your host'; })() }[turnRun.reason] || '';
     $('report-title').textContent = `${sim.fmtYear(turnRun.start)} → ${sim.fmtYear(sim.year)}`;
     const wy = $('report-why'); wy.hidden = !why; wy.textContent = why; wy.className = 'why ' + (turnRun.reason || '');
     // a painted strip for the moment that stopped the clock
@@ -1197,6 +1204,8 @@
     $('lensbtn').addEventListener('click', () => { $('lensmenu').hidden = !$('lensmenu').hidden; });
     $('opt-stories').checked = settings.stories !== false; $('opt-stories').addEventListener('change', (e) => { settings.stories = e.target.checked; if (sim && sim.setStories) sim.setStories(settings.stories); applySettings(); });
     TALES.init({ sim: () => sim, toast, afterAct: () => { refreshAll(true); updateTurnButton(); }, onClose: () => updateTurnButton(), artOf });
+    if (window.EPILOGUE) EPILOGUE.init({ sim: () => sim, artOf, onNew: () => { goHomeScreen(true); chooseMode(); }, onMenu: () => goHomeScreen(true), onClose: () => updateTurnButton() });
+    $('chron-story').addEventListener('click', () => { $('chron').close(); if (window.EPILOGUE && !EPILOGUE.open(sim.playerCiv() ? 'story' : 'fall')) toast('Found your people first: their story begins then'); });
     $('opt-continuous').checked = settings.continuous; $('opt-continuous').addEventListener('change', (e) => { settings.continuous = e.target.checked; if (turnRun.active) endTurn('stopped'); paused = true; applySettings(); updateTurnButton(); updateClock(); });
     attachTip($('date'), () => `<b>${sim.fmtYear(sim.year)}</b>${fmtInt(sim.year + 10000)} years since the first spring.`);
     document.querySelectorAll('.stance').forEach(b => b.addEventListener('click', () => { const c = sim && sim.playerCiv(); if (!c) return; c.policy.stance = b.dataset.stance; document.querySelectorAll('.stance').forEach(x => x.classList.toggle('on', x === b)); }));
@@ -1480,7 +1489,7 @@
   function loadLocal(quiet) {
     try {
       const s = readSave(); if (!s) { toast('No saved world here'); return false; }
-      sim = createSim(worldData, s.seed || 1); sim.load(s); world.setSim(sim); previewing = false; if (sim.setStories) sim.setStories(settings.stories !== false);
+      sim = createSim(worldData, s.seed || 1); sim.load(s); world.setSim(sim); previewing = false; fallTold = !!sim.fallen; if (sim.setStories) sim.setStories(settings.stories !== false);
       const fromHome = mode === 'intro';
       setMode('play'); $('intro').hidden = true; banner(null); mapcam.locked = false; mapcam.idleSpin = false; mapcam.fly = null; paused = true;
       if (s.cam) {
@@ -1568,6 +1577,7 @@
       if (turnRun.active) { checkInterrupts(); if (turnRun.active && sim.year >= turnRun.target) endTurn(''); }
       // (in continuous time a story stops the clock and is read at once)
       else if (settings.continuous && !paused) { const c = sim.playerCiv(); if (c && c.story && c.story.q && !$('tale').open) { paused = true; updateTurnButton(); updateClock(); TALES.show(); } }
+      epilogueWatch();
     }
     if (sim && mode === 'play') pumpFeed(now);
     terrain.dispOn = settings.quality === 'high' && mapcam.alt < 0.06;
