@@ -429,7 +429,10 @@ Conventions that matter:
   spaceport's pads and go up from them (`movers.js`: each pad's round by the clock, 150 s - the flight, the pad empty, the next
   rocket - a flame brighter than white at the tail, smoke that rolls out along the ground and hangs where it has been; for
   pictures `window.__launchAt` times the first launch). The garden flag (`FLAG.garden`,
-  128) greens whatever lies flat on a building.
+  128) greens whatever lies flat on a building. A pad is a thing (no windows, no roof of its own) raised a tenth of its height
+  over its flame trench, and the rockets stand where the world draws it: a town's site is moved off a river (`TOWN.siteOf` with
+  the decal), and found without it the rockets stood a kilometre from London's pads. Look at `city_space*`, `orbits_*`,
+  `hud_space`, `know_space` and `tale_moon` on the Mac after touching any of the Space Age.
 - **The market** (`econ.js`; `sim.market`). 63 goods: 42 the land yields (a cell has one, `sim.goods[i]`, and the age
   in which that place begins to yield it, `sim.gera[i]`: cocoa is old in Mesoamerica and came to West Africa with the
   plantations) and 21 made by recipes. A quantity is in lots, a price in coin per lot: the treasury's coin. Every year,
