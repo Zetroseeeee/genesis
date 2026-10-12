@@ -473,17 +473,31 @@
     // What people have made of the ground (the land-use tiles: crops in their rows, paving) has a size too, and it is the size the
     // game draws a village at, some twenty times life: a plot takes one repeat of its crop, a cobble is as wide as a doorway there.
     // n: cells to a repeat (a power of two); swap: the other way round.
-    // what a field shows at this time of its year (yr: 0 midwinter, 0.5 midsummer; on: outside the tropics): it may change its land-use
-    // layer (grain: 0 ripe, 1 young rows, 2 ploughed) and gives a tint (grain green before it ripens, pale stubble after it is cut,
-    // vines and orchards bare and pasture yellowed in winter). L is changed in place.
-    vec3 fieldYear(inout float L, float yr, float on) {
+    // what a field shows at this time of its year (yr: 0 midwinter, 0.5 midsummer; on: outside the tropics; h: the field's own dice):
+    // it may change the land-use layer (grain: 0 ripe, 1 young rows, 2 ploughed) and gives a tint. Half the grain is sown in the
+    // autumn (green through the winter, ripe in high summer, its stubble ploughed in and sown again), half in the spring (ploughed
+    // earth through the winter, ripe a few weeks later); vines and orchards stand bare and pasture yellows in winter. L is changed
+    // in place.
+    vec3 fieldYear(inout float L, float yr, float on, float h) {
       if (on < 0.5) return vec3(1.0);
-      bool winter = yr < 0.25 || yr >= 0.8;
       if (L < 2.5) {
-        if (winter) { L = 2.0; return vec3(1.0); }
-        if (yr < 0.38) { L = 1.0; return vec3(1.0); }
-        L = 0.0; return yr < 0.52 ? vec3(0.6, 0.92, 0.4) : yr < 0.66 ? vec3(1.0) : vec3(1.04, 0.96, 0.8) * 0.9;
+        if (h < 0.5) {
+          if (yr < 0.27) { L = 1.0; return vec3(0.78, 0.84, 0.72); }      // the winter wheat's young green
+          if (yr < 0.42) { L = 1.0; return vec3(1.0); }
+          if (yr < 0.55) { L = 0.0; return vec3(0.6, 0.92, 0.4); }        // green ears
+          if (yr < 0.68) { L = 0.0; return vec3(1.0); }                   // ripe
+          if (yr < 0.74) { L = 0.0; return vec3(1.04, 0.96, 0.8) * 0.9; } // stubble
+          if (yr < 0.84) { L = 2.0; return vec3(1.0); }                   // ploughed
+          L = 1.0; return vec3(0.72, 0.78, 0.66);                          // sown again: the first green over the earth
+        }
+        if (yr < 0.33) { L = 2.0; return vec3(1.0); }                     // ploughed through the winter
+        if (yr < 0.45) { L = 1.0; return vec3(1.0); }
+        if (yr < 0.58) { L = 0.0; return vec3(0.6, 0.92, 0.4); }
+        if (yr < 0.7) { L = 0.0; return vec3(1.0); }
+        if (yr < 0.82) { L = 0.0; return vec3(1.04, 0.96, 0.8) * 0.9; }
+        L = 2.0; return vec3(1.0);
       }
+      bool winter = yr < 0.25 || yr >= 0.8;
       if ((L == 4.0 || L == 5.0) && winter) return vec3(0.76, 0.68, 0.58);
       if (L == 6.0 && winter) return vec3(0.88, 0.82, 0.6);
       return vec3(1.0);
@@ -1129,7 +1143,8 @@
           // orchards stand bare and pasture yellows in winter. Every field keeps its own days, a farmer's, so the country turns over
           // field by field; nearer the warm south the grain grows through the winter and is cut in early summer.
           float yearOn = smoothstep(0.2, 0.3, latN0), yr0 = fract(uYearPh + (1.0 - hemi) * 0.5 + mix(0.1, 0.0, smoothstep(0.38, 0.5, latN0)));
-          vec3 tintB = fieldYear(flB, fract(yr0 + (hash21(bigId + 13.7) - 0.5) * 0.12), yearOn);
+          vec3 tintB = fieldYear(flB, fract(yr0 + (hash21(bigId + 13.7) - 0.5) * 0.08), yearOn, hash21(bigId + 21.1));
+          fieldOn = min(1.0, fieldOn * (1.0 + 0.6 * step(1.5, flB) * step(flB, 2.5)));      // (ploughed earth is bare: nothing of the grass about it shows through)
           #ifdef USE_GROUND
           #define FT(L, sw) ltex(L, L == 5.0 ? 256.0 : 128.0, sw)
           #else
@@ -1139,7 +1154,7 @@
           if (own > 0.01) {
             float hc = hash21(smallId + 5.3), hs = hash21(smallId + 9.1);
             float fl = (wet > 0.5 && hc < 0.6) ? 3.0 : hc < 0.35 ? 0.0 : hc < 0.55 ? 1.0 : hc < 0.68 ? 2.0 : hc < 0.84 ? 6.0 : (latN0 > 0.3 && latN0 < 0.55 && hc < 0.92) ? 4.0 : 5.0;
-            vec3 tintS = fieldYear(fl, fract(yr0 + (hash21(smallId + 13.7) - 0.5) * 0.12), yearOn);
+            vec3 tintS = fieldYear(fl, fract(yr0 + (hash21(smallId + 13.7) - 0.5) * 0.08), yearOn, hash21(smallId + 21.1));
             ft = mix(ft, FT(fl, step(0.5, hs)) * (0.9 + 0.2 * hash21(smallId + 7.7)) * tintS, own);
           }
           #undef FT
