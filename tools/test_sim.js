@@ -1644,6 +1644,36 @@ log('25. the woods');
     log(`   a year of the woods takes ${ms.toFixed(3)} ms`); check(ms < 0.25, `the woods are quick enough (${ms.toFixed(3)} ms a year)`); }
 }
 }
+if (want(26)) {
+log('26. the epilogue');
+{
+  const at = (lon, lat) => Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
+  const sim = createSim(wd, 2601); sim.setStories(false);
+  const P = sim.setPlayer(at(31.25, 29.9), 'Kemet'); P.aggression = 0; if (P.dip) P.dip.think = 1e12;
+  for (let y = 0; y < 400; y++) sim.tick();
+  check(P.annals && P.annals.length >= 35 && P.annals.every((a) => a.length === 4 && isFinite(a[1]) && a[2] >= 0), `the realm's annals are kept every ten years (${P.annals ? P.annals.length : 0} in 400 years)`);
+  const v = sim.epilogue();
+  check(!!v && v.alive && !!v.name && v.founded <= sim.year && v.place >= 1 && v.place <= v.of && v.annals.length >= P.annals.length, `the story of a living realm: ${v && v.name}, remembered ${v && v.place} of ${v && v.of}`);
+  check(Array.isArray(v.marks) && v.marks.every((m) => m.length === 3 && typeof m[2] === 'string'), `its moments as they were told (${v.marks.length})`);
+  const sv = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(sv); const P2 = s2.playerCiv();
+  check(!!P2 && P2.annals.length === P.annals.length && (P2.marks || []).length === (P.marks || []).length, 'saved and loaded with the realm');
+  // the fall: its last lands taken from it
+  for (const i of sim.LI) if (sim.owner[i] === P.id) { sim.owner[i] = -1; sim.level[i] = 0; }
+  sim.recount(); sim.tick(); sim.tick();
+  check(!sim.playerCiv() && sim.fallen === P && !!P.fell && /last lands/.test(P.fell[1]), `a fallen realm is kept as it was (${P.fell && P.fell.join(' · ')})`);
+  const f = sim.epilogue();
+  check(!!f && !f.alive && !!f.fell && f.name === P.fell[2] && f.marks.length > 0 && /is no more/.test(f.marks[f.marks.length - 1][2]), 'its story is told, and its fall is the last of its moments');
+  const sv2 = JSON.parse(JSON.stringify(sim.save())); const s3 = createSim(wd, 1); s3.load(sv2); const f3 = s3.epilogue();
+  check(!!f3 && !f3.alive && f3.name === f.name && f3.annals.length === f.annals.length && JSON.stringify(sv2).length < JSON.stringify(sv).length * 1.5, 'and again after the world is saved and loaded');
+  // a world saved before the epilogue: no annals, no moments, nobody fallen; its story begins when it is loaded
+  const old = JSON.parse(JSON.stringify(sv)); for (const c of old.civs) if (c) { delete c.annals; delete c.marks; } delete old.fallen;
+  const s4 = createSim(wd, 1); s4.load(old); for (let y = 0; y < 30; y++) s4.tick(); const v4 = s4.epilogue();
+  check(!!v4 && v4.annals.length >= 2 && v4.marks.length >= 0 && s4.fallen === null, 'a world saved before the epilogue begins its annals when it is loaded');
+  // the annals stay small in a long game
+  { const a = []; P2.annals = a; for (let k = 0; k < 1300; k++) a.push([k * 10, 1, 1, 0]); s2.tick(); for (let y = 0; y < 10; y++) s2.tick();
+    check(P2.annals.length <= 640, `a long game's annals are thinned (${P2.annals.length} kept of 1,300)`); }
+}
+}
 log(`\n${checks} checks, ${fails.length} failures`);
 
 if (fails.length) { console.log(fails.map(f => ' - ' + f).join('\n')); process.exit(1); }
