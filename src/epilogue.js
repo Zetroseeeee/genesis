@@ -78,7 +78,7 @@ window.EPILOGUE = (function () {
     const s = S(), LG = window.LEGACY, P = LG ? LG.PATHS : null; const fy = (y) => s.fmtYear(y);
     const age = AGES[Math.min(9, v.era)], peak = f.peak, wide = f.wide, end = v.alive ? v.year : (v.fell ? v.fell[0] : v.year);
     const remembered = v.total > 0 && P ? ` It is remembered above all for ${P[f.best].heir}: ${ordinal(v.place)} of the ${fmtInt(v.of)} realms that ever lived.` : '';
-    const atPeak = peak && end - peak[0] <= Math.max(20, (end - v.founded) * 0.03);      // (at its height now, or nearly)
+    const atPeak = peak && (v.alive ? v.pop >= peak[1] * 0.97 : end - peak[0] <= Math.max(20, (end - v.founded) * 0.03));      // (at its height now, or nearly)
     const height = peak && peak[1] > 0 && !(v.alive && atPeak) ? ` At its height, in ${fy(peak[0])}, its people numbered ${fmtPop(peak[1])}${wide && wide[2] > 1 ? `; the realm was widest in ${fy(wide[0])}, with ${fmtInt(wide[2])} regions` : ''}.` : '';
     if (!v.alive) { const [y, why] = v.fell || [v.year, '']; return `The realm rose in ${fy(v.founded)} and fell in ${fy(y)}${why ? ' (' + why + ')' : ''}, after ${span(v.founded, y)}, in the ${age}.${height}${remembered}`; }
     const now = ` In ${fy(v.year)} its people number ${fmtPop(v.pop)}${atPeak ? ', more than ever' : ''}, in ${fmtInt(v.cells)} regions, in the ${age}.`;

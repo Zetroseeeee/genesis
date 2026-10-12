@@ -1698,7 +1698,8 @@ function createSim(world, seed) {
       const pts = c.legacy ? c.legacy.pts.slice() : [0, 0, 0, 0, 0, 0], total = pts.reduce((a, b) => a + b, 0); let above = 0, of = 1;
       for (const o of civs) if (o && o !== c) { of++; if (legacy && legacy.scoreOf(o.id) > total) above++; }
       if (legacy) for (const g of legacy.save().hall) { if (g[0] === nm) continue; of++; if (g[1] > total) above++; }
-      return { id: c.id, alive, name: nm, people: c.name, color: c.color, founded: c.founded, year, era: c.era, fell: c.fell || null, annals: (c.annals || []).slice(), marks: (c.marks || []).slice(), events: (c.events || []).slice(),
+      const annals = (c.annals || []).slice(); if (alive && (!annals.length || annals[annals.length - 1][0] < year)) annals.push([year, Math.round(popOf[c.id] * 10) / 10, cellsOf[c.id], c.era]);      // (where it stands now ends its line)
+      return { id: c.id, alive, name: nm, people: c.name, color: c.color, founded: c.founded, year, era: c.era, fell: c.fell || null, annals, marks: (c.marks || []).slice(), events: (c.events || []).slice(),
         pts, total, place: above + 1, of, civ: c, pop: alive ? popOf[c.id] : 0, cells: alive ? cellsOf[c.id] : 0 };
     },
     // the weather (climate.js), in a world whose land has kinds: a realm's harvest this year against an ordinary year's (weighed by its

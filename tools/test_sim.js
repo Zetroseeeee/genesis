@@ -1653,7 +1653,7 @@ log('26. the epilogue');
   for (let y = 0; y < 400; y++) sim.tick();
   check(P.annals && P.annals.length >= 35 && P.annals.every((a) => a.length === 4 && isFinite(a[1]) && a[2] >= 0), `the realm's annals are kept every ten years (${P.annals ? P.annals.length : 0} in 400 years)`);
   const v = sim.epilogue();
-  check(!!v && v.alive && !!v.name && v.founded <= sim.year && v.place >= 1 && v.place <= v.of && v.annals.length === P.annals.length, `the story of a living realm: ${v && v.name}, remembered ${v && v.place} of ${v && v.of}`);
+  check(!!v && v.alive && !!v.name && v.founded <= sim.year && v.place >= 1 && v.place <= v.of && v.annals.length >= P.annals.length, `the story of a living realm: ${v && v.name}, remembered ${v && v.place} of ${v && v.of}`);
   check(Array.isArray(v.marks) && v.marks.every((m) => m.length === 3 && typeof m[2] === 'string'), `its moments as they were told (${v.marks.length})`);
   const sv = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(sv); const P2 = s2.playerCiv();
   check(!!P2 && P2.annals.length === P.annals.length && (P2.marks || []).length === (P.marks || []).length, 'saved and loaded with the realm');

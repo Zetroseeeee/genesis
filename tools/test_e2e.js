@@ -1166,7 +1166,7 @@ server.listen(0, async () => {
     await ev(() => document.querySelector('#ep-actions [data-ep="on"]').click()); await frames(1);
     check(!(await ev(() => document.getElementById('epi').open)), 'playing on closes it');
     // a people that falls: its last lands are lost, and the clock stops on its story
-    await ev(() => { const S = __G.sim, c = S.playerCiv(); for (const i of S.LI) if (S.owner[i] === c.id) { S.owner[i] = -1; S.level[i] = 0; } S.recount(); __G.setPaused(false); });
+    await ev(() => { const S = __G.sim, c = S.playerCiv(); for (const i of S.LI) if (S.owner[i] === c.id) { S.owner[i] = -1; S.level[i] = 0; } S.recount(); __G.startTurn(); });
     for (let k = 0; k < 40; k++) { await wait(500); if (await ev(() => document.getElementById('epi').open)) break; }
     q = await page1();
     check(q.open && /end of a people/i.test(q.kicker) && /fell in/.test(q.text) && q.acts[0] === 'A new world' && !(await ev(() => !!__G.sim.playerCiv())), `a fallen people's story is told (${q.text.slice(0, 90)}…; ${q.acts.join(', ')})`);
