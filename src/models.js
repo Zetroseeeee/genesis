@@ -71,8 +71,8 @@
         else { if (t3 < 0.25) { wash = vec3(0.62, 0.38, 0.26); wk = 0.3; } else if (t3 < 0.45) { wash = vec3(0.84, 0.78, 0.66); wk = 0.35; } }      // red earth, or a pale clay
         float on = mode == 0.0 ? plast : mode == 1.0 ? 1.0 - 0.7 * plast : 1.0;
         col = mix(col, wash * clamp(0.55 + lum * 1.1, 0.5, 1.2), wk * wallish * solid * on);
-        if (t4 < 0.3) col = mix(col, col * vec3(1.14, 1.07, 0.9), roofish);
-        else if (t4 < 0.62) { vec3 old = vec3(lum) * vec3(0.84, 0.85, 0.88); if (t4 > 0.5 && (cu == 1.0 || cu == 2.0 || cu == 6.0 || cu == 7.0)) old = mix(old, vec3(0.27, 0.33, 0.2) * (0.6 + lum), 0.45); col = mix(col, old, 0.5 * roofish); }
+        if (t4 < 0.3) col = mix(col, col * vec3(1.09, 1.04, 0.95), roofish);
+        else if (t4 < 0.62) { vec3 old = vec3(lum) * vec3(0.9, 0.87, 0.82); if (t4 > 0.5 && (cu == 1.0 || cu == 2.0 || cu == 6.0 || cu == 7.0)) old = mix(old, vec3(0.27, 0.33, 0.2) * (0.6 + lum), 0.45); col = mix(col, old, 0.5 * roofish); }
       }
       // a tree: its leaves turn in autumn and go in winter (vInfo.x: how far into autumn; flags: how bare, in 31 steps of two)
       if (uFoliage > 0.5) {
