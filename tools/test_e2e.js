@@ -231,14 +231,18 @@ server.listen(0, async () => {
   await scenario('turn: new era interrupt and green state', async (check) => {
     await ev(() => { const S = __G.sim; const c = S.playerCiv(); document.getElementById('turn').click(); setTimeout(() => { c.tech = 0.09; }, 300); });
     await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 60000 }); await frames(2);
-    const s = await state(); check(/state-good/.test(s.turn) && s.t1 === 'New era', 'green New era state: ' + s.turn + ' ' + s.t1);
-    await ev(() => document.getElementById('turn').click()); await frames(2); check((await state()).t1 === 'Advance', 'back to Advance after acknowledging');
+    // (a warning that came in the same turn - a drought's hunger, say - outranks the new age on the button; the age is then next in line)
+    const s = await state(); const eraQ = await ev(() => __G.attention().map((a) => a.id)); check((/state-good/.test(s.turn) && s.t1 === 'New era') || (/state-warn/.test(s.turn) && eraQ.includes('era')), 'green New era state, or the age next after a warning: ' + s.turn + ' ' + s.t1 + ' [' + eraQ.join(' ') + ']');
+    for (let k = 0; k < 4 && (await state()).t1 !== 'Advance'; k++) { await ev(() => { document.getElementById('turn').click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (window.TALES && TALES.isOpen()) TALES.close(); }); await frames(2); }
+    check((await state()).t1 === 'Advance', 'back to Advance after acknowledging');
     check((await ev(() => document.getElementById('id-era').textContent)).includes('BRONZE') || /Bronze/i.test(await ev(() => document.getElementById('id-era').textContent)), 'identity strip shows Bronze Age');
   });
   await scenario('turn: disaster on your land interrupts with an amber alert', async (check) => {
     // a disaster counts once the turn's first year has run: it is struck from inside the page, on the first frame after
     // that year (asked for from out here it sometimes arrived after the whole turn had run, and interrupted nothing)
-    await ev(() => new Promise((res) => { const S = __G.sim; const y0 = S.year; document.getElementById('turn').click(); const f = () => { if (S.year > y0) { const c = S.playerCiv(); S.logEvent(c, 'An earthquake shakes the land in ' + S.fullName(c), true, 'disaster', c.capital); S.quakes.push({ i: c.capital, year: S.year, mag: 7.5 }); S.rubble.set(c.capital, S.year); res(); } else requestAnimationFrame(f); }; requestAnimationFrame(f); }));
+    // (nothing may wait on the button first: it would open that and the turn would never run - the year never comes, and the page waited for ever)
+    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (window.TALES && TALES.isOpen()) TALES.close(); }); await frames(2);
+    await ev(() => new Promise((res) => { const S = __G.sim; const y0 = S.year; const t0 = performance.now(); document.getElementById('turn').click(); const f = () => { if (S.year > y0) { const c = S.playerCiv(); S.logEvent(c, 'An earthquake shakes the land in ' + S.fullName(c), true, 'disaster', c.capital); S.quakes.push({ i: c.capital, year: S.year, mag: 7.5 }); S.rubble.set(c.capital, S.year); res(); } else if (performance.now() - t0 > 90000) res(); else requestAnimationFrame(f); }; requestAnimationFrame(f); }));      // (and gives up after a minute and a half: the checks below then say what went wrong)
     await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 60000 }); await frames(2);
     const s = await state(); check(/state-warn/.test(s.turn) && s.t1 === 'Disaster', 'amber Disaster state: ' + s.turn + ' ' + s.t1);
     await ev(() => document.getElementById('turn').click()); await wait(500); await frames(2); check((await state()).t1 !== 'Disaster', 'acknowledged');
