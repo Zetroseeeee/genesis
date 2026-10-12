@@ -1186,6 +1186,30 @@ server.listen(0, async () => {
     await ev(() => { document.getElementById('turn').click(); document.getElementById('opt-continuous').click(); });
   });
 
+  // (last: it ends the player's people)
+  await scenario('epilogue: your story from the Chronicle, the end of the Holocene, a people that falls', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
+    const page1 = () => ev(() => ({ open: document.getElementById('epi').open, title: document.getElementById('ep-title').textContent, kicker: document.getElementById('ep-kicker').textContent, text: document.getElementById('ep-text').textContent,
+      tiles: document.querySelectorAll('#ep-tiles .ep-tile').length, paths: document.querySelectorAll('#ep-paths .ep-path').length, acts: [...document.querySelectorAll('#ep-actions .btn')].map((b) => b.textContent), annals: (__G.sim.epilogue() || { annals: [] }).annals.length }));
+    // the Chronicle's 'Your story': the story so far
+    await ev(() => __G.openChronicle('log')); await frames(1); await ev(() => document.getElementById('chron-story').click()); await frames(3);
+    let q = await page1();
+    check(q.open && q.title.length > 3 && /story so far/i.test(q.kicker) && q.tiles === 6 && q.paths === 6 && q.acts.join() === 'Close' && /Founded in/.test(q.text) && q.annals > 0, `the Chronicle's 'Your story' (${q.title}: ${q.tiles} figures, ${q.paths} paths, ${q.annals} annals; ${q.acts.join(', ')})`);
+    await ev(() => document.querySelector('#ep-actions [data-ep="close"]').click()); await frames(1);
+    // the end of the Holocene: the page offers to play on
+    await ev(() => EPILOGUE.open('end')); await frames(3); q = await page1();
+    check(q.open && /end of the Holocene/i.test(q.kicker) && q.acts[0] === 'Play on' && /The Holocene ends/.test(q.text), `the end of the Holocene: ${q.acts.join(', ')}`);
+    await ev(() => document.querySelector('#ep-actions [data-ep="on"]').click()); await frames(1);
+    check(!(await ev(() => document.getElementById('epi').open)), 'playing on closes it');
+    // a people that falls: its last lands are lost, and the clock stops on its story
+    await ev(() => { const S = __G.sim, c = S.playerCiv(); for (const i of S.LI) if (S.owner[i] === c.id) { S.owner[i] = -1; S.level[i] = 0; } S.recount(); __G.startTurn(); });
+    for (let k = 0; k < 40; k++) { await wait(500); if (await ev(() => document.getElementById('epi').open)) break; }
+    q = await page1();
+    check(q.open && /end of a people/i.test(q.kicker) && /fell in/.test(q.text) && q.acts[0] === 'A new world' && !(await ev(() => !!__G.sim.playerCiv())), `a fallen people's story is told (${q.text.slice(0, 90)}…; ${q.acts.join(', ')})`);
+    q = await ev(() => { document.querySelector('#ep-actions [data-ep="close"]').click(); return { open: document.getElementById('epi').open, turn: document.getElementById('turn1').textContent }; });
+    check(!q.open && /Gone/.test(q.turn), `and the world may be watched going on (${q.turn})`);
+  });
+
   // ---------- summary ----------
   const passed = results.filter(r => r.ok).length; log(`\n${passed}/${results.length} scenarios passed`);
   if (passed < results.length) log('FAILED: ' + results.filter(r => !r.ok).map(r => r.name).join(' | '));

@@ -623,6 +623,49 @@
   .tl-outtext { font-family: var(--serif); font-style: italic; font-size: calc(16px * var(--ui-scale)); line-height: 1.6; margin: 0; max-width: 64ch; }
   @media (max-width: 560px) { .tl-page { padding: 0 16px 16px; margin-top: -40px; } .tl-title { font-size: 23px; } .tl-choice { padding: 10px 12px 10px 10px; } }
   @media (prefers-reduced-motion: reduce) { .tl-fig img { animation: none; } }
+  /* the epilogue (epilogue.js): the story of the player's people, when it falls, when the Holocene ends, or asked for */
+  #epi .modal { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow-y: auto; position: relative; }
+  .epilogue .tl-fig { aspect-ratio: 2.6 / 1; flex: none; }
+  .epilogue .ep-page { flex: none; }
+  .epilogue.fell .tl-fig img { filter: saturate(0.5) brightness(0.78) sepia(0.28); }
+  .ep-page { padding: 0 34px 26px; position: relative; margin-top: -78px; z-index: 1; }
+  .epilogue.noart .ep-page { margin-top: 0; padding-top: 28px; }
+  .ep-date { color: var(--text-2); font-size: var(--fs-cap); margin: -8px 0 2px; letter-spacing: 0.04em; }
+  .ep-head { display: flex; gap: 16px; align-items: flex-end; margin-bottom: 12px; }
+  .ep-seal { flex: none; width: calc(78px * var(--ui-scale)); height: calc(78px * var(--ui-scale)); border-radius: 50%; overflow: hidden; border: 2px solid color-mix(in srgb, var(--gold) 70%, transparent); box-shadow: 0 4px 18px rgb(0 0 0 / 0.6); background: #10141c; }
+  .ep-seal canvas { width: 100%; height: 100%; display: block; }
+  .ep-who { color: var(--text-3); font-size: var(--fs-cap); }
+  .epilogue.fell .ep-seal { filter: grayscale(0.7) brightness(0.85); }
+  .ep-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 4px 0 16px; }
+  .ep-tile { display: flex; flex-direction: column; gap: 2px; padding: 9px 11px; background: rgb(255 255 255 / 0.035); border: 1px solid var(--rule); border-top: 2px solid color-mix(in srgb, var(--gold) 55%, transparent); min-width: 0; }
+  .ep-k { font-size: var(--fs-cap); color: var(--text-3); }
+  .ep-v { font-family: var(--display); font-weight: 600; font-size: calc(16px * var(--ui-scale)); color: #F3E7C9; line-height: 1.2; }
+  .ep-s { font-size: var(--fs-cap); color: var(--text-2); }
+  .ep-chart { width: 100%; height: calc(190px * var(--ui-scale)); display: block; margin: 0 0 18px; background: rgb(0 0 0 / 0.18); border: 1px solid var(--rule); }
+  .ep-cols { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 28px; }
+  .ep-cols h3 { font-family: var(--display); font-size: var(--fs-key); color: var(--gold-2); letter-spacing: 0.04em; margin: 0 0 10px; font-weight: 600; }
+  .ep-story { display: flex; flex-direction: column; gap: 6px; max-height: calc(420px * var(--ui-scale)); overflow-y: auto; padding-right: 6px; }
+  .ep-age { font-family: var(--display); font-size: var(--fs-body); color: var(--m); margin: 10px 0 2px; padding-bottom: 3px; border-bottom: 1px solid color-mix(in srgb, var(--m) 40%, transparent); font-weight: 600; letter-spacing: 0.05em; }
+  .ep-age:first-child { margin-top: 0; }
+  .ep-age { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .ep-m { display: grid; grid-template-columns: 74px 16px minmax(0, 1fr); gap: 6px; align-items: baseline; font-size: var(--fs-body); line-height: 1.45; }
+  .ep-y { color: var(--text-3); font-size: var(--fs-cap); font-variant-numeric: tabular-nums; }
+  .ep-i { color: var(--gold); width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; align-self: center; }
+  .ep-golden .ep-i { color: #F2C14E; } .ep-war .ep-i { color: #E8806F; } .ep-fall .ep-i { color: #F06A5A; } .ep-faith .ep-i { color: #B9A6E8; }
+  .ep-x { color: rgb(236 233 226 / 0.9); }
+  .ep-fall .ep-x { color: #F3A09A; font-weight: 600; }
+  .ep-paths { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+  .ep-path { display: grid; grid-template-columns: 74px minmax(0, 1fr) 46px; gap: 8px; align-items: center; font-size: var(--fs-body); color: var(--text-2); }
+  .ep-path i { height: 6px; border-radius: 3px; background: linear-gradient(to right, color-mix(in srgb, var(--gold) 70%, transparent) var(--w), rgb(255 255 255 / 0.07) var(--w)); }
+  .ep-path b { text-align: right; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .ep-path.best span, .ep-path.best b { color: var(--gold-2); }
+  .ep-firsts { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-body); margin-bottom: 14px; }
+  .ep-first { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 6px; }
+  .ep-none { color: var(--text-3); font-size: var(--fs-body); font-style: italic; margin: 0; }
+  .ep-rulers { color: var(--text-2); font-size: var(--fs-cap); margin: 0; }
+  .ep-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 16px; }
+  @media (max-width: 760px) { .ep-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ep-cols { grid-template-columns: 1fr; } .ep-page { padding: 0 16px 16px; margin-top: -40px; } }
+
   #news .pbody { gap: 18px; }
   #news .note h3 { font-family: var(--body); font-size: 15.5px; font-weight: 600; line-height: 1.35; color: var(--text); }
   #news .note time { display: block; font-size: 12px; color: var(--text-3); margin-bottom: 2px; font-variant-numeric: tabular-nums; }
@@ -1279,7 +1322,7 @@
 </div>
 
 <dialog id="chron"><div class="modal panel">
-  <div class="phead"><h2 class="display">Chronicle</h2><span class="micro" id="chron-sub"></span><button class="btn icon ghost" id="chron-close">✕</button></div>
+  <div class="phead"><h2 class="display">Chronicle</h2><span class="micro" id="chron-sub"></span><button class="btn" id="chron-story" title="The story of your people: its life, its moments, what it is remembered for">Your story</button><button class="btn icon ghost" id="chron-close">✕</button></div>
   <div class="tabs"><button class="on" data-ctab="log">Log</button><button data-ctab="legacy">Legacy</button><button data-ctab="powers">Powers</button><button data-ctab="graphs">Graphs</button><button data-ctab="stats">Statistics</button></div>
   <div class="pbody">
     <div data-cpane="log" class="sect" style="gap:10px"><div class="filters" id="logfilters"></div><div class="log" id="log"></div></div>
@@ -1359,6 +1402,25 @@
     <div class="tl-choices" id="tl-choices" role="group" aria-label="What will you do?"></div>
     <div class="tl-out" id="tl-out" hidden><span class="tl-outchoice" id="tl-outchoice"></span><p class="tl-outtext" id="tl-outtext"></p><span class="tl-chips" id="tl-outchips"></span><button class="btn primary" id="tl-done">Continue</button></div>
     <p class="tl-foot" id="tl-foot"></p>
+  </div>
+</div></dialog>
+
+<dialog id="epi" aria-labelledby="ep-title"><div class="modal panel tale epilogue" tabindex="-1">
+  <button class="btn icon ghost tl-x" data-ep="close" title="Close (Esc)">✕</button>
+  <figure class="tl-fig" id="ep-fig"><img id="ep-img" alt=""></figure>
+  <div class="ep-page">
+    <div class="ep-head"><div class="ep-seal" id="ep-seal"><canvas id="ep-face" width="112" height="112"></canvas></div><div>
+    <div class="tl-date" id="ep-kicker"></div>
+    <h2 class="tl-title" id="ep-title"></h2>
+    <div class="ep-date" id="ep-date"></div><div class="ep-who" id="ep-who"></div></div></div>
+    <p class="tl-text" id="ep-text"></p>
+    <div class="ep-tiles" id="ep-tiles"></div>
+    <canvas class="ep-chart" id="ep-chart" aria-label="Its people and its land over the ages"></canvas>
+    <div class="ep-cols">
+      <section><h3>Their story</h3><div class="ep-story" id="ep-story"></div></section>
+      <aside><h3>Remembered for</h3><div class="ep-paths" id="ep-paths"></div><h3>Firsts in the world</h3><div class="ep-firsts" id="ep-firsts"></div><p class="ep-rulers" id="ep-rulers"></p></aside>
+    </div>
+    <div class="ep-actions" id="ep-actions"></div>
   </div>
 </div></dialog>
 
@@ -1477,6 +1539,7 @@
 <script src="folk.js"></script>
 <script src="country.js"></script>
 <script src="tales.js"></script>
+<script src="epilogue.js"></script>
 <script src="troops.js"></script>
 <script src="fauna.js"></script>
 <script src="sound.js"></script>
