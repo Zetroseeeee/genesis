@@ -7,27 +7,27 @@ window.RULE = (function () {
   'use strict';
   // How long matters of state take, by age, in years: a reform, a change of heart, how often an estate acts. It is
   // also the length of a turn (main.js takes it from here), so that in every age a reform is the work of a turn or two.
-  const PACE = [200, 100, 50, 50, 40, 20, 10, 5, 5];
+  const PACE = [200, 100, 50, 50, 40, 20, 10, 5, 5, 5];
   // authority: the most a ruler can hold, and how much a steady realm gathers in a turn of its age (a state of the later ages
   // can change more, and has more that wants changing)
-  const AUTH_MAX = 150, AUTH_TURN = [10, 10, 10, 11, 12, 14, 18, 24, 28];
+  const AUTH_MAX = 150, AUTH_TURN = [10, 10, 10, 11, 12, 14, 18, 24, 28, 30];
 
   // ---------- the estates ----------
   // who they are, age by age, and what the realm gets from them when they are content (and loses when they are not)
   const ESTATES = [
-    { key: 'nobles', names: ['Clan heads', 'Nobles', 'Nobles', 'Nobles', 'Nobles', 'Nobles', 'Landowners', 'Old families', 'Old families'], note: 'hold the land and lead in war', lever: 'strength', k: 0.14, tone: '#C9A25E' },
-    { key: 'priests', names: ['Shamans', 'Priests', 'Priests', 'Priests', 'Clergy', 'Clergy', 'Clergy', 'Clergy', 'Clergy'], note: 'speak for the gods', lever: 'stab', k: 0.10, tone: '#E8E4D8' },
-    { key: 'merchants', names: ['Traders', 'Traders', 'Merchants', 'Merchants', 'Merchants', 'Merchants', 'Industrialists', 'Business', 'Business'], note: 'carry goods and lend coin', lever: 'trade', k: 0.24, tone: '#F2CF5B' },
-    { key: 'artisans', names: ['Craftsmen', 'Craftsmen', 'Craftsmen', 'Townsfolk', 'Townsfolk', 'Townsfolk', 'Workers', 'Workers', 'Workers'], note: 'make things in the towns', lever: 'work', k: 0.20, tone: '#F0A24A' },
-    { key: 'farmers', names: ['Hunters and farmers', 'Farmers', 'Farmers', 'Farmers', 'Peasants', 'Peasants', 'Farmers', 'Farmers', 'Farmers'], note: 'feed everyone else', lever: 'food', k: 0.10, tone: '#7BD36B' },
-    { key: 'soldiers', names: ['Warriors', 'Warriors', 'Warriors', 'Soldiers', 'Soldiers', 'Soldiers', 'The army', 'The army', 'The army'], note: 'bear arms for the realm', lever: 'strength', k: 0.22, tone: '#E45B5B' },
-    { key: 'scholars', names: ['The wise', 'Scribes', 'Scribes', 'Scholars', 'Scholars', 'Scholars', 'The educated', 'The educated', 'The educated'], note: 'keep the records and the learning', lever: 'research', k: 0.18, tone: '#5DA9F5' },
+    { key: 'nobles', names: ['Clan heads', 'Nobles', 'Nobles', 'Nobles', 'Nobles', 'Nobles', 'Landowners', 'Old families', 'Old families', 'Old families'], note: 'hold the land and lead in war', lever: 'strength', k: 0.14, tone: '#C9A25E' },
+    { key: 'priests', names: ['Shamans', 'Priests', 'Priests', 'Priests', 'Clergy', 'Clergy', 'Clergy', 'Clergy', 'Clergy', 'The faithful'], note: 'speak for the gods', lever: 'stab', k: 0.10, tone: '#E8E4D8' },
+    { key: 'merchants', names: ['Traders', 'Traders', 'Merchants', 'Merchants', 'Merchants', 'Merchants', 'Industrialists', 'Business', 'Business', 'Corporations'], note: 'carry goods and lend coin', lever: 'trade', k: 0.24, tone: '#F2CF5B' },
+    { key: 'artisans', names: ['Craftsmen', 'Craftsmen', 'Craftsmen', 'Townsfolk', 'Townsfolk', 'Townsfolk', 'Workers', 'Workers', 'Workers', 'Workers'], note: 'make things in the towns', lever: 'work', k: 0.20, tone: '#F0A24A' },
+    { key: 'farmers', names: ['Hunters and farmers', 'Farmers', 'Farmers', 'Farmers', 'Peasants', 'Peasants', 'Farmers', 'Farmers', 'Farmers', 'Growers'], note: 'feed everyone else', lever: 'food', k: 0.10, tone: '#7BD36B' },
+    { key: 'soldiers', names: ['Warriors', 'Warriors', 'Warriors', 'Soldiers', 'Soldiers', 'Soldiers', 'The army', 'The army', 'The army', 'The forces'], note: 'bear arms for the realm', lever: 'strength', k: 0.22, tone: '#E45B5B' },
+    { key: 'scholars', names: ['The wise', 'Scribes', 'Scribes', 'Scholars', 'Scholars', 'Scholars', 'The educated', 'The educated', 'The educated', 'Researchers'], note: 'keep the records and the learning', lever: 'research', k: 0.18, tone: '#5DA9F5' },
   ];
   const NE = ESTATES.length; const EK = {}; ESTATES.forEach((e, i) => { EK[e.key] = i; });
   // how much the old landed families count for, age by age; and how much the learned do, whatever else is true
-  const NOBLE_AGE = [0.7, 1, 1, 1, 1, 0.9, 0.6, 0.35, 0.25], LEARNED_AGE = [0, 0.02, 0.04, 0.06, 0.08, 0.12, 0.17, 0.22, 0.27];
+  const NOBLE_AGE = [0.7, 1, 1, 1, 1, 0.9, 0.6, 0.35, 0.25, 0.2], LEARNED_AGE = [0, 0.02, 0.04, 0.06, 0.08, 0.12, 0.17, 0.22, 0.27, 0.32];
   // of the people the simulation counts in a town's region, how many live in the town itself (the rest farm around it)
-  const TOWN_AGE = [0.1, 0.14, 0.18, 0.22, 0.22, 0.28, 0.45, 0.75, 1];
+  const TOWN_AGE = [0.1, 0.14, 0.18, 0.22, 0.22, 0.28, 0.45, 0.75, 1, 1.1];
   // content: what the form, the laws and the times add up to, bent so that nobody is ever wholly pleased or wholly lost
   const bent = (x) => 0.5 + 0.5 * Math.tanh(1.5 * x); const r5 = (v) => Math.round(v * 1e5) / 1e5;
 
@@ -43,27 +43,27 @@ window.RULE = (function () {
   // numbers whatever realms choose: after changing what forms and laws give, measure again.
   /* NORM:BEGIN */
   const NORM = {
-    tax: [0.72, 0.936, 1.126, 1.208, 1.03, 1.235, 1.424, 1.514, 1.47],
-    customs: [1, 1, 1, 1, 1.018, 1.632, 1.259, 0.902, 0.844],
-    upkeep: [1, 1, 1.078, 1.213, 1.268, 1.306, 1.23, 1.409, 1.569],
-    cost: [0, 0.008, 0.054, 0.083, 0.05, 0.033, 0.061, 0.116, 0.16],
-    stab: [0.062, 0.149, 0.179, 0.159, 0.189, 0.123, 0.081, 0.259, 0.319],
-    auth: [0.909, 1.222, 1.484, 1.27, 0.931, 1.483, 1.372, 0.965, 0.528],
-    food: [1.018, 0.994, 1.015, 1.025, 1.022, 1.071, 1.083, 1.066, 1.064],
-    grow: [1, 0.999, 1.015, 1.017, 0.994, 1.016, 1.025, 1.04, 1.045],
-    health: [1, 1, 1, 1, 1.065, 1.022, 1.146, 1.135, 1.165],
-    strength: [1.071, 1.119, 1.183, 1.272, 1.41, 1.35, 1.39, 1.376, 1.328],
-    levy: [1, 0.877, 0.864, 0.935, 0.968, 0.983, 0.989, 0.994, 0.997],
-    research: [1, 1.029, 1.048, 1.127, 1.123, 1.092, 1.393, 1.597, 1.757],
-    build: [1, 0.924, 0.86, 0.861, 0.986, 0.998, 0.997, 0.99, 0.996],
-    reach: [0.809, 1.14, 1.332, 1.429, 1.556, 1.428, 1.419, 1.368, 1.913],
-    trade: [1.022, 1.098, 1.113, 1.07, 1.103, 1.118, 1.35, 1.31, 1.315],
-    work: [0.999, 0.983, 1.032, 1.073, 1.094, 1.215, 1.134, 1.235, 1.25],
-    yield: [1, 1.02, 1.023, 1.043, 1.012, 1.002, 1, 1.029, 1.035],
-    expand: [1, 1, 1.019, 1.033, 1.022, 1.006, 1.002, 0.897, 0.943],
-    breakaway: [1, 1.132, 1.184, 1.034, 0.96, 0.873, 0.862, 0.876, 0.709],
-    unrest: [1, 1, 1.053, 1.054, 1.061, 1.016, 0.988, 0.96, 0.924],
-    hunger: [0.905, 0.818, 0.588, 0.508, 0.911, 0.987, 0.981, 0.997, 0.999],
+    tax: [0.72, 0.936, 1.126, 1.208, 1.03, 1.235, 1.424, 1.514, 1.47, 1.47],
+    customs: [1, 1, 1, 1, 1.018, 1.632, 1.259, 0.902, 0.844, 0.844],
+    upkeep: [1, 1, 1.078, 1.213, 1.268, 1.306, 1.23, 1.409, 1.569, 1.569],
+    cost: [0, 0.008, 0.054, 0.083, 0.05, 0.033, 0.061, 0.116, 0.16, 0.16],
+    stab: [0.062, 0.149, 0.179, 0.159, 0.189, 0.123, 0.081, 0.259, 0.319, 0.319],
+    auth: [0.909, 1.222, 1.484, 1.27, 0.931, 1.483, 1.372, 0.965, 0.528, 0.528],
+    food: [1.018, 0.994, 1.015, 1.025, 1.022, 1.071, 1.083, 1.066, 1.064, 1.064],
+    grow: [1, 0.999, 1.015, 1.017, 0.994, 1.016, 1.025, 1.04, 1.045, 1.045],
+    health: [1, 1, 1, 1, 1.065, 1.022, 1.146, 1.135, 1.165, 1.165],
+    strength: [1.071, 1.119, 1.183, 1.272, 1.41, 1.35, 1.39, 1.376, 1.328, 1.328],
+    levy: [1, 0.877, 0.864, 0.935, 0.968, 0.983, 0.989, 0.994, 0.997, 0.997],
+    research: [1, 1.029, 1.048, 1.127, 1.123, 1.092, 1.393, 1.597, 1.757, 1.757],
+    build: [1, 0.924, 0.86, 0.861, 0.986, 0.998, 0.997, 0.99, 0.996, 0.996],
+    reach: [0.809, 1.14, 1.332, 1.429, 1.556, 1.428, 1.419, 1.368, 1.913, 1.913],
+    trade: [1.022, 1.098, 1.113, 1.07, 1.103, 1.118, 1.35, 1.31, 1.315, 1.315],
+    work: [0.999, 0.983, 1.032, 1.073, 1.094, 1.215, 1.134, 1.235, 1.25, 1.25],
+    yield: [1, 1.02, 1.023, 1.043, 1.012, 1.002, 1, 1.029, 1.035, 1.035],
+    expand: [1, 1, 1.019, 1.033, 1.022, 1.006, 1.002, 0.897, 0.943, 0.943],
+    breakaway: [1, 1.132, 1.184, 1.034, 0.96, 0.873, 0.862, 0.876, 0.709, 0.709],
+    unrest: [1, 1, 1.053, 1.054, 1.061, 1.016, 0.988, 0.96, 0.924, 0.924],
+    hunger: [0.905, 0.818, 0.588, 0.508, 0.911, 0.987, 0.981, 0.997, 0.999, 0.999],
   };
   /* NORM:END */
   const NORMED = KEYS.map((k) => k !== 'auth');      // (authority is rule's own coin: nothing outside reads it)
@@ -123,10 +123,15 @@ window.RULE = (function () {
       'States that keep their own laws and share a currency, a market and a border.'],
     ['technocracy', 'Rule of experts', 'egov', '{n} Directorate', ['Director', 'Director'], 'named', { scholars: 2.3, merchants: 1.2, farmers: 0.8 }, { scholars: 0.2, farmers: -0.06, artisans: -0.04 }, { research: 0.18, work: 0.1, tax: 0.08, stab: -0.02, auth: 0.1 }, [0, 1e9],
       'Decisions are made by those who can show their working. Elections, where they are held, change little.'],
+    // ----- the Space Age -----
+    ['worldstate', 'World federation', 'worldgov', 'United {n}', ['Secretary-General', 'Secretary-General'], 'elected', { farmers: 1.1, artisans: 1.3, merchants: 1.4, scholars: 1.5, nobles: 0.3, soldiers: 0.5 }, { scholars: 0.1, merchants: 0.08, artisans: 0.06, soldiers: -0.08 }, { reach: 0.7, trade: 0.2, stab: 0.06, auth: -0.4, breakaway: -0.6, strength: -0.05 }, [120, 1e9],
+      'Peoples who keep their own tongues and laws, under one parliament for what all of them share.'],
+    ['algocracy', 'Government by machine', 'agi', '{n} Commonwealth', ['Steward', 'Steward'], 'named', { scholars: 2.0, merchants: 1.3, artisans: 0.9, farmers: 0.8, priests: 0.5 }, { scholars: 0.14, artisans: -0.06, priests: -0.08 }, { research: 0.2, work: 0.12, tax: 0.1, stab: -0.03, auth: 0.15 }, [0, 1e9],
+      'A mind of silicon drafts the budget and the law. People approve it, or are told why they should.'],
   ];
   // the kinds of rule the map tells apart (the lens that paints realms by how they are governed), and each form's kind
   const KINDS = { kin: ['Kin and chiefs', '#A8794A'], crown: ['Crowns', '#D6B25E'], empire: ['Empires', '#9B6BD6'], faith: ['Rule of the faithful', '#E8E4D8'], council: ['Councils and republics', '#4F9BE8'], sword: ['Rule by the sword', '#8A9A4B'], party: ['One party', '#D8453C'], experts: ['Experts', '#3FBFB0'] };
-  const KIND_OF = { band: 'kin', chiefdom: 'kin', league: 'kin', temple: 'faith', theocracy: 'faith', kingdom: 'crown', feudal: 'crown', absolute: 'crown', crown: 'crown', empire: 'empire', mandate: 'empire', citystate: 'council', republic: 'council', democracy: 'council', merchant: 'council', parliament: 'council', liberal: 'council', federation: 'council', tyranny: 'sword', horde: 'sword', junta: 'sword', leader: 'sword', peoples: 'party', technocracy: 'experts' };
+  const KIND_OF = { band: 'kin', chiefdom: 'kin', league: 'kin', temple: 'faith', theocracy: 'faith', kingdom: 'crown', feudal: 'crown', absolute: 'crown', crown: 'crown', empire: 'empire', mandate: 'empire', citystate: 'council', republic: 'council', democracy: 'council', merchant: 'council', parliament: 'council', liberal: 'council', federation: 'council', tyranny: 'sword', horde: 'sword', junta: 'sword', leader: 'sword', peoples: 'party', technocracy: 'experts', worldstate: 'council', algocracy: 'experts' };
   // what peoples of some tongues call their realm and its ruler under some of these forms
   const TONGUE = {
     turkic: { kingdom: ['{n} Khanate', 'Khan', 'Khatun'], feudal: ['{n} Khanate', 'Khan', 'Khatun'], absolute: ['{n} Khanate', 'Khan', 'Khatun'], empire: ['{n} Khaganate', 'Khagan', 'Khatun'] },
@@ -265,6 +270,15 @@ window.RULE = (function () {
     ['welfare', 'health', 'Public health', 'germs', { health: 0.25, grow: 0.06, cost: 0.04 }, { artisans: 0.08, scholars: 0.05 }, 'Sewers, clean water, vaccination and a doctor who answers to the town.'],
     ['welfare', 'insurance', 'Pensions and sick pay', 'welfare', { stab: 0.07, health: 0.1, grow: 0.03, cost: 0.09 }, { artisans: 0.18, farmers: 0.1, merchants: -0.1 }, 'Everyone pays in while they work, and is paid when they cannot.'],
     ['welfare', 'cradle', 'Cradle-to-grave care', 'genomics', { stab: 0.08, health: 0.2, grow: 0.02, cost: 0.14 }, { artisans: 0.18, farmers: 0.12, merchants: -0.14 }, 'Medicine, schooling, housing and an income are owed to everyone, by right.'],
+    // ----- the laws of the Space Age, field by field -----
+    ['land', 'rewilded', 'Land given back', 'vertical', { food: 0.02, stab: 0.02, yield: -0.03 }, { scholars: 0.08, farmers: -0.12 }, 'Food is grown in towers and vats. The fields go back to forest and marsh.'],
+    ['labour', 'basicincome', 'An income for all', 'agi', { stab: 0.06, work: -0.03, grow: 0.01, cost: 0.12 }, { artisans: 0.16, farmers: 0.12, merchants: -0.06 }, 'Machines do most of the work, and everyone is paid a living, working or not.'],
+    ['army', 'machines', 'Armies of machines', 'autonomy', { strength: 0.12, levy: -0.2, stab: 0.02, cost: 0.03 }, { soldiers: -0.15, artisans: 0.05 }, 'Machines fight. Soldiers command them from far away.'],
+    ['admin', 'arcologies', 'Cities under one roof', 'arcology', { reach: 0.3, cost: -0.02, grow: 0.01 }, { scholars: 0.06, artisans: 0.06, farmers: -0.06 }, 'A province is a tower of a million people, run like a building.'],
+    ['trade', 'skytrade', 'Trade beyond the sky', 'elevator', { trade: 0.15, customs: 0.1, reach: 0.1 }, { merchants: 0.16, artisans: 0.04 }, 'Goods go up the cable, and come down from the worlds beyond.'],
+    ['learning', 'tutors', 'A tutor for every child', 'agi', { research: 0.3, work: 0.08, cost: 0.08 }, { scholars: 0.16, artisans: 0.08, farmers: 0.06 }, 'Every child is taught by a patient machine mind, at its own pace.'],
+    ['speech', 'mindlink', 'The open mind', 'neural', { research: 0.12, trade: 0.04, stab: -0.03, auth: -0.1 }, { scholars: 0.16, merchants: 0.06, priests: -0.1 }, 'Thought is shared as freely as speech, and the state may not read it.'],
+    ['welfare', 'longlife', 'Long life for all', 'genemed', { health: 0.25, grow: 0.02, stab: 0.05, cost: 0.16 }, { artisans: 0.12, farmers: 0.1, scholars: 0.1, merchants: -0.1 }, 'The treatments that slow ageing are owed to everyone, not sold to the few.'],
   ];
   // Laws put power in some hands and take it from others, as a form's offices do: a weight on an estate's share of power while the
   // law is in force. (A crown that means to be rid of its great lords first pays its own soldiers and sends out its own officials.)
@@ -294,6 +308,7 @@ window.RULE = (function () {
     crown: ['enclosure', 'property', 'jury', 'excise', 'mercantile', 'universities'], parliament: ['property', 'equal', 'press', 'income', 'free', 'schooling', 'freetrade'], junta: ['conscript', 'police', 'censor', 'central', 'protected'],
     peoples: ['collective', 'assigned', 'planned', 'godless', 'line', 'police', 'central'], leader: ['conscript', 'police', 'line', 'protected', 'central', 'wallednet'],
     liberal: ['suffrage', 'equal', 'press', 'unions', 'progressive', 'insurance', 'schooling', 'opennet', 'human'], federation: ['selfrule', 'freetrade', 'human', 'opennet', 'professional', 'cradle'], technocracy: ['research', 'digital', 'agribusiness', 'professional', 'health'],
+    worldstate: ['human', 'freetrade', 'selfrule', 'opennet', 'skytrade', 'longlife'], algocracy: ['research', 'digital', 'tutors', 'basicincome', 'machines'],
   };
   // how the autopilot's rulers lean, field by field
   const LEAN = { conqueror: { army: 2, admin: 1.3 }, tyrant: { justice: 1.5, speech: 1.6, rights: 0.6 }, builder: { labour: 1.8, land: 1.2 }, pious: { faith: 2.2, welfare: 1.3 }, scholar: { learning: 2.2, speech: 1.3 }, merchant: { trade: 2.2, tax: 1.3 }, steward: { tax: 1.5, admin: 1.6, welfare: 1.4, justice: 1.3 }, navigator: { trade: 1.8 } };
@@ -324,11 +339,11 @@ window.RULE = (function () {
   const CKEY = CATS.map((c) => c.key); const ROW = KEYS.map((k) => NORM[k]); const FLOORED = ['levy', 'build', 'upkeep', 'unrest', 'breakaway', 'hunger'].map((k) => K[k]);
   const E_K = ESTATES.map((E) => E.k), E_LEVER = ESTATES.map((E) => K[E.lever]), E_STAB = ESTATES.map((E) => E.lever === 'stab');
   // what luxuries mean to those who make things: nothing in an age that has none, everything once there are towns
-  const LUX_AGE = [0, 0.5, 1, 1, 1, 1, 1, 1, 1];
+  const LUX_AGE = [0, 0.5, 1, 1, 1, 1, 1, 1, 1, 1];
   // power is open (elected, or chosen by elders), inherited, or closed (seized, or handed on by whoever holds it)
   const kindOf = (F) => F.succ === 'blood' ? 1 : F.succ === 'seized' || F.succ === 'named' ? 2 : 0;
   // what the mills and the machines do to those who work them, by age, before any law protects them
-  const FACTORY = [0, 0, 0, 0, 0, 0, 0.42, 0.34, 0.2];
+  const FACTORY = [0, 0, 0, 0, 0, 0, 0.42, 0.34, 0.2, 0.12];
   // what a band under the first law of every field gets from its rule: where every people begins, and so what the first age expects at its beginning
   const START = (() => { const v = KEYS.map((k) => ADDED[k] ? 0 : 1); const add = (g) => { for (const k in g) { if (ADDED[k]) v[K[k]] += g[k]; else v[K[k]] *= 1 + g[k]; } }; add(FORM.band.gives); for (const c of CATS) add(c.laws[0].gives); return v; })();
   // the age each belongs to is the age of the latest discovery it stands on (asked of know.js once it is there)
@@ -339,7 +354,7 @@ window.RULE = (function () {
   }
   // what a discovery opens here: forms and laws that stand on it
   const opens = (key) => { age(); return BY_DISCOVERY[key] || []; };
-  const estateName = (e, era) => ESTATES[e].names[Math.max(0, Math.min(8, era))];
+  const estateName = (e, era) => ESTATES[e].names[Math.max(0, Math.min(9, era))];
 
   // ---------- one world's rule ----------
   // host: { MAXC, civs, year(), rnd(), knows(c, discovery key), popOf, urban, townsOf, cellsOf, temples, markets, ports, acad, wonders,
@@ -366,12 +381,12 @@ window.RULE = (function () {
     const KN = window.KNOW;
     // what an age expects of a key: the measured means stand at the middle of each age, and a realm's knowledge says where between them it is
     // (before the middle of the first age: from what a band begins with to that age's mean)
-    function expect(k, tech) { if (!NORM || !NORMED[k]) return ADDED[KEYS[k]] ? 0 : 1; const e = KN.eraOf(tech), x = e + KN.fracOf(tech, e) - 0.5; const row = NORM[KEYS[k]]; if (x <= 0) return START[k] + (row[0] - START[k]) * Math.max(0, 1 + 2 * x); const a = x >= 8 ? 8 : Math.floor(x), b = Math.min(8, a + 1), t = x >= 8 ? 0 : x - a; return row[a] + (row[b] - row[a]) * t; }
+    function expect(k, tech) { if (!NORM || !NORMED[k]) return ADDED[KEYS[k]] ? 0 : 1; const e = KN.eraOf(tech), x = e + KN.fracOf(tech, e) - 0.5; const row = NORM[KEYS[k]]; if (x <= 0) return START[k] + (row[0] - START[k]) * Math.max(0, 1 + 2 * x); const a = x >= 9 ? 9 : Math.floor(x), b = Math.min(9, a + 1), t = x >= 9 ? 0 : x - a; return row[a] + (row[b] - row[a]) * t; }
     // (the same for every key at once, into EX)
     function expectAll(tech) {
       const e = KN.eraOf(tech), x = e + KN.fracOf(tech, e) - 0.5;
       if (x <= 0) { const t = Math.max(0, 1 + 2 * x); for (let k = 0; k < NK; k++) EX[k] = NORMED[k] ? START[k] + (ROW[k][0] - START[k]) * t : ADD[k] ? 0 : 1; return; }
-      const a = x >= 8 ? 8 : Math.floor(x), b = Math.min(8, a + 1), t = x >= 8 ? 0 : x - a; for (let k = 0; k < NK; k++) EX[k] = NORMED[k] ? ROW[k][a] + (ROW[k][b] - ROW[k][a]) * t : ADD[k] ? 0 : 1;
+      const a = x >= 9 ? 9 : Math.floor(x), b = Math.min(9, a + 1), t = x >= 9 ? 0 : x - a; for (let k = 0; k < NK; k++) EX[k] = NORMED[k] ? ROW[k][a] + (ROW[k][b] - ROW[k][a]) * t : ADD[k] ? 0 : 1;
     }
     for (let c = 0; c < MAXC; c++) neutral(c);
     const stats = { laws: 0, forms: 0, grown: 0, seized: 0, passed: 0, demands: 0, granted: 0, refused: 0, risings: new Array(NE).fill(0) };      // (what has happened in this world, for the tools that measure it)

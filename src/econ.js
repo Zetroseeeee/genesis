@@ -23,7 +23,7 @@
   const W0 = 1.2;                                  // coin for a unit of work when half the hands are busy
   const FLOWK = 0.6;                               // how much of a price gap one year's trade closes
   const LAND = 0.05, SEA = 0.003;                  // freight per cell of distance for a good of bulk 1: by road, by ship
-  const LANDK = [1, 1, 0.9, 0.8, 0.8, 0.7, 0.3, 0.15, 0.1], SEAK = [1, 1, 0.9, 0.8, 0.7, 0.5, 0.3, 0.2, 0.15];   // roads, then rails; sail, then steam
+  const LANDK = [1, 1, 0.9, 0.8, 0.8, 0.7, 0.3, 0.15, 0.1, 0.08], SEAK = [1, 1, 0.9, 0.8, 0.7, 0.5, 0.3, 0.2, 0.15, 0.12];   // roads, then rails; sail, then steam
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
   // ---------- goods ----------
@@ -171,7 +171,7 @@
     { key: 'ships', name: 'Shipping', b: 0.012, e: 1.0, era: 2, state: 1, of: [['ships', 1]] },
   ];
   const NC = CATS.length; const CAT = {};
-  CATS.forEach((c, k) => { c.id = k; CAT[c.key] = k; c.m = c.of.map(([key, w, from, to]) => ({ g: ID[key], w, from: from === undefined ? GOODS[ID[key]].era : from, to: to === undefined ? 8 : to })); });
+  CATS.forEach((c, k) => { c.id = k; CAT[c.key] = k; c.m = c.of.map(([key, w, from, to]) => ({ g: ID[key], w, from: from === undefined ? GOODS[ID[key]].era : from, to: to === undefined ? 9 : to })); });
   // people take to a good an age before they can make it themselves (it comes to them by trade)
   const wants = (m, era) => m.from <= era + 1 && era <= m.to;
   let NM = 0; for (const c of CATS) { c.m0 = NM; for (const m of c.m) m.idx = NM++; }      // every member of every category has a number

@@ -54,7 +54,7 @@
     let rs = ((h.seed || 1) ^ 0x5f3759df) >>> 0;
     const rnd = () => { rs += 0x6D2B79F5; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const pick = (a) => a[Math.floor(rnd() * a.length)];
-    const eraOf = (cv) => Math.min(8, Math.max(0, cv ? cv.era | 0 : 0));
+    const eraOf = (cv) => Math.min(9, Math.max(0, cv ? cv.era | 0 : 0));
     const cap1 = (s) => s.charAt(0).toUpperCase() + s.slice(1);
     const kindOf = (cv) => (h.kind ? h.kind(cv) : 'blood');
     // a people's tongue (people.js), else the realm's name style

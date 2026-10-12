@@ -26,9 +26,9 @@
 // nobody will lend. Everything is paced by the turn (rule.js's PACE). The module throws its own dice.
 (function () {
   'use strict';
-  const TURN = (window.RULE && window.RULE.PACE) || [200, 100, 50, 50, 40, 20, 10, 5, 5];
+  const TURN = (window.RULE && window.RULE.PACE) || [200, 100, 50, 50, 40, 20, 10, 5, 5, 5];
   // the rate of interest of each age, a year (Mesopotamian silver at a fifth; the Italian banks a tenth; consols at a twentieth)
-  const BASE = [0, 0.2, 0.16, 0.12, 0.1, 0.07, 0.05, 0.045, 0.035];
+  const BASE = [0, 0.2, 0.16, 0.12, 0.1, 0.07, 0.05, 0.045, 0.035, 0.03];
   // what knowing money makes of the rate (by discovery)
   const CUT = { coinage: 0.9, banking: 0.8, bourse: 0.85, centralbank: 0.8, finance: 0.9 };
   const LIMIT = 0.4;        // (a realm may owe what would take this share of its income in interest)
@@ -75,7 +75,7 @@
     let rs = ((h.seed || 1) ^ 0x6c8e9cf5) >>> 0;
     const rnd = () => { rs += 0x6D2B79F5; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const pick = (a) => a[Math.floor(rnd() * a.length)];
-    const eraOf = (cv) => Math.min(8, Math.max(0, cv ? cv.era | 0 : 0));
+    const eraOf = (cv) => Math.min(9, Math.max(0, cv ? cv.era | 0 : 0));
     const cap1 = (s) => s.charAt(0).toUpperCase() + s.slice(1);
     const city = (cell) => (cell >= 0 && h.cellName.get(cell)) || 'the city';
     function tongueOf(cv, cell) {

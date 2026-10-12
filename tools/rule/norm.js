@@ -17,7 +17,7 @@ const wd = { land: new Uint8Array(N), fert: new Float32Array(N), elev: new Uint8
 for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.data[i * 4 + 1] / 255; wd.flags[i] = png.data[i * 4 + 2]; wd.land[i] = png.data[i * 4 + 2] & 1; }
 { const sp = PNG.sync.read(fs.readFileSync(path.join(root, 'data/soil.png'))); wd.soil = new Uint8Array(N * 3); for (let i = 0; i < N; i++) { wd.soil[i * 3] = sp.data[i * 4]; wd.soil[i * 3 + 1] = sp.data[i * 4 + 1]; wd.soil[i * 3 + 2] = sp.data[i * 4 + 2]; } }      // (what the land feeds: land.js)
 for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'dynasty', 'story', 'legacy', 'intrigue', 'disease', 'land', 'climate', 'migrate', 'woods', 'sim']) (0, eval)(fs.readFileSync(path.join(root, 'src/' + f + '.js'), 'utf8'));
-const R = window.RULE; const NK = R.NK; const sum = [], wsum = new Float64Array(9), sumR = [], wsumR = new Float64Array(9); for (let e = 0; e < 9; e++) { sum.push(new Float64Array(NK)); sumR.push(new Float64Array(NK)); }
+const R = window.RULE; const NK = R.NK; const NA = window.KNOW.NE; const sum = [], wsum = new Float64Array(NA), sumR = [], wsumR = new Float64Array(NA); for (let e = 0; e < NA; e++) { sum.push(new Float64Array(NK)); sumR.push(new Float64Array(NK)); }
 const BY_PEOPLE = { food: 1, grow: 1, health: 1, hunger: 1, trade: 1, work: 1, yield: 1 };
 for (const seed of seeds) {
   const sim = window.createSim(wd, seed); const t0 = Date.now();
@@ -27,7 +27,7 @@ for (const seed of seeds) {
   let pop = 0; for (const cv of sim.civs) if (cv) pop += sim.popOf[cv.id];
   console.log(`seed ${seed}: ran to ${sim.fmtYear(sim.year)} in ${((Date.now() - t0) / 1000).toFixed(0)} s; ${sim.st.civCount} realms, ${(pop / 1000).toFixed(0)} m people`);
 }
-const table = {}; R.KEYS.forEach((key, k) => { const row = []; for (let e = 0; e < 9; e++) row.push(wsum[e] > 0 ? +(BY_PEOPLE[key] ? sum[e][k] / wsum[e] : sumR[e][k] / wsumR[e]).toFixed(3) : (e ? row[e - 1] : (R.ADDED[key] ? 0 : 1))); table[key] = row; });
+const table = {}; R.KEYS.forEach((key, k) => { const row = []; for (let e = 0; e < NA; e++) row.push(wsum[e] > 0 ? +(BY_PEOPLE[key] ? sum[e][k] / wsum[e] : sumR[e][k] / wsumR[e]).toFixed(3) : (e ? row[e - 1] : (R.ADDED[key] ? 0 : 1))); table[key] = row; });
 console.log('what each age gets from its rule (the means now, and what the file holds):');
 for (const key of R.KEYS) console.log(`  ${key.padEnd(10)} ${table[key].map((v) => v.toFixed(2).padStart(6)).join('')}    ${R.NORM ? R.NORM[key].map((v) => v.toFixed(2).padStart(6)).join('') : '(nothing yet)'}`);
 const text = '  const NORM = {\n' + R.KEYS.map((key) => `    ${key}: [${table[key].join(', ')}],`).join('\n') + '\n  };';

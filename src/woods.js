@@ -25,14 +25,14 @@ window.WOODS = (function () {
   // fallows and shifting fields, then two and three fields, the commons and the wood-pasture, the new husbandry; machines, fertiliser
   // and new seed feed more from less, the poorer fields are given up and the woods come back to them (the forests of Europe, New
   // England and Japan are larger now than in 1850)
-  const EXT = [1.8, 1.8, 1.7, 1.7, 1.7, 1.6, 1.5, 1.2, 1.1];
+  const EXT = [1.8, 1.8, 1.7, 1.7, 1.7, 1.6, 1.5, 1.2, 1.1, 1.05];
   // how much land a head its farming keeps clear, in hectares, by age: fields, pasture, meadow and fallow, the commons' grazing and
   // the village (the world's farmland and pasture were some five hectares a head about 1700, four in 1850, a little over one now:
   // less here, since a realm's people are not all its farmers' land - the steppe's herds graze what was never wood)
-  const HA = [5, 5, 4.5, 4, 3.6, 3.3, 2.5, 1.5, 1.0];
+  const HA = [5, 5, 4.5, 4, 3.6, 3.3, 2.5, 1.5, 1.0, 0.8];
   // how fast people clear what they need, the share of what is left to clear in a year, by age: fire and stone axes, bronze, iron
   // axes, the Classical and Medieval ages' saws and ploughs, gunpowder's age, steam, machines
-  const CLEAR = [0.004, 0.008, 0.015, 0.02, 0.025, 0.03, 0.05, 0.08, 0.08];
+  const CLEAR = [0.004, 0.008, 0.015, 0.02, 0.025, 0.03, 0.05, 0.08, 0.08, 0.06];
   // how fast a wood grows back where nobody needs the land (a share of what is missing in a year: half in some sixty years); on the
   // land the ice has just left it is the trees' own march north, over centuries
   const GROW = 0.012, GROW_ICE = 0.0025;
@@ -107,7 +107,7 @@ window.WOODS = (function () {
     function rates() {
       for (let c = 0; c < MAXC; c++) {
         const cv = civs[c]; wantK[c] = 0; rateK[c] = 0; growK[c] = 1; if (!cv) { fr[c] = 0; continue; }
-        const e = clamp(cv.era | 0, 0, 8), pol = cv.player ? POLICY[policy(cv)] : POLICY[0];
+        const e = clamp(cv.era | 0, 0, 9), pol = cv.player ? POLICY[policy(cv)] : POLICY[0];
         fr[c] = sup[c] > 0 ? Math.min(1, h.popOf(c) * 10 * HA[e] / (sup[c] * EXT[e])) : 0;
         wantK[c] = EXT[e] * fr[c] * farms(cv) * pol[3]; rateK[c] = CLEAR[e] * pol[4]; growK[c] = pol[5];
       }

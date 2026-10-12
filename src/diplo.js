@@ -5,7 +5,7 @@
 window.DIPLO = (function () {
   'use strict';
   // how long matters between realms take, by age: a turn (rule.js keeps the table; main.js takes its turns from there too)
-  const PACE = window.RULE ? window.RULE.PACE : [200, 100, 50, 50, 40, 20, 10, 5, 5];
+  const PACE = window.RULE ? window.RULE.PACE : [200, 100, 50, 50, 40, 20, 10, 5, 5, 5];
 
   // ---------- what two realms can agree ----------
   // [key, name, the discovery it stands on, how many turns it holds, what it is]
@@ -30,7 +30,7 @@ window.DIPLO = (function () {
   const TRIBUTE = 0.1, REPARATION = 0.12, REPARATION_TURNS = 3, CLAIM_TURNS = 3, UNION_TURNS = 6, NEVER = 1e12;
   // how much readier a realm that rules itself is to fight a neighbour it has a reason against than one it has none; and how much less ready to fight
   // without any, by age (the ages before writing kept no accounts of such things)
-  const WAR_CAUSE = 1.5, WAR_BARE = [1, 1, 0.95, 0.9, 0.9, 0.85, 0.8, 0.7, 0.6];
+  const WAR_CAUSE = 1.5, WAR_BARE = [1, 1, 0.95, 0.9, 0.9, 0.85, 0.8, 0.7, 0.6, 0.55];
   // what a realm that rules itself dares: a side (friends counted) up to two and a half times as mighty as its own, and no mightier
   const DARE = 0.4;
   // how many vassals a realm that rules itself asks for, and takes under its protection without thinking twice
@@ -53,7 +53,7 @@ window.DIPLO = (function () {
     spies: { name: 'Their agents caught', goal: 'tribute', text: 'Their agents were caught at work in your realm: sowing discord, stirring up a rising, or with poison for your heir.' },
   };
   // what an unprovoked war costs, by age: quiet at home, and trust abroad (the ages before writing kept no such accounts)
-  const UNJUST_STAB = [0, 0, 0.02, 0.04, 0.05, 0.07, 0.1, 0.14, 0.16], UNJUST_REP = [0, 0, 3, 5, 6, 8, 12, 16, 18];
+  const UNJUST_STAB = [0, 0, 0.02, 0.04, 0.05, 0.07, 0.1, 0.14, 0.16, 0.18], UNJUST_REP = [0, 0, 3, 5, 6, 8, 12, 16, 18, 20];
   // what the winner may ask, least first
   const TERMS = { white: 'Peace as things stand', tribute: 'Reparations', regime: 'A change of government', vassal: 'Submission' };
   const RANK = { white: 0, tribute: 1, regime: 2, vassal: 3 };
@@ -106,7 +106,7 @@ window.DIPLO = (function () {
     const setClaim = (a, key, until) => { const d = D(a); d.claim[key] = until; if (until < d.next) d.next = until; };
     // a claim come by otherwise than by paying for it: raiders over the border, a holy city demanded (story.js)
     const grantClaim = (a, bid) => { if (!a || !civs[bid] || bid === a.id) return; setClaim(a, bid * 4, Math.max(D(a).claim[bid * 4] || -Infinity, year() + CLAIM_TURNS * pace(a))); };
-    const era = (cv) => Math.max(0, Math.min(8, cv.era | 0)), pace = (cv) => PACE[era(cv)];
+    const era = (cv) => Math.max(0, Math.min(9, cv.era | 0)), pace = (cv) => PACE[era(cv)];
     const nameOf = (cv) => host.nameOf(cv);
     const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
     const pick = (l) => l[Math.floor(host.rnd() * l.length)];

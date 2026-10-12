@@ -24,7 +24,7 @@ for (let i = 0; i < N; i++) { wd.elev[i] = png.data[i * 4]; wd.fert[i] = png.dat
 { const sp = PNG.sync.read(fs.readFileSync(path.join(root, 'data/soil.png'))); wd.soil = new Uint8Array(N * 3); for (let i = 0; i < N; i++) { wd.soil[i * 3] = sp.data[i * 4]; wd.soil[i * 3 + 1] = sp.data[i * 4 + 1]; wd.soil[i * 3 + 2] = sp.data[i * 4 + 2]; } }      // (what the land feeds: land.js)
 for (const f of ['econ', 'know', 'rule', 'diplo', 'army', 'people', 'faith', 'culture', 'finance', 'dynasty', 'story', 'legacy', 'intrigue', 'disease', 'land', 'climate', 'migrate', 'woods', 'sim']) (0, eval)(fs.readFileSync(path.join(root, 'src/' + f + '.js'), 'utf8'));
 const DATES = [-4000, -3000, -2000, -1500, -1000, -500, 0, 500, 1000, 1400, 1600, 1800, 1900, 1950, 2000, 2050].filter((y) => y <= last);
-const sum = new Float64Array(9), wsum = new Float64Array(9);
+const NA = window.KNOW.NE; const sum = new Float64Array(NA), wsum = new Float64Array(NA);      // (an age without realms in it takes the one before's)
 const q = (a, f) => (a.length ? a[Math.min(a.length - 1, Math.floor(a.length * f))] : 0);
 for (const seed of seeds) {
   const sim = window.createSim(wd, seed); const C = sim.culture; const TURN = window.CULTURE.TURN;
@@ -56,6 +56,6 @@ for (const seed of seeds) {
     had = new Map(); for (const cv of sim.civs) if (cv) had.set(cv, C.born[cv.id]);
   }
 }
-const table = []; for (let e = 0; e < 9; e++) table.push(wsum[e] > 0 ? +(Math.exp(sum[e] / wsum[e]) - 1).toFixed(1) : (e ? table[e - 1] : 0));
+const table = []; for (let e = 0; e < NA; e++) table.push(wsum[e] > 0 ? +(Math.exp(sum[e] / wsum[e]) - 1).toFixed(1) : (e ? table[e - 1] : 0));
 console.log(`\nwhat renown each age's usual realm holds (now, and what the file holds):\n  ${table.map((v) => v.toFixed(1).padStart(7)).join('')}\n  ${window.CULTURE.NORM.map((v) => v.toFixed(1).padStart(7)).join('')}`);
 if (write) { const p = path.join(root, 'src/culture.js'); const s = fs.readFileSync(p, 'utf8'); const a = s.indexOf('// NORM-BEGIN'), z = s.indexOf('// NORM-END'); if (a < 0 || z < 0) throw new Error('no NORM marks in src/culture.js'); fs.writeFileSync(p, s.slice(0, a) + '// NORM-BEGIN\n  const NORM = [' + table.join(', ') + '];\n  ' + s.slice(z)); console.log('written to src/culture.js'); }
