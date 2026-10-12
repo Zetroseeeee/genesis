@@ -10,121 +10,244 @@
   const R_M = 6371000, D2R = Math.PI / 180, W = 720, H = 360;
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
   function hash(i, k) { let h = (i * 374761393 + k * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
-  const K_OPEN = 9;          // open country is drawn this many times life size (as the hosts are: troops.js); near a town, the town's own
+  const K_OPEN = 6;          // open country: drawn this many times life size (a herd must read from a few kilometres; near a town, the town's own scale)
   const SLOT = 0.022;        // a herd's place: a lattice of the world's, about two and a half kilometres (degrees of latitude)
   const REACH = 13;          // kilometres from what the eye looks at within which herds are kept
-  const CAP = 700;           // beasts of one kind drawn at most
+  const CAP = 700;           // beasts of one kind drawn at most, finely and coarsely each
+  const FINE_PX = 40;        // a beast drawn finely while it is longer than about this many pixels (at an ordinary field of view)
 
-  // ---------- the beasts: true size (body length L, shoulder S, metres), colours, shape ----------
-  // tusk, trunk, hump, horns (h: forward, b: back and out), antlers, ears, wool (a rounder body), stripes, long neck (neckUp), tail
+  // ---------- the beasts' shapes ----------
+  // A beast is a little sculpture of rounded pieces, each an ellipsoid, in true metres: forward +x, up +y, its side z, the ground at
+  // y = 0. A piece moves with a part: 0 the body, 1 the head and neck (turning at the neck's root to graze), 2..5 the legs (front left,
+  // front right, hind left, hind right: turning at the hip), 6 the tail (swishing at its root). Its shade: 1 the coat (times the beast's
+  // own colour), less than 1 darker, more lighter; 2 ivory, 3 horn, 4 stripes across the body, 4.5 stripes round a leg, 5 near black (a
+  // hoof, a dark face), 6 the coat with patches of white (on some of the cattle), 7 antler (borne by some of a herd), 8 wool.
+  const SPHERES = {};
+  function sphere(nLon, nLat) {      // a unit sphere's triangles, outward and counter-clockwise from outside (the poles as fans)
+    const key = nLon + 'x' + nLat; if (SPHERES[key]) return SPHERES[key];
+    const P = (i, j) => { const th = j / nLat * Math.PI, ph = i / nLon * 2 * Math.PI; return [Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]; };
+    const t = [];
+    for (let j = 0; j < nLat; j++) for (let i = 0; i < nLon; i++) {
+      const a = P(i, j), b = P(i + 1, j), c = P(i + 1, j + 1), d = P(i, j + 1);
+      if (j > 0) t.push(a, b, c);
+      if (j < nLat - 1) t.push(a, c, d);
+    }
+    return (SPHERES[key] = t);
+  }
+  class Sculpt {
+    constructor(fine) { this.pos = []; this.nor = []; this.part = []; this.fine = fine; this.tip = null; this.piv = [0, 0]; this.pieces = []; this.reach = 0.1; }
+    // an ellipsoid: its middle, its half sizes (along its own x, y, z), turned nose-up by pitch (about z) and then about the upright (yaw)
+    e(c, r, pitch, yaw, id, piv, shade) {
+      const big = Math.max(r[0], r[1], r[2]); const nLon = this.fine ? (big > 0.25 ? 9 : 6) : (big > 0.4 ? 6 : 4), nLat = this.fine ? (big > 0.25 ? 6 : 4) : (big > 0.4 ? 4 : 3);
+      const cp = Math.cos(pitch), sp = Math.sin(pitch), cy = Math.cos(yaw || 0), sy = Math.sin(yaw || 0), pv = piv || [0, 0];
+      const rot = (x, y, z) => { const x1 = x * cp - y * sp, y1 = x * sp + y * cp; return [x1 * cy + z * sy, y1, -x1 * sy + z * cy]; };
+      const v0 = this.pos.length / 3;
+      for (const n of sphere(nLon, nLat)) {
+        const p = rot(n[0] * r[0], n[1] * r[1], n[2] * r[2]); let m = rot(n[0] / r[0], n[1] / r[1], n[2] / r[2]); const l = Math.hypot(m[0], m[1], m[2]) || 1;
+        this.pos.push(c[0] + p[0], c[1] + p[1], c[2] + p[2]); this.nor.push(m[0] / l, m[1] / l, m[2] / l); this.part.push(id, pv[1], pv[0], shade);
+      }
+      // (horn, ivory and antler stay crisp, and so does whatever is thin beside the blending's reach - ears, a mane, a tail - which
+      // the blending would swallow: the rest are blended into one surface, below)
+      this.pieces.push({ c, r, cp, sp, cy, sy, id, v0, v1: this.pos.length / 3, hard: shade >= 1.5 && shade < 3.5 || shade > 6.5 && shade < 7.5 || Math.min(r[0], r[1], r[2]) < 0.3 * this.reach });
+    }
+    // how far inside the beast a point lies (metres, negative inside), its pieces joined smoothly over this.reach: the body's pieces and
+    // those of one part (a leg's surface is blended into the body, not into the other legs); the pieces' own sizes give their distances
+    field(x, y, z, part) {
+      const k = this.reach; let f = 1e9;
+      for (const q of this.pieces) {
+        if (q.hard || (part !== 0 && q.id !== 0 && q.id !== part)) continue;
+        const dx = x - q.c[0], dy = y - q.c[1], dz = z - (q.c[2] || 0);
+        const x1 = dx * q.cy - dz * q.sy, z1 = dx * q.sy + dz * q.cy; const lx = x1 * q.cp + dy * q.sp, ly = -x1 * q.sp + dy * q.cp, lz = z1;
+        const a = lx / q.r[0], b = ly / q.r[1], cc = lz / q.r[2], k0 = Math.sqrt(a * a + b * b + cc * cc), k1 = Math.sqrt(a * a / (q.r[0] * q.r[0]) + b * b / (q.r[1] * q.r[1]) + cc * cc / (q.r[2] * q.r[2]));
+        const d = k1 > 1e-9 ? k0 * (k0 - 1) / k1 : -Math.min(q.r[0], q.r[1], q.r[2]);
+        const h = Math.max(k - Math.abs(f - d), 0) / k; f = Math.min(f, d) - h * h * k * 0.25;
+      }
+      return f;
+    }
+    // every soft piece's surface moved out onto the blended one where two meet (a fillet where there was a crease), and lit by it
+    blend() {
+      const P = this.pos, N = this.nor, k = this.reach, e = k * 0.04;
+      for (const q of this.pieces) { if (q.hard) continue;
+        for (let v = q.v0; v < q.v1; v++) {
+          let x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2]; const id = q.id;
+          let f = this.field(x, y, z, id); if (f < -0.6 * k) continue;      // (deep inside another piece: hidden, left as it is)
+          for (let it = 0; it < 2 && Math.abs(f) > 1e-4; it++) {
+            const gx = (this.field(x + e, y, z, id) - f) / e, gy = (this.field(x, y + e, z, id) - f) / e, gz = (this.field(x, y, z + e, id) - f) / e, g2 = gx * gx + gy * gy + gz * gz;
+            if (g2 < 1e-6) break; x -= f * gx / g2; y -= f * gy / g2; z -= f * gz / g2; f = this.field(x, y, z, id);
+          }
+          if (Math.hypot(x - P[v * 3], y - P[v * 3 + 1], z - P[v * 3 + 2]) > 0.7 * k || Math.abs(f) > 0.05 * k) continue;      // (a step that went astray: the piece's own surface is kept)
+          const gx = this.field(x + e, y, z, id) - this.field(x - e, y, z, id), gy = this.field(x, y + e, z, id) - this.field(x, y - e, z, id), gz = this.field(x, y, z + e, id) - this.field(x, y, z - e, id), gl = Math.hypot(gx, gy, gz);
+          P[v * 3] = x; P[v * 3 + 1] = Math.max(y, -0.01); P[v * 3 + 2] = z; if (gl > 1e-9) { N[v * 3] = gx / gl; N[v * 3 + 1] = gy / gl; N[v * 3 + 2] = gz / gl; }
+        }
+      }
+    }
+    // an ellipsoid from point a to point b (a little longer, to close the joints), ra thick up and down, rb across
+    seg(a, b, ra, rb, id, piv, shade) {
+      const dx = b[0] - a[0], dy = b[1] - a[1], dz = (b[2] || 0) - (a[2] || 0), l = Math.hypot(dx, dy, dz) || 1e-3;
+      this.e([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, ((a[2] || 0) + (b[2] || 0)) / 2], [l * 0.6, ra, rb === undefined ? ra : rb], Math.asin(clamp(dy / l, -1, 1)), Math.atan2(-dz, dx), id, piv, shade);
+    }
+    // a chain of points, its thickness from r0 at the first to r1 at the last
+    chain(pts, r0, r1, id, piv, shade, flat) {
+      for (let k = 0; k + 1 < pts.length; k++) { const f = pts.length > 2 ? k / (pts.length - 2) : 0, r = r0 + (r1 - r0) * f; this.seg(pts[k], pts[k + 1], r, r * (flat || 1), id, piv, shade); }
+    }
+    geometry() {
+      this.blend();
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3)); g.setAttribute('aPart', new THREE.Float32BufferAttribute(this.part, 4));
+      // how far the head goes down to graze: until the muzzle is at the grass (an elephant's trunk does the reaching)
+      let graze = -0.2;
+      if (this.tip && !this.trunk) { const [mx, my] = this.tip, r = Math.hypot(mx, my), f0 = Math.atan2(my, mx), sn = ((this.browse || 0.1) - this.piv[1]) / r; graze = Math.max(-2.3, (Math.abs(sn) < 0.97 ? Math.asin(sn) : -1.33) - f0); }
+      g.setAttribute('aGrz', new THREE.Float32BufferAttribute(new Float32Array(this.pos.length / 3).fill(graze), 1)); g.userData.graze = graze;
+      return g;
+    }
+  }
+  const add = (p, x, y, z) => [p[0] + x, p[1] + y, (p[2] || 0) + (z || 0)];
+  // a beast on four legs, from its measures (metres): L the trunk's length, S the shoulder's height, W its breadth, leg the legs' share
+  // of the height, legT their thickness; the neck (nA its angle up, nL its length, nT its thickness, or a chain of its own: neck(B)), the
+  // head (hA its angle, nose down negative; hL, hT, hW its length, depth and breadth), and what this kind has besides
+  function quad(s, o) {
+    const L = o.L, S = o.S, Wd = o.W, legH = S * o.leg, D = S - legH, yc = legH + D * 0.5, coat = o.coat || 1, fr = o.front || 1;
+    const B = [L * 0.4, yc + D * (o.neckY === undefined ? 0.2 : o.neckY)]; s.piv = B; s.reach = 0.07 * S + 0.02; s.browse = o.browse || 0.1;
+    // the trunk of the body: barrel, chest, rump, the belly a shade lighter, the withers
+    s.e([0, yc, 0], [L * 0.5, D * 0.5, Wd * 0.5], 0, 0, 0, null, coat);
+    s.e([L * 0.27, yc + D * 0.04 * fr, 0], [L * 0.26 * fr, D * 0.55 * fr, Wd * 0.53 * fr], 0, 0, 0, null, coat);
+    s.e([-L * 0.29, yc + D * (0.03 + (o.rump || 0)), 0], [L * 0.25, D * 0.5 * (o.rumpK || 1), Wd * 0.5 * (o.rumpK || 1)], 0, 0, 0, null, coat);
+    s.e([L * 0.02, yc - D * 0.22, 0], [L * 0.36, D * 0.33, Wd * 0.45], 0, 0, 0, null, o.belly || (coat === 1 ? 1.14 : coat));
+    s.e([L * 0.3, yc + D * 0.32, 0], [L * 0.2, D * 0.32 * fr, Wd * 0.38 * fr], 0.1, 0, 0, null, coat);
+    if (o.hump) s.e([L * (o.humpX === undefined ? 0.24 : o.humpX), yc + D * 0.35 + o.hump * 0.55, 0], [L * (o.humpL || 0.22), D * 0.22 + o.hump * 0.6, Wd * 0.36], 0, 0, 0, null, coat);
+    if (o.shag) s.e([L * 0.1, yc - D * 0.15 - o.shag * legH * 0.3, 0], [L * 0.46, D * 0.42 + o.shag * legH * 0.3, Wd * 0.56], 0, 0, 0, null, o.shagShade || 0.86);
+    if (o.wool) { for (const [x, y, z, r] of [[0.3, 0.25, 0.25, 0.4], [-0.3, 0.25, -0.25, 0.4], [0, 0.4, 0, 0.45], [0.3, 0.1, -0.3, 0.38], [-0.3, 0.1, 0.3, 0.38], [0, 0.0, 0.32, 0.38], [0, 0.0, -0.32, 0.38]])
+      s.e([L * x, yc + D * y, Wd * z], [L * r * 0.55, D * r * 1.05, Wd * r * 1.2], 0, 0, 0, null, 8); }
+    // the legs, each turning at its hip; a hind leg's thigh deep and running into the rump
+    const lt = o.legT, fx = L * 0.31, hx = -L * 0.31, lz = Wd * 0.3, sock = o.sock || (coat === 4 ? 4.5 : 0.86);
+    for (const [x, z, id, hind] of [[fx, -lz, 2, 0], [fx, lz, 3, 0], [hx, -lz, 4, 1], [hx, lz, 5, 1]]) {
+      const piv = [x, hind ? legH + D * 0.4 : legH + D * 0.35];
+      if (o.column) {      // an elephant's: columns
+        s.e([x, legH * 0.72, z], [lt, legH * 0.4 + D * 0.2, lt], 0, 0, id, piv, coat);
+        s.e([x, legH * 0.28, z], [lt * 0.9, legH * 0.3, lt * 0.9], 0, 0, id, piv, coat * 0.96);
+        s.e([x + lt * 0.08, lt * 0.32, z], [lt * 1.02, lt * 0.33, lt * 1.02], 0, 0, id, piv, 0.82);
+        continue;
+      }
+      if (hind) s.e([x + L * 0.03, legH * 0.95, z * 0.95], [lt * 1.5, legH * 0.3 + D * 0.22, lt * 1.05], -0.2, 0, id, piv, coat);
+      else s.e([x, legH * 0.82, z], [lt * 1.0, legH * 0.27 + D * 0.12, lt * 0.88], 0, 0, id, piv, coat);
+      const lx = hind ? x - lt * 0.35 : x;
+      s.seg([hind ? x - lt * 0.1 : x, legH * 0.68], [lx, legH * 0.1], lt * 0.45, lt * 0.42, id, piv, sock);
+      if (hind) s.seg([x - lt * 0.1, legH * 0.72], [x + lt * 0.2, legH * 0.95], lt * 0.55, lt * 0.5, id, piv, coat);      // the hock up into the thigh
+      s.e([lx + lt * 0.12, lt * 0.33, z], [lt * 0.55, lt * 0.35, lt * 0.5], 0, 0, id, piv, o.hoof || 5);
+    }
+    // the neck, a chain from its root (straight unless the kind has its own), and the head at its end
+    const chain = o.neck ? o.neck(B) : [B, add(B, Math.cos(o.nA) * o.nL * 0.5, Math.sin(o.nA) * o.nL * 0.5), add(B, Math.cos(o.nA) * o.nL, Math.sin(o.nA) * o.nL)];
+    s.chain(chain, o.nT * 0.5, o.nT * 0.36, 1, B, coat, 0.82);
+    const E = chain[chain.length - 1], hA = o.hA, hd = [Math.cos(hA), Math.sin(hA)], hn = [-Math.sin(hA), Math.cos(hA)];
+    if (o.dewlap) s.e([B[0] + (E[0] - B[0]) * 0.55, Math.min(B[1], E[1]) - o.nT * 0.35, 0], [o.nL * 0.32, o.nT * 0.42, o.nT * 0.2], -0.3, 0, 1, B, coat);
+    const at = (u, v, z) => [E[0] + hd[0] * u + hn[0] * v, E[1] + hd[1] * u + hn[1] * v, z || 0];      // a point of the head: u along it, v up from it
+    s.e(at(o.hL * 0.32, o.hT * 0.08), [o.hL * 0.4, o.hT * 0.5, o.hW * 0.5], hA, 0, 1, B, o.face || coat);      // the skull
+    s.e(at(o.hL * 0.76, -o.hT * 0.1), [o.hL * 0.27, o.hT * 0.34, o.hW * 0.36], hA, 0, 1, B, o.muzzle || o.face || coat);      // the muzzle
+    const tip = at(o.hL * 1.0, -o.hT * 0.15); s.tip = [tip[0] - B[0], tip[1] - B[1]];
+    if (o.ear) for (const z of [-1, 1]) { const p = at(o.hL * 0.06, o.hT * 0.42, z * o.hW * 0.38); s.e([p[0], p[1] + o.ear * 0.25, p[2]], [o.ear * 0.16, o.ear * 0.5, o.ear * 0.08], o.earA === undefined ? 0.6 : o.earA, z * (o.earOut || 0.6), 1, B, o.face || coat); }
+    if (o.bigEars) for (const z of [-1, 1]) { const p = at(o.hL * 0.0, o.hT * 0.05, z * o.hW * 0.55); s.e(p, [o.bigEars * 0.4, o.bigEars * 0.5, 0.05], 0.1, z * 0.35, 1, B, coat * 0.95); }
+    if (o.mane) { const n = chain.length; for (let k = 0; k + 1 < n; k++) { const a = chain[k], b = chain[k + 1], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy), nx = -dy / l, ny = dx / l, r = o.nT * (0.5 - 0.14 * k / Math.max(1, n - 2));
+      s.seg(add(a, nx * r * 0.85, ny * r * 0.85), add(b, nx * r * 0.85, ny * r * 0.85), o.nT * 0.12, o.nT * 0.07, 1, B, o.maneShade || 0.42); } }
+    if (o.beard) s.seg(at(o.hL * 0.1, -o.hT * 0.45), at(-o.hL * 0.2, -o.hT * 0.45 - o.beard), o.hT * 0.18, o.hT * 0.12, 1, B, 0.45);
+    if (o.horns) o.horns(s, at, B, o);
+    if (o.trunk) { s.trunk = 1; const p0 = at(o.hL * 0.7, -o.hT * 0.2), T = o.trunk; s.chain([p0, add(p0, T * 0.08, -T * 0.35), add(p0, T * 0.1, -T * 0.7), add(p0, T * 0.2, -T * 0.98)], o.hT * 0.22, o.hT * 0.08, 1, B, coat * 0.95); }
+    // the tail, hanging from the rump, a tuft at its end where the kind has one
+    const tr = [-L * 0.52, yc + D * (0.28 + (o.rump || 0))], tl = o.tail || 0.3;
+    s.chain([tr, add(tr, -tl * 0.12, -tl * 0.5), add(tr, -tl * 0.14, -tl)], o.tT || 0.04, (o.tT || 0.04) * (o.bushy ? 1.4 : 0.8), 6, tr, o.tailShade || coat);
+    if (o.tuft) s.e(add(tr, -tl * 0.14, -tl * 1.02), [o.tT * 1.4, tl * 0.14, o.tT * 1.4], 0, 0, 6, tr, 0.4);
+  }
+  // horns and antlers, from the top of the head (at(u, v, z): a point along the head, up from it, out to the side)
+  const H_LYRE = (fwd) => (s, at, B, o) => { const h = o.hornL; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.05, o.hT * 0.45, z * o.hW * 0.32);
+    s.chain([p0, add(p0, 0.0, 0.04, z * h * 0.45), add(p0, h * 0.25 * fwd, h * 0.35, z * h * 0.62), add(p0, h * 0.45 * fwd, h * 0.62, z * h * 0.5)], 0.06 * h + 0.02, 0.012, 1, B, 3); } };
+  const HORNS = {
+    lyre: H_LYRE(1), aurochs: H_LYRE(1.6),
+    swept: (s, at, B, o) => { const h = o.hornL; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.02, o.hT * 0.42, z * o.hW * 0.25); s.chain([p0, add(p0, -h * 0.1, 0.02, z * h * 0.45), add(p0, -h * 0.35, h * 0.12, z * h * 0.72), add(p0, -h * 0.55, h * 0.3, z * h * 0.6)], 0.09, 0.02, 1, B, 3); } },
+    hook: (s, at, B, o) => { const h = o.hornL; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.0, o.hT * 0.5, z * o.hW * 0.1); s.chain([p0, add(p0, -0.05, -0.02, z * h * 0.4), add(p0, 0.02, -h * 0.45, z * h * 0.52), add(p0, h * 0.2, -h * 0.4, z * h * 0.58)], 0.09, 0.025, 1, B, 3); } },
+    yak: (s, at, B, o) => { const h = o.hornL; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.0, o.hT * 0.45, z * o.hW * 0.3); s.chain([p0, add(p0, 0, h * 0.1, z * h * 0.45), add(p0, h * 0.08, h * 0.5, z * h * 0.5), add(p0, -h * 0.05, h * 0.75, z * h * 0.35)], 0.06, 0.015, 1, B, 3); } },
+    bison: (s, at, B, o) => { const h = o.hornL; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.05, o.hT * 0.4, z * o.hW * 0.42); s.chain([p0, add(p0, 0, 0.02, z * h * 0.5), add(p0, h * 0.1, h * 0.5, z * h * 0.55)], 0.05, 0.015, 1, B, 5); } },
+    gnu: (s, at, B, o) => { const h = o.hornL; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.05, o.hT * 0.45, z * o.hW * 0.25); s.chain([p0, add(p0, 0, -h * 0.1, z * h * 0.45), add(p0, h * 0.05, h * 0.25, z * h * 0.6), add(p0, -h * 0.1, h * 0.45, z * h * 0.45)], 0.05, 0.012, 1, B, 5); } },
+    goat: (s, at, B, o) => { const h = o.hornL; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.1, o.hT * 0.45, z * o.hW * 0.2); s.chain([p0, add(p0, -h * 0.15, h * 0.4, z * h * 0.12), add(p0, -h * 0.5, h * 0.55, z * h * 0.2), add(p0, -h * 0.8, h * 0.35, z * h * 0.25)], 0.03, 0.008, 1, B, 3); } },
+    antlers: (s, at, B, o) => { const h = o.hornL; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.08, o.hT * 0.45, z * o.hW * 0.22), p1 = add(p0, -h * 0.08, h * 0.35, z * h * 0.22), p2 = add(p0, -h * 0.22, h * 0.72, z * h * 0.35), p3 = add(p0, -h * 0.1, h * 1.0, z * h * 0.32);
+      s.chain([p0, p1, p2, p3], 0.035, 0.015, 1, B, 7); s.seg(p1, add(p1, h * 0.3, h * 0.08, z * 0.02), 0.018, 0.018, 1, B, 7); s.seg(p2, add(p2, h * 0.25, h * 0.12, z * 0.03), 0.016, 0.016, 1, B, 7);
+      if (o.brow) s.seg(add(p0, -0.02, h * 0.12, z * 0.03), add(p0, h * 0.35, h * 0.05, z * 0.02), 0.02, 0.035, 1, B, 7); } },
+    tusks: (s, at, B, o) => { const h = o.hornL, m = o.mammoth; for (const z of [-1, 1]) { const p0 = at(o.hL * 0.55, -o.hT * 0.32, z * o.hW * 0.22);
+      s.chain(m ? [p0, add(p0, h * 0.16, -h * 0.22, z * h * 0.06), add(p0, h * 0.36, -h * 0.33, z * h * 0.16), add(p0, h * 0.56, -h * 0.28, z * h * 0.25), add(p0, h * 0.7, -h * 0.13, z * h * 0.25), add(p0, h * 0.74, h * 0.04, z * h * 0.17), add(p0, h * 0.66, h * 0.17, z * h * 0.06)]
+        : [p0, add(p0, h * 0.35, -h * 0.4, z * 0.04), add(p0, h * 0.75, -h * 0.35, z * 0.06), add(p0, h * 0.95, -h * 0.12, z * 0.04)], 0.1 * Math.min(1.4, h), 0.04, 1, B, 2); } },
+  };
+  // the kinds: their measures and colours (n: how many to a herd, the fewest and the most)
   const SP = {
-    mammoth:   { L: 4.6, S: 3.1, w: 0.42, col: [0x4b3423, 0x3e2b1d, 0x5a4029], tusk: 1.3, trunk: 1, hump: 0.5, hair: 1, neck: 0.07, head: 1.15, n: [3, 8] },
-    elephant:  { L: 5.0, S: 3.0, w: 0.4, col: [0x77716b, 0x6b6660, 0x807a72], tusk: 0.8, trunk: 1, ears: 1, neck: 0.06, head: 1.1, n: [4, 10] },
-    bison:     { L: 3.0, S: 1.8, w: 0.36, col: [0x3d2a1b, 0x45301f, 0x33241a], hump: 0.6, horns: 'h', hair: 1, neck: 0.2, head: 0.9, low: 1, n: [8, 26] },
-    muskox:    { L: 2.2, S: 1.35, w: 0.42, col: [0x2b2119, 0x33281e], hump: 0.3, horns: 'b', hair: 1, neck: 0.18, head: 0.85, low: 1, n: [6, 14] },
-    yak:       { L: 2.8, S: 1.65, w: 0.38, col: [0x231c17, 0x2e241c, 0x5a4a3c], hump: 0.4, horns: 'h', hair: 1, neck: 0.2, head: 0.9, low: 1, n: [4, 10] },
-    aurochs:   { L: 3.0, S: 1.75, w: 0.33, col: [0x2a1f17, 0x3a2a1c, 0x5c3f27], horns: 'h', neck: 0.3, head: 0.9, n: [4, 10] },
-    cattle:    { L: 2.4, S: 1.4, w: 0.34, col: [0x6e4a2e, 0x2a221d, 0xd8d0c2, 0x8c5a32, 0xb9a88f], horns: 'h', neck: 0.3, head: 0.85, piebald: 1, n: [6, 16] },
-    buffalo:   { L: 2.7, S: 1.5, w: 0.36, col: [0x3a3a3c, 0x2f3031, 0x46464a], horns: 'b', neck: 0.3, head: 0.9, low: 1, n: [4, 9] },
-    horse:     { L: 2.2, S: 1.5, w: 0.27, col: [0x7a5235, 0x5a3a24, 0x3a2a20, 0x9b7a55, 0xc9b8a0], neck: 0.45, neckUp: 0.95, head: 0.75, mane: 1, tail: 0.75, n: [4, 12] },
-    zebra:     { L: 2.2, S: 1.35, w: 0.27, col: [0xe8e4dc], neck: 0.42, neckUp: 0.9, head: 0.7, stripes: 1, mane: 1, tail: 0.6, n: [8, 20] },
-    wildebeest:{ L: 2.2, S: 1.4, w: 0.28, col: [0x52504c, 0x47443f, 0x5c5850], hump: 0.25, horns: 'b', neck: 0.35, head: 0.8, mane: 1, n: [14, 36] },
-    reindeer:  { L: 1.9, S: 1.15, w: 0.27, col: [0x837a6c, 0x6f6658, 0x9a9182, 0xcfc8bb], antlers: 1, neck: 0.42, neckUp: 0.75, head: 0.65, n: [10, 28] },
-    deer:      { L: 1.9, S: 1.2, w: 0.24, col: [0x8c5a34, 0x7a4e2e, 0x9b6a40], antlers: 1, neck: 0.45, neckUp: 0.85, head: 0.6, n: [3, 8] },
-    camel:     { L: 2.8, S: 2.0, w: 0.28, col: [0xb38a5a, 0xa47b4c, 0xc49a68], hump: 0.9, neck: 0.5, neckUp: 0.55, head: 0.65, tail: 0.5, n: [3, 8] },
-    llama:     { L: 1.6, S: 1.15, w: 0.27, col: [0xd8cbb4, 0x8a6a4a, 0xece6da, 0x5a4636], neck: 0.5, neckUp: 1.25, head: 0.45, wool: 1, n: [5, 14] },
-    sheep:     { L: 1.3, S: 0.8, w: 0.36, col: [0xdcd5c6, 0xe6e0d2, 0xcfc6b4, 0x3a3430], wool: 1, darkHead: 1, neck: 0.2, head: 0.4, n: [14, 38] },
-    goat:      { L: 1.25, S: 0.8, w: 0.26, col: [0x6e5a46, 0xd8d0c2, 0x3a302a, 0x9b8064], horns: 'b', neck: 0.3, neckUp: 0.6, head: 0.42, n: [5, 14] },
+    mammoth:   { L: 3.0, S: 3.0, W: 1.6, leg: 0.5, legT: 0.3, column: 1, hump: 0.35, humpX: 0.3, rump: -0.22, rumpK: 0.9, shag: 0.75, shagShade: 0.8, nA: 0.25, nL: 0.2, nT: 1.1, hA: -0.25, hL: 0.95, hT: 1.15, hW: 0.85, ear: 0.3, earA: 0.2, trunk: 1.9, horns: HORNS.tusks, hornL: 2.0, mammoth: 1, tail: 0.4, tT: 0.06, tuft: 1, col: [0x4b3423, 0x3e2b1d, 0x5a4029], n: [3, 8] },
+    elephant:  { L: 3.2, S: 3.1, W: 1.55, leg: 0.52, legT: 0.3, column: 1, rump: -0.05, nA: 0.2, nL: 0.22, nT: 1.0, hA: -0.3, hL: 1.0, hT: 0.95, hW: 0.8, bigEars: 1.3, trunk: 1.9, horns: HORNS.tusks, hornL: 0.9, tail: 1.0, tT: 0.04, tuft: 1, col: [0x77716b, 0x6b6660, 0x807a72], n: [4, 10] },
+    bison:     { L: 1.9, S: 1.8, W: 0.75, leg: 0.42, legT: 0.15, front: 1.22, hump: 0.3, humpX: 0.3, rump: -0.14, rumpK: 0.85, shag: 0.45, nA: -0.35, nL: 0.45, nT: 0.75, neckY: 0.05, hA: -1.05, hL: 0.55, hT: 0.5, hW: 0.42, face: 0.72, beard: 0.25, horns: HORNS.bison, hornL: 0.28, ear: 0.08, tail: 0.5, tT: 0.03, tuft: 1, col: [0x3d2a1b, 0x45301f, 0x33241a], n: [8, 26] },
+    muskox:    { L: 1.3, S: 1.3, W: 0.75, leg: 0.36, legT: 0.12, hump: 0.15, shag: 1.15, shagShade: 0.8, nA: 0.0, nL: 0.25, nT: 0.5, neckY: 0.1, hA: -0.85, hL: 0.45, hT: 0.36, hW: 0.32, horns: HORNS.hook, hornL: 0.45, tail: 0.12, tT: 0.04, sock: 0.95, col: [0x2b2119, 0x33281e], n: [6, 14] },
+    yak:       { L: 1.7, S: 1.6, W: 0.7, leg: 0.42, legT: 0.13, hump: 0.22, shag: 0.85, nA: 0.0, nL: 0.4, nT: 0.55, hA: -0.7, hL: 0.5, hT: 0.32, hW: 0.28, horns: HORNS.yak, hornL: 0.5, ear: 0.1, tail: 0.7, tT: 0.06, bushy: 1, col: [0x231c17, 0x2e241c, 0x5a4a3c, 0xd8d0c4], n: [4, 10] },
+    aurochs:   { L: 2.0, S: 1.75, W: 0.65, leg: 0.52, legT: 0.14, nA: 0.3, nL: 0.55, nT: 0.55, hA: -0.6, hL: 0.6, hT: 0.32, hW: 0.27, dewlap: 1, horns: HORNS.aurochs, hornL: 0.75, ear: 0.12, earA: 1.3, earOut: 1.2, tail: 0.8, tT: 0.03, tuft: 1, col: [0x2a1f17, 0x3a2a1c, 0x5c3f27], n: [4, 10] },
+    cattle:    { L: 1.75, S: 1.35, W: 0.62, leg: 0.5, legT: 0.12, coat: 6, nA: 0.25, nL: 0.5, nT: 0.46, hA: -0.75, hL: 0.5, hT: 0.28, hW: 0.24, dewlap: 1, horns: HORNS.lyre, hornL: 0.32, ear: 0.12, earA: 1.3, earOut: 1.2, tail: 0.8, tT: 0.03, tuft: 1, col: [0x6e4a2e, 0x2a221d, 0xd8d0c2, 0x8c5a32, 0xb9a88f], n: [6, 16] },
+    buffalo:   { L: 1.9, S: 1.5, W: 0.75, leg: 0.45, legT: 0.14, nA: 0.05, nL: 0.5, nT: 0.55, hA: -0.45, hL: 0.55, hT: 0.32, hW: 0.28, horns: HORNS.swept, hornL: 0.9, ear: 0.12, earA: 1.4, earOut: 1.3, tail: 0.7, tT: 0.03, tuft: 1, col: [0x3a3a3c, 0x2f3031, 0x46464a], n: [4, 9] },
+    horse:     { L: 1.55, S: 1.45, W: 0.55, leg: 0.56, legT: 0.1, nA: 0.85, nL: 0.85, nT: 0.38, hA: -1.0, hL: 0.6, hT: 0.25, hW: 0.2, ear: 0.13, mane: 1, tail: 0.8, tT: 0.07, tailShade: 0.42, sock: 0.78, col: [0x7a5235, 0x5a3a24, 0x3a2a20, 0x9b7a55, 0xc9b8a0], n: [4, 12] },
+    zebra:     { L: 1.5, S: 1.32, W: 0.52, leg: 0.56, legT: 0.095, coat: 4, nA: 0.8, nL: 0.75, nT: 0.36, hA: -1.0, hL: 0.55, hT: 0.24, hW: 0.19, muzzle: 5, ear: 0.17, mane: 1, maneShade: 4, tail: 0.55, tT: 0.03, tuft: 1, col: [0xe8e4dc], n: [8, 20] },
+    wildebeest:{ L: 1.5, S: 1.35, W: 0.5, leg: 0.55, legT: 0.09, front: 1.1, rump: -0.12, rumpK: 0.9, nA: 0.45, nL: 0.5, nT: 0.4, hA: -1.1, hL: 0.55, hT: 0.26, hW: 0.2, face: 0.6, mane: 1, beard: 0.25, horns: HORNS.gnu, hornL: 0.4, ear: 0.1, tail: 0.65, tT: 0.04, tailShade: 0.4, col: [0x52504c, 0x47443f, 0x5c5850], n: [14, 36] },
+    reindeer:  { L: 1.35, S: 1.15, W: 0.45, leg: 0.56, legT: 0.075, nA: 0.6, nL: 0.55, nT: 0.32, hA: -0.9, hL: 0.42, hT: 0.2, hW: 0.17, ear: 0.12, mane: 1, maneShade: 1.3, horns: HORNS.antlers, hornL: 1.0, brow: 1, tail: 0.12, tT: 0.04, belly: 1.3, col: [0x837a6c, 0x6f6658, 0x9a9182, 0xcfc8bb], n: [10, 28] },
+    deer:      { L: 1.4, S: 1.2, W: 0.42, leg: 0.6, legT: 0.07, nA: 0.75, nL: 0.6, nT: 0.28, hA: -0.95, hL: 0.42, hT: 0.2, hW: 0.16, ear: 0.16, horns: HORNS.antlers, hornL: 0.85, tail: 0.12, tT: 0.03, belly: 1.25, col: [0x8c5a34, 0x7a4e2e, 0x9b6a40], n: [3, 8] },
+    camel:     { L: 1.6, S: 2.0, W: 0.55, leg: 0.62, browse: 0.9, legT: 0.09, hump: 0.45, humpX: 0.0, humpL: 0.3, nT: 0.3, nL: 1.3, neck: (B) => [B, add(B, 0.45, -0.25), add(B, 0.8, 0.1), add(B, 0.92, 0.55)], hA: -0.15, hL: 0.55, hT: 0.22, hW: 0.18, ear: 0.08, tail: 0.5, tT: 0.04, tuft: 1, col: [0xb38a5a, 0xa47b4c, 0xc49a68], n: [3, 8] },
+    llama:     { L: 1.15, S: 1.1, W: 0.42, leg: 0.55, browse: 0.25, legT: 0.075, wool: 1, nA: 1.3, nL: 0.75, nT: 0.26, hA: -0.25, hL: 0.32, hT: 0.17, hW: 0.15, ear: 0.17, earA: 0.15, earOut: 0.3, tail: 0.2, tT: 0.06, col: [0xd8cbb4, 0x8a6a4a, 0xece6da, 0x5a4636], n: [5, 14] },
+    sheep:     { L: 1.0, S: 0.75, W: 0.55, leg: 0.4, legT: 0.05, wool: 1, nA: 0.35, nL: 0.25, nT: 0.3, hA: -0.9, hL: 0.28, hT: 0.16, hW: 0.13, face: 0.92, ear: 0.1, earA: 1.5, earOut: 1.4, sock: 0.9, hoof: 0.4, tail: 0.2, tT: 0.04, col: [0xdcd5c6, 0xe6e0d2, 0xcfc6b4, 0x3a3430], n: [14, 38] },
+    goat:      { L: 0.95, S: 0.75, W: 0.36, leg: 0.55, legT: 0.05, nA: 0.55, nL: 0.35, nT: 0.2, hA: -0.75, hL: 0.3, hT: 0.15, hW: 0.12, beard: 0.12, horns: HORNS.goat, hornL: 0.3, ear: 0.1, earA: 1.2, earOut: 1.0, tail: 0.12, tT: 0.03, col: [0x6e5a46, 0xd8d0c2, 0x3a302a, 0x9b8064], n: [5, 14] },
   };
   const KINDS = Object.keys(SP);
-
-  // a quadruped of boxes, forward +x, up +y, its side z; aPart: x what it is (0 body, 1 head and neck, 2..5 legs: the front left,
-  // front right, hind left, hind right), y and z the joint it turns about (height, place along the body), w its shade (1 the coat,
-  // 0.55 legs and hooves, 1.15 a lighter belly or wool, 2 ivory, 3 horn, 4 the striped coat, 5 a dark face)
-  function beastGeometry(o) {
-    const pos = [], nor = [], part = [];
-    const box = (cx, cy, cz, sx, sy, sz, id, py, px, shade, taper) => {
-      const hx = sx / 2, hy = sy / 2, hz = sz / 2, t = taper === undefined ? 1 : taper;
-      const c = [[-hx, -hy, -hz], [hx, -hy, -hz], [hx, -hy, hz], [-hx, -hy, hz], [-hx * t, hy, -hz * t], [hx * t, hy, -hz * t], [hx * t, hy, hz * t], [-hx * t, hy, hz * t]];
-      const faces = [[0, 1, 2, 3, 0, -1, 0], [7, 6, 5, 4, 0, 1, 0], [4, 5, 1, 0, 0, 0, -1], [6, 7, 3, 2, 0, 0, 1], [5, 6, 2, 1, 1, 0, 0], [7, 4, 0, 3, -1, 0, 0]];
-      for (const f of faces) for (const k of [0, 1, 2, 0, 2, 3]) { const v = c[f[k]]; pos.push(cx + v[0], cy + v[1], cz + v[2]); nor.push(f[4], f[5], f[6]); part.push(id, py, px, shade); }
-    };
-    const L = o.L, S = o.S, Wd = L * o.w, legH = S * (o.hair ? 0.5 : 0.58), bodyH = (S - legH) * (o.wool ? 1.25 : 1.1), bx = 0;
-    const bodyY = legH + bodyH / 2 - (o.wool ? bodyH * 0.1 : 0);
-    const coat = o.stripes ? 4 : 1;
-    // the body, a little deeper at the shoulder; the belly lighter; a hump over the shoulders
-    box(bx, bodyY, 0, L * 0.82, bodyH, Wd, 0, 0, 0, coat, 0.92);
-    box(bx, legH + bodyH * 0.08, 0, L * 0.7, bodyH * 0.2, Wd * 0.9, 0, 0, 0, o.stripes ? 4 : 1.12);
-    if (o.hump) box(bx + L * (o.L > 2.6 && !o.trunk ? 0.05 : 0.18), legH + bodyH + bodyH * 0.18 * o.hump, 0, L * 0.34, bodyH * 0.45 * o.hump, Wd * 0.8, 0, 0, 0, coat, 0.55);
-    if (o.hair) box(bx + L * 0.1, legH + bodyH * 0.05, 0, L * 0.6, bodyH * 0.35, Wd * 1.04, 0, 0, 0, 1, 1.0);      // the long coat hanging below the belly
-    // legs, each turning at its hip
-    const lt = Math.max(0.11, L * (o.trunk ? 0.11 : 0.07)), fx = L * 0.3, hx = -L * 0.3, lz = Wd * 0.32;
-    const legs = [[fx, -lz, 2], [fx, lz, 3], [hx, -lz, 4], [hx, lz, 5]];
-    for (const [x, z, id] of legs) { box(x, legH / 2 + 0.02, z, lt, legH + 0.04, lt, id, legH, x, 0.62); box(x, 0.05, z, lt * 1.1, 0.1, lt * 1.1, id, legH, x, 0.4); }
-    // neck and head, turning down at the shoulders to graze
-    const nx = L * 0.37, ny = legH + bodyH * 0.6, nl = o.neck * L, up = o.neckUp === undefined ? (o.low ? -0.25 : 0.35) : o.neckUp;
-    const ex = nx + Math.cos(up) * nl, ey = ny + Math.sin(up) * nl;      // where the neck ends and the head begins
-    const segs = 3; for (let s = 0; s < segs; s++) { const f0 = s / segs, f1 = (s + 1) / segs, x = nx + Math.cos(up) * nl * (f0 + f1) / 2, y = ny + Math.sin(up) * nl * (f0 + f1) / 2; box(x, y, 0, Math.max(nl / segs * 1.25, bodyH * 0.45), bodyH * (o.trunk ? 0.75 : 0.42), Wd * (o.trunk ? 0.7 : 0.42), 1, ny, nx, coat); }
-    if (o.mane) box(nx + Math.cos(up) * nl * 0.5 - 0.05, ny + Math.sin(up) * nl * 0.5 + bodyH * 0.24, 0, nl * 0.9, bodyH * 0.14, Wd * 0.12, 1, ny, nx, 0.45);
-    const hl = o.head * (o.trunk ? 0.55 : 0.32) * L * 0.5 + 0.1, hh = bodyH * (o.trunk ? 0.75 : 0.5), hw = Wd * (o.trunk ? 0.62 : 0.45);
-    const hx0 = ex + hl * 0.35, hy0 = ey - (o.low ? hh * 0.1 : hh * 0.15);
-    box(hx0, hy0, 0, hl, hh, hw, 1, ny, nx, o.darkHead ? 5 : coat, 0.85);
-    box(hx0 + hl * 0.55, hy0 - hh * 0.2, 0, hl * 0.35, hh * 0.55, hw * 0.75, 1, ny, nx, o.darkHead ? 5 : (o.stripes ? 5 : coat));      // the muzzle
-    if (o.trunk) { box(hx0 + hl * 0.65, hy0 - hh * 0.75, 0, hl * 0.3, hh * 1.3, hw * 0.3, 1, ny, nx, 1, 0.7); box(hx0 + hl * 0.72, hy0 - hh * 1.45, 0, hl * 0.22, hh * 0.35, hw * 0.25, 1, ny, nx, 1); }
-    if (o.tusk) for (const z of [-hw * 0.3, hw * 0.3]) { box(hx0 + hl * 0.7, hy0 - hh * 0.45, z, hl * 0.9 * o.tusk, hh * 0.12, hh * 0.12, 1, ny, nx, 2); box(hx0 + hl * (0.7 + 0.5 * o.tusk), hy0 - hh * 0.2, z, hl * 0.12, hh * 0.45 * o.tusk, hh * 0.11, 1, ny, nx, 2); }
-    if (o.ears) for (const z of [-hw * 0.62, hw * 0.62]) box(hx0 - hl * 0.15, hy0 + hh * 0.05, z, hl * 0.5, hh * 0.9, hw * 0.12, 1, ny, nx, 1.05);
-    if (o.horns === 'h') for (const z of [-1, 1]) { box(hx0 - hl * 0.2, hy0 + hh * 0.55, z * hw * 0.62, hl * 0.18, hh * 0.18, hw * 0.55, 1, ny, nx, 3); box(hx0 - hl * 0.05, hy0 + hh * 0.75, z * hw * 0.88, hl * 0.14, hh * 0.35, hl * 0.12, 1, ny, nx, 3); }
-    if (o.horns === 'b') for (const z of [-1, 1]) box(hx0 - hl * 0.35, hy0 + hh * 0.5, z * hw * 0.45, hl * 0.55, hh * 0.16, hw * 0.3, 1, ny, nx, 3);
-    if (o.antlers) for (const z of [-1, 1]) { box(hx0 - hl * 0.15, hy0 + hh * 0.9, z * hw * 0.5, hl * 0.12, hh * 1.3, hl * 0.12, 1, ny, nx, 3); box(hx0 - hl * 0.05, hy0 + hh * 1.45, z * hw * 0.85, hl * 0.6, hh * 0.12, hw * 0.5, 1, ny, nx, 3); box(hx0 + hl * 0.1, hy0 + hh * 1.2, z * hw * 0.7, hl * 0.1, hh * 0.5, hl * 0.1, 1, ny, nx, 3); }
-    // tail
-    const tl = (o.tail || 0.3) * S * 0.6; box(-L * 0.44, legH + bodyH * 0.55 - tl * 0.45, 0, L * 0.05 + 0.04, tl, Wd * 0.12, 0, 0, 0, o.mane ? 0.45 : coat);
-    // how far the head goes down to graze: until the muzzle is at the grass (an elephant's trunk does the reaching)
-    let graze = -0.25;
-    if (!o.trunk) { const mx = hx0 + hl * 0.72 - nx, my = hy0 - hh * 0.48 - ny, r = Math.hypot(mx, my), f0 = Math.atan2(my, mx), sn = (0.12 - ny) / r;
-      graze = Math.max(-2.3, (Math.abs(sn) < 0.97 ? Math.asin(sn) : -1.33) - f0); }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('aPart', new THREE.Float32BufferAttribute(part, 4));
-    g.setAttribute('aGrz', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3).fill(graze), 1)); g.userData.graze = graze;
-    return g;
-  }
+  function beastGeometry(o, fine) { const s = new Sculpt(fine); quad(s, o); return s.geometry(); }
 
   const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.THING : '3.0';
   const VERT = `
-    attribute vec4 aPart; attribute vec2 aWalk; attribute float aGrz;      // aWalk: where it is in its stride, how much it walks (0 grazing, 1 walking)
-    uniform float uTime; varying vec3 vN, vCol, vView, vLocal; varying float vShade;
+    attribute vec4 aPart; attribute vec2 aWalk; attribute float aGrz;      // aWalk: the beast's own dice (and its stride's phase), how much it walks (0 grazing, 1 walking)
+    uniform float uTime; varying vec3 vN, vCol, vView, vLocal; varying float vShade, vSeed;
     ${AIR_V}
     vec2 turn(vec2 q, float a) { float c = cos(a), s = sin(a); return vec2(q.x * c - q.y * s, q.x * s + q.y * c); }
     void main() {
-      vec3 p = position, n = normal; float id = aPart.x, walk = aWalk.y;
-      float ph = uTime * 6.0 + aWalk.x * 6.2832;
-      if (id > 1.5) {
+      vec3 p = position, n = normal; float id = aPart.x, walk = max(aWalk.y, 0.0), seed = aWalk.x; vec2 piv = vec2(aPart.z, aPart.y);
+      float ph = uTime * 6.0 + seed * 6.2832;
+      // antlers on some of a herd only (the stags; among reindeer most of a herd): the others' are gathered to a point
+      if (aPart.w > 6.5 && aPart.w < 7.5 && fract(seed * 13.7) > 0.45) p = vec3(piv, 0.0);
+      if (id > 5.5) {
+        // the tail swishes now and then, from side to side
+        float a = sin(uTime * 2.3 + seed * 40.0) * 0.35 * smoothstep(0.3, 0.9, sin(uTime * 0.4 + seed * 17.0));
+        vec2 q = turn(vec2(p.z, p.y - piv.y), a); p.z = q.x; p.y = piv.y + q.y; vec2 m = turn(vec2(n.z, n.y), a); n.z = m.x; n.y = m.y;
+      } else if (id > 1.5) {
         // a walk: each leg swings at its hip, the diagonal pairs together
         float sgn = (id < 2.5 || id > 4.5) ? 1.0 : -1.0; float a = sin(ph) * 0.42 * walk * sgn;
-        vec2 piv = vec2(aPart.z, aPart.y); p.xy = piv + turn(p.xy - piv, a); n.xy = turn(n.xy, a);
+        p.xy = piv + turn(p.xy - piv, a); n.xy = turn(n.xy, a);
       } else if (id > 0.5) {
-        // grazing, the head goes down to the grass and comes up now and then
-        float g = (1.0 - walk) * (0.62 + 0.38 * smoothstep(-0.3, 0.6, sin(uTime * 0.55 + aWalk.x * 23.0))); float a = aGrz * g + 0.06 * sin(ph) * walk;
-        vec2 piv = vec2(aPart.z, aPart.y); p.xy = piv + turn(p.xy - piv, a); n.xy = turn(n.xy, a);
+        // grazing: the head down at the grass, and now and then up a while to look about (one standing for a picture: up)
+        float up = smoothstep(0.55, 0.85, sin(uTime * 0.21 + seed * 23.0)), g = aWalk.y < 0.0 ? 0.0 : (1.0 - walk) * (1.0 - up); float a = aGrz * g + 0.06 * sin(ph) * walk;
+        p.xy = piv + turn(p.xy - piv, a); n.xy = turn(n.xy, a);
       }
       p.y += abs(sin(ph)) * 0.04 * walk;      // (the whole beast rises a little with each stride)
-      vShade = aPart.w; vCol = instanceColor; vLocal = position;
+      vShade = aPart.w; vSeed = seed; vCol = instanceColor; vLocal = position;
       vec4 mv = modelViewMatrix * instanceMatrix * vec4(p, 1.0); vView = mv.xyz;
       vN = normalize(normalMatrix * (mat3(instanceMatrix) * n));
       air(mv.xyz, ${AIR_N}, vAirT, vAirL);
       gl_Position = projectionMatrix * mv;
     }`;
   const FRAG = `
-    precision highp float; uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uDusk, uSnow;
-    varying vec3 vN, vCol, vView, vLocal; varying float vShade;
+    precision highp float; uniform vec3 uSunV, uUpV, uSunCol; uniform float uDay, uDusk;
+    varying vec3 vN, vCol, vView, vLocal; varying float vShade, vSeed;
     ${AIR_F}
     ${window.SHADOWS ? SHADOWS.GLSL : 'float sunHidden(vec3 p) { return 0.0; }'}
+    float hash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float vnoise(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(hash3(i), hash3(i + vec3(1.0, 0.0, 0.0)), f.x), mix(hash3(i + vec3(0.0, 1.0, 0.0)), hash3(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+                 mix(mix(hash3(i + vec3(0.0, 0.0, 1.0)), hash3(i + vec3(1.0, 0.0, 1.0)), f.x), mix(hash3(i + vec3(0.0, 1.0, 1.0)), hash3(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z); }
     void main() {
-      vec3 n = normalize(vN); vec3 col = vCol;
-      if (vShade > 4.5) col = vec3(0.13, 0.11, 0.1);                                                   // a dark face
-      else if (vShade > 3.5) col = mix(vec3(0.9, 0.88, 0.84), vec3(0.08), step(0.5, fract(vLocal.x * 3.2 + vLocal.y * 1.1)));      // the zebra's stripes
-      else if (vShade > 2.5) col = vec3(0.62, 0.58, 0.5);                                             // horn and antler
-      else if (vShade > 1.5) col = vec3(0.86, 0.82, 0.7);                                             // ivory
-      else col *= vShade;
+      vec3 n = normalize(vN); vec3 col = vCol; float sh = vShade; const vec3 PALE = vec3(0.9, 0.88, 0.84);
+      if (sh > 7.5) col = vCol * (0.88 + 0.2 * vnoise(vLocal * 11.0));                                                     // wool, in locks
+      else if (sh > 6.5) col = vec3(0.5, 0.42, 0.33);                                                                    // antler
+      else if (sh > 5.5) { if (fract(vSeed * 7.31) < 0.4) col = mix(col, PALE, step(0.58, vnoise(vLocal * 2.4 + vSeed * 31.0))); }      // patches of white on some
+      else if (sh > 4.75) col = vec3(0.1, 0.09, 0.08);                                                                   // a hoof, a dark face
+      else if (sh > 4.25) col = mix(PALE, vec3(0.07), step(0.5, fract(vLocal.y * 7.0)));                                 // a zebra's legs, banded
+      else if (sh > 3.5) col = mix(PALE, vec3(0.07), step(0.5, fract(vLocal.x * 3.4 + sin(vLocal.y * 5.0) * 0.25)));    // a zebra's coat
+      else if (sh > 2.5) col = vec3(0.58, 0.54, 0.46);                                                                   // horn
+      else if (sh > 1.5) col = vec3(0.86, 0.82, 0.7);                                                                    // ivory
+      else col = sh > 1.0 ? mix(vCol, PALE, (sh - 1.0) * 1.6) : vCol * sh;                                               // a pale belly, darker legs
       float diff = max(dot(n, uSunV), 0.0) * (1.0 - sunHidden(vView + n * 0.2)), sky = 0.5 + 0.5 * dot(n, uUpV);
       vec3 amb = mix(vec3(0.25, 0.31, 0.49) * (0.7 + 0.5 * sky), vec3(0.32, 0.34, 0.38) * (0.45 + 0.75 * sky) + vec3(0.27, 0.22, 0.155) * (1.0 - sky), uDay) + vec3(0.27, 0.19, 0.20) * uDusk * (0.5 + 0.6 * sky);
       vec3 lit = col * (amb + diff * 0.82 * uSunCol);
@@ -231,19 +354,22 @@
       this.scene = scene; this.terrain = terrain; this.world = world; this.exag = terrain.exag; this.enabled = true;
       const bu = world.bUniforms; this.uni = { uSunV: bu.uSunV, uUpV: bu.uUpV, uDay: bu.uDay, uSunCol: bu.uSunCol, uDusk: bu.uDusk, uSnow: bu.uSnow, uTime: { value: 0 } };
       if (window.AIR) Object.assign(this.uni, AIR.uniforms); if (window.SHADOWS) Object.assign(this.uni, SHADOWS.uniforms);
-      const mat = new THREE.ShaderMaterial({ uniforms: this.uni, vertexShader: VERT, fragmentShader: FRAG });
-      this.inst = {};
-      for (const k of KINDS) {
-        const g = beastGeometry(SP[k]); const walk = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 2), 2); walk.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aWalk', walk);
-        const m = new THREE.InstancedMesh(g, mat, CAP); m.count = 0; m.visible = false; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3).fill(1), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
-        scene.add(m); this.inst[k] = { mesh: m, walk };
-      }
+      this.mat = new THREE.ShaderMaterial({ uniforms: this.uni, vertexShader: VERT, fragmentShader: FRAG });
+      this.inst = {}; this.lodK = 1; this.budget = 1;      // a kind's meshes, fine and coarse, are made when first wanted
       // their shadows: the body's own outline cast on the ground away from the sun (a capsule from the feet to where the body's falls)
       { const su = { uSunV: bu.uSunV, uDay: bu.uDay }; if (window.SHADOWS) Object.assign(su, SHADOWS.uniforms);
         this.smat = new THREE.ShaderMaterial({ uniforms: su, vertexShader: SH_VERT, fragmentShader: SH_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
         this.shadow = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), this.smat, CAP * 4); this.shadow.count = 0; this.shadow.visible = false; this.shadow.frustumCulled = false; this.shadow.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(this.shadow); }
-      this.herds = []; this.last = { lon: 999, lat: 999, t: -1e9, yr: -1e9 }; this._m = new THREE.Matrix4(); this._vc = null; this._vcV = -1; this.stats = { herds: 0, beasts: 0 };
+      this.herds = []; this.last = { lon: 999, lat: 999, t: -1e9, yr: -1e9 }; this._m = new THREE.Matrix4(); this._v = new THREE.Vector3(); this._vc = null; this._vcV = -1; this.stats = { herds: 0, beasts: 0 };
+    }
+    // every kind standing in rows, for a look at them (the scenes): side on to the eye when it looks north
+    zoo(lon, lat, k) { k = k || K_OPEN; const dLat = 9 * k / 111000, dLon = dLat / Math.max(0.2, Math.cos(lat * D2R)); this.extra = KINDS.map((kind, i) => ({ kind, lon: lon + ((i % 6) - 2.5) * dLon, lat: lat + (Math.floor(i / 6) - 1) * dLat, n: 1, k, still: true, yaw: Math.PI })); this.last.t = -1e9; return this.extra.length; }
+    meshOf(kind, lod) {
+      const I = this.inst[kind] || (this.inst[kind] = [null, null]); if (I[lod]) return I[lod];
+      const g = beastGeometry(SP[kind], lod === 0); const walk = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 2), 2); walk.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aWalk', walk);
+      const m = new THREE.InstancedMesh(g, this.mat, CAP); m.count = 0; m.visible = false; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3).fill(1), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
+      this.scene.add(m); return (I[lod] = { mesh: m, walk, n: 0 });
     }
     // the herds about the eye: a lattice of the world's places, each hashed to a herd or none by what lives there
     respawn(cam, sim) {
@@ -254,7 +380,7 @@
       for (let j = j0; j <= j1; j++) {
         const lat0 = j * SLOT, sl = SLOT / Math.max(0.2, Math.cos(lat0 * D2R)); const i0 = Math.floor((cam.lon - dLon) / sl), i1 = Math.ceil((cam.lon + dLon) / sl);
         for (let i = i0; i <= i1; i++) {
-          const key = j * 100003 + i; const u = hash(key, 17); if (u > 0.55) continue;      // (most places have no herd at any one time)
+          const key = j * 100003 + i; const u = hash(key, 17); if (u > 0.55 * this.budget) continue;      // (most places have no herd at any one time)
           const lat = lat0 + (hash(key, 23) - 0.5) * SLOT * 0.8, lon = i * sl + (hash(key, 29) - 0.5) * sl * 0.8; if (lat > 84 || lat < -60) continue;
           if (GEO.distKm(cam.lon, cam.lat, lon, lat) > REACH) continue;
           const cell = Math.floor((90 - lat) / 180 * H) * W + (((Math.floor((lon + 180) / 360 * W)) % W) + W) % W; if (!sim.land[cell]) continue;
@@ -284,16 +410,16 @@
       }
       // herds asked for by hand (the scenes, the tests): { kind, lon, lat, n, k }
       for (const e of this.extra || []) { const key = -1 - Math.round((e.lon + 180) * 1e4) * 7 - Math.round((e.lat + 90) * 1e4) * 13; const prev = old.get(key);
-        herds.push(prev && prev.kind === e.kind ? prev : this.herd(key, e.kind, !!e.kept, e.lon, e.lat, e.k || K_OPEN, e.n)); }
+        herds.push(prev && prev.kind === e.kind ? prev : this.herd(key, e.kind, !!e.kept, e.lon, e.lat, e.k || K_OPEN, e.n, e.still, e.yaw)); }
       this.herds = herds;
     }
-    herd(key, kind, kept, lon, lat, k, n) {
+    herd(key, kind, kept, lon, lat, k, n, still, yaw) {
       const sp = SP[kind]; if (!n) n = sp.n[0] + Math.floor(hash(key, 47) * (sp.n[1] - sp.n[0] + 1));
-      const spread = Math.sqrt(n) * sp.L * 2.2 * k;      // (metres, as drawn: a herd stands a few body lengths apart)
-      const h = { key, kind, kept, lon, lat, cl: Math.max(0.2, Math.cos(lat * D2R)), k, n, spread, drift: hash(key, 53) * 6.2832, beasts: [] };
-      for (let b = 0; b < n; b++) { const a = hash(key, 100 + b) * 6.2832, r = Math.sqrt(hash(key, 200 + b)) * spread; const bx = Math.cos(a) * r, bz = Math.sin(a) * r;
+      const spread = Math.sqrt(n) * (sp.L + 0.5) * 2.2 * k;      // (metres, as drawn: a herd stands a few body lengths apart)
+      const h = { key, kind, kept, lon, lat, cl: Math.max(0.2, Math.cos(lat * D2R)), k, n, spread, drift: hash(key, 53) * 6.2832, beasts: [], still: !!still };
+      for (let b = 0; b < n; b++) { const a = hash(key, 100 + b) * 6.2832, r = n > 1 ? Math.sqrt(hash(key, 200 + b)) * spread : 0; const bx = Math.cos(a) * r, bz = Math.sin(a) * r;
         const col = sp.col[Math.floor(hash(key, 300 + b) * sp.col.length)];
-        h.beasts.push({ x: bx, z: bz, tx: bx, tz: bz, yaw: hash(key, 400 + b) * 6.2832, walk: 0, rest: 2 + hash(key, 500 + b) * 14, ph: hash(key, 600 + b), col, shade: 0.85 + 0.3 * hash(key, 700 + b), hg: 0, hx: 1e9, hz: 1e9, hv: -1, wet: false }); }
+        h.beasts.push({ x: bx, z: bz, tx: bx, tz: bz, yaw: yaw !== undefined ? yaw : hash(key, 400 + b) * 6.2832, walk: 0, rest: still ? Infinity : 2 + hash(key, 500 + b) * 14, ph: hash(key, 600 + b), col, shade: 0.85 + 0.3 * hash(key, 700 + b), hg: 0, hx: 1e9, hz: 1e9, hv: -1, wet: false }); }
       return h;
     }
     update(cam, sim, now, dt) {
@@ -303,16 +429,21 @@
       const moved = GEO.distKm(cam.lon, cam.lat, this.last.lon, this.last.lat) > 2.5;
       if (moved || now - this.last.t > 9000 || sim.year !== this.last.yr) { this.last = { lon: cam.lon, lat: cam.lat, t: now, yr: sim.year }; this.respawn(cam, sim); }
       if (this._vcV !== this.terrain.meshVersion || !this._vc || this._vc.size > 30000) { this._vc = new Map(); this._vcV = this.terrain.meshVersion; }
-      this.animate(Math.min(0.1, dt || 0.016), now / 1000);
+      this.animate(Math.min(0.1, dt || 0.016), now / 1000, cam.camera ? cam.camera.position : null, cam.camera ? cam.camera.fov : 50);
     }
-    clear() { if (this.stats.beasts) { for (const k in this.inst) { this.inst[k].mesh.count = 0; this.inst[k].mesh.visible = false; } if (this.shadow) { this.shadow.count = 0; this.shadow.visible = false; } this.stats = { herds: 0, beasts: 0 }; } this.herds = []; this.last.t = -1e9; }
-    animate(dt, t) {
-      const counts = {}; for (const k of KINDS) counts[k] = 0; const T = this.terrain, exag = this.exag, m = this._m, el = m.elements; let ns = 0, nb = 0;
+    clear() { if (this.stats.beasts) { for (const k in this.inst) for (const I of this.inst[k]) if (I) { I.mesh.count = 0; I.mesh.visible = false; } if (this.shadow) { this.shadow.count = 0; this.shadow.visible = false; } this.stats = { herds: 0, beasts: 0 }; } this.herds = []; this.last.t = -1e9; }
+    animate(dt, t, eye, fov) {
+      for (const k in this.inst) for (const I of this.inst[k]) if (I) I.n = 0;
+      const T = this.terrain, exag = this.exag, m = this._m, el = m.elements; let ns = 0, nb = 0;
+      const focal = 1 / Math.tan((fov || 50) * D2R / 2) * (window.innerHeight || 900) / 2;      // pixels to a radian, about
       const sh = this.shadow, she = sh ? sh.instanceMatrix.array : null;
       for (const h of this.herds) {
-        const sp = SP[h.kind], I = this.inst[h.kind]; if (!I) continue; const k = h.k;
+        const sp = SP[h.kind], k = h.k;
+        // finely or coarsely, by how long its beasts are in the picture
+        let lod = 1; if (eye) { const b0 = h.beasts[0], dM = GEO.toVec(h.lon, h.lat, this._v).multiplyScalar(1 + (b0 ? b0.hg : 0) * exag / R_M).distanceTo(eye) * R_M; lod = (sp.L * 1.6 * k) / Math.max(1, dM) * focal * this.lodK > FINE_PX ? 0 : 1; }
+        const I = this.meshOf(h.kind, lod);
         // the herd drifts over the days, slowly, wandering about its place (a tenth of a metre a second, as drawn k times the true pace)
-        const A = h.spread * 1.1, w = 0.1 * k / A, hcx = A * Math.sin(t * w + h.drift), hcz = A * Math.sin(t * w * 0.77 + h.drift * 2.3);
+        const A = h.still ? 0 : h.spread * 1.1, w = 0.1 * k / Math.max(1, A), hcx = A * Math.sin(t * w + h.drift), hcz = A * Math.sin(t * w * 0.77 + h.drift * 2.3);
         for (const b of h.beasts) {
           // graze, then now and then walk a little way to better grass, keeping with the herd
           if (b.walk < 0.5) { b.rest -= dt; if (b.rest <= 0) { const a = Math.random() * 6.2832, r = Math.sqrt(Math.random()) * h.spread; b.tx = Math.cos(a) * r; b.tz = Math.sin(a) * r; b.walk = 1; } }
@@ -325,7 +456,7 @@
           const x = b.x + hcx, z = b.z + hcz; const lon = h.lon + x / (R_M * h.cl * D2R), lat = h.lat + z / (R_M * D2R);
           if (Math.abs(x - b.hx) + Math.abs(z - b.hz) > 2 * k || b.hv !== T.meshVersion) { b.hg = Math.max(0, T.meshHeightAt(lon, lat, this._vc)); b.wet = !!(T.isWater && T.isWater(lon, lat)); b.hx = x; b.hz = z; b.hv = T.meshVersion; }
           if (b.wet) continue;      // (a herd that has wandered to a shore: those in the water are not drawn)
-          const idx = counts[h.kind]; if (idx >= CAP) continue; counts[h.kind] = idx + 1;
+          const idx = I.n; if (idx >= CAP) continue; I.n = idx + 1;
           const lo = lon * D2R, la = lat * D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
           const Ex = -slo, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
           const fx = Math.cos(b.yaw), fz = Math.sin(b.yaw), s = k / R_M, rr = 1 + b.hg * exag / R_M;
@@ -335,16 +466,16 @@
           el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
           I.mesh.setMatrixAt(idx, m); const c = b.col, ca = I.mesh.instanceColor.array, q = b.shade;
           ca[idx * 3] = ((c >> 16) & 255) / 255 * q; ca[idx * 3 + 1] = ((c >> 8) & 255) / 255 * q; ca[idx * 3 + 2] = (c & 255) / 255 * q;
-          I.walk.setXY(idx, b.ph, gait); nb++;
+          I.walk.setXY(idx, b.ph, h.still ? -1 : gait); nb++;
           // its shadow: half its length forward, the body's height up, half its width (and a little for the legs) to the side
-          if (sh && ns < CAP * 4) { const hl = sp.L * 0.48 * k / R_M, hb = sp.S * 0.72 * k / R_M, hw = sp.L * sp.w * 0.6 * k / R_M, o = ns * 16;
+          if (sh && ns < CAP * 4) { const hl = sp.L * 0.72 * k / R_M, hb = sp.S * 0.72 * k / R_M, hw = sp.W * 0.62 * k / R_M, o = ns * 16;
             she[o] = (fx * Ex + fz * Nx) * hl; she[o + 1] = (fz * Ny) * hl; she[o + 2] = (fx * Ez + fz * Nz) * hl; she[o + 3] = 0;
             she[o + 4] = Ux * hb; she[o + 5] = Uy * hb; she[o + 6] = Uz * hb; she[o + 7] = 0;
             she[o + 8] = (fz * Ex - fx * Nx) * hw; she[o + 9] = (-fx * Ny) * hw; she[o + 10] = (fz * Ez - fx * Nz) * hw; she[o + 11] = 0;
             she[o + 12] = Ux * rr; she[o + 13] = Uy * rr; she[o + 14] = Uz * rr; she[o + 15] = 1; ns++; }
         }
       }
-      for (const k of KINDS) { const I = this.inst[k], c = counts[k]; I.mesh.count = c; I.mesh.visible = c > 0; GEO.touch(I.mesh.instanceMatrix, c); GEO.touch(I.mesh.instanceColor, c); GEO.touch(I.walk, c); }
+      for (const k in this.inst) for (const I of this.inst[k]) if (I) { const c = I.n; I.mesh.count = c; I.mesh.visible = c > 0; GEO.touch(I.mesh.instanceMatrix, c); GEO.touch(I.mesh.instanceColor, c); GEO.touch(I.walk, c); }
       if (sh) { sh.count = ns; sh.visible = ns > 0; GEO.touch(sh.instanceMatrix, ns); }
       this.stats = { herds: this.herds.length, beasts: nb };
     }
