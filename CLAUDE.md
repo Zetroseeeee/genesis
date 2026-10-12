@@ -1400,6 +1400,13 @@ Conventions that matter:
   Placement: houses at life size × the town's scale; landmarks likewise with more give; `fit: 'run'` walls end to
   end following the ground; `fit: 'gate'` a gate with wall on both sides; `site` = the building-site model shown
   while a building goes up, laid out on the finished building's footprint.
+  **No two houses alike** (since 0.44): an ordinary house is drawn a little narrower or shorter than its plot's model (0.9 to
+  1.02 each way) and a storey's worth lower or higher (0.84 to 1.16), by hashes of its plot (`placeModel`; great buildings,
+  open monuments and things keep their size, and nothing grows past the ground `fitHouses` gave it), and the model shader gives
+  a lived-in house its own walls and roof by its people's ways (`mflags / 2 - 1` is the culture): washed with lime or ochre or
+  bare clay, timber fresh, tarred or gone silver, plaster white or grey, red earth or pale clay; a roof newly laid, old or, where
+  it rains, mossed; the openings stay dark. Where neighbouring peoples built alike their models stand in each other's towns
+  (`ALSO` in `models.js`: the Bronze Age's mud brick, one storey or two, from the Aegean to the Indus).
 - Trees are cut-out photographs on camera-facing cards (`card: true` in the manifest, most without a mesh). Each
   says where it grows (`tree: { zones, region, deciduous, bare }`); `zoneOf()` in `trees.js` gives the flora zone
   of a point (boreal, temperate, med, easia, dry, savanna, rain). Near a town they are drawn at the town's scale.
