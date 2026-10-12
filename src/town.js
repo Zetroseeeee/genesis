@@ -441,7 +441,7 @@
       if (era === 6) {
         if (rr < coreR) { const tall = q < 0.78; return [tall ? 'tenement' : 'mansard', tall && (cul === 1 || cul === 2 || cul === 9) ? WALL.brick : WALL.plaster, tall && (cul === 0 || cul === 3 || cul === 5) ? ROOF.flat : ROOF.slate, s * (0.8 + q2 * 0.14), s * (0.76 + q3 * 0.16), Math.min(capH, (13 + 9 * q2) * (1 + 0.25 * big)), 0, pal]; }
         if (rr < innerR) { if (q < 0.035) return ['mill', WALL.brick, ROOF.slate, s * 0.92, s * 0.7, 15 + 8 * q2, 0, ['#8f4a3a', '#7d4033', '#6f3a30']]; return CK === 'easia' || CK === 'seasia' ? spec('shophouse', q, q2, q3) : CK === 'euro' && cul === 0 || CK === 'east' ? spec(q < 0.5 ? 'perimold' : 'rows', q, q2, q3) : spec('rows', q, q2, q3); }
-        return null;
+        return s >= 40 ? spec(CK === 'euro' || CK === 'east' ? (q < 0.6 ? 'rows' : 'homes') : 'homes', q, q2, q3) : null;      // (beyond the terraces the people's own houses: on a great city's plot, a block of them)
       }
       if (biz) { const dd = Math.hypot(x - biz.x, z - biz.z) / biz.r; if (dd < 1) {
         const g = Math.exp(-1.6 * dd * dd) * (0.25 + 0.75 * Math.pow(q, 1.8)) * (q2 > 0.95 ? 1.45 : 1);      // (the tallest in the middle, falling away, a few standing out above the rest)
@@ -486,7 +486,7 @@
       const ang = Math.atan2(z, x);
       if (!planned) { let lane = false; for (const g of lanes) { const da = Math.abs(((ang - g) + Math.PI * 3) % (Math.PI * 2) - Math.PI); if (da * r < s * 0.5 && r > plaza) { lane = true; break; } } if (!lane && era >= 1) { const rr = (r - plaza) % ringStep; if (rr < s * 0.75 && r - plaza > s) lane = true; } if (lane) continue; }
       const lump = 0.86 + 0.28 * (0.5 + 0.5 * Math.cos(ang * 3 + rnd(41) * 6.28)) * (0.5 + 0.5 * Math.sin(ang * 5 + rnd(42) * 6.28));
-      const fill = (1 - smooth(R * 0.72 * lump, R * 1.25 * lump, r) * 0.92) * (era >= 7 && r > R * subR ? 0.9 : 1);      // (the suburbs: here and there a plot left to a school's field, a yard)
+      const fill = (1 - (era >= 6 ? smooth(R * 0.84 * lump, R * 1.12 * lump, r) : smooth(R * 0.72 * lump, R * 1.25 * lump, r)) * 0.92) * (era >= 7 && r > R * subR ? 0.9 : 1);      // (a city of the machine age ends more sharply than a market town fades into its fields)      // (the suburbs: here and there a plot left to a school's field, a yard)
       if (hash(i, 300 + gx * 131 + gy) > fill) continue;
       if (!cellPass('h', x, z)) continue;
       if (lmPlot && Math.hypot(x - lmPlot.x, z - lmPlot.z) < lmPlot.r + s * 0.45) continue;   // no house on the landmark's plot
@@ -494,7 +494,7 @@
       slots.push([r, x, z, gx, gy]);
     }
     slots.sort((a, b) => a[0] - b[0]);
-    const coarseFrom = coarse ? 0 : (lvl >= 4 ? R * (era >= 6 ? 0.85 : 0.5) : 1e9);
+    const coarseFrom = coarse ? 0 : (lvl >= 4 ? R * (era >= 6 ? 0.95 : 0.5) : 1e9);
     let nSites = 0;
     for (const [r, x, z, gx, gy] of slots) {
       if (count >= maxN) break;
@@ -673,7 +673,7 @@
     // --- streets, for the ground decal: [x0, z0, x1, z1, halfWidth] in metres ---
     const streets = []; const cls = era <= 2 ? 0.56 : era <= 6 ? 0.68 : 0.88;   // trodden earth, cobbles, asphalt (the terrain shader reads the class)
     if (planned) {
-      const step = (blockN + 1) * s; const hw = Math.max(1.5, street * (era >= 6 ? 0.5 : 0.32)); const ext = R * 1.15;
+      const step = (blockN + 1) * s; const hw = Math.max(1.5, street * (era >= 6 ? 0.5 : 0.32)); const ext = R * (era >= 6 ? 1.02 : 1.15);      // (no grid of empty streets beyond a city's last blocks)
       for (let u = -Math.ceil(ext / step) * step; u <= ext; u += step) { const half = Math.sqrt(Math.max(0, ext * ext - u * u)); if (half < s) continue;
         streets.push([u * ca - (-half) * sa, u * sa + (-half) * ca, u * ca - half * sa, u * sa + half * ca, hw]);      // along v
         streets.push([(-half) * ca - u * sa, (-half) * sa + u * ca, half * ca - u * sa, half * sa + u * ca, hw]); }     // along u
