@@ -166,10 +166,12 @@
     return 0;
   }
   const L_TUNDRA = 2, L_BOREAL = 3, L_DESERT = 4, L_STEPPE = 5, L_GRASS = 6, L_OCWOOD = 7, L_MEDIT = 8, L_MONSOON = 9, L_SAVANNA = 10, L_RAIN = 11, L_HIGH = 12, L_PLATEAU = 13, L_COWOOD = 14, L_TASIA = 15;
-  // the wild: [kind, weight] for a kind of land, a continent and a year (the mammoths go between 9000 and 7500 BC; the aurochs in AD 1627)
-  function wildOf(cls, ct, year) {
-    const mam = year < -7500 ? clamp((-7500 - year) / 1500, 0, 1) : 0, aur = year < 1600 ? 1 : 0;
-    const bis = year < 1850 ? 1 : year < 1890 ? (1890 - year) / 40 + 0.03 : 0.03;      // the bison of the plains were shot out in forty years
+  // the wild: [kind, weight] for a kind of land, a continent and a year (the mammoths go between 9000 and 7500 BC; the aurochs in AD 1627);
+  // where the land is given back (rule.js's 'rewilded', a law of the Space Age) the bison come back to the plains and cattle bred back to
+  // the aurochs roam the woods
+  function wildOf(cls, ct, year, rew) {
+    const mam = year < -7500 ? clamp((-7500 - year) / 1500, 0, 1) : 0, aur = year < 1600 ? 1 : rew ? 0.7 : 0;
+    const bis = rew ? 0.9 : year < 1850 ? 1 : year < 1890 ? (1890 - year) / 40 + 0.03 : 0.03;      // the bison of the plains were shot out in forty years
     if (ct === 4) return null;
     if (ct === 2) {
       if (cls === L_GRASS || cls === L_STEPPE) return [['bison', bis], ['mammoth', 0.25 * mam], ['deer', 0.15]];
@@ -262,9 +264,10 @@
           const o = sim.owner[cell], cv = o >= 0 ? sim.civs[o] : null, p = sim.pop[cell] || 0, ct = continent(lon, lat);
           // keepers: a realm that herds, where its people live; the wild: where few do
           const knows = cv && KH >= 0 && sim.know.has[o * sim.know.ND + KH];
+          const rew = !!(cv && cv.rule && cv.rule.laws && cv.rule.laws.land === 'rewilded');
           let kind = null, kept = false;
-          if (knows && p > 0.3 && hash(key, 31) < clamp(p / 4, 0.25, 0.85)) { kind = pick(keptOf(cls, ct, KHo >= 0 && sim.know.has[o * sim.know.ND + KHo], cv.era | 0, ct < 2 || !!(sim.disease && sim.disease.met && sim.disease.met(o))), hash(key, 37)); kept = !!kind; }
-          if (!kind) { const wildP = (1 - clamp(p / 3, 0, 1)) * (cv ? (cv.era >= 6 ? 0.15 : cv.era >= 3 ? 0.5 : 0.8) : 1); if (hash(key, 41) < wildP) kind = pick(wildOf(cls, ct, yr), hash(key, 43)); }
+          if (knows && p > 0.3 && hash(key, 31) < clamp(p / 4, 0.25, 0.85) * (rew ? 0.3 : 1)) { kind = pick(keptOf(cls, ct, KHo >= 0 && sim.know.has[o * sim.know.ND + KHo], cv.era | 0, ct < 2 || !!(sim.disease && sim.disease.met && sim.disease.met(o))), hash(key, 37)); kept = !!kind; }
+          if (!kind) { const wildP = rew ? 0.6 * (1 - clamp(p / 8, 0, 0.7)) : (1 - clamp(p / 3, 0, 1)) * (cv ? (cv.era >= 6 ? 0.15 : cv.era >= 3 ? 0.5 : 0.8) : 1); if (hash(key, 41) < wildP) kind = pick(wildOf(cls, ct, yr, rew), hash(key, 43)); }
           if (!kind) continue;
           // not in a town: the built-up ground of the region's town and its neighbours'
           let inTown = false, k = K_OPEN;
