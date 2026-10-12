@@ -264,6 +264,7 @@
     const era = styleEra(eraReal, cul), band = bandOf(era);        // everything below is planned in the manner of this era (the old ways last: see OLD_UNTIL)
     const quake = sim.rubble && sim.rubble.has(i) ? Math.min(3, Math.floor((year - sim.rubble.get(i)) / 10)) : -1;
     const people = peopleOf(sim, i); const R = trueR(people, era, cul); const kS = scaleOf(R), kH = hScale(kS);
+    const tallK = clamp(Math.log10(people / 30000) / 2.2, 0, 1);      // (how tall a city's towers rise is how many live in it: a town of sixty thousand has towers of a hundred metres, a city of millions its supertalls)
     const isCap = c.capital === i; const sp = sim.special[i]; const wallsL = sim.walls[i]; const infra = sim.infra[i];
     const houses = HOUSES[cname][band]; const pal = PAL[cname][band];
     const items = []; const rnd = (k) => hash(i, k);
@@ -338,6 +339,7 @@
     const landmarkSize = (kind, big) => {
       const S = { menhirs: [plaza * 1.4, 3.5, plaza * 1.4], ziggurat: [46, 22, 46], pyramid: [110, 70, 110], steppyramid: [44, 26, 44], temple: [34, 17, 58], colosseum: [150, 45, 120], cathedral: [44, 60, 96], church: [16, 22, 34], basilica: [60, 55, 90], mosque: [50, 40, 50], tajmosque: [60, 55, 60], mudmosque: [36, 18, 36], onion: [24, 34, 40], hall: [48, 18, 26], pagoda: [22, 42, 22], stupa: [40, 26, 40], shikhara: [26, 42, 34], stepped: [60, 34, 60], mound: [70, 12, 70], pueblo: [40, 12, 30], palace: [110, 22, 40], keep: [26, 30, 26], station: [70, 18, 30], crystal: [120, 30, 60], irontower: [60, 300, 60], stadium: [190, 40, 150], spire: [70, 600, 70], lighthouse: [16, 55, 16], granary: [10, 8, 10] }[kind] || [30, 15, 30];
       const m = big ? (kind === 'menhirs' ? 2.2 : kind === 'irontower' || kind === 'spire' ? 1.3 : 1.9) : 1;
+      if (kind === 'spire' && !big) S[1] = 120 + 480 * tallK;      // (a town's mast stands as high as its towers; the great ones are a capital's wonder)
       return [S[0] * m, S[1] * m, S[2] * m];
     };
     const hasLm = lvl >= 2 || era === 0 || isCap;
@@ -350,7 +352,7 @@
     const cellPass = (kind, x, z) => { for (const k in dist) { if (near(x, z, dist[k]) < dist[k].rad) return false; } return true; };
     const n = Math.ceil(R * 1.3 / s);
     const heightOf = (kind, cent) => {
-      const base = { hut: 4, tipi: 5, longhouse: 5, stilt: 6, adobe: 4.5, pueblo: 7, courtyard: 5.5, courtyardc: 5.5, domehouse: 6, gable: 7.5, hip: 7, curved: 6.5, halftimber: 10, townhouse: 12, mansard: 16, palazzo: 16, terrace: 8.5, tenement: 18, block: 16, tower: 60, skyscraper: 160, granary: 5 }[kind] || 6;
+      const base = { hut: 4, tipi: 5, longhouse: 5, stilt: 6, adobe: 4.5, pueblo: 7, courtyard: 5.5, courtyardc: 5.5, domehouse: 6, gable: 7.5, hip: 7, curved: 6.5, halftimber: 10, townhouse: 12, mansard: 16, palazzo: 16, terrace: 8.5, tenement: 18, block: 16, tower: 60, skyscraper: 160, granary: 5, villa: 7.5, bungalow: 5.5, slab: 30, podium: 80, cyltower: 120, taper: 300, mill: 18, mall: 11 }[kind] || 6;
       const cap = [7, 9, 10, 14, 18, 22, 28, 320, 520][era];
       let h = base * (0.85 + rnd(7) * 0.3);
       if (kind === 'block') h = (10 + 18 * cent) * (0.7 + rnd(8) * 0.6);
@@ -358,11 +360,63 @@
       if (kind === 'skyscraper') h = (120 + 260 * cent * (lvl >= 4 ? 1.5 : 1)) * (0.7 + rnd(10) * 0.7);
       return Math.min(cap, h);
     };
+    // --- the city of the machine age and after (style era 6 on). The Industrial town keeps an old town of tenements round its
+    // square and rows of terraces about it, its mills among them; from the Modern age a great city has towers in the middle
+    // (highest at the very middle, falling away, a few standing out above the rest), flats about them, houses with gardens
+    // at the edge, and parks between. By how far out a plot lies (rr: 0 the middle, 1 the edge) and how great the city is
+    // (big: 0 a market town, 1 a metropolis of millions).
+    const big = clamp((lvl - 1) / 3, 0, 1) * clamp(Math.log10(people / 3000) / 2, 0.3, 1);
+    const coreR = era === 6 ? 0.2 + 0.12 * big : 0.1 + 0.22 * big, innerR = coreR + 0.2 + 0.1 * big, subR = era === 6 ? 0.8 : 0.66 - 0.08 * big;
+    const SMALL = { hut: 1, adobe: 1, courtyard: 1, courtyardc: 1, gable: 1, hip: 1, curved: 1, stilt: 1, domehouse: 1, townhouse: 1, halftimber: 1, pueblo: 1, longhouse: 1, tipi: 1 };
+    const suburbK = houses.filter((e) => SMALL[e[0]]).concat(era >= 7 && cul !== 6 && cul !== 7 ? [['villa', 4, cul === 1 || cul === 2 || cul === 9 ? WALL.brick : WALL.plaster, cul === 0 || cul === 3 || cul === 8 ? ROOF.tile : ROOF.slate], ['bungalow', 2, WALL.plaster, cul === 0 || cul === 3 || cul === 5 || cul === 8 ? ROOF.tile : ROOF.metal]] : []);
+    const GLASS = ['#9fb3c4', '#a9c0c9', '#8fa5b8', '#b8c4cc', '#7f98a8', '#94a8a0'];
+    const flatsWall = (q) => (cul === 1 || cul === 2 || cul === 9) ? (q < 0.45 ? WALL.brick : WALL.concrete) : cul === 6 ? WALL.concrete : (q < 0.5 ? WALL.plaster : WALL.concrete);
+    const capH = [7, 9, 10, 14, 18, 22, 28, 320, 520, 900][era];
+    // the kind of a plot in the city, its materials and its size: [kind, wall, roof, w, d, h] in true metres; null where the culture's
+    // own houses stand (in the Industrial age beyond the terraces, later in the suburbs)
+    const urban = (rr, k) => {
+      if (era < 6) return null;
+      const q = hash(i, k + 21), q2 = hash(i, k + 22), q3 = hash(i, k + 23);
+      if (era === 6) {
+        if (rr < coreR) { const tall = q < 0.78; return [tall ? 'tenement' : 'mansard', tall && (cul === 1 || cul === 2 || cul === 9) ? WALL.brick : WALL.plaster, tall && (cul === 0 || cul === 3 || cul === 5) ? ROOF.flat : ROOF.slate, s * (0.8 + q2 * 0.14), s * (0.76 + q3 * 0.16), Math.min(capH, (13 + 9 * q2) * (1 + 0.25 * big))]; }
+        if (rr < innerR) { if (q < 0.035) return ['mill', WALL.brick, ROOF.slate, s * 0.92, s * 0.7, 15 + 8 * q2]; return ['terrace', WALL.brick, cul === 0 || cul === 3 || cul === 5 || cul === 8 ? ROOF.tile : ROOF.slate, s * 0.97, s * (0.56 + 0.1 * q3), 8.5 + 3 * q2]; }
+        return null;
+      }
+      if (rr < coreR) {
+        const g = Math.exp(-2.6 * (rr / coreR) * (rr / coreR)) * (0.35 + 0.65 * Math.pow(q, 1.6)) * (q2 > 0.96 ? 1.35 : 1);
+        const H = era >= 8 ? 30 + (10 + 520 * tallK) * g : 22 + (8 + 300 * tallK) * g;
+        const glass = q3 < (era >= 8 ? 0.8 : 0.45);
+        const kind = era >= 8 ? (g > 0.72 && tallK > 0.6 && q2 > 0.55 ? 'taper' : q2 < 0.22 ? 'cyltower' : q2 < 0.55 ? 'podium' : 'tower') : (tallK > 0.4 && q2 < 0.3 ? 'skyscraper' : q2 < 0.62 ? 'podium' : 'tower');
+        const wd = kind === 'taper' ? s * 0.96 : kind === 'podium' ? s * (0.86 + 0.1 * q3) : s * (0.58 + 0.26 * q3);
+        return [kind, glass ? WALL.glass : kind === 'skyscraper' ? WALL.stone : WALL.concrete, ROOF.flat, wd, kind === 'podium' || kind === 'taper' || kind === 'cyltower' ? wd : wd * (0.75 + 0.25 * q2), Math.min(capH, H)];
+      }
+      if (rr < innerR) {
+        if (era >= 8 && q < 0.45) return ['tower', q2 < 0.45 ? WALL.glass : flatsWall(q3), ROOF.flat, s * (0.5 + 0.22 * q3), s * (0.5 + 0.22 * q2), Math.min(capH, 26 + (14 + 90 * tallK) * q2)];      // towers of flats
+        if (q < 0.6) return ['slab', flatsWall(q3), ROOF.flat, s * 0.96, s * (0.4 + 0.1 * q2), Math.min(capH, 15 + (12 + 25 * tallK) * q2)];
+        return ['block', flatsWall(q3), ROOF.flat, s * (0.78 + 0.1 * q2), s * (0.78 + 0.1 * q3), Math.min(capH, 13 + 15 * q2)];
+      }
+      if (rr < subR) return q < 0.35 ? ['slab', flatsWall(q3), ROOF.flat, s * 0.94, s * (0.38 + 0.1 * q2), 11 + 10 * q2] : ['block', flatsWall(q3), ROOF.flat, s * (0.76 + 0.12 * q2), s * (0.76 + 0.12 * q3), 9 + 9 * q2];
+      if (q < 0.025 && rr < 0.92 && lvl >= 2) return ['mall', WALL.concrete, ROOF.flat, s * 0.96, s * 0.96, 10 + 3 * q2];
+      return null;
+    };
+    // parks: a block of the grid left to grass and trees here and there, more of them the later the age, and more in the middle
+    const parkP = planned && era >= 6 ? [0, 0, 0, 0, 0, 0, 0.05, 0.085, 0.11, 0.13][era] : 0;
+    const parks = [], parkOf = new Map();
+    const isPark = (gx, gy) => {
+      if (!parkP) return false; const bx = Math.floor(gx / (blockN + 1)), by = Math.floor(gy / (blockN + 1)), key = bx * 8192 + by; let v = parkOf.get(key);
+      if (v === undefined) { const u = (bx * (blockN + 1) + (blockN + 1) / 2) * s, w = (by * (blockN + 1) + (blockN + 1) / 2) * s; const x = u * ca - w * sa, z = u * sa + w * ca, rr = Math.hypot(x, z) / R;
+        v = rr < 0.85 && Math.hypot(x, z) > plaza * 2 && hash(i, 7000 + bx * 131 + by) < parkP * (0.6 + 0.8 * (1 - rr)) ? 1 : 0;
+        if (v && lmPlot && Math.hypot(x - lmPlot.x, z - lmPlot.z) < lmPlot.r + blockN * s) v = 0;
+        if (v) for (const kk in dist) if (Math.hypot(x - dist[kk].x, z - dist[kk].z) < dist[kk].rad + blockN * s) { v = 0; break; }
+        if (v) parks.push([x, z, blockN * s * 0.5]); parkOf.set(key, v); }
+      return v === 1;
+    };
     let count = 0; const maxN = coarse ? 2600 : 12000;
     const slots = [];
     for (let gy = -n; gy <= n; gy++) for (let gx = -n; gx <= n; gx++) {
       // streets: leave every (blockN+1)-th row/column empty in planned towns; organic towns leave radial lanes
       if (planned && ((gx % (blockN + 1) + blockN + 1) % (blockN + 1) === 0 || (gy % (blockN + 1) + blockN + 1) % (blockN + 1) === 0)) continue;
+      if (parkP && isPark(gx, gy)) continue;      // (a park's block: its grass is laid below, its trees are trees.js's)
       let u = gx * s, v = gy * s;
       if (!planned) { const jit = dense ? 0.1 : 0.7; u += (hash(i, 100 + gx * 131 + gy) - 0.5) * s * jit; v += (hash(i, 200 + gx * 131 + gy) - 0.5) * s * jit; }
       const x = u * ca - v * sa, z = u * sa + v * ca; const r = Math.hypot(x, z);
@@ -370,7 +424,7 @@
       const ang = Math.atan2(z, x);
       if (!planned) { let lane = false; for (const g of lanes) { const da = Math.abs(((ang - g) + Math.PI * 3) % (Math.PI * 2) - Math.PI); if (da * r < s * 0.5 && r > plaza) { lane = true; break; } } if (!lane && era >= 1) { const rr = (r - plaza) % ringStep; if (rr < s * 0.75 && r - plaza > s) lane = true; } if (lane) continue; }
       const lump = 0.86 + 0.28 * (0.5 + 0.5 * Math.cos(ang * 3 + rnd(41) * 6.28)) * (0.5 + 0.5 * Math.sin(ang * 5 + rnd(42) * 6.28));
-      const fill = 1 - smooth(R * 0.72 * lump, R * 1.25 * lump, r) * 0.92;
+      const fill = (1 - smooth(R * 0.72 * lump, R * 1.25 * lump, r) * 0.92) * (era >= 7 && r > R * subR ? 0.72 : 1);      // (the suburbs: houses with gardens between)
       if (hash(i, 300 + gx * 131 + gy) > fill) continue;
       if (!cellPass('h', x, z)) continue;
       if (lmPlot && Math.hypot(x - lmPlot.x, z - lmPlot.z) < lmPlot.r + s * 0.45) continue;   // no house on the landmark's plot
@@ -387,14 +441,21 @@
       if (r > coarseFrom || coarse) {
         // one instance per block at the edge of big cities (and for far towns)
         if ((gx % 2 + 2) % 2 || (gy % 2 + 2) % 2) continue;
-        const hh = era >= 6 ? (6 + 14 * cent) * (0.7 + hash(i, k + 2) * 0.6) : 5 + 4 * cent;
-        push(era >= 6 ? 'block' : 'blockold', x, z, s * 1.7, hh, s * 1.7, axis, colorOf(k + 3), packStyle(era >= 7 ? WALL.concrete : houses[0][2], houses[0][3], cul, FLAG.block)); count++; continue;
+        if (era >= 6) {      // (by zone: a tower stands for the towers about it, a cluster of roofs for the suburbs' houses)
+          const u = urban(r / R, k);
+          if (u && (u[0] === 'tower' || u[0] === 'podium' || u[0] === 'skyscraper' || u[0] === 'cyltower' || u[0] === 'taper')) { push(u[0], x, z, Math.min(u[3] * 1.5, s * 1.7), u[5], Math.min(u[4] * 1.5, s * 1.7), axis, u[1] === WALL.glass ? colorOfP(GLASS, k + 3) : colorOf(k + 3), packStyle(u[1], u[2], cul, 0)); count++; continue; }
+          if (!u && era >= 7) { const e = pickW(suburbK.length ? suburbK : houses, hash(i, k + 4)); push('blockold', x, z, s * 1.6, 7 + 2 * hash(i, k + 2), s * 1.6, axis, colorOf(k + 3), packStyle(e[2], e[3], cul, FLAG.block)); count++; continue; }
+          const hh = u ? u[5] : (6 + 14 * cent) * (0.7 + hash(i, k + 2) * 0.6);
+          push('block', x, z, s * 1.7, hh, s * 1.7, axis, colorOf(k + 3), packStyle(u ? u[1] : era >= 7 ? WALL.concrete : houses[0][2], ROOF.flat, cul, FLAG.block)); count++; continue;
+        }
+        const hh = 5 + 4 * cent;
+        push('blockold', x, z, s * 1.7, hh, s * 1.7, axis, colorOf(k + 3), packStyle(houses[0][2], houses[0][3], cul, FLAG.block)); count++; continue;
       }
       // construction state of this plot: part of the newest ring, or being rebuilt for the new age
       let prog = 1, old = false;
       if (growing && r > Rprev * 0.97) { const t0 = hash(i, k + 13) * T * 0.7; prog = clamp((age - t0) / (T * 0.45), 0, 1); if (prog <= 0) continue; }
       if (waves) { const tUp = hash(i, k + 17) * ERA_T * 0.85; if (eraAge < tUp) old = true; else if (eraAge < tUp + 4) prog = Math.min(prog, clamp((eraAge - tUp) / 4, 0.05, 1)); }
-      const hs = old ? housesOld : houses; const pl = old ? palOld : pal;
+      const hs = old ? housesOld : era >= 7 && r > R * subR && suburbK.length ? suburbK : houses; const pl = old ? palOld : pal;
       const e = pickW(hs, hash(i, k + 4)); let kind = e[0], wm = e[2], rm = e[3];
       let w = s * (0.48 + 0.16 * cent + hash(i, k + 5) * 0.24), d = s * (0.48 + 0.16 * cent + hash(i, k + 6) * 0.24);
       if (kind === 'longhouse') { w *= 2.1; d *= 0.75; } if (kind === 'terrace') { w *= 2.4; d *= 0.8; } if (kind === 'hut' || kind === 'tipi') { w = d = Math.min(w, d) * 0.85; }
@@ -402,14 +463,18 @@
       if (kind === 'townhouse') { w *= 0.7; d *= 1.15; } if (kind === 'tower' || kind === 'skyscraper') { w *= 1.2; d *= 1.2; }
       // Sims-style plot variety: extras around the core kinds
       let h = heightOf(kind, cent);
-      if (!old && era >= 7 && lvl >= 3 && cent > 0.55 && hash(i, k + 7) < (0.25 + 0.35 * (era - 7)) * cent) { kind = era >= 8 && hash(i, k + 8) < 0.35 ? 'skyscraper' : 'tower'; wm = WALL.glass; rm = ROOF.flat; h = heightOf(kind, cent); w = d = Math.min(s * 0.82, 40 + hash(i, k + 9) * 25); }
-      if (!old && era === 6 && lvl >= 2 && hash(i, k + 7) < 0.06) { kind = 'chimney'; w = d = 3; h = 28 + hash(i, k + 8) * 20; wm = WALL.brick; }
+      if (kind === 'villa' || kind === 'bungalow') { w = s * (0.5 + 0.12 * hash(i, k + 5)); d = s * (0.46 + 0.12 * hash(i, k + 6)); }
       if (planned) { w = Math.min(w, s * 0.82); d = Math.min(d, s * 0.82); }
+      let col = null;
+      if (!old && era >= 6) { const u = urban(r / R, k); if (u) { [kind, wm, rm, w, d, h] = u; if (wm === WALL.glass) col = colorOfP(GLASS, k + 10); } else if (era >= 7) { w *= 0.86; d *= 0.86; } }      // (the city by zone; in the suburbs the houses are smaller than their plots)
       if (dense && !old) { w = s * (0.86 + hash(i, k + 5) * 0.1); d = s * (0.86 + hash(i, k + 6) * 0.1); }      // the plot is the house: neighbours' walls meet
       if (quake >= 0 && hash(i, k + 11) < 0.35 * (1 - quake / 3)) { push('rubble', x, z, w, Math.min(h * 0.75, 6), d, yaw, colorOfP(pl, k + 10), packStyle(wm, ROOF.flat, cul, FLAG.ruin)); count++; continue; }
-      const hit = push(kind, x, z, w, h, d, yaw, colorOfP(pl, k + 10), packStyle(wm, rm, cul, 0), 0, prog); if (old) hit.era = eraPrev; count++; if (prog < 1) nSites++;
+      const hit = push(kind, x, z, w, h, d, yaw, col !== null ? col : colorOfP(pl, k + 10), packStyle(wm, rm, cul, 0), 0, prog); if (old) hit.era = eraPrev; count++; if (prog < 1) nSites++;
     }
 
+    // --- the parks' grass (its trees are planted by trees.js, which reads L.parks) ---
+    const PARK = ['#5d8a45', '#668f4a', '#55803f', '#6a9450'];
+    for (let q = 0; q < parks.length; q++) { const [x, z, hw] = parks[q]; push('lawn', x, z, hw * 2 * 0.97, 2.4, hw * 2 * 0.97, axis, colorOfP(PARK, 7400 + q), packStyle(WALL.plaster, ROOF.flat, cul, FLAG.thing)).tag = 'park'; }
     // --- the landmark itself (its plot was kept clear above) ---
     if (lvl >= 2 || era === 0 || isCap) {
       const [lw, lh, ld] = landmarkSize(lmKind, wonderProg >= 0);
@@ -558,7 +623,8 @@
     for (const it of items) { it.x *= kS; it.z *= kS; it.w *= kS; it.d *= kS; it.h *= kH; }
     for (const st of streets) { st[0] *= kS; st[1] *= kS; st[2] *= kS; st[3] *= kS; st[4] *= kS; }
     for (const wv of walls) { wv.x *= kS; wv.z *= kS; }
-    const out = { key, R: R * kS, Rt: R, k: kS, kh: kH, plaza: plaza * kS, axis, gates, items, walls, wallR: wallStyle !== 'none' ? wallR * kS : 0, culture: cul, era, eraReal, coast, harbour, streets, streetCls: cls, plots, sites: nSites, growing: !!growing };
+    for (const pk of parks) { pk[0] *= kS; pk[1] *= kS; pk[2] *= kS; }
+    const out = { key, R: R * kS, Rt: R, k: kS, kh: kH, plaza: plaza * kS, axis, gates, items, walls, wallR: wallStyle !== 'none' ? wallR * kS : 0, culture: cul, era, eraReal, coast, harbour, streets, streetCls: cls, plots, sites: nSites, growing: !!growing, parks, suburb: era >= 7 ? subR : 0 };
     cache.set(ck, out);
     if (cache.size > 400) { const first = cache.keys().next().value; cache.delete(first); }
     return out;

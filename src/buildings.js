@@ -141,6 +141,18 @@
     g.spire = merge([box(1, 0.6, 1), box(0.7, 0.2, 0.7, 0, 0.6), box(0.42, 0.1, 0.42, 0, 0.8), cyl(0.005, 0.12, 0.1, 6, 0, 0.9)]);
     g.lighthouse = merge([cyl(0.28, 0.5, 0.8, 10), cyl(0.34, 0.3, 0.04, 10, 0, 0.8), cyl(0.2, 0.2, 0.12, 8, 0, 0.84), cone(0.26, 0.04, 8, 0, 0.96)]);
     g.factory = merge([box(1, 0.7, 1), gableRoof(0.34, 0.3, 1.04, -0.33, 0.7), gableRoof(0.34, 0.3, 1.04, 0, 0.7), gableRoof(0.34, 0.3, 1.04, 0.33, 0.7)]);
+    // the cities of the machine age and after (town.js plans them by zone: towers in the middle, flats about them, houses with
+    // gardens at the edge, parks between)
+    g.slab = merge([box(1, 0.96, 1), box(0.24, 0.04, 0.5, -0.28, 0.96, 0), box(0.1, 0.05, 0.14, 0.3, 0.96, 0.18)]);      // a block of flats, long and thin: its lift house and a water tank on the roof
+    g.podium = merge([box(1, 0.14, 1), box(0.58, 0.83, 0.58, 0.08, 0.14, -0.06), box(0.3, 0.03, 0.3, 0.08, 0.97, -0.06)]);      // an office tower on its base of shops
+    g.cyltower = merge([cyl(0.5, 0.5, 0.96, 20), cyl(0.44, 0.46, 0.02, 20, 0, 0.96), cyl(0.2, 0.2, 0.02, 12, 0, 0.98)]);      // round, in glass
+    g.taper = merge([box(1, 0.3, 1), box(0.84, 0.24, 0.84, 0, 0.3), box(0.68, 0.18, 0.68, 0, 0.54), box(0.5, 0.12, 0.5, 0, 0.72), box(0.32, 0.07, 0.32, 0, 0.84), box(0.18, 0.04, 0.18, 0, 0.91), cyl(0.01, 0.04, 0.05, 6, 0, 0.95)]);      // the tallest of a skyline: setback upon setback to a needle
+    g.villa = merge([box(0.62, 0.56, 0.68, -0.15, 0, -0.12), hipRoof(0.7, 0.3, 0.76, 0.17, -0.15, 0.56, -0.12), box(0.36, 0.38, 0.44, 0.3, 0, 0.22), box(0.38, 0.04, 0.46, 0.3, 0.38, 0.22), box(0.08, 0.18, 0.08, -0.32, 0.74, -0.28)]);      // a house with its garage beside it
+    g.bungalow = merge([box(1, 0.52, 0.78), hipRoof(1.08, 0.26, 0.86, 0.3, 0, 0.52), box(0.3, 0.06, 0.2, -0.2, 0.0, 0.47)]);
+    g.mill = merge([box(1, 0.74, 1), box(1.03, 0.04, 1.03, 0, 0.74), box(0.2, 0.2, 0.32, 0.38, 0.78, 0), cyl(0.05, 0.08, 1.35, 8, -0.44, 0, 0.44)]);      // a mill of five floors and its chimney
+    { const ms = [cyl(0.46, 0.46, 0.84, 20)]; for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; ms.push(cyl(0.018, 0.022, 1, 4, Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5)); } ms.push(ring(0.52, 0.48, 0.03, 20, 0, 0.97)); g.gasometer = merge(ms); }      // a gasholder in its frame
+    g.mall = merge([box(1, 0.66, 1), box(0.42, 0.34, 0.3, 0.2, 0.66, -0.12), box(0.24, 0.12, 0.24, -0.26, 0.66, 0.24)]);
+    g.lawn = merge([box(1, 0.5, 1, 0, -0.48, 0)]);      // a park's grass (its trees are trees.js's): lies just above the ground, reaches down into it
     return g;
   }
 
@@ -316,6 +328,6 @@
     }`;
 
   // instance caps: enough for the biggest city in view plus its neighbours
-  const MAXI = { scaffold: 4000, hut: 6000, tipi: 2500, longhouse: 4000, stilt: 4000, adobe: 9000, pueblo: 2500, courtyard: 6000, courtyardc: 5000, domehouse: 2500, gable: 12000, hip: 7000, curved: 7000, halftimber: 5000, townhouse: 6000, mansard: 2500, palazzo: 1500, terrace: 7000, tenement: 6000, block: 12000, blockold: 8000, tower: 4000, skyscraper: 1000, granary: 1200, chimney: 1200, barn: 1500, warehouse: 800, windmill: 400, turbine: 500, lamp: 2500, stall: 800, well: 200, fountain: 200, statue: 300, obelisk: 200, pier: 400, boat: 400, ship: 300, crane: 300, menhirs: 300, ziggurat: 300, pyramid: 200, steppyramid: 300, temple: 500, colosseum: 150, cathedral: 300, church: 500, basilica: 200, mosque: 400, tajmosque: 100, mudmosque: 300, onion: 300, hall: 400, pagoda: 400, stupa: 300, shikhara: 300, stepped: 300, mound: 200, palace: 300, keep: 800, roundtower: 2500, gatehouse: 600, wall: 5000, palisade: 3000, bastion: 500, station: 200, crystal: 100, irontower: 100, stadium: 150, spire: 200, lighthouse: 200, factory: 1200, car: 200, cart: 100, plane: 100, train: 100, rubble: 6000, wallstub: 3000, pillars: 600, tent: 2500, bigtent: 400, catapult: 300, cannon: 400 };
+  const MAXI = { scaffold: 4000, hut: 6000, tipi: 2500, longhouse: 4000, stilt: 4000, adobe: 9000, pueblo: 2500, courtyard: 6000, courtyardc: 5000, domehouse: 2500, gable: 12000, hip: 7000, curved: 7000, halftimber: 5000, townhouse: 6000, mansard: 2500, palazzo: 1500, terrace: 7000, tenement: 6000, block: 12000, blockold: 8000, tower: 4000, skyscraper: 1000, granary: 1200, chimney: 1200, barn: 1500, warehouse: 800, windmill: 400, turbine: 500, lamp: 2500, stall: 800, well: 200, fountain: 200, statue: 300, obelisk: 200, pier: 400, boat: 400, ship: 300, crane: 300, menhirs: 300, ziggurat: 300, pyramid: 200, steppyramid: 300, temple: 500, colosseum: 150, cathedral: 300, church: 500, basilica: 200, mosque: 400, tajmosque: 100, mudmosque: 300, onion: 300, hall: 400, pagoda: 400, stupa: 300, shikhara: 300, stepped: 300, mound: 200, palace: 300, keep: 800, roundtower: 2500, gatehouse: 600, wall: 5000, palisade: 3000, bastion: 500, station: 200, crystal: 100, irontower: 100, stadium: 150, spire: 200, lighthouse: 200, factory: 1200, slab: 6000, podium: 2500, cyltower: 1200, taper: 400, villa: 9000, bungalow: 6000, mill: 600, gasometer: 300, mall: 300, lawn: 1500, car: 200, cart: 100, plane: 100, train: 100, rubble: 6000, wallstub: 3000, pillars: 600, tent: 2500, bigtent: 400, catapult: 300, cannon: 400 };
   window.BKIT = { makeKit, VERT, FRAG, MAXI };
 })();

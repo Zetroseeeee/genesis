@@ -477,8 +477,13 @@
               if (tw === undefined) { const c = sim.civs[sim.owner[j]]; if (c) { const [sLon, sLat] = TOWN.siteOf(sim, j, c, T, null); tw = { sLon, sLat, R: TOWN.radiusM(sim, j, c), F: TOWN.fieldsM(sim, j, c), k: TOWN.scaleOf(TOWN.radiusTrue(sim, j, c)), L: TOWN.layout(sim, j, c, { coarse: false }), cl: Math.max(0.15, Math.cos((90 - (y2 + 0.5) / H * 180) * D2R)) }; } else tw = null; towns.set(j, tw); }
               if (!tw) continue; const R = tw.R, F = tw.F;
               const ddm = GEO.distKm(lon, lat, tw.sLon, tw.sLat) * 1000; if (ddm > Math.max(F * 1.3, R * 2.8)) continue;
+              // (a park in the middle of a city: grass and trees on a block of the grid - L.parks, town.js)
+              let park = false; const PK = tw.L.parks;
+              if (PK && PK.length && ddm < R * 1.05) { const px = (lon - tw.sLon) * D2R * tw.cl * R_M, pz = (lat - tw.sLat) * D2R * R_M, ca = Math.cos(tw.L.axis), sa = Math.sin(tw.L.axis);
+                for (let q = 0; q < PK.length; q++) { const dx = px - PK[q][0], dz = pz - PK[q][1], hw = PK[q][2] * 0.86; if (Math.abs(dx * ca + dz * sa) < hw && Math.abs(dz * ca - dx * sa) < hw) { park = true; break; } } }
               // (within the town's fields only the odd tree is left standing - a tree by a town is drawn at the town's scale, and a quarter of a forest of those would still be a wood)
               if (ddm < F * 1.3) density *= smooth(R * 0.9, R * 1.25, ddm) * (0.06 + 0.94 * smooth(F * 0.9, F * 1.25, ddm));
+              if (park) density = Math.max(density, 0.7);
               if (density > 0 && ddm < R * 2.8 && townKeepsClear(tw.L, (lon - tw.sLon) * D2R * tw.cl * R_M, (lat - tw.sLat) * D2R * R_M, 3 * tw.k)) density = 0;
               const kTown = tw.k; if (kTown > kEff) kEff = Math.max(kEff, kTier + (kTown - kTier) * (1 - smooth(R * 1.4, R * 2.8, ddm))); }
             if (!sim.level[i]) { const cl = sim.woods ? sim.woods.cleared(i) : sim.owner[i] >= 0 ? sim.cultivation(i) : 0; density *= 1 - 0.35 * cl; }      // (the woods that stand: woods.js)
