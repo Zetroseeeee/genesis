@@ -18,17 +18,17 @@
 (function () {
   // how fast a region is taken into its rulers' people, a year, by age, alone among strangers (beside its rulers' own
   // people several times as fast: see step)
-  const ASSIM = [0.0004, 0.0006, 0.0008, 0.001, 0.0009, 0.0011, 0.0022, 0.003, 0.0026];
+  const ASSIM = [0.0004, 0.0006, 0.0008, 0.001, 0.0009, 0.0011, 0.0022, 0.003, 0.0026, 0.0024];
   // how restless the peoples who are not a realm's rulers' make it, by age: their share of its people times this
-  const RESTLESS = [0.05, 0.07, 0.09, 0.11, 0.11, 0.13, 0.24, 0.28, 0.22];
+  const RESTLESS = [0.05, 0.07, 0.09, 0.11, 0.11, 0.13, 0.24, 0.28, 0.22, 0.2];
   // what share of their people realms of each age usually rule of other peoples (tools/people/norm.js measures it):
   // a realm is restless only for what it holds beyond its age's way, and a little steadier for less
   // NORM-BEGIN
-  const NORM = [0.039, 0.064, 0.09, 0.076, 0.072, 0.081, 0.116, 0.091, 0.046];
+  const NORM = [0.039, 0.064, 0.09, 0.076, 0.072, 0.081, 0.116, 0.091, 0.046, 0.046];
   // NORM-END
   // a people drifts apart where it has spread farther than this from its home, in regions, by age (roads, books and a
   // common ruler hold a tongue together over more ground)
-  const DRIFT = [14, 18, 22, 26, 28, 32, 40, 56, 80];
+  const DRIFT = [14, 18, 22, 26, 28, 32, 40, 56, 80, 100];
   // laws (rule.js, by key): how restless other peoples are under them (minor), and how fast they are taken in (assim)
   const LAW = {
     citizens: { minor: 1.3, assim: 0.7 }, castes: { minor: 1.1, assim: 0.8 }, orders: { minor: 1.05 }, subjects: { minor: 0.85, assim: 1.2 },
@@ -129,7 +129,7 @@
       const t0 = performance.now(), yr = year();
       // a fifth of the land each year: who has been taken into their rulers' people
       const k5 = ((yr % 5) + 5) % 5, era = [];
-      for (let c = 0; c < MAXC; c++) era[c] = civs[c] ? Math.min(8, Math.max(0, civs[c].era | 0)) : 0;
+      for (let c = 0; c < MAXC; c++) era[c] = civs[c] ? Math.min(9, Math.max(0, civs[c].era | 0)) : 0;
       const af = new Float32Array(MAXC); for (let c = 0; c < MAXC; c++) if (civs[c]) af[c] = ASSIM[era[c]] * lawF(c, 'assim') * 5 * (h.pull ? h.pull(c) : 1);      // (a realm of renown takes others in faster: culture.js)
       for (let k = k5; k < LI.length; k += 5) {
         const i = LI[k], o = owner[i]; if (o < 0) continue; const p = ppl[i], r = ruling[o]; if (!p || !r || p === r || !af[o]) continue;
@@ -161,7 +161,7 @@
       for (let k = 0; k < LI.length; k++) { const i = LI[k], p = ppl[i]; if (!p) continue; const P = list[p]; const d = h.cellDist(i, P.home); const f = far.get(p); if (!f || d > f.d) far.set(p, { i, d }); }
       for (const [p, f] of far) {
         const P = list[p]; if (P.n < 12 || yr - P.born < 300) continue;
-        const o = owner[f.i], e = o >= 0 && civs[o] ? Math.min(8, Math.max(0, civs[o].era | 0)) : 0; const D = DRIFT[e];
+        const o = owner[f.i], e = o >= 0 && civs[o] ? Math.min(9, Math.max(0, civs[o].era | 0)) : 0; const D = DRIFT[e];
         if (f.d < D) continue;
         // (under one realm that rules it, a people keeps together: the tongue of the capital is heard everywhere)
         const held = o >= 0 && ruling[o] === p ? 0.35 : 1;

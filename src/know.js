@@ -15,7 +15,7 @@
   'use strict';
   const UNIT = 100000;            // insight as shown: tech times this
   const T0 = 0.02;                // every people starts with this much; what its tech is above it, it can spend
-  const ERA_AT = [0, 0.08, 0.18, 0.30, 0.42, 0.55, 0.66, 0.80, 0.92, 1.0];      // where each age begins (the simulation takes its ages from here)
+  const ERA_AT = [0, 0.08, 0.18, 0.30, 0.42, 0.55, 0.66, 0.80, 0.92, 1.0, 1.15];      // where each age begins (the simulation takes its ages from here); the last is where the Space Age ends
   const BRANCHES = [
     { key: 'land', name: 'Land', note: 'fields, herds, mines' }, { key: 'craft', name: 'Craft', note: 'making things' }, { key: 'trade', name: 'Trade', note: 'markets, ships, roads' },
     { key: 'war', name: 'War', note: 'arms and walls' }, { key: 'state', name: 'State', note: 'rule and law' }, { key: 'mind', name: 'Mind', note: 'learning, faith, healing' },
@@ -221,6 +221,23 @@
     ['genomics', 'Genomics', 8, 'mind', 0.8, 'biotech', { health: 0.2, grow: 0.03 }, 'A whole genome read in a day. Medicine fitted to the patient.', ''],
     ['cleanpower', 'Clean power', 8, 'land', 0.9, 'materials semiconductors', { c_heavy: 0.1, c_chem: 0.1, income: 0.04 }, 'Sun and wind turned into electricity for less than coal.', ''],
     ['ai', 'Thinking machines', 8, 'mind', 1.3, 'internet computers', { research: 0.3, c_tech: 0.3 }, 'Programs that learn from the world\'s writing and answer in kind.', 'f'],
+    // ----- Space Age (what comes after our own day: the game's guess, in the spirit of what is being worked on now) -----
+    ['fusion', 'Fusion power', 9, 'craft', 1.3, 'cleanpower materials', { c_heavy: 0.3, c_chem: 0.2, income: 0.08 }, 'The fire of the sun held in a magnetic bottle: power without end and without smoke.', 'cf'],
+    ['agi', 'General intelligence', 9, 'mind', 1.4, 'ai', { research: 0.35, c_tech: 0.3, income: 0.06 }, 'Minds of silicon that reason as well as any person, and never tire.', 'f'],
+    ['genemed', 'Genetic medicine', 9, 'mind', 1.0, 'genomics', { health: 0.3, grow: 0.03 }, 'Inherited illness edited out before birth, and ageing slowed.', ''],
+    ['vertical', 'Vertical farms', 9, 'land', 0.9, 'greenrev automation', { food: 0.25 }, 'Crops stacked forty floors high under coloured light, fed by water alone.', 'c'],
+    ['cultured', 'Cultured food', 9, 'land', 0.8, 'biotech', { food: 0.15, y_herd: 0.2 }, 'Meat and milk grown from cells in a vat: the herds are not needed.', ''],
+    ['arcology', 'Arcologies', 9, 'state', 1.0, 'materials egov', { grow: 0.04, build: 0.15, reach: 0.15 }, 'A city in a single building: homes, farms, work and parks for a hundred thousand people.', 'f'],
+    ['quantum', 'Quantum computing', 9, 'mind', 1.0, 'computers', { research: 0.2, income: 0.05 }, 'Machines that weigh every answer at once.', ''],
+    ['orbital', 'Orbital industry', 9, 'craft', 1.0, 'spaceflight automation', { c_tech: 0.25, c_heavy: 0.15, reach: 0.15 }, 'Factories, telescopes and power stations in orbit, tended by machines.', 'cf'],
+    ['asteroid', 'Asteroid mining', 9, 'land', 0.9, 'orbital materials', { y_mine: 0.35, income: 0.05 }, 'Metals and water mined from the rocks between the planets.', ''],
+    ['settlement', 'Settling other worlds', 9, 'trade', 1.1, 'orbital genemed', { reach: 0.25, research: 0.1 }, 'The first towns beyond the Earth, on the Moon and on Mars.', 'f'],
+    ['elevator', 'The space elevator', 9, 'trade', 0.9, 'orbital materials', { trade: 0.2, sea: 0.1 }, 'A cable from the ground to orbit: the stars at the price of a railway ticket.', 'f'],
+    ['autonomy', 'Autonomous machines', 9, 'war', 1.0, 'networks agi', { strength: 0.25, siege: 0.15 }, 'Wars fought by machines that choose their own targets.', ''],
+    ['shields', 'Planetary defence', 9, 'war', 0.8, 'missiles spaceflight', { defence: 0.25, strength: 0.1 }, 'Lasers and interceptors that stop missiles, and asteroids.', ''],
+    ['worldgov', 'World federation', 9, 'state', 0.9, 'unions', { stab: 0.05, trade: 0.15 }, 'The nations of the Earth under one parliament for what they share.', 'f'],
+    ['climateeng', 'Climate engineering', 9, 'land', 0.8, 'cleanpower', { food: 0.1, stab: 0.02 }, 'The air managed like a garden: carbon drawn down, the heat let out.', ''],
+    ['neural', 'Neural interfaces', 9, 'mind', 0.8, 'agi genemed', { research: 0.15, health: 0.1 }, 'Thought read and written directly: the mind joined to the network.', ''],
   ];
   const BR = {}; BRANCHES.forEach((b, i) => { BR[b.key] = i; });
   const ID = {}; RAW.forEach((r, i) => { if (ID[r[0]] !== undefined) throw new Error('know: two discoveries are called ' + r[0]); ID[r[0]] = i; });

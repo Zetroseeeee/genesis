@@ -72,7 +72,7 @@ window.WORKS = (function () {
     return `${bits.join(' · ')} <span class="cu-x">${mult.join(' · ')}</span>`;
   }
   function renderMine() {
-    const s = S(), c = me(), K = C(); const e = Math.min(8, c.era | 0); const rel = K.rel(c.id), ren = K.renown[c.id], norm = K.NORM[e];
+    const s = S(), c = me(), K = C(); const e = Math.min(9, c.era | 0); const rel = K.rel(c.id), ren = K.renown[c.id], norm = K.NORM[e];
     const p = K.pace(c.id), T = K.threshold(c.id), left = p > 0 ? Math.ceil((T - K.prog[c.id]) / p) : -1; const gold = K.isGolden(c.id), G = K.goldenNeed(c.id); const turn = K.TURN[e];
     const lvl = c.patron === undefined ? 1 : c.patron;
     const pride = K.unrest(c);

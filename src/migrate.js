@@ -16,7 +16,7 @@ window.MIGRATE = (function () {
   // ships of the ocean, then steamships and railways (the great emigrations of the nineteenth century: a twentieth of Europe in a
   // decade at their height; of the world, some one in a thousand a year from 1850 to 1940, to other lands and to its own far
   // frontiers), then the closed borders and settled lands of the last ages
-  const RATE = [0.0004, 0.0005, 0.0005, 0.0006, 0.0006, 0.0009, 0.004, 0.0035, 0.003];
+  const RATE = [0.0004, 0.0005, 0.0005, 0.0006, 0.0006, 0.0009, 0.004, 0.0035, 0.003, 0.0025];
   // how readily the law of labour lets people go (rule.js's labour field: a serf is bound to the land; free hands go where the work is)
   const MOB = { kin: 1, corvee: 0.8, slavery: 0.5, serfdom: 0.25, guilds: 0.9, free: 1.3, factoryacts: 1.3, unions: 1.3, assigned: 0.3 };
   // refugees: of those a famine kills, as many again flee it; of a realm losing its land to a war a share a year; of one coming apart
@@ -36,7 +36,7 @@ window.MIGRATE = (function () {
   // the next island, not a people over the sea: at four tenths of the pull in the Middle Ages, Java peopled Australia), a
   // quarter of it under sail (a few thousand a year crossed to the Americas), all of it with steam; the realm's own far land by
   // its share of room
-  const GAP0 = 0.05, LIVE_POW = 1.5, SEA = [0.02, 0.03, 0.05, 0.08, 0.1, 0.25, 1, 1, 1], SELF = 1.2, KIN = 1.5, FAITH_KIN = 1.2;
+  const GAP0 = 0.05, LIVE_POW = 1.5, SEA = [0.02, 0.03, 0.05, 0.08, 0.1, 0.25, 1, 1, 1, 1], SELF = 1.2, KIN = 1.5, FAITH_KIN = 1.2;
   // what the player's realm says of its borders, and of its people leaving (kept on the realm: civ.mig.b, civ.mig.l)
   const BORDERS = [['open', 'Open', 'Anyone who comes may stay and work.', 1], ['guarded', 'Guarded', 'Some are let in, as the work needs them.', 0.35], ['closed', 'Closed', 'Strangers are turned back at the border.', 0.03]];
   const LEAVING = [['free', 'Free to go', 'Whoever wants to leave may leave.', 1], ['barred', 'Barred', 'Nobody leaves without the crown\'s leave: fewer go.', 0.15]];
@@ -89,7 +89,7 @@ window.MIGRATE = (function () {
       rot = (rot + 7919) % MAXC;      // (sources in a turning order: no realm is always first to the room)
       for (let q = 0; q < MAXC; q++) {
         const c = (q + rot) % MAXC, cv = civs[c]; if (!cv || !(cap[c] > 0)) continue; const P = h.pop(c); if (!(P > 0.5)) continue;
-        const pol = policy(cv), era = clamp(cv.era | 0, 0, 8), st = h.stab(cv);
+        const pol = policy(cv), era = clamp(cv.era | 0, 0, 9), st = h.stab(cv);
         const mob = (MOB[h.labour(cv)] || 1) * (cv.player ? LEAVING[pol.l][3] : 1);
         const flee = (h.starved(c) * FAMINE_FLEE + P * ((h.lost(c) > 0 ? WAR_FLEE : 0) + (st < 0.3 ? UNREST_FLEE * (0.3 - st) / 0.3 : 0))) * Math.min(1, mob * 1.5);
         if (!(crowd[c] > 0.01 * P) && !(flee > 0.05)) continue;      // (nobody much to send: most realms, most years)

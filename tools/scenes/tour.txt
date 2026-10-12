@@ -110,6 +110,15 @@ city_mena    | tools/scenes/town.js | {lon:31.24,lat:30.04,tech:0.86,pop:3000,wa
 city_soviet  | tools/scenes/town.js | {lon:37.62,lat:55.75,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.5,1.15,0.3), 7000); | 55
 costb_city   | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:0.96,pop:6000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => { __sceneLook('town',0.55,1.15,0.9); }, 7000); setTimeout(() => { __T.costsCity(); }, 30000); | 70
 costb_suburb | tools/scenes/town.js | {lon:-87.63,lat:41.88,tech:0.86,pop:2500,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => { __sceneLook('town',0.6,1.15,0.6); }, 7000); setTimeout(() => { __T.costsCity(); }, 30000); | 70
+# --- the Space Age: garden towers, arcologies, vertical farms, solar fields, a spaceport, the space elevator (special 318: a wonder of the age) ---
+city_space   | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.55,1.15,0.9), 7000); | 55
+city_space_green | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('greentower',4,1.0,0.6), 7000); | 55
+city_space_arco | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('arcology',2.2,1.1,0.4), 7000); | 55
+city_space_lift | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('landmark',0.6,1.35,0.5), 7000); | 55
+city_space_port | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('spaceport',3,1.1,0.3), 7000); window.__launchAt = performance.now() + 50000; | 55
+city_space_launch | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('spaceport',30,1.36,0.3), 7000); window.__launchAt = performance.now() + 39000; | 55
+city_space_launch_night | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0,sun:[-0.22,4.6]} | setTimeout(() => __sceneLook('spaceport',30,1.36,0.3), 7000); window.__launchAt = performance.now() + 39000; | 55
+city_space_night | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0,sun:[-0.2,4.6]} | setTimeout(() => __sceneLook('town',0.4,1.15,0.9), 7000); | 55
 # --- shrines and wonders that are models ---
 mena_temple  | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('temple', 5, 1.05, 0.3), 7000); | 32
 iron_med_wonder | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.2,pop:10,walls:2,special:94} | setTimeout(() => __sceneLook('town', 0.9, 1.0, 0.3), 7000); | 32
@@ -129,6 +138,7 @@ know         | tools/scenes/know.js | {} | | 16
 know_queue   | tools/scenes/know.js | {learn:['farming','pottery','weaving'],queue:['megaliths','quarrying'],key:'bronze'} | | 16
 know_iron    | tools/scenes/know.js | {years:9000,age:2,key:'iron'} | | 22
 know_stand   | tools/scenes/know.js | {years:9000,tab:'stand'} | | 22
+know_space   | tools/scenes/know.js | {age:9,key:'fusion'} | | 16
 # --- laws and government: a band's first laws, a medieval realm's, the forms of government, the estates and a demand ---
 laws         | tools/scenes/gov.js | {auth:60,key:'clanland'} | | 16
 laws_medieval | tools/scenes/gov.js | {age:4,years:60,auth:90,key:'standing'} | | 22
@@ -147,6 +157,7 @@ hud          | tools/scenes/dip.js tools/scenes/hud.js | {lens:true} | | 26
 hud_laws     | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,screen:'gov'} | | 28
 hud_copper   | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:6,screen:'market'} | | 28
 hud_glass    | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:8} | | 26
+hud_space    | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:9} | | 26
 legacy       | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,screen:'legacy'} | | 28
 intrigue     | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:4,screen:'intrigue'} | | 28
 schemes      | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:4,screen:'schemes'} | | 28
@@ -306,6 +317,8 @@ sky_limb        | tools/scenes/forest.js | null | window.__cloudTime = 0; const 
 sky_peru        | tools/scenes/forest.js | null | window.__cloudTime = 0; const f = () => __forest(-86.0, -18.0, 1500000, 0.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_edge        | tools/scenes/forest.js | null | window.__cloudTime = 0; const f = () => __forest(60.0, 20.0, 9000000, 0.0, 0, 0.5, [0.03, 4.7]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_edge_low    | tools/scenes/forest.js | null | window.__cloudTime = 0; const f = () => __forest(78.0, 20.0, 1500000, 0.9, 4.7, 0.5, [0.05, 4.7]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
+orbits_edge     | tools/scenes/forest.js | null | window.__cloudTime = 0; window.__orbits = 3600; const f = () => __forest(60.0, 20.0, 9000000, 0.0, 0, 0.5, [0.03, 4.7]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
+orbits_low      | tools/scenes/forest.js | null | window.__cloudTime = 0; window.__orbits = 3600; const f = () => __forest(78.0, 20.0, 1500000, 0.9, 4.7, 0.5, [0.05, 4.7]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_under       | tools/scenes/forest.js | null | window.__cloudTime = 0; const f = () => __forest(78.0, 22.0, 900, 1.4, 0.6, 0.5, [0.8, 2.2], 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_under_fair  | tools/scenes/forest.js | null | window.__cloudTime = 20084; const f = () => __forest(22.0, 2.0, 900, 1.4, 4.7, 0.5, [0.9, 3.6], 0.75); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_under_high  | tools/scenes/forest.js | null | window.__cloudTime = 20084; const f = () => __forest(22.0, 2.0, 900, 1.4, 4.7, 0.5, [0.9, 3.6], 1.25); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
@@ -397,6 +410,7 @@ tale_raid     | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'raid'}
 heritage      | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'heritage',d:{from:3,to:4,paths:[4,5,0],did:[1,1,0]}} | | 170
 spies         | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'spies',d:{o:'near',k:'murder',p:'heir'}} | | 170
 pestilence    | tools/scenes/tale.js | {years:10750,lon:2.35,lat:48.85,k:'plague',kind:'plague'} | | 220
+tale_moon     | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'otherworld'} | | 170
 # where the world's people live (land.js): a world run to AD 1000 from orbit over the old world and over the Americas; a capital on the Nile with its land named
 peopled      | tools/scenes/land.js | {years:11000,look:'globe',alt:11000000,at:[75,25]} | | 230
 peopled_west | tools/scenes/land.js | {years:11000,look:'globe',alt:11000000,at:[-65,10]} | | 230
