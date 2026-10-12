@@ -868,7 +868,11 @@ server.listen(0, async () => {
     await ev(() => { const S = __G.sim, c = S.playerCiv(); S.setStories(true); if (c.story) c.story.q = null; const e = Math.min(8, c.era + 1); c.tech = Math.max(c.tech, S.ERAS[e][1] + 0.01); c.era = S.eraOf(c.tech); __T.teach(c); __G.run(1); });
     await frames(2); await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
     // (a story of the family may come in the same year - a birth is told when it happens - and the age's question then waits behind it)
-    for (let k = 0; k < 3; k++) { const t = await ev(() => TALES.isOpen() ? document.getElementById('tl-title').textContent : ''); if (!t || /leaves?$/.test(t)) break; await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2); await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2); }
+    for (let k = 0; k < 4; k++) {
+      const t = await ev(() => TALES.isOpen() ? document.getElementById('tl-title').textContent : ''); if (!t || /leaves?$/.test(t)) break;
+      const i = await ev(() => { const b = [...document.querySelectorAll('#tl-choices .tl-choice')].find((x) => !x.getAttribute('aria-disabled')); return b ? +b.dataset.tl : -1; }); if (i < 0) break;
+      await page.click(`#tl-choices [data-tl="${i}"]`); await frames(1); await page.click('#tl-done'); await frames(2); await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
+    }
     q = await ev(() => ({ open: TALES.isOpen(), title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | ') }));
     check(q.open && /leaves?$/.test(q.title) && q.n === 3 && /until the next age/.test(q.chips), `a new age asks what the last one leaves: "${q.title}" (${q.chips.slice(0, 120)})`);
     await page.keyboard.press('1'); await frames(1); await page.keyboard.press('Enter'); await frames(2);
