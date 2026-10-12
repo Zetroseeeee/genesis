@@ -1232,7 +1232,13 @@ Conventions that matter:
   distance, because a crown has a size as grass has not), except in settled country, which is cleared to pasture
   with trees standing in it. What people have made of the ground (crops in their rows, paving) is laid at the size
   the game draws a village at (`ltex`); between the houses of a town that is not paved the beaten ways are pale and
-  grass holds on beside them. A software renderer takes the pack at a quarter of its size (`GROUND=1`: whole).
+  grass holds on beside them. The farmland keeps the year outside the tropics (`fieldYear`, `uYearPh` = `seasonPhase`,
+  the south half a year on, the warm south a few weeks ahead): half its grain is sown in the autumn (the winter's young
+  green, green ears, ripe gold in high summer, stubble, ploughed earth and sown again), half in the spring (ploughed
+  earth through the winter, young rows, ripe some weeks later); every field keeps its own days (the field's dice), so
+  the country turns over field by field; ploughed earth lies bare (nothing of the grass about it shows through, or
+  it was olive); vines and orchards stand bare and pasture yellows in winter. Look at the Mac's `fields_*` after
+  touching it (a medieval village of the Midlands with its woods cleared: `clear` in `tools/scenes/town.js`). A software renderer takes the pack at a quarter of its size (`GROUND=1`: whole).
   `uGndShow = <layer>` shows one material everywhere; `uGndV` is how much a meadow varies.
   **What it costs** (the build Mac, a virtual GPU, 1680 by 1050; `costg_*` holds the materials against the ground
   drawn the old way in one page): looking down on a town 28 frames a second against 31, on a meadow 29 against

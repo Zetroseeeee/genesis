@@ -450,3 +450,10 @@ costf_herds  | tools/scenes/holocene.js | {lon:35,lat:-2.5,alt:700,tilt:1.3,head
 epi_story    | tools/scenes/epilogue.js | {years:11000} | setTimeout(() => { const m = document.querySelector('#epi .modal'); if (m) m.scrollTop = 520; }, 270000); | 280
 epi_fall     | tools/scenes/epilogue.js | {years:8000,fall:true} | | 160
 epi_end      | tools/scenes/epilogue.js | {years:12160} | setTimeout(() => { const m = document.querySelector('#epi .modal'); if (m) m.scrollTop = 520; }, 230000); | 240
+# --- the farmland's year (terrain.js, fieldYear): young rows in spring, green grain, ripe gold, stubble, the winter's ploughed earth, about a
+#     medieval village of the English midlands ---
+fields_spring | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:0.45,pop:8,walls:1,special:12,clear:0.75,season:0.31} | setTimeout(() => { const r = __sceneLook('town', 2, 1.2, 0); const M = __G.mapcam; M.lat = M.tLat = M.lat + r.R * 1.8 / 111320; }, 4000); | 150
+fields_summer | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:0.45,pop:8,walls:1,special:12,clear:0.75,season:0.45} | setTimeout(() => { const r = __sceneLook('town', 2, 1.2, 0); const M = __G.mapcam; M.lat = M.tLat = M.lat + r.R * 1.8 / 111320; }, 4000); | 150
+fields_harvest| tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:0.45,pop:8,walls:1,special:12,clear:0.75,season:0.6} | setTimeout(() => { const r = __sceneLook('town', 2, 1.2, 0); const M = __G.mapcam; M.lat = M.tLat = M.lat + r.R * 1.8 / 111320; }, 4000); | 150
+fields_autumn | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:0.45,pop:8,walls:1,special:12,clear:0.75,season:0.72} | setTimeout(() => { const r = __sceneLook('town', 2, 1.2, 0); const M = __G.mapcam; M.lat = M.tLat = M.lat + r.R * 1.8 / 111320; }, 4000); | 150
+fields_winter | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:0.45,pop:8,walls:1,special:12,clear:0.75,season:0.95} | setTimeout(() => { const r = __sceneLook('town', 2, 1.2, 0); const M = __G.mapcam; M.lat = M.tLat = M.lat + r.R * 1.8 / 111320; }, 4000); | 150
