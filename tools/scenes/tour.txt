@@ -108,6 +108,8 @@ city_latam   | tools/scenes/town.js | {lon:-99.13,lat:19.43,tech:0.86,pop:3000,w
 city_latam_edge | tools/scenes/town.js | {lon:-99.13,lat:19.43,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('shacks',3.5,1.05,0.8), 7000); | 55
 city_mena    | tools/scenes/town.js | {lon:31.24,lat:30.04,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.5,1.15,0.3), 7000); | 55
 city_soviet  | tools/scenes/town.js | {lon:37.62,lat:55.75,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.5,1.15,0.3), 7000); | 55
+costb_city   | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:0.96,pop:6000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => { __sceneLook('town',0.55,1.15,0.9); }, 7000); setTimeout(() => { __T.costsCity(); }, 30000); | 70
+costb_suburb | tools/scenes/town.js | {lon:-87.63,lat:41.88,tech:0.86,pop:2500,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => { __sceneLook('town',0.6,1.15,0.6); }, 7000); setTimeout(() => { __T.costsCity(); }, 30000); | 70
 # --- shrines and wonders that are models ---
 mena_temple  | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('temple', 5, 1.05, 0.3), 7000); | 32
 iron_med_wonder | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.2,pop:10,walls:2,special:94} | setTimeout(() => __sceneLook('town', 0.9, 1.0, 0.3), 7000); | 32

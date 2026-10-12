@@ -395,7 +395,11 @@ Conventions that matter:
   across (`street`). Trees stand in the gardens and courts of those blocks (`GARDEN`, `gardenAt` in `trees.js`) and in the
   parks. A plot not yet rebuilt in a new age keeps a block of the age before. A city of millions is some twenty thousand plots
   (`maxN`), drawn one by one to 0.95 of its radius (`coarseFrom`). `node tools/towns/census.js` says what each city is made
-  of; look at `city_*` on the Mac after touching any of it.
+  of; look at `city_*` on the Mac after touching any of it. *What it costs* (the build Mac, the same views in two starts of the
+  app, so loosely): a great city filling the picture 12 to 18 frames a second against 16 to 22 with the blocks it had before, an
+  industrial city and a Soviet one about the same. A cluster is five to twenty times a block's triangles (`homes` 156, `rows`
+  276, `medina` 510: the kit's triangle count is `node` over `BKIT.makeKit()`), and from a few kilometres most of them are
+  slivers; a far cluster drawn as one box with its houses painted on it is the next thing to try if it must be cheaper.
 - **The market** (`econ.js`; `sim.market`). 63 goods: 42 the land yields (a cell has one, `sim.goods[i]`, and the age
   in which that place begins to yield it, `sim.gera[i]`: cocoa is old in Mesoamerica and came to West Africa with the
   plantations) and 21 made by recipes. A quantity is in lots, a price in coin per lot: the treasury's coin. Every year,
