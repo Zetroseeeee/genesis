@@ -24,6 +24,7 @@ function createSim(world, seed) {
   const LAND = window.LAND;      // what the land feeds (land.js; a tool that does not load it, or a world without data/soil.png, feeds by the old map)
   const CLIMATE = window.CLIMATE;      // the ice, the green Sahara, droughts and good years (climate.js; only in a world whose land has kinds)
   const MIGRATE = window.MIGRATE;      // people on the move: emigrants, refugees, settlers (migrate.js; likewise)
+  const WOODS = window.WOODS;      // the world's woods: cleared for fields, grown back where people leave (woods.js; likewise)
   const { land, fert, elev, flags } = world;   // land Uint8, fert Float32 0..1, elev Uint8, flags Uint8 (1 land,2 river,4 coast,8 ice)
 
   // ---------- RNG ----------
@@ -229,6 +230,8 @@ function createSim(world, seed) {
   let intrigue = null;    // (its spies and schemes: intrigue.js)
   let disease = null;    // (its sicknesses: disease.js)
   let mig = null;    // (its people on the move: migrate.js)
+  let woods = null;    // (its woods: woods.js)
+  const useA = new Uint8Array(N);      // (how far each region's people use its land: people against what it feeds, x 255 - the woods are cleared by it)
   let storiesOn = true;      // (the player's: the page's setting)
   function fullName(c) { return rule ? rule.fullName(c) : c.name; }
   function religionName(st) {
@@ -357,7 +360,7 @@ function createSim(world, seed) {
   const warCnt = new Int16Array(MAXC).fill(-1); const warsOf = (cv) => { const c = cv.id; let k = warCnt[c]; if (k < 0) { k = 0; for (const _ in cv.wars) k++; warCnt[c] = k; } return k; };
   // how each realm is governed (rule.js): its form, its laws and its estates leave factors here every year, as knowledge does
   const worksIn = (c) => { let k = 0; const b = c * IND.length; for (let j = 0; j < IND.length; j++) k += indN[b + j]; return k; };
-  rule = RULE.create({ MAXC, civs, year: () => year, rnd, knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1, popOf, urban, townsOf, cellsOf, temples, markets, ports, acad, wonders, newcomers: (c) => (mig && landOn ? mig.share(c) : 0),
+  rule = RULE.create({ MAXC, civs, year: () => year, rnd, knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1, popOf, urban, townsOf, cellsOf, temples, markets, ports, acad, wonders, newcomers: (c) => (mig && landOn ? mig.share(c) : 0), woodsKept: (c) => woods !== null && landOn && civs[c] && civs[c].player === true && woods.policy(civs[c]) === 1,
     works: worksIn, sat: (c, key) => market.sat[c * NC + CAT[key]], living: (c) => market.LS[c], traded: (c) => market.gdp[c] > 0 ? (market.impV[c] + market.expV[c]) / (2 * market.gdp[c]) : (civs[c] && civs[c].rule && civs[c].rule.tr) || 0,      // (a world just loaded has no year of trade behind it yet: what it was when saved)
     warsN: warsOf, tongue: (cv) => STYLES[cv.style] ? STYLES[cv.style].k : '', nameOf: (cv) => fullName(cv), span: (cv) => spanOf(cv),
     event: (cv, text, important, kind) => logEvent(cv, text, important || !!cv.player, kind === 'state' ? 'state' : 'law'), alarm: () => {}, news: (cv, text) => logEvent(cv, text, true, 'state'),
@@ -384,7 +387,7 @@ function createSim(world, seed) {
     P.target = 1 + P.wars + P.overreach + P.taxes + P.stance + P.temples + P.wonders + P.luxuries + P.hunger + P.ruler + P.knowledge + P.rule + P.peoples + P.faiths + P.culture + P.finance + P.dynasty + P.story + P.sickness + P.newcomers; return P;
   }
   const spanOf = (cv) => (40 + cv.tech * 3000) * KF[cv.id * NKF + KK.reach] * RF[cv.id * NRF + RK.reach];      // how many regions a realm holds without strain
-  const fmNow = (cv) => foodMult(cv.tech) * KF[cv.id * NKF + KK.food] * RF[cv.id * NRF + RK.food];
+  const fmNow = (cv) => foodMult(cv.tech) * KF[cv.id * NKF + KK.food] * RF[cv.id * NRF + RK.food] * (woods !== null && landOn ? woods.foodF(cv) : 1);
   // a realm's row of what a unit of farmland of each kind feeds it this year: its age (and how far into the next), its continent's
   // crops and beasts (the Americas and Australia farm with fewer until they have met the old world: its sicknesses come with its ships)
   function landRow(cv) {
@@ -692,6 +695,21 @@ function createSim(world, seed) {
     stab: (cv) => cv.stability, nb: (c) => nearNb[c] || lastNb[c], partners: partnersOf, ls: (c) => market.LS[c], ruling: (c) => (people ? people.ruling[c] : 0),
     faith: (c) => (faith ? faith.state[c] : 0), labour: (cv) => rule.ruleOf(cv).laws.labour, harvest: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1),
     atWar: (cv, d) => cv.wars[d] !== undefined, news: migrationNews, teach: (d, x) => { const dv = civs[d]; if (dv && x > 0) dv.tech = Math.min(1, dv.tech + x); } }) : null;
+  // the world's woods (woods.js): cleared toward what its people's fields, pasture and fallow take, at the pace of their tools,
+  // grown back where they leave; timber by the woods that stand; the player's word on his woods
+  woods = WOODS && LM ? WOODS.create({ N, W, H, LI, MAXC, soil, owner, use: useA, civs, popOf: (c) => popOf[c], ice: ICE, year: () => year, cult: (i) => cultivationOf(i), pop, wood, goods, gTimber: G_TIMBER }) : null;
+  // (how far a realm uses a region's land: its people against what it feeds, as far as they farm; and of every region, worked out from
+  //  the people and the land as they stand - for a world just loaded, before a year has passed)
+  function fillUse() { for (const cv of civs) if (cv) { landRow(cv); fmOf[cv.id] = fmNow(cv); } for (const i of LI) { const o = owner[i], c = o >= 0 ? civs[o] : null; if (!c) { useA[i] = 0; continue; } const K = capacity(i, c), p = pop[i]; useA[i] = p >= K ? 255 : (255 * p / Math.max(K, 0.01)) | 0; } }
+  function cultivationOf(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 0; const c = civs[o]; const K = capacity(i, c); const farm = Math.min(1, Math.max(0, (c.tech - 0.025) / 0.1)); return K > 0.01 ? Math.min(1, pop[i] / K) * farm * (level[i] ? 1 : 0.6) : 0; }
+  // the player's woods, once a decade: told when a quarter, a half or three quarters of what would stand by nature are gone, and when
+  // they come back above a half (calm news: the woods go over generations)
+  function woodsNews() {
+    const cv = civs[player]; if (!cv) return; const w = woods.of(player); if (w.nature < 2000) return;
+    const b = w.share >= 0.75 ? 0 : w.share >= 0.5 ? 1 : w.share >= 0.25 ? 2 : 3, W0 = cv.woods || (cv.woods = { k: 'clear' }), was = W0.b === undefined ? b : W0.b; W0.b = b;
+    if (b > was) logEvent(cv, b === 1 ? `A quarter of the woods of ${fullName(cv)} are gone: fields and pasture where the wildwood stood` : b === 2 ? `Half the woods of ${fullName(cv)} are gone: the land is fields and pasture with woods between` : `Three quarters of the woods of ${fullName(cv)} are gone: timber comes dear, and from abroad`, false, 'state', cv.capital, true);
+    else if (b < was && b <= 1) logEvent(cv, `The woods of ${fullName(cv)} are growing back: ${Math.round(w.share * 100)} in a hundred of what would stand by nature`, false, 'state', cv.capital, true);
+  }
   // a decade's great flow of people: the player hears where his own went and whence newcomers came; the world of the greatest
   function migrationNews(a, b, v) {
     const A = civs[a], B = civs[b]; if (!A || !B) return; const k = v * 1000, n = k >= 1e6 ? (k / 1e6).toFixed(1) + ' million' : Math.round(k / 1000) * 1000 >= 1000 ? (Math.round(k / 1000) * 1000).toLocaleString() : Math.max(10, Math.round(k / 10) * 10).toLocaleString();
@@ -759,8 +777,9 @@ function createSim(world, seed) {
   // much), and the wood, stone and sea salt any country has
   function yieldsOf(i, o, c, p) {
     const g = goods[i], b = o * NG;
-    if (g) { held[b + g] = 1; if (c.era >= gera[i] && gmask[b + g]) rawPop[b + g] += ((special[i] & 512) ? p * 2.2 : p) * RF[o * NRF + RK.yield] * (landOn && HV !== null && CROP[g] ? 1 + CROP[g] * (HV[i] - 1) : 1); }      // (a crop is as good as the year's harvest: climate.js)
-    const wd = wood[i]; if (wd) rawPop[b + G_TIMBER] += p * wd; rawPop[b + G_STONE] += p * 0.1; if (flags[i] & 4) rawPop[b + G_SALT] += p * 0.08;
+    const wf = woods !== null && landOn ? woods.woodF(i) : 1;      // (timber by the woods that stand: woods.js)
+    if (g) { held[b + g] = 1; if (c.era >= gera[i] && gmask[b + g]) rawPop[b + g] += ((special[i] & 512) ? p * 2.2 : p) * RF[o * NRF + RK.yield] * (landOn && HV !== null && CROP[g] ? 1 + CROP[g] * (HV[i] - 1) : 1) * (g === G_TIMBER ? wf : 1); }      // (a crop is as good as the year's harvest: climate.js)
+    const wd = wood[i]; if (wd) rawPop[b + G_TIMBER] += p * wd * wf; rawPop[b + G_STONE] += p * 0.1; if (flags[i] & 4) rawPop[b + G_SALT] += p * 0.08;
   }
   const NB = [-W - 1, -W, -W + 1, -1, 1, W - 1, W, W + 1];
   function nbOf(i, k) { // wrap-safe neighbour
@@ -991,7 +1010,7 @@ function createSim(world, seed) {
         // (people on the move, as migrate.js reckoned them last year)
         if (migOn && c) { if (mAct[o] === 1) p = migMove(i, o, p, K); if (migAcc) migCount(o, p, K); }
         if (p < 0.001) p = 0;
-        pop[i] = p;
+        pop[i] = p; useA[i] = p >= K ? 255 : (255 * p / Math.max(K, 0.01)) | 0;
         // (a far cell of a realm with room in it, one a year chosen as by lot: where its emigrants go - colonies across the sea, a frontier far off)
         if (landOn && c && p < 0.35 * K && K > 0.3 && c.capital >= 0) { const hk = Math.imul(i ^ Math.imul(year, 0x27D4EB2D), 0x165667B1) >>> 0; if (hk < roomKey[o] && cellDist(i, c.capital) > 20) { roomKey[o] = hk; roomCell[o] = i; } }
       }
@@ -1019,6 +1038,7 @@ function createSim(world, seed) {
     for (let c = 0; c < MAXC; c++) if (civs[c]) mightOf[c] = strength(civs[c], popOf[c], mines[c]);
     diplo.tick();      // (who trades with whom; what tribute changes hands this year)
     if (migOn) mig.step();      // (who leaves, and for where: the land pass of next year moves them)
+    if (woods !== null && landOn) { woods.step(); if (year % 10 === 0 && player >= 0) woodsNews(); }      // (a fifth of the land: cleared toward what its fields need, grown back where they need less)
     for (let c = 0; c < MAXC; c++) {
       const cv = civs[c]; if (!cv) continue;
       if (cellsOf[c] === 0) { diplo.fell(cv); killCiv(cv, 'its last lands were lost'); continue; }
@@ -1036,7 +1056,7 @@ function createSim(world, seed) {
       const living = market.LS[c], customs = market.rev[c];
       cv.trade = { living, customs, imp: market.impV[c], exp: market.expV[c] };
       // (taxes by the rate, by what the realm's law of taxes brings in and its state spends; the army and the scholars; what the customs took)
-      const gross = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * (1 + ports[c] * 0.05 + Math.min(0.3, markets[c] * 0.04) + Math.min(0.3, mines[c] * 0.05) + 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1))) * tv(cv, 'income', 1) * KF[c * NKF + KK.income] * RF[ro + RK.tax] * (finance ? finance.taxF(c) : 1) * (story ? story.incF(c) : 1) * (disease ? disease.incF(c) : 1);
+      const gross = popOf[c] * (0.06 + cv.tech * 0.3) * cv.policy.tax * (1 + ports[c] * 0.05 + Math.min(0.3, markets[c] * 0.04) + Math.min(0.3, mines[c] * 0.05) + 0.3 * Math.max(0, living - 0.45) * (1 + Math.min(0.5, markets[c] * 0.1))) * tv(cv, 'income', 1) * KF[c * NKF + KK.income] * RF[ro + RK.tax] * (finance ? finance.taxF(c) : 1) * (story ? story.incF(c) : 1) * (disease ? disease.incF(c) : 1) * (woods !== null && landOn ? woods.incF(c) : 1);
       cv.gross = gross;      // (what lenders lend against: finance.js)
       const income = gross * (1 - RF[ro + RK.cost]) - popOf[c] * 0.05 * (cv.policy.military - 1) * (cv.policy.military > 1 ? RF[ro + RK.upkeep] : 1) - popOf[c] * SCHOLARS * (cv.policy.research - 1) + customs * RF[ro + RK.customs] + diplo.trIn[c] - diplo.trOut[c];      // (and what vassals and the beaten pay, or what is paid to a lord or a victor)
       cv.income = income; cv.wealth += income;
@@ -1546,7 +1566,7 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(c.player ? -30 : cellsOf[c.id] > 20 ? -15 : -6), rulers: c.rulers.slice(-3) } : null), /* (the reigns of a realm are its houses' lines now: dynasty.js; a save is better small) */ worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
-      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, climate: climate && landOn ? climate.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : foodTab === FOOD_039 ? 39 : undefined, land: landOn ? 1 : undefined,
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, woods: woods && landOn ? woods.save() : undefined, climate: climate && landOn ? climate.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : foodTab === FOOD_039 ? 39 : undefined, land: landOn ? 1 : undefined,
     };
   }
   function load(s) {
@@ -1595,6 +1615,7 @@ function createSim(world, seed) {
     if (intrigue) intrigue.load(s.intrigue);      // (the schemes under way are on the realms: civ.intrigue; a world saved before them has none)
     if (disease) disease.load(s.disease);      // (a world saved before sickness travelled has none under way, and its peoples have had nothing yet)
     if (mig) mig.load(s.mig);      // (a world saved before people moved between realms has no flows yet; its realms' borders are open)
+    if (woods && landOn) { fillUse(); if (!woods.load(s.woods)) woods.settle(); }      // (a world saved before the woods: as much wood as its fields leave, nature's where nobody farms)
     if (legacy) { legacy.load(s.legacy); if (!s.legacy) legacy.settle(); }      // (a world from before legacies: each realm begins in its own age with nothing remembered)      // (what each realm's stories left behind is on the realm: civ.story; a world saved before stories begins without)
   }
   // who touches whom by land, read off the map (the tick keeps it up from border contacts afterwards)
@@ -1655,7 +1676,7 @@ function createSim(world, seed) {
     get story() { return story; }, get legacy() { return legacy; }, get intrigue() { return intrigue; }, get disease() { return disease; },
     // the weather (climate.js), in a world whose land has kinds: a realm's harvest this year against an ordinary year's (weighed by its
     // people), who starved, what softens a famine there; a place's weather; whether the ice still lies on a place
-    get climate() { return climate && landOn ? climate : null; }, get mig() { return mig && landOn ? mig : null; }, migPolicy: (what, key) => { const c = playerCiv(); if (!c || !mig) return 'No realm'; return mig.setPolicy(c, what, key); }, harvestOf: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1), starvedOf: (c) => starved[c], reliefOf: (c) => relief[c],
+    get climate() { return climate && landOn ? climate : null; }, get mig() { return mig && landOn ? mig : null; }, get woods() { return woods && landOn ? woods : null; }, cleared: (i) => (woods && landOn ? woods.cleared(i) : cultivationOf(i)), woodsPolicy: (key) => { const c = playerCiv(); if (!c || !woods || !landOn) return 'No realm'; return woods.setPolicy(c, key); }, migPolicy: (what, key) => { const c = playerCiv(); if (!c || !mig) return 'No realm'; return mig.setPolicy(c, what, key); }, harvestOf: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1), starvedOf: (c) => starved[c], reliefOf: (c) => relief[c],
     climateHere: (i) => (climate && landOn ? climate.here(i) : null), iced, lakeAt, lakeWill: (i) => !!(climate && landOn && !climate.bare && year < CLIMATE.GREEN[0].off0 && climate.chadCells.includes(i)),      /* (land the great lake will rise over: the player is told to settle on its shore) */
     diseaseView: () => { const c = playerCiv(); return disease ? disease.view(c ? c.id : -1) : null; }, shutAgainst: (q) => { const c = playerCiv(); return c && disease ? disease.quarantine(c, q, 0) : 'No realm'; },
     intrigueView: (bid) => { const c = playerCiv(); return c && intrigue ? intrigue.view(c.id, bid === undefined ? -1 : bid) : null; },
@@ -1663,7 +1684,7 @@ function createSim(world, seed) {
     storyChoose: (i) => { const c = playerCiv(); if (!c || !story) return 'No realm'; const r = story.choose(c.id, i); dynastyNews(); financeNews(); cultureNews(); return r; }, setStories: (on) => { storiesOn = !!on; }, get storiesOn() { return storiesOn; }, plague, meteor, bounty, drought,
     TRAITS, traitOf, fullName, fmtYear, describeCell, isAtWar, capacity, eraOf, strength, save, load, recount, rnd, religionName, makeName, logEvent, evolveGovAll,
     settlementsOf(id) { const out = []; for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (owner[i] === id && level[i]) out.push(i); } out.sort((a, b) => pop[b] - pop[a]); return out; },
-    cultivation(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 0; const c = civs[o]; const K = capacity(i, c); const farm = Math.min(1, Math.max(0, (c.tech - 0.025) / 0.1)); return K > 0.01 ? Math.min(1, pop[i] / K) * farm * (level[i] ? 1 : 0.6) : 0; },
+    cultivation: cultivationOf,
     prophet(i) { const o = owner[i]; if (o < 0 || !civs[o]) return 'Click a state'; const c = civs[o]; c.stability = Math.min(1, c.stability + 0.2);
       if (c.player && !faith.state[o]) { faith.prophet(o, i, 'god'); faithNews(); return 'A prophet arises: found his faith in Laws (V)'; }
       const f = faith.found(o, i, { why: 'god' }); faithNews(); return f ? `${cap(faith.nameOf(f))} is born` : 'No faith can be founded here'; },

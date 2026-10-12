@@ -903,7 +903,7 @@ server.listen(0, async () => {
     check(!r.s && r.idle, 'called home: the agents wait for orders'); await ev(() => ENVOYS.close());
     // foreign agents caught in the player's realm: the court is asked what to do with them
     r = await ev(() => { const S = __G.sim, c = S.playerCiv(), t = S.civs[window.__spy]; S.setStories(true); if (c.story) { c.story.q = null; c.story.n = 1e12; } t.wealth = 1e5; const why = S.intrigue.begin(t, c, 'discord'); if (why) return { why };
-      t.intrigue.s.risk = 0.99; for (let y = 0; y < 30 && t.intrigue.s; y++) { if (c.story && c.story.q && c.story.q.k !== 'spies') c.story.q = null; __G.run(1); } return { why: '', left: !!t.intrigue.s, q: c.story && c.story.q ? c.story.q.k : '' }; });
+      t.intrigue.s.risk = 0.99; for (let y = 0; y < 30 && t.intrigue.s; y++) { if (c.story && c.story.q && c.story.q.k !== 'spies') c.story.q = null; if (c.story) { c.story.s = c.story.s || {}; c.story.s.birth = c.story.s.wedding = S.year; } __G.run(1); } return { why: '', left: !!t.intrigue.s, q: c.story && c.story.q ? c.story.q.k : '' }; });      // (no birth or wedding in the family told in the year the agents are caught: it would take the court's ear first)
     check(!r.why && !r.left && r.q === 'spies', `a neighbour's agents are caught (${JSON.stringify(r)})`);
     await ev(() => { if (!TALES.isOpen()) TALES.open(); }); await frames(2);
     r = await ev(() => ({ open: TALES.isOpen(), title: document.getElementById('tl-title').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: [...document.querySelectorAll('#tl-choices .tl-chip')].map((e) => e.textContent).join(' | '), art: (document.querySelector('#tale img, #tale .tl-art') || {}).src || getComputedStyle(document.querySelector('#tale .tl-art') || document.body).backgroundImage }));
@@ -998,6 +998,34 @@ server.listen(0, async () => {
     check(/On the move/.test(r), 'the realm\'s panel says who came and who left: ' + r.slice(r.indexOf('On the move'), r.indexOf('On the move') + 50));
     await ev(() => { __G.sim.playerCiv().mig = { b: 'open', l: 'free', o: 0, i: 0, y: __G.sim.year }; __G.sim.mig.load({ rot: 0, flows: [] }); __T.quiet(); });
   });
+  await scenario('the woods: the Land tab (the realm\'s woods by how much stands, its land, the harvest, timber, the world\'s woods), royal forests set there, the lens of the woods with its key and its word, the inspector and the realm\'s panel', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
+    // the realm's woods felled by hand to two fifths of nature's, so that there is something to see
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), X = S.woods; if (!X) return { none: 1 }; const cells = S.LI.filter((i) => S.owner[i] === c.id && X.pot[i] >= 25); for (const i of cells) X.cover[i] = Math.round(X.pot[i] * 0.4);
+      const w = X.of(c.id); return { n: cells.length, share: +w.share.toFixed(2), era: c.era }; });
+    check(!r.none && r.n > 0 && r.share < 0.6, `the realm's woods felled to ${Math.round(r.share * 100)}% of nature's (${JSON.stringify(r)})`);
+    const era = r.era;
+    await ev(() => GOV.open('land')); await frames(2);
+    r = await ev(() => ({ open: document.getElementById('gov').open, pane: !document.querySelector('#gov [data-gpane="land"]').hidden, list: document.getElementById('gv-land').textContent, info: document.getElementById('gv-lainfo').textContent, btns: document.querySelectorAll('#gv-lainfo [data-woods]').length, plant: document.querySelector('#gv-lainfo [data-woods="plant"]').disabled }));
+    check(r.open && r.pane && /Your woods/.test(r.list) && /of what would stand by nature/.test(r.list) && /Your land/.test(r.list) && /This year/.test(r.list) && /Timber/.test(r.list) && /The world/.test(r.list), 'the Land tab: ' + r.list.replace(/\s+/g, ' ').slice(0, 140));
+    check(/Your word on your woods/.test(r.info) && r.btns === 3 && r.plant === (era < 6), `the word on the woods: ${r.info.replace(/\s+/g, ' ').slice(0, 90)} (planting ${r.plant ? 'waits for the Industrial age' : 'open'})`);
+    await ev(() => document.querySelector('#gv-lainfo [data-woods="keep"]').click()); await frames(2);
+    r = await ev(() => ({ k: __G.sim.playerCiv().woods.k, on: !!document.querySelector('#gv-lainfo [data-woods="keep"].on') }));
+    check(r.k === 'keep' && r.on, 'the woods kept for the crown, and the page says so');
+    await ev(() => document.getElementById('gov').close()); await frames(1);
+    // the lens of the woods (Shift+W): painted by how much stands, its key with the world's woods and the realm's, and the word on them
+    await page.keyboard.press('Shift+W'); await frames(4);
+    r = await ev(() => { const W = __G.world, S = __G.sim, c = S.playerCiv(), b = S.woods.bandOf(c.capital); return { on: document.getElementById('v-wds').classList.contains('on'), mode: W.palMode, lens: __G.globals.uLens.value, key: document.getElementById('govkey').textContent, keep: !!document.querySelector('#govkey [data-woods="keep"].on'), band: b, pal: b ? W.palData[b * 4 + 3] : 255 }; });
+    check(r.on && r.mode === 'woods' && r.lens === 1 && /The woods: \d+% of nature's stand · yours \d+%/.test(r.key) && /· you/.test(r.key) && r.keep && r.pal === 255, `Shift+W paints the woods: ${r.key.slice(0, 110)}`);
+    await ev(() => document.querySelector('#govkey [data-woods="clear"]').click()); await frames(2);
+    r = await ev(() => ({ k: __G.sim.playerCiv().woods.k, on: !!document.querySelector('#govkey [data-woods="clear"].on') })); check(r.k === 'clear' && r.on, 'and the word on them can be given there too');
+    await page.keyboard.press('Shift+W'); await frames(3); r = await ev(() => ({ on: document.getElementById('v-wds').classList.contains('on'), mode: __G.world.palMode })); check(!r.on && r.mode === 'realm', 'Shift+W turns it off');
+    // the inspector and the realm's panel
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(); const i = S.LI.find((j) => S.owner[j] === c.id && S.woods.pot[j] >= 25); __G.select(i); return { cell: document.getElementById('sel-cell').textContent, realm: document.getElementById('sc-kv').textContent }; });
+    check(/Woods\d+% of the land, of \d+% by nature/.test(r.cell), 'the inspector: ' + r.cell.slice(r.cell.indexOf('Woods'), r.cell.indexOf('Woods') + 50));
+    check(/Woods\d+% of nature's stand/.test(r.realm), 'the realm\'s panel: ' + r.realm.slice(r.realm.indexOf('Woods'), r.realm.indexOf('Woods') + 60));
+    await ev(() => { const S = __G.sim, X = S.woods; for (const i of S.LI) if (S.owner[i] === S.playerCiv().id) X.cover[i] = X.pot[i]; __T.quiet(); });
+  });
   await scenario('hover: plot chip over land and sea', async (check) => {
     await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.004, 0.5, 0); }); await wait(500); await frames(5);
     const vp = page.viewportSize(); await page.mouse.move(vp.width / 2, vp.height / 2); await wait(120); await page.mouse.move(vp.width / 2 + 3, vp.height / 2 + 3); await wait(120);
@@ -1015,6 +1043,11 @@ server.listen(0, async () => {
         return { out, overlap, meets, cut, n, w: innerWidth }; });
       check(r.out.length === 0, `${vp.width}px: elements outside viewport: ${r.out.join('; ')}`); check(!r.overlap, `${vp.width}px: inspector overlaps the dock`); check(!r.meets && !r.cut && r.n >= 10, `${vp.width}px: the ${r.n} launchers stop short of the minimap, none cut off (${r.meets || 'clear'}${r.cut ? r.cut + ' cut' : ''})`);
       await ev(() => document.getElementById('l-build').click());
+      // (the layers' menu, all thirteen of them, opens inside the window)
+      await ev(() => document.getElementById('lensbtn').click()); await frames(2);
+      const m = await ev(() => { const b = document.getElementById('lensmenu').getBoundingClientRect(); return { top: Math.round(b.top), left: Math.round(b.left), n: document.querySelectorAll('#lensmenu .btn').length }; });
+      check(m.top >= 0 && m.left >= 0 && m.n >= 13, `${vp.width}px: the layers' menu opens inside the window (top ${m.top}, left ${m.left}, ${m.n} layers)`);
+      await ev(() => document.getElementById('lensbtn').click()); await frames(1);
     }
     await page.setViewportSize({ width: 1024, height: 640 }); await wait(300);
   });

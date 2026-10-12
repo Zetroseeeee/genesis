@@ -425,6 +425,7 @@ window.RULE = (function () {
       cond[EK.farmers] -= landless(cv); cond[EK.artisans] -= voiceless(cv);
       // (newcomers: hands for the merchants' ventures and the workshops, strangers on the land to the farmers - by how many came in the last decade)
       const nc = host.newcomers ? Math.min(0.25, host.newcomers(c)) : 0; if (nc > 0) { cond[EK.merchants] += 0.3 * nc; cond[EK.farmers] -= 0.3 * nc; }
+      if (host.woodsKept && host.woodsKept(c)) { cond[EK.nobles] += 0.05; cond[EK.farmers] -= 0.05; }      // (royal forests: the nobles' hunting grounds, the farmers kept from the land: woods.js)
     }
     // Once there are presses in the world, word goes round that those who work could rule, and they are harder to content where the
     // land is other people's and the mills answer to nobody: what agitators add to the grievances of the country and of the towns (nothing where the land has been
@@ -683,11 +684,11 @@ window.RULE = (function () {
     function times(c, cv, e) {
       const towns = Math.max(1, host.townsOf[c]); const tax = cv.policy.tax - 1, mil = cv.policy.military - 1, res = cv.policy.research - 1; const wars = host.warsN(cv); const out = []; const key = ESTATES[e].key;
       const food = host.sat(c, 'food'), lux = host.sat(c, 'luxury'), arms = host.sat(c, 'arms'), living = host.living(c); const put = (t, v) => { if (Math.abs(v) >= 0.005) out.push([t, v]); };
-      if (key === 'nobles') { put('Taxes', -0.15 * tax); put('A warlike stance', cv.policy.stance === 'aggressive' ? 0.04 : 0); put('Wonders', 0.04 * Math.min(1, host.wonders[c])); }
+      if (key === 'nobles') { put('Taxes', -0.15 * tax); put('A warlike stance', cv.policy.stance === 'aggressive' ? 0.04 : 0); put('Wonders', 0.04 * Math.min(1, host.wonders[c])); put('Royal forests to hunt in', host.woodsKept && host.woodsKept(c) ? 0.05 : 0); }
       else if (key === 'priests') { put('Temples', 0.12 * Math.min(1, host.temples[c] / towns)); put('Wonders', 0.05 * Math.min(1, host.wonders[c])); put('No faith of the realm', cv.religion ? 0 : -0.03); }
       else if (key === 'merchants') { put('Trade across the border', 0.25 * Math.min(0.6, host.traded(c))); put('Markets and harbours', 0.08 * Math.min(1, (host.markets[c] + host.ports[c]) / towns)); put('War', -0.06 * wars); put('Taxes', -0.08 * tax); put('Newcomers: hands for hire', 0.3 * (host.newcomers ? Math.min(0.25, host.newcomers(c)) : 0)); }
       else if (key === 'artisans') { put('Luxuries', 0.25 * LUX_AGE[cv.era] * (lux - 0.5)); put('How well people live', 0.25 * (living - 0.5)); put('Taxes', -0.18 * tax); put('Hunger', -0.25 * Math.max(0, 0.8 - food)); put('The mills: long hours, low pay', -millsOf(c, cv.era)); put('Agitators promise them the mills', -voiceless(cv)); }
-      else if (key === 'farmers') { put('Hunger', -0.4 * Math.max(0, 0.8 - food)); put('Taxes', -0.22 * tax); put('War', -0.04 * wars); put('How well people live', 0.12 * (living - 0.5)); put('Agitators promise them the land', -landless(cv)); put('Strangers on the land', -0.3 * (host.newcomers ? Math.min(0.25, host.newcomers(c)) : 0)); }
+      else if (key === 'farmers') { put('Hunger', -0.4 * Math.max(0, 0.8 - food)); put('Taxes', -0.22 * tax); put('War', -0.04 * wars); put('How well people live', 0.12 * (living - 0.5)); put('Agitators promise them the land', -landless(cv)); put('Strangers on the land', -0.3 * (host.newcomers ? Math.min(0.25, host.newcomers(c)) : 0)); put('Kept out of the royal forests', host.woodsKept && host.woodsKept(c) ? -0.05 : 0); }
       else if (key === 'soldiers') { put('Pay', 0.22 * mil); put('Arms', 0.14 * (arms - 0.5)); put('War', wars ? 0.03 : 0); }
       else { put('Scholars\' pay', 0.22 * res); put('Academies', 0.14 * Math.min(1, host.acad[c] / towns)); }
       out.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])); return out;

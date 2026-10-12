@@ -13,7 +13,7 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 
 - `npm run build` — `tools/build.js` copies `src/` to `dist/`, links `dist/data → data/`, writes `dist/local.html`.
 - `ONLY=2,7 node tools/test_sim.js` — headless simulation checks (sections selectable with `ONLY`).
-- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~38 min for all 50).
+- `node tools/test_e2e.js ["filter|filter"]` — Playwright end-to-end suite on software GL (~39 min for all 51).
   Never run two browser harnesses at once: software GL starves and scenarios time out.
 - `node tools/shot2.js <name> "<script>" <t1> <t2> ["<script2>"]` — two screenshots into `shots/`.
 - `node tools/shotn.js <name> "<setup>" <wait ms> <label=script> ...` — several screenshots in one session
@@ -159,6 +159,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   nothing holds (the high Arctic, Baffin, Iceland) until the years the ice leaves the points are as near history's as it can make them
   (some minutes; it prints the worst points), and `--write` puts the table into `src/climate.js` between its DOMES marks. Run it after
   touching the domes or the lobes, then test_sim 23 and the climate probe.
+- `node tools/woods/probe.js [seed,seed] [last year]` — the world's woods through the ages: the share of nature's woods that stands in
+  the world and in Maddison's ten regions at each date, how much was cleared and grown back since the date before, how long a year of
+  it takes. Hold it to its header; run it after touching `woods.js` or what it reads (the land's kinds, the land's pass), then the
+  market's yields (`tools/econ/calibrate.js`: timber comes from the woods that stand) and the war-and-peace probe over 12345 and 777.
 - `node tools/migrate/probe.js [seed,seed] [last year]` — people on the move through the ages: how many leave their homes in each
   span and how many of them for other realms, how many flee, how many in a thousand a year, the Americas' share of the world's people
   and how many of them are of peoples from over the ocean, the decade's greatest streams, how long a year of it takes. Hold it to its
@@ -278,12 +282,14 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/disease.js` | `DISEASE` | Pestilence that travels: six kinds (smallpox, measles, plague, typhus, influenza, cholera), the age that breeds each, how readily it passes and kills; one world's sickness: outbreaks and where they burn, what every people has lived through, who is spared, quarantines; pure data (the dead are taken by the host) |
 | `src/climate.js` | `CLIMATE` | The weather of the Holocene: the ice sheets that withdraw from the north, the green Sahara of the wet centuries, the great droughts and colds history remembers, every year's droughts and good years; one world's weather: every place's harvest this year, the ice, the green lands; pure data |
 | `src/land.js` | `LAND` | What the land feeds: sixteen kinds of land (`data/soil.png`), how intensely each kind's farmland is farmed in each age (`FIT`, measured by `tools/people/landfit.js`), what it gives people who do not farm, the continents' crops and beasts; pure data |
+| `src/woods.js` | `WOODS` | The world's woods: what would stand in every region by nature and what stands now; cleared for fields, pasture and fallow by the age's needs and tools, grown back where people leave and where the ice has gone; timber by the woods that stand; the player's word on his woods (royal forests, planting); the lens's bands; pure data |
 | `src/migrate.js` | `MIGRATE` | People on the move: emigrants from crowded land to land with room and a better living (the realm's own far land, its neighbours, the realms its roads and ships reach), refugees of famine, war and unrest, the newcomers' people and faith taking the places they come to outnumber; the player's borders and leaving; one world's flows, the decade's greatest; pure data |
 | `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
 | `src/court.js` | `COURT` | The Court, the laws screen's last tab: the ruling family as a tree of faces (parents, the throne and consort, brothers and sisters, children, grandchildren), the line of succession, a regency, the house and its reigns; a person's page (raise as, pass over, marry) |
-| `src/folk.js` | `FOLK` | The Peoples tab, the laws screen's tab before the Court: the realm's peoples, its rulers' people abroad, who came and who left in the last ten years, the world's great migrations, the policies of borders and of leaving |
+| `src/country.js` | `COUNTRY` | The Land tab, the laws screen's tab before the Court: the realm's woods against nature's (by the bands of the lens), its kinds of land, the year's harvest, its timber, the world's woods and who keeps most and least of theirs, the word on the woods |
+| `src/folk.js` | `FOLK` | The Peoples tab, the laws screen's tab before the Land: the realm's peoples, its rulers' people abroad, who came and who left in the last ten years, the world's great migrations, the policies of borders and of leaving |
 | `src/works.js` | `WORKS` | The culture screen: renown against the age, the next great person, the golden age, patronage, the living great people (commissions), the works held and lost; the world's renowned realms, golden ages, great people of late and greatest works |
 | `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
@@ -917,6 +923,43 @@ Conventions that matter:
   fitted again, lower by up to a sixth (the first ages' points held where they were: lowered with the rest, the Stone Age's bands
   left more land to new peoples and the world had twenty realms more). After touching it run `tools/migrate/probe.js` over 12345 and 777, the regional census
   (`tools/people/regions.js`), the world's people (`tools/know/people.js`) and the war-and-peace probe.
+- **The woods** (`woods.js`; `sim.woods`; the Land tab of the laws screen, `country.js`; the lens of the woods, Shift+W, in `main.js`
+  and `world.js`). Every region of the land has a share that would stand in wood by nature (`pot`: the trees of our own day where they
+  stand - the high bits of `soil.png`'s red - or what its kind of land carries, `POT`: the temperate and continental woods, the taiga,
+  the rainforest and tropical Asia most; steppe, desert and tundra next to none) and a share that stands now (`cover`, in steps of 1/250,
+  `Q`). In 10,000 BC the woods are nature's and nothing stands under the ice; the land the ice leaves grows its first woods over
+  centuries (`GROW_ICE`, `wild`), and is no field in the picture. Where a realm farms, its people clear what their fields, pasture and
+  fallow take: of the land it can farm where its people live (`sup`: the farmland of our own day and six tenths of its pasture, `need`,
+  as far as its people use each region, `use` from the land's pass) the share its people need at so many hectares a head by the age
+  (`HA`, times `EXT`: long fallows and shifting fields first, a hectare a head once machines and fertiliser feed many from little), and
+  they clear it where the land is farmed, at the pace of their tools (`CLEAR`: fire and stone axes, iron axes and the plough, saws,
+  steam, machines); where they leave, the woods grow back, half in some sixty years (`GROW`). Only regions with woods worth the name
+  are cleared (a tenth of their land and more: `MINW`); the steppe's and the desert's few trees are as nature has them, and their fields
+  are their people's (`h.cult`, the old cultivation). A fifth of the land is gone over each year, in one piece (`LAP`), most of it
+  woods nobody clears and passed over at once; the land a realm can farm is counted a fifth a year and summed when all five are in
+  (`scan`; whole after a load). What it gives: timber at the market by the woods that stand (`woodF`: hedgerows, coppices and orchards
+  keep a quarter where they are gone; in `yieldsOf`), **measured against the age** as every edge is - over what the woods the
+  world's people live in yield on the whole (`wfK`, counted with the rest a fifth a year): the world has the timber it always had and
+  the market's yields stand as they were measured, but a realm that has cleared its woods has less of it than one that kept them (laid
+  on without it, the yields measured again doubled timber everywhere to make up for the cleared ages, the wildwood of the first ages
+  was a timber yard, and one world fought a sixth fewer wars); and the picture - the ground's fields (`uSim.b`, `sim.cleared`) and the trees
+  (`trees.js`) are the woods that stand, not who farms this year: a field stays where a wood was felled until the wood grows back.
+  The player's word on his woods (`POLICY`, on the realm as `civ.woods.k`): cleared as the farmers will; kept for the crown (the royal
+  forests: three quarters as much cleared, at half the pace; the land feeds three in a hundred less; the nobles hunt in them and the
+  farmers are kept out: `woodsKept` in rule's host); planted (from the Industrial age: the woods grow back three times as fast on
+  land nobody farms, for two in a hundred of the realm's income). He hears, once a decade, when a quarter, a half and three quarters of
+  his woods are gone and when they grow back above a half (calm news: `woodsNews`). The inspector says a region's woods now and by
+  nature; the realm's panel its woods against nature's (the player's opens the Land tab); the Land tab its woods by the lens's bands,
+  its kinds of land, the year's harvest, its timber (the yield, the price at home), the world's woods and the realms that keep most and
+  least of theirs, and the word on the woods; the lens of the woods (`world.palMode = 'woods'`) paints every region by how much of
+  nature's woods stands (`BANDS`: wildwood, woods with clearings, thinned, cleared, growing back - where the woods are short of what
+  its people leave standing), its key with the world's woods and the player's, and the word. Saved with the world (`save().woods`: a
+  byte a region of the land in its order, a bit for the land the ice has left) and the realm (`civ.woods`: the word, the band last told);
+  a world saved before the woods has as much wood as its fields leave (`settle`), one saved before the land had kinds none (its fields
+  are who farms them, as before). The module throws no dice. Measured over 12345 and 777 (`tools/woods/probe.js`, whose header says what to hold it to): the
+  world keeps 0.86 of nature's woods in 1700 and 0.8 in 2000; the heartland of western Europe a fifth to two fifths by 1300 and a
+  fifth in 1850, growing back since; India a third by 2000. A year of it is a tenth to a fifth of a millisecond (test section 25).
+  Look at the Mac's `wds_*` after touching it, and run the probe over 12345 and 777, then the war-and-peace probe.
 - **Workshops** (`IND` in `sim.js`): works a town raises on a plot like a temple (`sim.ind`: cell -> plot + 1 for each
   kind). Each makes one kind of work (`ECON.SECTORS`) cheaper for the whole realm, a granary keeps food, a warehouse
   lets merchants hold more. The work on a cell's own good is the old `mine` (bit 512), now for any good, named by
@@ -1160,7 +1203,7 @@ Conventions that matter:
   halved with every level above): change it and everything that fades with the distance moves.
   *Before the plough* (`uWild`, at "the country before the plough" in the shader). The photograph is of our own day:
   where woods would stand, half of what it shows is field and pasture, tan with stubble in July, and from the
-  photograph alone that is dry ground. Where nobody farms (`sim.b`: the simulation knows who does), ground lighter
+  photograph alone that is dry ground. Where the woods stand (`sim.b`: how far they are cleared, woods.js), ground lighter
   than a wood is given back the colour of the woods and glades that stood there, keeping a share of its own light
   and dark (a remapping of each texel, not a smoothing: the grain of the country stays); where the game's people
   have cleared the land, the photograph's own fields show - a realm's farmland is seen from orbit, and grows with

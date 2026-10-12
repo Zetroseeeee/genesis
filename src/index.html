@@ -255,6 +255,7 @@
   /* lens popover */
   #lensmenu { position: absolute; right: 0; bottom: calc(100% + 6px); display: flex; flex-direction: column; gap: 4px; padding: 6px; min-width: 160px; }
   #lensmenu .btn { justify-content: flex-start; text-align: left; }
+  @media (max-height: 860px) { #lensmenu { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, auto); } }      /* (thirteen layers in two columns where a window is short: in one they ran off its top) */
   #govkey { position: absolute; right: 0; bottom: calc(100% + 46px); padding: 8px 10px 9px; display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; width: 236px; box-sizing: border-box; font-size: var(--fs-cap); }
   #govkey:not([hidden]) ~ #lensmenu { right: 242px; }      /* (the layers' menu opens beside the key, not over it) */
   #govkey .gk-row { grid-column: 1 / -1; display: flex; gap: 4px; margin-top: 5px; } #govkey .gk-row .btn { flex: 1; min-height: 24px; padding: 2px 6px; font-size: 11px; letter-spacing: 0.04em; } #govkey .gk-note { grid-column: 1 / -1; color: var(--text-3); font-size: 11px; line-height: 1.35; margin-top: 2px; }
@@ -885,6 +886,7 @@
   .gv-tenet { appearance: none; text-align: left; font: inherit; color: var(--text); background: rgb(18 24 34); border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
   .gv-tenet b { font-size: 13px; font-weight: 600; } .gv-tenet small { font-size: 11.5px; color: var(--text-3); line-height: 1.4; } .gv-tenet:hover { border-color: color-mix(in srgb, var(--gold) 50%, transparent); }
   .gv-tenet.on { background: linear-gradient(90deg, rgb(185 139 240 / 0.22), rgb(185 139 240 / 0.06)), rgb(22 29 41); border-color: var(--cul); } .gv-tenet.on small { color: var(--text-2); } .gv-tenet:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  .gv-tenet:disabled { opacity: 0.5; cursor: default; } .gv-tenet:disabled:hover { border-color: var(--rule); }      /* (a word that waits for a later age: planting the woods) */
   /* the peoples: rows that are not buttons */
   .fk-row { cursor: default; } .fk-row:hover { border-color: transparent; } .fk-row.n { grid-template-columns: 10px minmax(0, 1fr) auto; } .fk-row em { white-space: nowrap; }
   /* the court: the ruling family as a tree of faces, the line of succession, the house */
@@ -1242,6 +1244,7 @@
           <button class="btn" id="v-ren" title="How renowned each realm is for its age, and who is in a golden age (Shift+Z)">Renown</button>
           <button class="btn" id="v-sick" title="Where pestilence burns, and who is spared it (Shift+P)">Sickness</button>
           <button class="btn" id="v-hrv" title="This year's harvest, place by place: droughts, good years, the ice and the green lands (Shift+H)">Harvest</button>
+          <button class="btn" id="v-wds" title="How much of nature's woods still stands, place by place, and where they grow back (Shift+W)">Woods</button>
         </div>
       </div>
     </div>
@@ -1312,13 +1315,14 @@
 <dialog id="gov"><div class="modal panel" tabindex="-1">
   <div class="phead"><h2 class="display">Laws</h2><span class="micro" id="gv-sub"></span><span id="gv-auth"></span><button class="btn icon ghost" id="gv-close" title="Close (Esc)">✕</button></div>
   <div class="gv-now" id="gv-now"></div>
-  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button><button data-gtab="folk">Peoples</button><button data-gtab="court">Court</button></div>
+  <div class="tabs" id="gv-tabs"><button class="on" data-gtab="laws">Laws</button><button data-gtab="form">Government</button><button data-gtab="estates">Estates</button><button data-gtab="faith">Faith</button><button data-gtab="folk">Peoples</button><button data-gtab="land">Land</button><button data-gtab="court">Court</button></div>
   <div class="gv-body">
     <section data-gpane="laws" class="gv-split"><div class="gv-list" id="gv-laws"></div><aside class="gv-info" id="gv-info"></aside></section>
     <section data-gpane="form" class="gv-split" hidden><div class="gv-list" id="gv-forms"></div><aside class="gv-info" id="gv-finfo"></aside></section>
     <section data-gpane="estates" id="gv-estates" hidden></section>
     <section data-gpane="faith" class="gv-split" hidden><div class="gv-list" id="gv-faiths"></div><aside class="gv-info" id="gv-fthinfo"></aside></section>
     <section data-gpane="folk" class="gv-split" hidden><div class="gv-list" id="gv-folk"></div><aside class="gv-info" id="gv-fkinfo"></aside></section>
+    <section data-gpane="land" class="gv-split" hidden><div class="gv-list" id="gv-land"></div><aside class="gv-info" id="gv-lainfo"></aside></section>
     <section data-gpane="court" class="gv-split" hidden><div class="gv-list" id="gv-court"></div><aside class="gv-info" id="gv-ctinfo"></aside></section>
   </div>
 </div></dialog>
@@ -1444,6 +1448,7 @@
 <script src="land.js"></script>
 <script src="climate.js"></script>
 <script src="migrate.js"></script>
+<script src="woods.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -1466,6 +1471,7 @@
 <script src="works.js"></script>
 <script src="court.js"></script>
 <script src="folk.js"></script>
+<script src="country.js"></script>
 <script src="tales.js"></script>
 <script src="troops.js"></script>
 <script src="main.js"></script>
