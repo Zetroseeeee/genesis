@@ -143,9 +143,11 @@
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       gl_PointSize = (aKind > 0.5 ? 3.4 : 1.7) * uPx;
     }`;
-  SKY.ORBIT_F = `uniform float uAlpha, uTime; varying float vLit, vKind, vPh;
+  // (from far out, where the whole swarm is the point, what is in the Earth's shadow keeps a faint light of its own - uOwn: the
+  //  game's licence, so that the night side shows what people have put round it; from the ground they go dark, as they do)
+  SKY.ORBIT_F = `uniform float uAlpha, uTime, uOwn; varying float vLit, vKind, vPh;
     void main() { vec2 q = gl_PointCoord - 0.5; float a = exp(-dot(q, q) * 13.0) - 0.04; if (a <= 0.0) discard;
-      vec3 c = vKind > 0.5 ? vec3(0.92, 0.96, 1.0) * 1.4 * vLit + vec3(1.0, 0.3, 0.22) * step(0.86, fract(uTime * 0.6 + vPh)) : vec3(1.0, 0.97, 0.9) * 0.6 * vLit;
+      vec3 c = vKind > 0.5 ? vec3(0.92, 0.96, 1.0) * (1.4 * vLit + 0.3 * uOwn) + vec3(1.0, 0.3, 0.22) * step(0.86, fract(uTime * 0.6 + vPh)) : vec3(1.0, 0.97, 0.9) * (0.6 * vLit + 0.16 * uOwn);
       gl_FragColor = vec4(c * a * uAlpha, 1.0); }`;
   class Orbits {
     constructor(scene) {
@@ -159,12 +161,12 @@
         orb[i * 4] = inc; orb[i * 4 + 1] = rnd() * TAU; orb[i * 4 + 2] = rnd() * TAU; orb[i * 4 + 3] = alt; kind[i] = st ? 1 : 0;
       }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aOrb', new THREE.BufferAttribute(orb, 4)); g.setAttribute('aKind', new THREE.BufferAttribute(kind, 1)); g.setDrawRange(0, 0);
-      this.uniforms = { uTime: { value: 0 }, uPx: { value: 1 }, uSun: { value: new THREE.Vector3(1, 0, 0) }, uAlpha: { value: 1 } };
+      this.uniforms = { uTime: { value: 0 }, uPx: { value: 1 }, uSun: { value: new THREE.Vector3(1, 0, 0) }, uAlpha: { value: 1 }, uOwn: { value: 0 } };
       this.points = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: this.uniforms, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, vertexShader: SKY.ORBIT_V, fragmentShader: SKY.ORBIT_F }));
       this.points.frustumCulled = false; this.points.renderOrder = 8; scene.add(this.points); this.NS = NS; this.NT = NT; this.n = 0;
     }
     // how many: thirty a year after the world's first spaceflight (to 1,600), and with orbital industry forty more a year (to 2,000) and the stations
-    update(sim, time, sun, px, alpha) {
+    update(sim, time, sun, px, alpha, alt) {
       let nt = 0, st = false; const K = sim && sim.know;
       if (K && K.ID && K.first) { const y = sim.year, f0 = K.first[K.ID.spaceflight], f1 = K.first[K.ID.orbital];
         if (f0) nt = Math.min(1600, Math.max(40, (y - Math.max(f0.y, y - 400)) * 30));
@@ -172,6 +174,7 @@
       if (window.__orbits !== undefined) { nt = Math.min(this.NT, window.__orbits); st = window.__orbits > 1600; }      // (for pictures)
       const g = this.points.geometry; g.setDrawRange(st ? 0 : this.NS, Math.min(this.NT, nt) + (st ? this.NS : 0)); this.n = nt + (st ? this.NS : 0);
       const U = this.uniforms; U.uTime.value = time; U.uSun.value.copy(sun); U.uPx.value = px; U.uAlpha.value = alpha === undefined ? 1 : alpha;      // (as the stars are: none in a daylit sky)
+      U.uOwn.value = Math.min(1, Math.max(0, ((alt || 0) - 0.05) / 0.25));
       this.points.visible = this.n > 0 && U.uAlpha.value > 0.004;
     }
   }

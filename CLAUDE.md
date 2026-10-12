@@ -1059,8 +1059,9 @@ Conventions that matter:
   (`SKY.Orbits`): from the world's first spaceflight, satellites (thirty a year to 1,600; with orbital industry forty more a year to
   2,000, and a dozen stations, brighter, with a light that blinks), points on circular orbits drawn twice as high as they are, round
   the Earth in two minutes of play and more the higher they go, worked out in the vertex shader, lit unless the Earth's shadow is
-  on them: from the ground they cross the sky for an hour or two after dusk (`window.__orbits` sets how many, for pictures:
-  `orbits_*`). The camera can be lifted to the sky once
+  on them: from the ground they cross the sky for an hour or two after dusk; from far out (above some 300 km, wholly by 1,900) what
+  is in the Earth's shadow keeps a faint light of its own (`uOwn`: the game's licence, so that the night side shows the swarm)
+  (`window.__orbits` sets how many, for pictures: `orbits_*`). The camera can be lifted to the sky once
   its tilt is at the end (`mapcam.lift`: PageUp, or a drag past the end; back with the top button or U). For tests:
   `window.__skyYear` (2000: the catalogues' sky), `__moonAge` (0 new, pi full), `__moonLight`, `__cloudTime` (the
   weather held where it is); `__T.faceStar(ra hours, dec)` and `__T.faceMoon()` turn the eye to them.
