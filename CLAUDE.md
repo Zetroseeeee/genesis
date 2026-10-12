@@ -1608,22 +1608,27 @@ Conventions that matter:
   speck-sized mesh it was 16.2 against 17.2). Look at the Mac's `herds_*` and `birds_*` after touching any of it.
 - **Weather** (`weather.js`; `__G.weather`; at the Cinematic setting). Rain falls where the Earth's own clouds stand thick over the
   point looked at (`SKY.cloudAt`, thinned over a ruled country by `SKY.less` as the sky has them), as far as its climate lets it
-  (`Trees.ARID`: a desert's cloud seldom rains), swelling and slackening as a shower does (`wander`); it comes in and goes over some
-  seconds, and the ground it wets dries over a minute. Snow where snow lies or as good as (`trees.lyingAt`). A thunderstorm where
-  the climate is the tropics' or a continent's summer (Köppen A, Cfa, Cwa, Dfa ...) and the rain is heavy: the sky flashes twice
-  (`flash`, post.js `uFlash`), one strike in three to four comes down within sight as a bolt (a jagged ribbon from 2 to 3 km up to
-  the ground, brighter than white so that it glows, turned across the eye's line) and its thunder follows by how far away it struck
-  (`onThunder` -> `SOUND.thunder`: a crack when near, then rolls, lower and longer the further). *What is seen*: streaks (and
-  flakes) in a box about the eye whose size goes with how far the eye is from what it looks at (`uBox`: a twelfth of it, 8 to 260
-  m: drawn for the picture, as a town is, so that a streak reads as rain at every height), anchored to the ground (`uOff`: the eye's
-  place in metres along east, up and north, wrapped by the box) so the rain does not travel with the eye, worked out in view space
-  (`uFrame`), slanted by the wind (from the west in the middle latitudes, the east in the trades; harder in a storm), up to 6,000 of
-  them while the eye is under 2 to 5 km; the murk (post.js `uMurk`, `uMurkD`: what is further than one and a half times the eye's
-  distance goes into the grey of the rain, the sky with it); the ground darker and its sun weaker where it is wet (terrain.js
-  `uWet`), the houses' sun likewise (`world.rainShade`). *Heard*: the patter and hiss of rain (a texture: drops each a tick through
-  its own resonance), the roar of a downpour, birds and insects quiet and fewer in the street. For pictures and tests:
-  `__G.weather.extra = { rain, snow, storm }` holds the weather, `holdBolt` keeps the next bolt, `strike(cam, {})` brings one. Look
-  at the Mac's `rain_*`, `snow_town` and `storm_bolt` after touching any of it.
+  (`Trees.ARID`: a desert's cloud seldom rains) and the year does (climate.js `hv`: a drought holds it off whatever the clouds, a good
+  year brings it the more), swelling and slackening as a shower does (`wander`); it comes in and goes over some seconds, and the
+  ground it wets dries over a minute. Snow where snow lies or as good as (`trees.lyingAt`). A thunderstorm where the climate is the
+  tropics' or a continent's summer (Köppen A, Cfa, Cwa, Dfa ...) and the rain is heavy: the sky flashes twice (`flash`, post.js
+  `uFlash`), one strike in three to four comes down within sight as a bolt (a jagged ribbon from 2 to 3 km up to the ground, brighter
+  than white so that it glows, turned across the eye's line; it writes its depth, so the murk is reckoned at the bolt and not at the
+  sky behind it) and its thunder follows by how far away it struck (`onThunder` -> `SOUND.thunder`: a crack when near, then rolls,
+  lower and longer the further). *What is seen*: streaks (and flakes) in a box about the eye whose size goes with how far the eye
+  is from what it looks at (`uBox`: a twelfth of it, 8 to 260 m: drawn for the picture, as a town is, so that a streak reads as rain
+  at every height), anchored to the ground (`uOff`: the box's place in metres along east, up and north, wrapped by the box) so the
+  rain does not travel with the eye, worked out in view space (`uFrame`), slanted by the wind (from the west in the middle latitudes,
+  the east in the trades; harder in a storm), up to 9,000 streaks while the eye is under 2 to 5 km. Snow's box stands three
+  quarters of itself ahead of the eye (`uC`), with up to 16,000 flakes and none nearer than a fifth of the box: about the eye, the few
+  hundred in sight were a pattern of dots, and a flake by the eye a blot. The murk (post.js `uMurk`, `uMurkD`): the distance goes
+  into the grey of the rain, two thirds of the way at 1.2 times the eye's distance and never within 1,200 m, the sky with it, and
+  what it covers loses half its colour; the light is the flat grey of an overcast day: the ground's sun is weaker where it is wet
+  (terrain.js `uWet`) and the houses' by up to seven tenths (`world.rainShade`). *Heard*: the patter and hiss of rain (a texture:
+  drops each a tick through its own resonance), the roar of a downpour, birds and insects quiet and fewer in the street. For
+  pictures and tests: `__G.weather.extra = { rain, snow, storm }` holds the weather, `holdBolt` keeps the next bolt, `strike(cam,
+  {}, true)` brings one down. *What it costs* (the build Mac, `costr_rain`): a town in the rain 13.0 frames a second against 13.5
+  dry. Look at the Mac's `rain_*`, `snow_town` and `storm_bolt` after touching any of it.
 - **Sound** (`sound.js`; `SOUND`; the volumes in the menu, `settings.vol`). Nothing is a recording: every sound is made as it is
   heard by the Web Audio API, out of noise, oscillators and filters, so it can follow the world anywhere and the game carries no
   sound files. *The engine* (`Engine`): the world's, the interface's and (for later) music's buses under the master, through a gentle
