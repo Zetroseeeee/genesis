@@ -1348,7 +1348,7 @@
   function intrigueNews() { const X = sim && sim.intrigue; if (!X || !X.news.length) return; const N = X.news.splice(0, X.news.length); for (const n of N.slice(-3)) toast(n.text); }
   // a pestilence that reaches the realm, or burns itself out there (disease.js); the map under the lens of sickness changes with it
   function diseaseNews() { const X = sim && sim.disease; if (!X || !X.news.length) return; const N = X.news.splice(0, X.news.length); for (const n of N.slice(-2)) toast(n.text); if (view.sick) world.refreshTextures(); }
-  function refreshAll(force) { legacyNews(); intrigueNews(); diseaseNews(); updateEconomy(); updateTurnButton(); updateClock(); updateDock(); updateTracker(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); ENVOYS.refresh(); WORKS.refresh(); if (view.gov || view.rel || view.ppl || view.fth || view.ren || view.sick) renderGovKey(); }
+  function refreshAll(force) { legacyNews(); intrigueNews(); diseaseNews(); updateEconomy(); updateTurnButton(); updateClock(); updateDock(); updateTracker(); if (selected >= 0) { updateInspector(force); updateOutliner(); } updateMinimap(force); MARKET.renderMovers(); MARKET.refresh(); TREE.refresh(); GOV.refresh(); ENVOYS.refresh(); WORKS.refresh(); if (view.gov || view.rel || view.ppl || view.fth || view.ren || view.sick || view.hrv || view.wds) renderGovKey(); }
 
   // ---------- home screen, version, updates ----------
   // version.json is written by the build: what this game is and what changed lately. window.desktop is the app's

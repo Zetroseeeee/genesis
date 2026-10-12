@@ -1043,6 +1043,11 @@ server.listen(0, async () => {
         return { out, overlap, meets, cut, n, w: innerWidth }; });
       check(r.out.length === 0, `${vp.width}px: elements outside viewport: ${r.out.join('; ')}`); check(!r.overlap, `${vp.width}px: inspector overlaps the dock`); check(!r.meets && !r.cut && r.n >= 10, `${vp.width}px: the ${r.n} launchers stop short of the minimap, none cut off (${r.meets || 'clear'}${r.cut ? r.cut + ' cut' : ''})`);
       await ev(() => document.getElementById('l-build').click());
+      // (the layers' menu, all thirteen of them, opens inside the window)
+      await ev(() => document.getElementById('lensbtn').click()); await frames(2);
+      const m = await ev(() => { const b = document.getElementById('lensmenu').getBoundingClientRect(); return { top: Math.round(b.top), left: Math.round(b.left), n: document.querySelectorAll('#lensmenu .btn').length }; });
+      check(m.top >= 0 && m.left >= 0 && m.n >= 13, `${vp.width}px: the layers' menu opens inside the window (top ${m.top}, left ${m.left}, ${m.n} layers)`);
+      await ev(() => document.getElementById('lensbtn').click()); await frames(1);
     }
     await page.setViewportSize({ width: 1024, height: 640 }); await wait(300);
   });

@@ -167,7 +167,7 @@ window.WOODS = (function () {
     }
     // a world saved before the woods: as much wood as its people's fields leave, nature's wherever nobody farms
     function settle() { tally(); for (let k = 0; k < LI.length; k++) { const i = LI[k], P = pot[i], o = owner[i]; if (iced(i)) { cover[i] = 0; continue; } const w = o >= 0 && P >= MINW ? want(i, o) : 0; cover[i] = w >= P ? 0 : Math.round(P - w); } }
-    return { pot, cover, need, wild, step, cleared, woodF, foodF, incF, policy, setPolicy, of, realms, census, bandOf, stats, save, load, settle };
+    return { pot, cover, need, wild, sup, fr, wantK, step, cleared, woodF, foodF, incF, policy, setPolicy, of, realms, census, bandOf, stats, save, load, settle };
   }
   return { create, POT, EXT, HA, CLEAR, GROW, POLICY, PK, PLANT_ERA, Q, BANDS, BK };
 })();

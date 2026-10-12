@@ -255,6 +255,7 @@
   /* lens popover */
   #lensmenu { position: absolute; right: 0; bottom: calc(100% + 6px); display: flex; flex-direction: column; gap: 4px; padding: 6px; min-width: 160px; }
   #lensmenu .btn { justify-content: flex-start; text-align: left; }
+  @media (max-height: 860px) { #lensmenu { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, auto); } }      /* (thirteen layers in two columns where a window is short: in one they ran off its top) */
   #govkey { position: absolute; right: 0; bottom: calc(100% + 46px); padding: 8px 10px 9px; display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; width: 236px; box-sizing: border-box; font-size: var(--fs-cap); }
   #govkey:not([hidden]) ~ #lensmenu { right: 242px; }      /* (the layers' menu opens beside the key, not over it) */
   #govkey .gk-row { grid-column: 1 / -1; display: flex; gap: 4px; margin-top: 5px; } #govkey .gk-row .btn { flex: 1; min-height: 24px; padding: 2px 6px; font-size: 11px; letter-spacing: 0.04em; } #govkey .gk-note { grid-column: 1 / -1; color: var(--text-3); font-size: 11px; line-height: 1.35; margin-top: 2px; }
@@ -885,6 +886,7 @@
   .gv-tenet { appearance: none; text-align: left; font: inherit; color: var(--text); background: rgb(18 24 34); border: 1px solid var(--rule); border-radius: var(--radius); padding: 7px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
   .gv-tenet b { font-size: 13px; font-weight: 600; } .gv-tenet small { font-size: 11.5px; color: var(--text-3); line-height: 1.4; } .gv-tenet:hover { border-color: color-mix(in srgb, var(--gold) 50%, transparent); }
   .gv-tenet.on { background: linear-gradient(90deg, rgb(185 139 240 / 0.22), rgb(185 139 240 / 0.06)), rgb(22 29 41); border-color: var(--cul); } .gv-tenet.on small { color: var(--text-2); } .gv-tenet:focus-visible { outline: 2px solid var(--select); outline-offset: 1px; }
+  .gv-tenet:disabled { opacity: 0.5; cursor: default; } .gv-tenet:disabled:hover { border-color: var(--rule); }      /* (a word that waits for a later age: planting the woods) */
   /* the peoples: rows that are not buttons */
   .fk-row { cursor: default; } .fk-row:hover { border-color: transparent; } .fk-row.n { grid-template-columns: 10px minmax(0, 1fr) auto; } .fk-row em { white-space: nowrap; }
   /* the court: the ruling family as a tree of faces, the line of succession, the house */
