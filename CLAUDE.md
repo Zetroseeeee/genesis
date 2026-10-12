@@ -379,8 +379,9 @@ Conventions that matter:
   saved by their place in their list, so new ones go at its end), three stories (a town on the Moon, the machine that asks to be
   heard, cooling the sky). Every table by age has a tenth entry, and every clamp of an age is to 9: **a table by age that is one
   short gives `undefined`, and that is NaN in everything downstream** (`node tools/space/probe.js` runs a world to 2150 and looks
-  for it). The tables measured by the probes (`NORM` in `rule.js`, `culture.js`, `faith.js`, `people.js`) took the Information Age's
-  values for it until measured; the probes count every age (`KNOW.NE`) and an age no realm reached takes the one before's. After
+  for it). What realms of the age get from their rule (`NORM` in `rule.js`) was measured from the realms that entered it by 2050 over
+  12345 and 777 (`tools/rule/norm.js` without `--write`, the tenth column only: the other ages keep what they were measured at);
+  the other tables measured by the probes (`NORM` in `culture.js`, `faith.js`, `people.js`) took the Information Age's values; the probes count every age (`KNOW.NE`) and an age no realm reached takes the one before's. After
   the last discovery a realm learns without end (`KNOW.FUTURE`), as before. *Small families* (`FAMILY`, `familyOf` in `sim.js`): in
   the Space Age people come to fill less of what their land could feed, all of it as the age begins and seven tenths at its end
   (the growth's logistic aims at `K x famF`; famine still answers to `K`), so where they are more their numbers fall slowly, as the
