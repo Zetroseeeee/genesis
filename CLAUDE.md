@@ -1565,7 +1565,7 @@ Conventions that matter:
   over fields and towns, vultures soaring over the savanna, the steppe and the dry hills, skeins of geese going north in spring and
   south in autumn over the northern lands, and at dusk in autumn and winter a cloud of starlings over the farmland of the temperate
   north. A bird is a body of rounded pieces with flat wings that beat about their roots (a gull beats now and then, a vulture glides);
-  drawn 8 to 20 times life size by the eye's distance. For pictures: `__G.fauna.extra = [{ kind, lon, lat, n, kept, k, still, yaw }]`
+  drawn 8 to 30 times life size by the eye's distance. For pictures: `__G.fauna.extra = [{ kind, lon, lat, n, kept, k, still, yaw }]`
   puts a herd where asked, `__G.fauna.zoo(lon, lat)` stands every kind in rows, heads up, and `__G.birds.extra = [{ kind, mode, lon,
   lat }]` starts a flock (mode: skein, wheel, soar, cross, cloud). A software renderer gets half the herds and flocks and the coarse
   beasts sooner (`budget`, `lodK`). Look at the Mac's `herds_*` after touching any of it.

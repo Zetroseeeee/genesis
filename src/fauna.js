@@ -17,7 +17,7 @@
   const REACH = 10;          // kilometres from what the eye looks at within which herds are kept
   const SEE_M = 18000;       // the eye nearer than this to what it looks at sees the beasts
   const CAP = 700;           // beasts of one kind drawn at most, finely and coarsely each
-  const FINE_PX = 40;        // a beast drawn finely while it is longer than about this many pixels (at an ordinary field of view)
+  const FINE_PX = 40, SPECK_PX = 12;      // a beast drawn finely while it is longer than about this many pixels, coarsely down to the second, and below it as a speck
 
   // ---------- the beasts' shapes ----------
   // A beast is a little sculpture of rounded pieces, each an ellipsoid, in true metres: forward +x, up +y, its side z, the ground at
@@ -41,7 +41,8 @@
     constructor(fine) { this.pos = []; this.nor = []; this.part = []; this.fine = fine; this.tip = null; this.piv = [0, 0]; this.pieces = []; this.reach = 0.1; }
     // an ellipsoid: its middle, its half sizes (along its own x, y, z), turned nose-up by pitch (about z) and then about the upright (yaw)
     e(c, r, pitch, yaw, id, piv, shade) {
-      const big = Math.max(r[0], r[1], r[2]); const nLon = this.fine ? (big > 0.25 ? 9 : 6) : (big > 0.4 ? 6 : 4), nLat = this.fine ? (big > 0.25 ? 6 : 4) : (big > 0.4 ? 4 : 3);
+      const big = Math.max(r[0], r[1], r[2]), q = this.fine === true ? 0 : this.fine === false ? 1 : this.fine;      // (0 finely, 1 coarsely, 2 a speck)
+      const nLon = q === 0 ? (big > 0.25 ? 9 : 6) : q === 1 ? (big > 0.4 ? 6 : 4) : (big > 0.4 ? 5 : 3), nLat = q === 0 ? (big > 0.25 ? 6 : 4) : q === 1 ? (big > 0.4 ? 4 : 3) : (big > 0.4 ? 3 : 2);
       const cp = Math.cos(pitch), sp = Math.sin(pitch), cy = Math.cos(yaw || 0), sy = Math.sin(yaw || 0), pv = piv || [0, 0];
       const rot = (x, y, z) => { const x1 = x * cp - y * sp, y1 = x * sp + y * cp; return [x1 * cy + z * sy, y1, -x1 * sy + z * cy]; };
       const v0 = this.pos.length / 3;
@@ -198,7 +199,7 @@
     goat:      { L: 0.95, S: 0.75, W: 0.36, leg: 0.55, legT: 0.05, nA: 0.55, nL: 0.35, nT: 0.2, hA: -0.75, hL: 0.3, hT: 0.15, hW: 0.12, beard: 0.12, horns: HORNS.goat, hornL: 0.3, ear: 0.1, earA: 1.2, earOut: 1.0, tail: 0.12, tT: 0.03, col: [0x6e5a46, 0xd8d0c2, 0x3a302a, 0x9b8064], n: [5, 14] },
   };
   const KINDS = Object.keys(SP);
-  function beastGeometry(o, fine) { const s = new Sculpt(fine); quad(s, o); return s.geometry(); }
+  function beastGeometry(o, q) { const s = new Sculpt(q === undefined ? 0 : q === true ? 0 : q === false ? 1 : q); quad(s, o); return s.geometry(); }
 
   const AIR_V = window.AIR ? AIR.VERT : '\n    varying vec3 vAirT, vAirL; void air(vec3 p, float n, out vec3 T, out vec3 L) { T = vec3(1.0); L = vec3(0.0); }', AIR_F = window.AIR ? AIR.FRAG : '\n    varying vec3 vAirT, vAirL; vec3 airOver(vec3 c, vec3 T, vec3 L) { return c; }', AIR_N = window.AIR ? AIR.THING : '3.0';
   const VERT = `
@@ -358,7 +359,7 @@
       const bu = world.bUniforms; this.uni = { uSunV: bu.uSunV, uUpV: bu.uUpV, uDay: bu.uDay, uSunCol: bu.uSunCol, uDusk: bu.uDusk, uSnow: bu.uSnow, uTime: { value: 0 } };
       if (window.AIR) Object.assign(this.uni, AIR.uniforms); if (window.SHADOWS) Object.assign(this.uni, SHADOWS.uniforms);
       this.mat = new THREE.ShaderMaterial({ uniforms: this.uni, vertexShader: VERT, fragmentShader: FRAG });
-      this.inst = {}; this.lodK = 1; this.budget = 1; this.kEye = 0;      // a kind's meshes, fine and coarse, are made when first wanted
+      this.inst = {}; this.lodK = 1; this.budget = 1; this.kEye = 0;      // a kind's meshes, fine, coarse and a speck, are made when first wanted
       // their shadows: the body's own outline cast on the ground away from the sun (a capsule from the feet to where the body's falls)
       { const su = { uSunV: bu.uSunV, uDay: bu.uDay }; if (window.SHADOWS) Object.assign(su, SHADOWS.uniforms);
         this.smat = new THREE.ShaderMaterial({ uniforms: su, vertexShader: SH_VERT, fragmentShader: SH_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
@@ -368,8 +369,8 @@
     // every kind standing in rows, for a look at them (the scenes): side on to the eye when it looks north
     zoo(lon, lat, k) { k = k || K_OPEN; const dLat = 9 * k / 111000, dLon = dLat / Math.max(0.2, Math.cos(lat * D2R)); this.extra = KINDS.map((kind, i) => ({ kind, lon: lon + ((i % 6) - 2.5) * dLon, lat: lat + (Math.floor(i / 6) - 1) * dLat, n: 1, k, still: true, yaw: Math.PI })); this.last.t = -1e9; return this.extra.length; }
     meshOf(kind, lod) {
-      const I = this.inst[kind] || (this.inst[kind] = [null, null]); if (I[lod]) return I[lod];
-      const g = beastGeometry(SP[kind], lod === 0); const walk = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 2), 2); walk.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aWalk', walk);
+      const I = this.inst[kind] || (this.inst[kind] = [null, null, null]); if (I[lod]) return I[lod];
+      const g = beastGeometry(SP[kind], lod); const walk = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 2), 2); walk.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aWalk', walk);
       const m = new THREE.InstancedMesh(g, this.mat, CAP); m.count = 0; m.visible = false; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3).fill(1), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
       this.scene.add(m); return (I[lod] = { mesh: m, walk, n: 0 });
@@ -412,7 +413,8 @@
         }
       }
       // herds asked for by hand (the scenes, the tests): { kind, lon, lat, n, k }
-      for (const e of this.extra || []) { const key = -1 - Math.round((e.lon + 180) * 1e4) * 7 - Math.round((e.lat + 90) * 1e4) * 13; const prev = old.get(key);
+      for (const e of this.extra || []) { if (e.lon === undefined) { e.lon = cam.lon + (e.dx || 0); e.lat = cam.lat + (e.dy || 0); }      // (a herd asked for without a place: where the eye looks)
+        const key = -1 - Math.round((e.lon + 180) * 1e4) * 7 - Math.round((e.lat + 90) * 1e4) * 13; const prev = old.get(key);
         herds.push(prev && prev.kind === e.kind ? prev : this.herd(key, e.kind, !!e.kept, e.lon, e.lat, e.k || K_OPEN, e.n, e.still, e.yaw)); }
       this.herds = herds;
     }
@@ -444,7 +446,7 @@
       for (const h of this.herds) {
         const sp = SP[h.kind], k = Math.max(h.k, this.kEye);
         // finely or coarsely, by how long its beasts are in the picture
-        let lod = 1; if (eye) { const b0 = h.beasts[0], dM = GEO.toVec(h.lon, h.lat, this._v).multiplyScalar(1 + (b0 ? b0.hg : 0) * exag / R_M).distanceTo(eye) * R_M; const px = (sp.L * 1.6 * k) / Math.max(1, dM) * focal; if (px < 1) continue; lod = px * this.lodK > FINE_PX ? 0 : 1; }      // (a herd too far to make out is not drawn)
+        let lod = 1; if (eye) { const b0 = h.beasts[0], dM = GEO.toVec(h.lon, h.lat, this._v).multiplyScalar(1 + (b0 ? b0.hg : 0) * exag / R_M).distanceTo(eye) * R_M; const px = (sp.L * 1.6 * k) / Math.max(1, dM) * focal; if (px < 1) continue; lod = px * this.lodK > FINE_PX ? 0 : px * this.lodK > SPECK_PX ? 1 : 2; }      // (a herd too far to make out is not drawn)
         const I = this.meshOf(h.kind, lod);
         // the herd drifts over the days, slowly, wandering about its place (a tenth of a metre a second, as drawn k times the true pace)
         const A = h.still ? 0 : h.spread * 1.1, w = 0.1 / Math.max(1, A), hcx = A * Math.sin(t * w + h.drift), hcz = A * Math.sin(t * w * 0.77 + h.drift * 2.3);
@@ -578,13 +580,13 @@
       if (mode === 'skein') {      // geese in their V, going north in spring and south in autumn, across the eye's ground
         const n = 9 + Math.floor(R() * 22), north = season < 0.5; f.head = (north ? Math.PI / 2 : -Math.PI / 2) + (R() - 0.5) * 0.9; f.v = 16; f.h = 260 + R() * 260;
         f.x = -Math.cos(f.head) * 5000; f.z = -Math.sin(f.head) * 5000; f.life = 900;      // (it comes in from beyond the eye's ground and leaves it)
-        for (let i = 0; i < n; i++) { const row = Math.ceil(i / 2), side = i === 0 ? 0 : (i % 2 ? 1 : -1); f.birds.push({ fx: -row * 1.5 + (R() - 0.5) * 0.3, fz: side * row * 1.15 + (R() - 0.5) * 0.3, fy: (R() - 0.5) * 0.8, ph: R(), amp: 1, col: B.col[Math.floor(R() * B.col.length)] }); }
+        for (let i = 0; i < n; i++) { const row = Math.ceil(i / 2), side = i === 0 ? 0 : (i % 2 ? 1 : -1); f.birds.push({ fx: -row * 2.2 + (R() - 0.5) * 0.4, fz: side * row * 1.7 + (R() - 0.5) * 0.4, fy: (R() - 0.5) * 0.8, ph: R(), amp: 1, col: B.col[Math.floor(R() * B.col.length)] }); }
       } else if (mode === 'wheel' || mode === 'soar') {      // gulls wheeling over a shore; vultures circling high on a warm updraught
         const n = mode === 'wheel' ? 3 + Math.floor(R() * 9) : 2 + Math.floor(R() * 6); f.h = mode === 'wheel' ? 50 + R() * 70 : 300 + R() * 350;
-        for (let i = 0; i < n; i++) f.birds.push({ cx: (R() - 0.5) * 60, cz: (R() - 0.5) * 60, r: (mode === 'wheel' ? 20 : 45) + R() * (mode === 'wheel' ? 40 : 90), w: (R() < 0.5 ? 1 : -1), ph: R(), a0: R() * 6.2832, dh: (R() - 0.5) * (mode === 'wheel' ? 40 : 120), amp: 0, col: B.col[Math.floor(R() * B.col.length)] });
+        for (let i = 0; i < n; i++) f.birds.push({ cx: (R() - 0.5) * 30, cz: (R() - 0.5) * 30, r: (mode === 'wheel' ? 8 : 20) + R() * (mode === 'wheel' ? 20 : 40), w: (R() < 0.5 ? 1 : -1), ph: R(), a0: R() * 6.2832, dh: (R() - 0.5) * (mode === 'wheel' ? 40 : 120), amp: 0, col: B.col[Math.floor(R() * B.col.length)] });
       } else if (mode === 'cross') {      // crows going over from field to field, a loose band
         const n = 4 + Math.floor(R() * 14); f.head = R() * 6.2832; f.v = 11; f.h = 30 + R() * 50; f.x = -Math.cos(f.head) * 600; f.z = -Math.sin(f.head) * 600;
-        for (let i = 0; i < n; i++) f.birds.push({ fx: (R() - 0.5) * 50, fz: (R() - 0.5) * 30, fy: (R() - 0.5) * 12, ph: R(), amp: 1, col: B.col[Math.floor(R() * B.col.length)] });
+        for (let i = 0; i < n; i++) f.birds.push({ fx: (R() - 0.5) * 25, fz: (R() - 0.5) * 15, fy: (R() - 0.5) * 6, ph: R(), amp: 1, col: B.col[Math.floor(R() * B.col.length)] });
       } else {      // starlings gathering at dusk, a cloud that folds and turns
         const n = 420 + Math.floor(R() * 320); f.h = 90 + R() * 70;
         for (let i = 0; i < n; i++) { let u, v, w; do { u = R() * 2 - 1; v = R() * 2 - 1; w = R() * 2 - 1; } while (u * u + v * v + w * w > 1); f.birds.push({ u, v, w, ph: R(), amp: 1, col: B.col[0] }); }
@@ -598,14 +600,14 @@
       // flocks come now and then, up to a few at once, and go when their time is up or they are far from the eye
       const want = Math.round(4 * this.budget);
       this.flocks = this.flocks.filter((f) => { const dk = GEO.distKm(cam.lon, cam.lat, f.lon + f.x / (R_M * f.cl * D2R), f.lat + f.z / (R_M * D2R)); return t - f.t0 < f.life && dk < 9 && (f.mode === 'skein' || dk < 6); });
-      if (this.extra) { for (const e of this.extra) this.flocks.push(this.flock(e.kind, e.mode, e.lon, e.lat, season)); this.extra = null; }
+      if (this.extra) { for (const e of this.extra) this.flocks.push(this.flock(e.kind, e.mode, e.lon === undefined ? cam.lon + (e.dx || 0) : e.lon, e.lat === undefined ? cam.lat + (e.dy || 0) : e.lat, season)); this.extra = null; }      // (a flock asked for without a place: where the eye looks)
       if (this.flocks.length < want && t > this.next) { this.spawn(sim, cam, season === undefined ? 0.45 : season, day, dusk); this.next = t + 2 + Math.random() * 8; }
-      this.kB = Math.max(8, Math.min(20, cam.dist * R_M / 300));      // (birds are small: drawn 8 to 20 times life size, by the eye's distance)
+      this.kB = Math.max(8, Math.min(30, cam.dist * R_M / 150));      // (birds are small: drawn 8 to 30 times life size, by the eye's distance)
       this.animate(Math.min(0.1, dt || 0.016), t);
     }
     animate(dt, t) {
       for (const k in this.inst) this.inst[k].n = 0;
-      const T = this.terrain, exag = this.exag, m = this._m, el = m.elements, kB = this.kB; let nb = 0;
+      const T = this.terrain, exag = this.exag, m = this._m, el = m.elements, kB = this.kB, hk = Math.max(1, kB / 8); let nb = 0;
       for (const f of this.flocks) {
         const B = BIRDS[f.kind], I = this.meshOf(f.kind), age = t - f.t0;
         if (f.v) { f.x += Math.cos(f.head) * f.v * kB * dt; f.z += Math.sin(f.head) * f.v * kB * dt; }
@@ -628,7 +630,8 @@
             const ux = b.u * s1 * 1.6 + 0.4 * Math.sin(t * 0.4 + b.w * 2), uz = b.w * s2, cth = Math.cos(th), sth = Math.sin(th);
             x = f.x + (ux * cth - uz * sth) * A; z = f.z + (ux * sth + uz * cth) * A; y = f.h + b.v * A * 0.45 * (1 + 0.4 * Math.sin(t * 0.37 + b.u * 3)); yaw = th + Math.PI / 2;
           }
-          y = f.g * exag + y * ins + (1 - ins) * 300;      // (the ground is drawn twice as tall: the flock keeps its height over it)
+          y = f.g * exag + (y * ins + (1 - ins) * 300) * hk;      // (the ground is drawn twice as tall: the flock keeps its height over it; and flies higher as it is
+          // drawn larger, over the roofs of towns drawn many times larger than life)
           const lon = f.lon + x / (R_M * f.cl * D2R), lat = f.lat + z / (R_M * D2R);
           const idx = I.n; if (idx >= B_CAP) break; I.n = idx + 1;
           const lo = lon * D2R, la = lat * D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
