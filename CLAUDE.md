@@ -85,6 +85,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   tools/update/walk.js` takes pictures of everything a player sees of an update (`shots/up_*.png`), with made-up
   versions; `tools/update/realwalk.js` (its header says how) takes them of the update that is really out, in a
   checkout of the version before it, from a copy of the real feed (`tools/update/mirror.mjs`).
+- `node tools/space/probe.js [seed] [last year]` — a world through the Space Age (to 2150): realms in each age at each date, the
+  most learned, the world's people, anything on a realm that is not a number, what the leader knows and how it is governed, the save
+  loaded again and run on. Run it after touching any table by age.
 - `node tools/econ/probe.js [seed] [last year] [goods]` — the world's economy through the ages in numbers: prices
   against the usual, output against need, who is short, how much crosses borders, what the workshops make, and how
   long the market takes a year. `node tools/econ/calibrate.js [seed,seed] --write` measures how much each raw good's land
@@ -256,7 +259,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | File | Global | Role |
 | --- | --- | --- |
 | `src/econ.js` | `ECON` | Goods, recipes, wants; where the Earth keeps things; one world's market: prices, workshops, trade between realms |
-| `src/know.js` | `KNOW` | The discoveries (174, in nine ages and six branches), what each opens and gives; one world's knowledge: who knows what, who studies what |
+| `src/know.js` | `KNOW` | The discoveries (190, in ten ages and six branches), what each opens and gives; one world's knowledge: who knows what, who studies what |
 | `src/rule.js` | `RULE` | Forms of government (24), laws (100 in twelve fields), the seven estates, authority; one world's rule: what every realm has chosen, who holds power in it, reforms, demands, risings |
 | `src/diplo.js` | `DIPLO` | What two realms can swear, why they go to war and what a winner may ask; one world's diplomacy: what every realm thinks of every other and why, pacts, vassals, claims, wars with friends on both sides, offers to the player |
 | `src/army.js` | `ARMY` | Hosts and fleets: the autopilot's host on every front, the player's levy that marches where he sends it (by road over land, by fleet over the sea), battles, assaults and sieges; pure data |
@@ -365,7 +368,19 @@ Conventions that matter:
 - **Headings.** A plan item's `yaw` runs from east toward north (counter-clockwise), and a building's front is its
   local +z: at `yaw = a - π/2` a building standing at angle `a` from the centre faces the centre. Great buildings
   are never turned to fit their plot (their front stays on the square); houses may be.
-- **Eras** 0–8: Stone, Bronze, Iron, Classical, Medieval, Renaissance, Industrial, Modern, Information.
+- **Eras** 0–9: Stone, Bronze, Iron, Classical, Medieval, Renaissance, Industrial, Modern, Information, Space.
+- **The Space Age** (era 9, since 0.43): what comes after our own day, the game's guess in the spirit of what is being worked on
+  now. It begins where the Information Age ends (`tech` 1.0, history's AD 2030) and ends at 1.15 (`TMAX` in `sim.js`, the last of
+  `KNOW.ERA_AT`; `HIST` holds the realms in front to 2150): sixteen discoveries (fusion, general intelligence, genetic medicine,
+  vertical farms, cultured food, arcologies, quantum computing, orbital industry, asteroid mining, settling other worlds, the space
+  elevator, autonomous machines, planetary defence, world federation, climate engineering, neural interfaces), two forms of
+  government (a world federation, government by machine) and eight laws, six ambitions and five firsts (`legacy.js`: firsts are
+  saved by their place in their list, so new ones go at its end), three stories (a town on the Moon, the machine that asks to be
+  heard, cooling the sky). Every table by age has a tenth entry, and every clamp of an age is to 9: **a table by age that is one
+  short gives `undefined`, and that is NaN in everything downstream** (`node tools/space/probe.js` runs a world to 2150 and looks
+  for it). The tables measured by the probes (`NORM` in `rule.js`, `culture.js`, `faith.js`, `people.js`) took the Information Age's
+  values for it until measured; the probes count every age (`KNOW.NE`) and an age no realm reached takes the one before's. After
+  the last discovery a realm learns without end (`KNOW.FUTURE`), as before.
   **Cultures** 0–9: med, north, east, mena, africa, sasia, easia, seasia, america, namerica.
 - **The old ways last.** A town is planned in the manner of `TOWN.styleEra(era, culture)`, not always of its own era:
   where people went on building as their forebears had (`OLD_UNTIL` in `town.js`: the north and the steppe through
@@ -1515,7 +1530,7 @@ Conventions that matter:
   A rim is the border's own background (`var(--plate) padding-box, var(--rim) border-box` with a transparent border), so a plate
   needs no pseudo-element and no position of its own. No blur over the globe (it would be redone every frame).
 - **The top bar**: the ruler's seal (`#id-seal`: the face from `portrait.js`, in a ring of the realm's colour; it opens the realm,
-  its tooltip names realm, ruler, house and heir), the realm's name, age, form and ruler; the ledger; the date with the nine ages
+  its tooltip names realm, ruler, house and heir), the realm's name, age, form and ruler; the ledger; the date with the ten ages
   under it (`#ages`: those behind the player in metal, the one it is in filled as far as it has come, a white tick where the
   world's front is; it opens where the realm stands in knowledge). `--top` is its height: the panels under it begin below it.
   As the window narrows the ruler's line goes first (1,540 px), then the ledger's changes (1,320), then everything but the seal

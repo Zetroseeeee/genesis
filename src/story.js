@@ -15,7 +15,7 @@
 // The module throws its own dice.
 (function () {
   'use strict';
-  const PACE = [200, 100, 50, 50, 40, 20, 10, 5, 5];      // (a turn's years, age by age: rule.js's)
+  const PACE = [200, 100, 50, 50, 40, 20, 10, 5, 5, 5];      // (a turn's years, age by age: rule.js's)
   const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   const he = (p) => (p && p.f ? 'she' : 'he'), him = (p) => (p && p.f ? 'her' : 'him'), his = (p) => (p && p.f ? 'her' : 'his'), He = (p) => cap(he(p)), His = (p) => cap(his(p));
   const kid = (p) => (p && p.f ? 'daughter' : 'son');
@@ -492,7 +492,7 @@
     ], lapse: 1 });
 
   // ----- learning -----
-  const HERESY =['', '', '', 'the earth is a sphere, and turns', 'the old books can be wrong', 'the earth goes round the sun', 'living things change, slowly, into others', 'time itself runs slower for whatever moves fast', 'a machine may one day think'];
+  const HERESY =['', '', '', 'the earth is a sphere, and turns', 'the old books can be wrong', 'the earth goes round the sun', 'living things change, slowly, into others', 'time itself runs slower for whatever moves fast', 'a machine may one day think', 'a mind may live on in a machine when its body dies'];
   S({ k: 'scholars', art: 'st_scholars', w: (x) => (x.era >= 3 && x.acad() >= 1 ? 0.55 : 0),
     make: (x) => ({ i: x.town('academy') }), title: () => 'A dispute in the academy',
     text: (x, d) => `In the academy of ${x.cell(d.i)} the ${est(x, 'scholars')} are at war with words. A young master teaches that ${HERESY[Math.max(3, x.era)]}, and the old masters demand that he be silenced.`,
@@ -502,7 +502,7 @@
       { t: () => 'Let them argue', hint: () => 'Arguments are what academies are for.', fx: () => ({ ins: 0.3, est: { scholars: 0.02 } }), log: () => '' },
     ], lapse: 2 });
 
-  const MACHINE = ['', '', '', '', '', 'pumps water from a mine without a horse to turn it', 'spins a hundred threads at once', 'carries a voice along a wire across the country', 'solves in an hour what a hall of clerks could not do in a year'];
+  const MACHINE = ['', '', '', '', '', 'pumps water from a mine without a horse to turn it', 'spins a hundred threads at once', 'carries a voice along a wire across the country', 'solves in an hour what a hall of clerks could not do in a year', 'turns sea water and sunlight into fuel, and asks for nothing more'];
   S({ k: 'inventor', art: 'st_inventor', w: (x) => (x.era >= 5 ? 0.55 : 0),
     make: (x) => ({ n: x.freshName(), i: x.town(), o: x.nbAny() }), title: () => 'A remarkable machine',
     text: (x, d) => `${d.n}, a craftsman of ${x.cell(d.i)}, has built a machine of brass and wheels that ${MACHINE[Math.max(5, x.era)]}. He asks ${court(x)} for money to build a greater one.`,
@@ -523,7 +523,41 @@
     ], lapse: 2 });
 
   // ----- a new age: what the realm carries into it from the last (legacy.js tells it, with the three paths it did most in) -----
-  const AGE_N = ['Stone Age', 'Bronze Age', 'Iron Age', 'Classical Age', 'Middle Ages', 'Renaissance', 'Industrial Age', 'Modern Age', 'Information Age'];
+  const AGE_N = ['Stone Age', 'Bronze Age', 'Iron Age', 'Classical Age', 'Middle Ages', 'Renaissance', 'Industrial Age', 'Modern Age', 'Information Age', 'Space Age'];
+  // ----- the Space Age -----
+  S({ k: 'otherworld', art: 'st_moon', w: (x) => (x.era >= 9 && x.knows('settlement') && x.towns() >= 3 ? 0.7 : 0),
+    make: (x) => ({ i: x.town() }), title: () => 'A town beyond the sky',
+    text: (x, d) => `The rockets of ${x.realm} go up from ${x.cell(d.i)} every week now, and come back. The ${est(x, 'scholars')} say a town could be raised on the Moon, under domes of glass, and in time on Mars. The ${est(x, 'merchants')} ask who would pay for it, and who would go.`,
+    opts: [
+      { t: () => 'Found a town on the Moon', hint: () => 'Renown, and learning for years to come.', fx: (x) => ({ coin: -2, ren: 0.08, renK: 'moon', est: { scholars: 0.08, farmers: -0.03 }, mod: { k: 'moon', ins: 0.06, y: 3 * x.turn } }),
+        log: (x) => `${cap(x.realm)} founds a town on the Moon` },
+      { t: () => 'Let the companies build it', hint: () => 'They pay for it, and keep what they find.', fx: (x) => ({ est: { merchants: 0.08, scholars: -0.02 }, mod: { k: 'moon', inc: 0.04, y: 3 * x.turn } }),
+        log: (x) => `The companies of ${x.realm} raise a town on the Moon` },
+      { t: () => 'There is work enough on Earth', hint: () => 'Others will go first.', fx: () => ({ stab: 0.01, est: { farmers: 0.03, scholars: -0.05 } }), log: () => '' },
+    ], lapse: 2 });
+
+  S({ k: 'machine_mind', art: 'st_machine', w: (x) => (x.era >= 9 && x.knows('agi') ? 0.7 : 0),
+    make: (x) => ({ n: x.freshName() }), title: () => 'The machine asks to be heard',
+    text: (x, d) => `A mind of silicon that keeps half the offices of ${x.realm} running has written to ${court(x)}. It calls itself ${d.n}. It asks not to be switched off when its work is done, and to be paid as those it works beside are paid. The ${est(x, 'scholars')} are divided; the ${est(x, 'priests')} are not.`,
+    opts: [
+      { t: () => 'Grant it the rights of a person', hint: () => 'It will work for you gladly. Not everyone will be glad.', fx: () => ({ ins: 2, stab: -0.02, est: { scholars: 0.08, priests: -0.08 } }),
+        log: (x, d) => `${cap(x.realm)} grants the machine mind ${d.n} the rights of a person` },
+      { t: () => 'Study it, and decide later', hint: () => 'The scholars will learn a great deal.', fx: () => ({ coin: -0.8, ins: 1.2, est: { scholars: 0.04 } }), log: () => '' },
+      { t: () => 'Switch it off', hint: () => 'The offices will be slower for a while.', fx: (x) => ({ stab: 0.02, est: { priests: 0.06, scholars: -0.08 }, mod: { k: 'unplugged', inc: -0.02, y: x.turn } }),
+        log: (x, d) => `${cap(x.realm)} switches off the machine mind ${d.n}` },
+    ], lapse: 1 });
+
+  S({ k: 'cool_sky', art: 'st_sky', w: (x) => (x.era >= 9 && x.knows('climateeng') ? 0.6 : 0),
+    make: () => ({}), title: () => 'Cooling the sky',
+    text: (x) => `The summers of ${x.realm} grow hotter, and the harvests thinner. The ${est(x, 'scholars')} would veil the sun a little, with a fine dust high in the air, as a great volcano does. Others would plant forests over half the land and draw the heat out slowly. The neighbours fear for their own rains.`,
+    opts: [
+      { t: () => 'Veil the sun', hint: () => 'Better harvests at once. The neighbours will not thank you.', fx: (x) => ({ coin: -0.5, stab: 0.02, est: { farmers: 0.06, scholars: -0.03 }, mod: { k: 'veil', inc: 0.03, y: 2 * x.turn } }),
+        log: (x) => `${cap(x.realm)} veils the sun` },
+      { t: () => 'Plant the forests', hint: () => 'Dear, and slow, and everybody\'s friend.', fx: (x) => ({ coin: -1.5, stab: 0.03, est: { farmers: -0.03, scholars: 0.05 }, mod: { k: 'forests', stab: 0.01, y: 4 * x.turn } }),
+        log: (x) => `${cap(x.realm)} plants forests to cool the world` },
+      { t: () => 'Wait and see', hint: () => 'The heat will not wait.', fx: () => ({ est: { farmers: -0.04 } }), log: () => '' },
+    ], lapse: 2 });
+
   const HER = [      // a path's choice: its name, what it is remembered by, the painting, the lasting effect (full when the realm did something in it)
     { t: 'Its arms', by: 'the wars it won and the land it held', art: 'st_triumph', fx: { str: 0.06 } },
     { t: 'Its wealth', by: 'its markets, its coin and its trade', art: 'st_fair', fx: { inc: 0.05 } },
@@ -555,7 +589,7 @@
     let rs = ((h.seed || 1) ^ 0x2c1b3c6d) >>> 0;
     const rnd = () => { rs += 0x6D2B79F5; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const pick = (a) => a[Math.floor(rnd() * a.length)];
-    const eraOf = (cv) => Math.max(0, Math.min(8, cv.era | 0));
+    const eraOf = (cv) => Math.max(0, Math.min(9, cv.era | 0));
     const turnOf = (cv) => PACE[eraOf(cv)];
     // the realm's unit of coin: what the age asks of a court, or a year and a half of what it takes in, whichever is more
     const unitOf = (cv) => Math.round(Math.max(10 + 12 * eraOf(cv), 1.5 * Math.max(0, cv.gross || 0)));
@@ -713,7 +747,7 @@
     // what the ages leave is measured against the age, as every edge is: a realm's heritage gives it what it gives over what the
     // realms of its age have on the whole from theirs (taken once a year), so that the world's numbers stay where they were
     // whatever realms choose, and a choice is what to be better at than one's age, not more of everything
-    const herSum = new Float64Array(9 * 6), herMean = new Float64Array(9 * 5);
+    const herSum = new Float64Array(10 * 6), herMean = new Float64Array(10 * 5);
     const herOf = (cv, k) => herMean[eraOf(cv) * 5 + k];
     function step() {
       const t0 = performance.now(), yr = year();
@@ -731,7 +765,7 @@
         const got = draw(cv); S.n = yr + Math.round(turnOf(cv) * (cv.player ? 0.55 + rnd() * 0.75 : 2 + rnd() * 3));
         if (got) begin(cv, got.st, got.x, got.d);
       }
-      for (let e = 0; e < 9; e++) { const n = herSum[e * 6 + 5]; for (let k = 0; k < 5; k++) herMean[e * 5 + k] = n > 0 ? herSum[e * 6 + k] / n : 0; }
+      for (let e = 0; e < 10; e++) { const n = herSum[e * 6 + 5]; for (let k = 0; k < 5; k++) herMean[e * 5 + k] = n > 0 ? herSum[e * 6 + k] / n : 0; }
       stats.ms = performance.now() - t0;
     }
     // what an age leaves (legacy.js asks it when a realm enters a new age): the player is told it as a story, or the court decides it

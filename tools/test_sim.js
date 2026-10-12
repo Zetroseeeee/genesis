@@ -33,7 +33,7 @@ function invariants(sim, tag) {
   check(badLevel === 0, `${tag}: ${badLevel} bad settlement levels`);
   let n = 0;
   for (const c of sim.civs) { if (!c) continue; n++;
-    check(isFinite(c.tech) && c.tech >= 0 && c.tech <= 1, `${tag}: ${c.name} tech ${c.tech}`);
+    check(isFinite(c.tech) && c.tech >= 0 && c.tech <= window.KNOW.ERA_AT[window.KNOW.NE] + 1e-9, `${tag}: ${c.name} tech ${c.tech}`);
     check(isFinite(c.stability) && c.stability >= 0 && c.stability <= 1, `${tag}: ${c.name} stability ${c.stability}`);
     check(isFinite(c.wealth), `${tag}: ${c.name} wealth ${c.wealth}`);
     check(c.era === sim.eraOf(c.tech), `${tag}: ${c.name} era ${c.era} != eraOf(${c.tech})`);
@@ -454,13 +454,13 @@ log('10. laws and government');
   check(R.FORMS[0].key === 'band' && R.FORMS[0].need.length === 0, 'a people begins as a band');
   { const all = R.FORMS.concat(R.LAWS); check(new Set(all.map(x => x.key)).size === all.length && new Set(all.map(x => x.name)).size === all.length, 'every form and law has a key and a name of its own');
     check(all.every(x => x.text && x.text.length > 20 && x.text.length < 200), 'and a line about it');
-    check(all.every(x => x.need.every(k => KN.ID[k] !== undefined) && x.era >= 0 && x.era <= 8), 'each stands on real discoveries, and belongs to an age');
+    check(all.every(x => x.need.every(k => KN.ID[k] !== undefined) && x.era >= 0 && x.era < KN.NE), 'each stands on real discoveries, and belongs to an age');
     const idle = R.LAWS.filter(L => !L.first && !Object.keys(L.gives).length).map(L => L.key); check(idle.length === 0, `every law but the first of its field changes something (${idle.join(', ') || 'none idle'})`);
-    const perEra = new Array(9).fill(0); for (const x of all) perEra[x.era]++; check(perEra.every(n => n >= 6), `every age opens forms and laws (${perEra.join(', ')} by age)`);
-    check(R.ESTATES.every(E => E.names.length === 9 && R.K[E.lever] !== undefined), 'every estate has a name in every age and something it gives');
+    const perEra = new Array(KN.NE).fill(0); for (const x of all) perEra[x.era]++; check(perEra.every(n => n >= 6), `every age opens forms and laws (${perEra.join(', ')} by age)`);
+    check(R.ESTATES.every(E => E.names.length === KN.NE && R.K[E.lever] !== undefined), 'every estate has a name in every age and something it gives');
     const swayed = R.LAWS.filter(L => L.swayed).length, wayless = R.FORMS.filter(F => !F.ways.length).map(F => F.key); check(swayed > 50 && R.LAWS.every(L => L.sway.length === R.NE && L.sway.every(v => v > 0.2 && v < 2)) && R.CATS.every(C => !C.laws[0].swayed), `${swayed} laws put power in some hands and take it from others (the first of each field in nobody's)`);
     check(wayless.join() === 'band' && R.FORMS.every(F => F.ways.every(L => F.way[L.id] === 1 && L.wayOf.includes(F))), 'every form but the band of kin has ways of its own');
-    check(R.NORM && R.KEYS.every(key => R.NORM[key] && R.NORM[key].length === 9 && R.NORM[key].every(v => isFinite(v))), 'what each age expects of rule has been measured for every key');
+    check(R.NORM && R.KEYS.every(key => R.NORM[key] && R.NORM[key].length === KN.NE && R.NORM[key].every(v => isFinite(v))), 'what each age expects of rule has been measured for every key');
     const st = KN.LIST.filter(D => KN.BRANCHES[D.branch].key === 'state' && !R.opens(D.key).length).map(D => D.key); log(`   discoveries of the state that open no form or law yet: ${st.join(', ') || 'none'}`); check(st.length <= 2, 'nearly every discovery of the state opens a form or a law'); }
   // a new people
   const sim = createSim(wd, 11); const i0 = sim.LI.find(i => sim.homeOf(i) > 0.6 && (sim.flags[i] & 2)); const c = sim.setPlayer(i0, 'Lawgivers', null); for (let n = 0; n < 25; n++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {}); sim.recount();
@@ -1225,7 +1225,7 @@ if (want(19)) {
 log('19. legacies');
 {
   const LG = window.LEGACY, art = JSON.parse(fs.readFileSync('data/tex/atlas.json', 'utf8')).ui;
-  check(LG.AMB.length === 54 && LG.OF.every((l) => l.length === 6 && new Set(l.map((a) => a.path)).size === 6), `six ambitions an age, one in each path (${LG.AMB.length})`);
+  check(LG.AMB.length === 6 * window.KNOW.NE && LG.OF.length === window.KNOW.NE && LG.OF.every((l) => l.length === 6 && new Set(l.map((a) => a.path)).size === 6), `six ambitions an age, one in each path (${LG.AMB.length})`);
   check(new Set(LG.AMB.map((a) => a.key)).size === LG.AMB.length && new Set(LG.FIRSTS.map((f) => f.key)).size === LG.FIRSTS.length, 'every ambition and every first has a key of its own');
   for (const f of LG.FIRSTS) if (f.know) check(window.KNOW.ID[f.know] !== undefined, `the first "${f.name}" is a discovery there is (${f.know})`);
   // a player's kingdom of the Iron Age, with a neighbour that keeps still
@@ -1426,7 +1426,7 @@ if (want(22)) {
 log('22. the land');
 {
   const L = window.LAND; const at = (lon, lat) => Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
-  check(L.CLASSES.length === 16 && L.CLASSES.every((K) => K.name && L.CURVES[K.curve] && K.text !== undefined) && L.TAB.length === 16 * 9, 'sixteen kinds of land, each with its course through the ages');
+  check(L.CLASSES.length === 16 && L.CLASSES.every((K) => K.name && L.CURVES[K.curve] && K.text !== undefined) && L.TAB.length === 16 * window.KNOW.NE, 'sixteen kinds of land, each with its course through the ages');
   const sim = createSim(wd, 104); check(sim.landOn === true, 'a new world is fed by its land');
   const ganges = at(85, 25.5), kansas = at(-98, 38.5), nile = at(31.0, 30.8), sahara = at(10, 24), mexico = at(-99.1, 19.4);
   const K = (i) => sim.landClass(i); check(L.CLASSES[K(ganges)].key === 'monsoon' && L.CLASSES[K(kansas)].key === 'grass' && L.CLASSES[K(nile)].key === 'desert' && L.CLASSES[K(mexico)].key === 'high', `the Ganges is monsoon farmland, Kansas grassland, the Nile's delta desert, the valley of Mexico a tropical highland (${[ganges, kansas, nile, mexico].map((i) => L.CLASSES[K(i)].name).join(', ')})`);

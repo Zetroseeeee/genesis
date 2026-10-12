@@ -19,7 +19,7 @@ window.LEGACY = (function () {
     { key: 'reach', name: 'Reach', what: 'its reach', heir: 'its envoys, its oaths and its ships' },
   ];
   const PI = {}; PATHS.forEach((p, i) => { PI[p.key] = i; });
-  const AGES = ['Stone Age', 'Bronze Age', 'Iron Age', 'Classical Age', 'Middle Ages', 'Renaissance', 'Industrial Age', 'Modern Age', 'Information Age'];
+  const AGES = ['Stone Age', 'Bronze Age', 'Iron Age', 'Classical Age', 'Middle Ages', 'Renaissance', 'Industrial Age', 'Modern Age', 'Information Age', 'Space Age'];
   // how far a realm has come toward n of something (a share, 0 to 1); a place among the realms of the world (1 within the first n)
   const upTo = (v, n) => Math.max(0, Math.min(1, v / n));
   const rank = (r, n) => (r >= 1 && r <= n ? 1 : r > n ? Math.max(0, n / r) * 0.9 : 0);
@@ -27,7 +27,7 @@ window.LEGACY = (function () {
   // among the first n realms of the world to learn a discovery (the order is kept as realms learn: learned()); once others have
   // been first, it cannot be fulfilled any more
   const early = (x, key, n) => { const at = x.g.at && x.g.at[key]; return at ? (at <= n ? 1 : 0) : 0; };
-  const RACE = ['writing', 'alphabet', 'railways', 'flight', 'spaceflight'];
+  const RACE = ['writing', 'alphabet', 'railways', 'flight', 'spaceflight', 'shields', 'settlement'];
   // ----- the ambitions of every age (x: what the realm has, from the host; test -> how far it has come, 1 when fulfilled) -----
   const AMB = [
     A(0, 'arms', 'valleys', 'A people of many valleys', 'Hold 8 regions', (x) => upTo(x.cells(), 8)),
@@ -84,15 +84,21 @@ window.LEGACY = (function () {
     A(8, 'learning', 'sky', 'Beyond the sky', 'Be among the first five realms to go into space', (x) => early(x, 'spaceflight', 5)),
     A(8, 'faith', 'calm', 'A people at peace with itself', 'Keep nine tenths of stability', (x) => upTo(x.stability(), 0.9)),
     A(8, 'reach', 'everywhere', 'Friends everywhere', 'Be sworn to 8 realms', (x) => upTo(x.pacts(), 8)),
+    A(9, 'arms', 'shield', 'The shield of the world', 'Be among the first five realms to raise planetary defences', (x) => early(x, 'shields', 5)),
+    A(9, 'wealth', 'abundance', 'Abundance', 'Be among the three greatest economies, your people wanting for nothing', (x) => Math.min(rank(x.gdpRank(), 3), upTo(x.ls(), 0.99))),
+    A(9, 'splendour', 'starlight', 'A light among the stars', 'Hold 10 masterpieces', (x) => upTo(x.masters(), 10)),
+    A(9, 'learning', 'worlds', 'Other worlds', 'Be among the first three realms to settle another world', (x) => early(x, 'settlement', 3)),
+    A(9, 'faith', 'starfaith', 'A faith for the stars', 'See your faith kept by 16 realms', (x) => upTo(x.faithRealms(), 16)),
+    A(9, 'reach', 'oneworld', 'One world', 'Be sworn to 12 realms', (x) => upTo(x.pacts(), 12)),
   ];
   AMB.forEach((a, i) => { a.id = i; });
   const AK = {}; AMB.forEach((a) => { AK[a.key] = a; });
-  const OF = []; for (let e = 0; e < 9; e++) OF.push(AMB.filter((a) => a.era === e));
+  const OF = []; for (let e = 0; e < AGES.length; e++) OF.push(AMB.filter((a) => a.era === e));
   const worth = (era) => 10 + 5 * era;      // what an ambition of an age is worth: more in later ages, as the ages are shorter
   // ----- the world's firsts: once, for whoever is first (test on a realm; or a discovery: whoever first learned it) -----
   const F = (key, era, name, test, know) => ({ key, era, name, test, know });
   const FIRSTS = [
-    ...AGES.slice(1).map((n, k) => F('age' + (k + 1), k + 1, `First into the ${n}`, (x) => x.era >= k + 1)),
+    ...AGES.slice(1, 9).map((n, k) => F('age' + (k + 1), k + 1, `First into the ${n}`, (x) => x.era >= k + 1)),      // (firsts are saved by their place in this list: what comes later goes at its end)
     F('faith', 1, 'The first faith', (x) => x.founded()),
     F('great', 1, 'The first great person', (x) => x.greats() >= 1),
     F('wonder', 2, 'The first wonder of the world', (x) => x.wonders() >= 1),
@@ -106,6 +112,8 @@ window.LEGACY = (function () {
     F('railways', 6, 'The first railway', null, 'railways'), F('electricity', 6, 'The first electric light', null, 'electricity'), F('flight', 7, 'The first flight', null, 'flight'),
     F('fission', 7, 'The first split atom', null, 'fission'), F('computers', 8, 'The first computer', null, 'computers'), F('spaceflight', 8, 'The first into space', null, 'spaceflight'),
     F('internet', 8, 'The first network of networks', null, 'internet'), F('ai', 8, 'The first thinking machine', null, 'ai'),
+    F('age9', 9, 'First into the Space Age', (x) => x.era >= 9), F('fusion', 9, 'The first star lit on Earth', null, 'fusion'), F('agi', 9, 'The first mind of silicon', null, 'agi'),
+    F('settlement', 9, 'The first town beyond the Earth', null, 'settlement'), F('elevator', 9, 'The first road to the sky', null, 'elevator'),
   ];
   FIRSTS.forEach((f, i) => { f.id = i; });
   const FK = {}; FIRSTS.forEach((f) => { FK[f.key] = f; });
@@ -195,7 +203,7 @@ window.LEGACY = (function () {
       {
         // (a discovery's first is whoever first learned it, as the knowledge keeps it, looked at once in five years; the rest are asked
         // of each realm in its own year of the five, as its ambitions are)
-        const open = []; let minEra = 9;
+        const open = []; let minEra = AGES.length;
         for (const f of FIRSTS) { if (firsts[f.id]) continue; if (f.know) { if (yr % 5 === 0) { const at = h.firstOf(f.know); if (at && at.id >= 0 && civs[at.id]) takeFirst(f, civs[at.id], at.y > -1e8 ? at.y : yr); } continue; } open.push(f); if (f.era - 1 < minEra) minEra = f.era - 1; }
         if (open.length) for (let c = (5 - (yr % 5)) % 5; c < MAXC; c += 5) {
           const cv = civs[c]; if (!cv || cv.era < minEra) continue; let x = null;

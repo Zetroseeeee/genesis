@@ -23,14 +23,14 @@
 (function () {
   'use strict';
   // a turn of each age, in years (rule.js's PACE)
-  const TURN = (window.RULE && window.RULE.PACE) || [200, 100, 50, 50, 40, 20, 10, 5, 5];
+  const TURN = (window.RULE && window.RULE.PACE) || [200, 100, 50, 50, 40, 20, 10, 5, 5, 5];
   // a realm's work towards its next great person, a year, by age, for each town (an academy counts as three towns, a temple
   // or a market as two, a wonder as five); tools/culture/probe.js shows what the great realms of each age bring forth in a turn
-  const PACE = [0, 0.000077, 0.00029, 0.000175, 0.00019, 0.00058, 0.001, 0.00175, 0.0017];
+  const PACE = [0, 0.000077, 0.00029, 0.000175, 0.00019, 0.00058, 0.001, 0.00175, 0.0017, 0.0017];
   // the renown of the usual realm of each age (tools/culture/probe.js --write measures it: the mean of the logarithm over
   // realms, weighted by the square root of their people, so that as many realms are above it as below and pride sums to nought)
   // NORM-BEGIN
-  const NORM = [0, 2.4, 19.4, 29.1, 39.7, 54.9, 60.5, 64.8, 57.5];
+  const NORM = [0, 2.4, 19.4, 29.1, 39.7, 54.9, 60.5, 64.8, 57.5, 57.5];
   // NORM-END
   // the kinds of great people: the discovery each stands on, what in a realm makes them (temple, academy, market, wonder,
   // town: weights), what a work of theirs is worth, what it brings the realm, and how their works are named ({P} a person,
@@ -101,7 +101,7 @@
     let rs = ((h.seed || 1) ^ 0x1f83d9ab) >>> 0;
     const rnd = () => { rs += 0x6D2B79F5; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const pick = (a) => a[Math.floor(rnd() * a.length)];
-    const eraOf = (cv) => Math.min(8, Math.max(0, cv ? cv.era | 0 : 0));
+    const eraOf = (cv) => Math.min(9, Math.max(0, cv ? cv.era | 0 : 0));
 
     // ---------- names ----------
     // a great person is named in the tongue of the people of the city he was born in (people.js)

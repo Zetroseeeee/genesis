@@ -226,7 +226,7 @@ window.MARKET = (function () {
     if (!act.length) h += `<div class="hint" style="padding:8px 2px">Nothing is being made yet. Workshops start where a trade pays: where its materials are cheap and what it makes is dear.</div>`;
     if (idle.length) h += `<div class="mk-idle"><span class="micro">Not paying here now</span>${idle.map(l => `<span title="${pct(l.margin)} on a lot">${escH(EC.RECIPES[l.r].name)}</span>`).join('')}</div>`;
     { const todo = []; EC.RECIPES.forEach((R, ri) => { const gate = R.era <= c.era ? s.know.craftGate(c.id, ri) : null; if (gate) todo.push([R, gate]); }); if (todo.length) h += `<div class="mk-idle"><span class="micro">Not yet learned</span>${todo.map(([R, gate]) => `<span>${escH(R.name)} <button class="linkish" data-kgo="${gate.key}">${escH(gate.name)}</button></span>`).join('')}</div>`; }
-    const later = EC.RECIPES.filter(R => R.era === c.era + 1); if (later.length) h += `<div class="mk-idle"><span class="micro">Comes with the ${s.ERAS[Math.min(8, c.era + 1)][0]}</span>${later.map(R => `<span>${escH(R.name)}</span>`).join('')}</div>`;
+    const later = EC.RECIPES.filter(R => R.era === c.era + 1); if (later.length) h += `<div class="mk-idle"><span class="micro">Comes with the ${s.ERAS[Math.min(s.ERAS.length - 1, c.era + 1)][0]}</span>${later.map(R => `<span>${escH(R.name)}</span>`).join('')}</div>`;
     h += `</div>`; el.innerHTML = h;
   }
 
