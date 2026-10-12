@@ -347,7 +347,7 @@
       el[8] = (sy * Ex - cy * Nx) * ds; el[9] = (-cy * Ny) * ds; el[10] = (sy * Ez - cy * Nz) * ds; el[11] = 0;
       const rr = 1 + (Math.max(hg, 0) * this.exag) / R_M; el[12] = Ux * rr; el[13] = Uy * rr; el[14] = Uz * rr; el[15] = 1;
       I.mesh.setMatrixAt(idx, this._m); const ca = I.mesh.instanceColor.array; ca[idx * 3] = ((color >> 16) & 255) / 255; ca[idx * 3 + 1] = ((color >> 8) & 255) / 255; ca[idx * 3 + 2] = (color & 255) / 255;
-      I.info.setXYZW(idx, era, (idx % 97) / 97, TOWN.packStyle(4, 4, 0, 0), krep || 1); this.counts[kind] = idx + 1;
+      I.info.setXYZW(idx, era, (idx % 97) / 97, TOWN.packStyle(1, 4, 0, 64), krep || 1); this.counts[kind] = idx + 1;      // (painted, a thing: no door or windows)
     }
     animate(dt, sim) {
       for (const k in this.inst) this.counts[k] = 0;

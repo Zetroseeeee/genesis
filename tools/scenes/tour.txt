@@ -136,6 +136,7 @@ know         | tools/scenes/know.js | {} | | 16
 know_queue   | tools/scenes/know.js | {learn:['farming','pottery','weaving'],queue:['megaliths','quarrying'],key:'bronze'} | | 16
 know_iron    | tools/scenes/know.js | {years:9000,age:2,key:'iron'} | | 22
 know_stand   | tools/scenes/know.js | {years:9000,tab:'stand'} | | 22
+know_space   | tools/scenes/know.js | {age:9,key:'fusion'} | | 16
 # --- laws and government: a band's first laws, a medieval realm's, the forms of government, the estates and a demand ---
 laws         | tools/scenes/gov.js | {auth:60,key:'clanland'} | | 16
 laws_medieval | tools/scenes/gov.js | {age:4,years:60,auth:90,key:'standing'} | | 22
@@ -154,6 +155,7 @@ hud          | tools/scenes/dip.js tools/scenes/hud.js | {lens:true} | | 26
 hud_laws     | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,screen:'gov'} | | 28
 hud_copper   | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:6,screen:'market'} | | 28
 hud_glass    | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:8} | | 26
+hud_space    | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:9} | | 26
 legacy       | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,screen:'legacy'} | | 28
 intrigue     | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:4,screen:'intrigue'} | | 28
 schemes      | tools/scenes/dip.js tools/scenes/hud.js | {lens:true,age:4,screen:'schemes'} | | 28
@@ -406,6 +408,7 @@ tale_raid     | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'raid'}
 heritage      | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'heritage',d:{from:3,to:4,paths:[4,5,0],did:[1,1,0]}} | | 170
 spies         | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'spies',d:{o:'near',k:'murder',p:'heir'}} | | 170
 pestilence    | tools/scenes/tale.js | {years:10750,lon:2.35,lat:48.85,k:'plague',kind:'plague'} | | 220
+tale_moon     | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'otherworld'} | | 170
 # where the world's people live (land.js): a world run to AD 1000 from orbit over the old world and over the Americas; a capital on the Nile with its land named
 peopled      | tools/scenes/land.js | {years:11000,look:'globe',alt:11000000,at:[75,25]} | | 230
 peopled_west | tools/scenes/land.js | {years:11000,look:'globe',alt:11000000,at:[-65,10]} | | 230

@@ -492,7 +492,7 @@
         // (how faint a star is shown: more of them from out in space than through the air, and more where a screen's pixels are small enough to hold them apart)
         this.starField.update(cam.camera.position, turn, SKY.soft ? 6.5 : 8.7 - 1.5 * skyA + 0.9 * Math.log2(Math.max(1, su.uPx.value)));
         this.stars.visible = su.uAlpha.value > 0.004; }
-      if (this.orbits) this.orbits.update(this.sim, time, sun, this.starUniforms.uPx.value);
+      if (this.orbits) this.orbits.update(this.sim, time, sun, this.starUniforms.uPx.value, this.starUniforms.uAlpha.value);
       // lights follow the sun; hemisphere dims at night for the camera's local sun elevation
       this.sunLight.position.copy(sun).multiplyScalar(10); this.sunLight.target.position.set(0, 0, 0);
       const camUp = cam.camera.position.clone().normalize(); const sunUp = camUp.dot(sun);

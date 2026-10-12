@@ -1,7 +1,7 @@
 // The knowledge screen as the player sees it. Options in window.__scene (all optional):
 //   lon, lat: where the realm is founded     years: how long the world then runs by itself (0 = the first day)
 //   learn: discoveries the player's people learn at the start (keys)     queue: discoveries put in the queue
-//   tab: tree or stand     key: the discovery whose page is open     age: scroll the tree to this age (0..8)
+//   tab: tree or stand     key: the discovery whose page is open     age: scroll the tree to this age (0..9)
 (() => {
   const G = window.__G; if (!G) return 'no game';
   const P = Object.assign({ lon: 31.25, lat: 29.9, years: 0, learn: [], queue: [], tab: 'tree', key: '', age: -1 }, window.__scene || {});

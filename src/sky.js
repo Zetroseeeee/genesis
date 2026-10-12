@@ -164,14 +164,15 @@
       this.points.frustumCulled = false; this.points.renderOrder = 8; scene.add(this.points); this.NS = NS; this.NT = NT; this.n = 0;
     }
     // how many: thirty a year after the world's first spaceflight (to 1,600), and with orbital industry forty more a year (to 2,000) and the stations
-    update(sim, time, sun, px) {
+    update(sim, time, sun, px, alpha) {
       let nt = 0, st = false; const K = sim && sim.know;
       if (K && K.ID && K.first) { const y = sim.year, f0 = K.first[K.ID.spaceflight], f1 = K.first[K.ID.orbital];
         if (f0) nt = Math.min(1600, Math.max(40, (y - Math.max(f0.y, y - 400)) * 30));
         if (f1) { nt += Math.min(2000, Math.max(150, (y - Math.max(f1.y, y - 400)) * 40)); st = true; } }
       if (window.__orbits !== undefined) { nt = Math.min(this.NT, window.__orbits); st = window.__orbits > 1600; }      // (for pictures)
       const g = this.points.geometry; g.setDrawRange(st ? 0 : this.NS, Math.min(this.NT, nt) + (st ? this.NS : 0)); this.n = nt + (st ? this.NS : 0);
-      this.points.visible = this.n > 0; const U = this.uniforms; U.uTime.value = time; U.uSun.value.copy(sun); U.uPx.value = px;
+      const U = this.uniforms; U.uTime.value = time; U.uSun.value.copy(sun); U.uPx.value = px; U.uAlpha.value = alpha === undefined ? 1 : alpha;      // (as the stars are: none in a daylit sky)
+      this.points.visible = this.n > 0 && U.uAlpha.value > 0.004;
     }
   }
 
