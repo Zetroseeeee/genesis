@@ -35,6 +35,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   planner: eras 0–2 must show nothing but `stall` (the market model brings its own) and `rubble`, and so must the
   later eras of the peoples who keep the old ways (`node tools/coverage.js 3,4,5`). `node tools/density.js` reports
   how much of a town's ground its houses cover.
+- `node tools/towns/census.js [eras] [peoples] [sizes in thousands]` — what a town of each people, age and size is made of,
+  from the planner alone (seconds): how many buildings of each kind, its parks, the tallest thing in it, how long its plan took
+  (a city of millions some tens of milliseconds: keep it under a tenth of a second). Run it after touching how cities are laid
+  out, then look at the `city_*` pictures on the Mac.
 - `node tools/dbg3.js "<script>" "<probe>" <wait>` — run a script in the page and print a probe object.
 - `node tools/live.js "<setup script>" [wait ms]` — a page that stays up, to look again and again without starting the
   game each time (run it with `nohup ... &`; it answers on 127.0.0.1:8791): `curl -s localhost:8791/eval --data-binary
@@ -372,6 +376,26 @@ Conventions that matter:
   shrine of the old kind - all models. `L.era` is the style era, `L.eraReal` the civilisation's; the world picks
   models by `it.era` if set (old houses in a new age, a wonder of an earlier one), else by `L.era`. A model's `eras`
   in the manifest therefore only cover the ages that really build that way.
+- **Cities of the machine age and after** (`town.js`, from "how a city of the machine age and after is laid out"; the kit's
+  clusters in `buildings.js`; since 0.42). Every people's cities grew their own way (`CK`, by culture). The old cities of Europe
+  and the Middle East keep their old towns in the middle (`oldTown`, within `oldR` of the radius: nine old houses wall to wall to
+  a plot, `oldtown`, a medina's about their courts, `medina`), round the cathedral or mosque they always had (their landmark
+  stays the medieval one), the railway station at the old town's edge and a stadium at the city's; their towers stand in a
+  business quarter beside the old town (`biz`). The Americas put their towers in the middle (a downtown of a few square
+  kilometres even in a city of millions: `coreR`) and spread out in houses with gardens and malls; East Asia houses its millions
+  in towers of flats in rows on their blocks (`compound`), the Soviet east in slabs; the fast-growing cities of the south grow
+  at their edges in houses people built themselves (`shacks`) and behind compound walls (`walled`); the Industrial city has its
+  tenements in the middle, rows of terraces and mills about them, gasholders by the works. Each ring (inner, outer, the
+  suburbs) is a weighed list of kinds (`Z[CK]`), and `spec` makes a kind a plot's building: its materials, size, height and
+  palette (`HOMEPAL`, `FLATPAL`: the houses' paint by how each people paints them). A plot of a modern city is a block of sixty
+  to ninety metres (one drawn building stands for sixty people and more: `PPB`), so where houses stand it holds a cluster of
+  them (`homes`: six in two rows back to back, their gardens between; `homes4`, `rows` of terraces, `walled`, `shacks`), each
+  house of it a paint and a roof of its own (the block flag: the kit's shader tints by the house's cell, `hc`); on a smaller
+  plot it is one house of the sort. The plots beside a street come up to it, and a city street is fifteen to thirty metres
+  across (`street`). Trees stand in the gardens and courts of those blocks (`GARDEN`, `gardenAt` in `trees.js`) and in the
+  parks. A plot not yet rebuilt in a new age keeps a block of the age before. A city of millions is some twenty thousand plots
+  (`maxN`), drawn one by one to 0.85 of its radius (`coarseFrom`). `node tools/towns/census.js` says what each city is made
+  of; look at `city_*` on the Mac after touching any of it.
 - **The market** (`econ.js`; `sim.market`). 63 goods: 42 the land yields (a cell has one, `sim.goods[i]`, and the age
   in which that place begins to yield it, `sim.gera[i]`: cocoa is old in Mesoamerica and came to West Africa with the
   plantations) and 21 made by recipes. A quantity is in lots, a price in coin per lot: the treasury's coin. Every year,
