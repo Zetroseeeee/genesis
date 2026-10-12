@@ -75,7 +75,7 @@
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.004; comp.release.value = 0.25;
     E.master.connect(comp); comp.connect(ctx.destination);
     const bus = (g) => { const n = ctx.createGain(); n.gain.value = g; n.connect(E.master); return n; };
-    E.world = bus(0.8); E.ui = bus(0.7); E.music = bus(0.6);
+    E.world = bus(0.8); E.ui = bus(0.7); E.mduck = bus(1); E.music = ctx.createGain(); E.music.gain.value = 0.6; E.music.connect(E.mduck);      // (the music steps back under what the age brings: mduck)
     E.duck = ctx.createGain(); E.duck.connect(E.world);      // (the world is quieter while a page is open over it)
 
     // rooms: a convolver with a tail of noise made here, darkening as it dies away (the high frequencies first, as in air and halls)
@@ -788,7 +788,11 @@
     E.master.gain.setTargetAtTime(Math.pow(clamp(V.master, 0, 1), 1.6) * 1.1, t, 0.05); E.world.gain.setTargetAtTime(Math.pow(clamp(V.world, 0, 1), 1.6), t, 0.05); E.ui.gain.setTargetAtTime(Math.pow(clamp(V.ui, 0, 1), 1.6), t, 0.05); E.music.gain.setTargetAtTime(Math.pow(clamp(V.music, 0, 1), 1.6), t, 0.05);
   };
   SOUND.ui = function (kind) { if (SOUND.V && SOUND.E.ctx.state === 'running') SOUND.V.ui(kind); };
-  SOUND.sting = function (kind) { if (SOUND.V && SOUND.E.ctx.state === 'running') SOUND.V.sting(kind); };
+  SOUND.sting = function (kind) {
+    if (!SOUND.V || SOUND.E.ctx.state !== 'running') return;
+    SOUND.V.sting(kind);
+    if (/^(age|war|wonder|golden|end|fall|disaster)$/.test(kind)) { const g = SOUND.E.mduck.gain, t = SOUND.E.ctx.currentTime; g.cancelScheduledValues(t); g.setTargetAtTime(0.3, t, 0.08); g.setTargetAtTime(1, t + 3.5, 1); }
+  };
 
   // what the camera looks at, as the soundscape asks it (worked out from the game, a few times a second)
   const cellOf = (lon, lat) => clamp(Math.floor((90 - lat) / 180 * 360), 0, 359) * 720 + ((Math.floor((lon + 180) / 360 * 720) % 720) + 720) % 720;      // (the simulation's grid: 720 by 360)

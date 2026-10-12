@@ -4,7 +4,7 @@
 import sys, os, wave, numpy as np
 import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt
 from scipy.signal import lfilter
-D = 'shots/sound'
+D = os.environ.get('DIR', 'shots/sound')      # (DIR=shots/sound/music for the pieces of music.js)
 # loudness as ITU-R BS.1770 has it (LUFS): the K-weighting (a shelf that hears the highs 4 dB louder, a high-pass under 38 Hz), the
 # mean square over 400 ms blocks a quarter apart, gated; and the short-term loudness (3 s) at its loudest and its quietest tenth
 def kweight(x, fs):
