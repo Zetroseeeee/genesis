@@ -75,7 +75,7 @@
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.004; comp.release.value = 0.25;
     E.master.connect(comp); comp.connect(ctx.destination);
     const bus = (g) => { const n = ctx.createGain(); n.gain.value = g; n.connect(E.master); return n; };
-    E.world = bus(0.8); E.ui = bus(0.7); E.music = bus(0.6);
+    E.world = bus(0.8); E.ui = bus(0.7); E.mduck = bus(1); E.music = ctx.createGain(); E.music.gain.value = 0.6; E.music.connect(E.mduck);      // (the music steps back under what the age brings: mduck)
     E.duck = ctx.createGain(); E.duck.connect(E.world);      // (the world is quieter while a page is open over it)
 
     // rooms: a convolver with a tail of noise made here, darkening as it dies away (the high frequencies first, as in air and halls)
@@ -224,10 +224,10 @@
     }
     // a struck string (a piano): partials a little sharp of the harmonic series, each dying the faster the higher it is, with the
     // hammer's knock
-    function piano(o, t, f, a) {
-      E.stats.voices++;
-      const P = []; for (let k = 1; k <= 8; k++) P.push([k * Math.sqrt(1 + 0.0004 * k * k), 1 / Math.pow(k, 1.25), 3.2 / Math.pow(k, 0.65) * clamp(300 / f, 0.35, 1.4)]);
-      partials(o, t, f, a * 0.5, P, { at: 0.003 }); partials(o, t, f * 1.0015, a * 0.25, P.slice(0, 3), { at: 0.003 });
+    function piano(o, t, f, a, len) {
+      E.stats.voices++; const dk = len ? clamp(len / 1.6, 0.35, 1) : 1;      // (len: how long the note is meant to be held - a quick figure's notes are damped sooner)
+      const P = []; for (let k = 1; k <= 6; k++) P.push([k * Math.sqrt(1 + 0.0004 * k * k), 1 / Math.pow(k, 1.25), 3.2 / Math.pow(k, 0.75) * clamp(300 / f, 0.35, 1.4) * dk]);
+      partials(o, t, f, a * 0.5, P, { at: 0.003 }); partials(o, t, f * 1.0015, a * 0.25, P.slice(0, 2), { at: 0.003 });      // (six partials and a second string beside the first two: a piano's notes are many at once)
       knock(o, t, Math.min(4000, f * 3), a * 0.12, 0.03, 1.5);
     }
     // an electric piano (frequency modulation: the tine's bell in the attack, then a round tone)
@@ -788,7 +788,11 @@
     E.master.gain.setTargetAtTime(Math.pow(clamp(V.master, 0, 1), 1.6) * 1.1, t, 0.05); E.world.gain.setTargetAtTime(Math.pow(clamp(V.world, 0, 1), 1.6), t, 0.05); E.ui.gain.setTargetAtTime(Math.pow(clamp(V.ui, 0, 1), 1.6), t, 0.05); E.music.gain.setTargetAtTime(Math.pow(clamp(V.music, 0, 1), 1.6), t, 0.05);
   };
   SOUND.ui = function (kind) { if (SOUND.V && SOUND.E.ctx.state === 'running') SOUND.V.ui(kind); };
-  SOUND.sting = function (kind) { if (SOUND.V && SOUND.E.ctx.state === 'running') SOUND.V.sting(kind); };
+  SOUND.sting = function (kind) {
+    if (!SOUND.V || SOUND.E.ctx.state !== 'running') return;
+    SOUND.V.sting(kind);
+    if (/^(age|war|wonder|golden|end|fall|disaster)$/.test(kind)) { const g = SOUND.E.mduck.gain, t = SOUND.E.ctx.currentTime; g.cancelScheduledValues(t); g.setTargetAtTime(0.3, t, 0.08); g.setTargetAtTime(1, t + 3.5, 1); }
+  };
 
   // what the camera looks at, as the soundscape asks it (worked out from the game, a few times a second)
   const cellOf = (lon, lat) => clamp(Math.floor((90 - lat) / 180 * 360), 0, 359) * 720 + ((Math.floor((lon + 180) / 360 * 720) % 720) + 720) % 720;      // (the simulation's grid: 720 by 360)

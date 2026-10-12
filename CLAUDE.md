@@ -95,6 +95,10 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   loudest and quietest three seconds) and a spectrogram (`shots/sound/sheet.png`, `<gallery>_grid.png`). `--solo surf,birds` keeps
   only those layers. Nothing can be listened to here: hold a change to the numbers (the levels in the header of the sound's notes
   below) and to the pictures (a bird's song is a run of bent lines where that bird sings, a wave a swell, a crash and a long hiss).
+- `node tools/sound/music.js name:era:culture:mood:seed[:seconds[:parts]] ...`, then `python3 tools/sound/roll.py <names>` and
+  `DIR=shots/sound/music python3 tools/sound/sheet.py <names>` — pieces of the music of the ages without the game (mood: calm, war,
+  golden, dark, theme; parts: lead, fig, hold, bass, beat, colour, to hear some alone): `shots/sound/music/<name>.wav`, its events,
+  a piano roll of the parts (`rolls.png`) and its loudness. Every age and people should come out between -22 and -25 LUFS there.
 - `node tools/econ/probe.js [seed] [last year] [goods]` — the world's economy through the ages in numbers: prices
   against the usual, output against need, who is short, how much crosses borders, what the workshops make, and how
   long the market takes a year. `node tools/econ/calibrate.js [seed,seed] --write` measures how much each raw good's land
@@ -289,6 +293,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/decal.js`, `trees.js`, `life.js`, `movers.js`, `events.js` | | Roads/rivers decals, vegetation, people, vehicles, disasters and battles |
 | `src/fauna.js` | `FAUNA` | The beasts and birds about the eye: herds wild and kept (`Fauna`), flocks in the air (`Flocks`); pure drawing |
 | `src/sound.js` | `SOUND` | The sound of the world: wind, sea, woods, birds, insects, beasts, towns, battles - what the camera looks at - and the interface's voice in the age's instruments, all made as it is heard by the Web Audio API (no recordings) |
+| `src/music.js` | `MUSIC` | The music of the ages: a piece made as it is played from the player's age, people and fortunes (the age's instruments and the people's own, its scale, a motif and its answer over a drone or chords), on the sound's engine; the game's theme on the home screen |
 | `src/market.js` | `MARKET` | The market screen (board, a good's page and book, partners, workshops, ledger), the movers, the goods' glyphs |
 | `src/tree.js` | `TREE` | The knowledge screen: the tree age by age and branch by branch, a discovery's page, the queue, where the realm stands |
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand; the faith; the court (`court.js`) |
@@ -1637,6 +1642,24 @@ Conventions that matter:
   -23 at the crash, -29.5 between), a wood at dawn -25, a summer night -25, a town -24 to -29, the heights -26, a battle -23, winter in
   a wood -33, the interface's stings -19 at their loudest. *What it costs*: the audio runs on its own thread; the page's part is
   `SOUND.update` (`SOUND.ms`, a tenth of a second of it: some hundredths of a millisecond on the build Mac).
+- **Music** (`music.js`; `MUSIC`; the menu's fourth volume). A piece is composed as it begins (`compose`: era, culture, mood, seed)
+  and handed to the sound's engine a second and a half ahead (`update`); a minute or two and a half of silence between pieces (the
+  world is heard alone), the game's theme on the home screen (`THEME`: sixteen bars written out in the Dorian mode on A, over its own
+  chords), faded out when a game begins and back on the way home. *What plays*: the age's ensemble (`ENS`: who leads, the figure
+  under it, what is held, the bass, the beat, the colour - a bone flute, a hum and a frame drum in the Stone Age; a lyre or a flute
+  over a drone, bronze bells; a recorder and a lute over an organ; lutes over viols, with chords; a piano over strings; an electric
+  piano, an arpeggio and a pad; glass), and a people's own from the Bronze Age to the Renaissance (`FLAVOUR`: an oud, a ney and a
+  darbuka; a kora, a balafon and djembes; a sitar's glide over a tanpura, and tabla; a bamboo flute, a koto, taiko and a temple
+  bell; a gamelan of saron and bonang with its gong at every fourth bar; panpipes and drums), its lead staying through the Modern age
+  over the machine age's piano and strings. The people's scale is `SOUND.SCALE`, its key `KEY`. *How it goes*: an opening, then
+  A A' B A'' of four bars each and a close - a motif of two bars (rhythms from `CELLS`, steps of the scale rising and falling), its
+  answer (moved by a step, ending on the fifth, then the key note), a contrast higher up, the motif ornamented and the close; over a
+  drone (moving to the fourth or fifth for the contrast half the time) where the age knew no harmony, over chords from the
+  Renaissance on (`PROG_MAJ`, `PROG_MIN`, four bars at a time, home through the fifth; the melody's downbeats on the chord's notes),
+  a breath at the end of a phrase. War makes it faster, lower and drummed; a golden age brighter; hard times slower. Every part has
+  its place in the stereo picture and its share of the hall; how loud each instrument is against the others is `GAIN` (measured a
+  part at a time by `tools/sound/music.js`) and each part `ROLE`. What the age brings (a new age, a war, a wonder, a golden age, a
+  disaster) steps the music back for a few seconds (`SOUND.E.mduck`).
 - **After dark** (`life.js`): open fires burn from dusk till morning in towns that have no lamps yet (style era ≤ 5):
   a great one on the square, braziers either side of each gate and before the great buildings, a few before house
   doors where there is room. Each is two instances of the smoke mesh: a flame (a card facing the eye) and the pool of
