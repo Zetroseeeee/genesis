@@ -1631,7 +1631,7 @@ Conventions that matter:
   dry. Look at the Mac's `rain_*`, `snow_town` and `storm_bolt` after touching any of it.
 - **Sound** (`sound.js`; `SOUND`; the volumes in the menu, `settings.vol`). Nothing is a recording: every sound is made as it is
   heard by the Web Audio API, out of noise, oscillators and filters, so it can follow the world anywhere and the game carries no
-  sound files. *The engine* (`Engine`): the world's, the interface's and (for later) music's buses under the master, through a gentle
+  sound files. *The engine* (`Engine`): the world's, the interface's and music's buses under the master, through a gentle
   compressor; two rooms made of noise that darkens as it dies (the open air's, 1.4 s, for the world; a hall, 2.8 s, for the
   interface); the elements - a whistle bent along a curve (`whistle`: a bird's note, a flute), a harsh voice through formants
   (`rasp`: a crow, a gull, a beast), a knock (noise through a resonance), struck partials (`partials`, `BELLS`: church, bronze,
