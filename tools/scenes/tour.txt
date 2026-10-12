@@ -113,7 +113,9 @@ city_space   | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,wal
 city_space_green | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('greentower',4,1.0,0.6), 7000); | 55
 city_space_arco | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('arcology',2.2,1.1,0.4), 7000); | 55
 city_space_lift | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('landmark',0.6,1.35,0.5), 7000); | 55
-city_space_port | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('spaceport',3,1.1,0.3), 7000); | 55
+city_space_port | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('spaceport',3,1.1,0.3), 7000); window.__launchAt = performance.now() + 50000; | 55
+city_space_launch | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('spaceport',30,1.36,0.3), 7000); window.__launchAt = performance.now() + 39000; | 55
+city_space_launch_night | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0,sun:[-0.22,4.6]} | setTimeout(() => __sceneLook('spaceport',30,1.36,0.3), 7000); window.__launchAt = performance.now() + 39000; | 55
 city_space_night | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0,sun:[-0.2,4.6]} | setTimeout(() => __sceneLook('town',0.4,1.15,0.9), 7000); | 55
 # --- shrines and wonders that are models ---
 mena_temple  | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('temple', 5, 1.05, 0.3), 7000); | 32
@@ -311,6 +313,8 @@ sky_limb        | tools/scenes/forest.js | null | window.__cloudTime = 0; const 
 sky_peru        | tools/scenes/forest.js | null | window.__cloudTime = 0; const f = () => __forest(-86.0, -18.0, 1500000, 0.0, 0, 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_edge        | tools/scenes/forest.js | null | window.__cloudTime = 0; const f = () => __forest(60.0, 20.0, 9000000, 0.0, 0, 0.5, [0.03, 4.7]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_edge_low    | tools/scenes/forest.js | null | window.__cloudTime = 0; const f = () => __forest(78.0, 20.0, 1500000, 0.9, 4.7, 0.5, [0.05, 4.7]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
+orbits_edge     | tools/scenes/forest.js | null | window.__cloudTime = 0; window.__orbits = 3600; const f = () => __forest(60.0, 20.0, 9000000, 0.0, 0, 0.5, [0.03, 4.7]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
+orbits_low      | tools/scenes/forest.js | null | window.__cloudTime = 0; window.__orbits = 3600; const f = () => __forest(78.0, 20.0, 1500000, 0.9, 4.7, 0.5, [0.05, 4.7]); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_under       | tools/scenes/forest.js | null | window.__cloudTime = 0; const f = () => __forest(78.0, 22.0, 900, 1.4, 0.6, 0.5, [0.8, 2.2], 0.5); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_under_fair  | tools/scenes/forest.js | null | window.__cloudTime = 20084; const f = () => __forest(22.0, 2.0, 900, 1.4, 4.7, 0.5, [0.9, 3.6], 0.75); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44
 sky_under_high  | tools/scenes/forest.js | null | window.__cloudTime = 20084; const f = () => __forest(22.0, 2.0, 900, 1.4, 4.7, 0.5, [0.9, 3.6], 1.25); f(); setTimeout(f, 3000); setTimeout(f, 7000); | 44

@@ -416,7 +416,10 @@ Conventions that matter:
   solar tiles (half the slate and flat roofs of the age: `roofLayer`); a downtown of turning towers (`twist`) and needles; one to
   three arcologies (cities in one building, terraces of gardens to a crown) about a great city's middle, a spaceport with its pads
   beyond a capital, fields of solar panels in the country (a thing in glass: the shader draws its panels), and in a capital that
-  raised it the space elevator, its cable twelve kilometres into the sky with a light at its head. The garden flag (`FLAG.garden`,
+  raised it the space elevator, its cable twelve kilometres into the sky with a light at its head. Rockets stand on the
+  spaceport's pads and go up from them (`movers.js`: each pad's round by the clock, 150 s - the flight, the pad empty, the next
+  rocket - a flame brighter than white at the tail, smoke that rolls out along the ground and hangs where it has been; for
+  pictures `window.__launchAt` times the first launch). The garden flag (`FLAG.garden`,
   128) greens whatever lies flat on a building.
 - **The market** (`econ.js`; `sim.market`). 63 goods: 42 the land yields (a cell has one, `sim.goods[i]`, and the age
   in which that place begins to yield it, `sim.gera[i]`: cocoa is old in Mesoamerica and came to West Africa with the
@@ -1044,7 +1047,12 @@ Conventions that matter:
   Vega and that of AD 2000 about Polaris). A star's light is its magnitude, its colour its B-V; how many are drawn goes
   with how dark the sky is (`uDeep`). The Milky Way is NASA's map of it and the Moon the Moon's own picture (LRO's),
   both in the sky's own shader (`SKY.GLSL`); the Moon goes round the Earth's path, through all its phases in some forty
-  minutes of play, and is lit as its angle from the sun has it, with earthshine on its dark side (`SKY.moonAt`). The camera can be lifted to the sky once
+  minutes of play, and is lit as its angle from the sun has it, with earthshine on its dark side (`SKY.moonAt`). *What people have put in orbit*
+  (`SKY.Orbits`): from the world's first spaceflight, satellites (thirty a year to 1,600; with orbital industry forty more a year to
+  2,000, and a dozen stations, brighter, with a light that blinks), points on circular orbits drawn twice as high as they are, round
+  the Earth in two minutes of play and more the higher they go, worked out in the vertex shader, lit unless the Earth's shadow is
+  on them: from the ground they cross the sky for an hour or two after dusk (`window.__orbits` sets how many, for pictures:
+  `orbits_*`). The camera can be lifted to the sky once
   its tilt is at the end (`mapcam.lift`: PageUp, or a drag past the end; back with the top button or U). For tests:
   `window.__skyYear` (2000: the catalogues' sky), `__moonAge` (0 new, pi full), `__moonLight`, `__cloudTime` (the
   weather held where it is); `__T.faceStar(ra hours, dec)` and `__T.faceMoon()` turn the eye to them.
