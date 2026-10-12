@@ -280,7 +280,7 @@
     }
     uniform sampler2D uWater; uniform vec4 uWaterRect, uWaterP;      // the water's edge (data/w): P = 0 the picture's map, 1 a pack, 2 no shore near; the level's scale; for 2 the distance and the kind
     uniform float uDLon, uDLat, uLevel;
-    uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix; uniform vec4 uSeason; uniform vec4 uBare; uniform vec4 uIceCold;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
+    uniform vec3 uSun; uniform float uTime, uCamAlt, uDayMix, uYearPh; uniform vec4 uSeason; uniform vec4 uBare; uniform vec4 uIceCold;   // winter N, autumn N, winter S, autumn S (0..1); leaves down N, S, the cold of the year N, S
     uniform sampler2D uOwner, uPal, uSim, uNoise;
     // (the planet's own maps travel as one texture of two layers where they could be made one: info.png, and what grows there by
     //  nature - the map the trees are planted by)
@@ -473,6 +473,21 @@
     // What people have made of the ground (the land-use tiles: crops in their rows, paving) has a size too, and it is the size the
     // game draws a village at, some twenty times life: a plot takes one repeat of its crop, a cobble is as wide as a doorway there.
     // n: cells to a repeat (a power of two); swap: the other way round.
+    // what a field shows at this time of its year (yr: 0 midwinter, 0.5 midsummer; on: outside the tropics): it may change its land-use
+    // layer (grain: 0 ripe, 1 young rows, 2 ploughed) and gives a tint (grain green before it ripens, pale stubble after it is cut,
+    // vines and orchards bare and pasture yellowed in winter). L is changed in place.
+    vec3 fieldYear(inout float L, float yr, float on) {
+      if (on < 0.5) return vec3(1.0);
+      bool winter = yr < 0.25 || yr >= 0.8;
+      if (L < 2.5) {
+        if (winter) { L = 2.0; return vec3(1.0); }
+        if (yr < 0.38) { L = 1.0; return vec3(1.0); }
+        L = 0.0; return yr < 0.52 ? vec3(0.6, 0.92, 0.4) : yr < 0.66 ? vec3(1.0) : vec3(1.04, 0.96, 0.8) * 0.9;
+      }
+      if ((L == 4.0 || L == 5.0) && winter) return vec3(0.76, 0.68, 0.58);
+      if (L == 6.0 && winter) return vec3(0.88, 0.82, 0.6);
+      return vec3(1.0);
+    }
     vec3 ltex(float L, float n, float swap) {
       vec2 p = fract(uLadN / n) + (uLadF + gLoc) / n; if (swap > 0.5) p = p.yx;
       return texture(uLanduse, vec3(p, L)).rgb;
@@ -1109,16 +1124,23 @@
           float wet = step(0.45, green) * step(warm, 0.35) * step(latN0, 0.45);
           float hcB = hash21(bigId + 5.3), hsB = hash21(bigId + 9.1);
           float flB = (wet > 0.5 && hcB < 0.6) ? 3.0 : hcB < 0.35 ? 0.0 : hcB < 0.55 ? 1.0 : hcB < 0.68 ? 2.0 : hcB < 0.84 ? 6.0 : (latN0 > 0.3 && latN0 < 0.55 && hcB < 0.92) ? 4.0 : 5.0;
+          // the year on the farmland, outside the tropics: grain is sown, comes up green in its rows, ripens to gold and is cut, the
+          // stubble is ploughed in and the earth lies brown through the winter (snow lies on it as on the ground about it); vines and
+          // orchards stand bare and pasture yellows in winter. Every field keeps its own days, a farmer's, so the country turns over
+          // field by field; nearer the warm south the grain grows through the winter and is cut in early summer.
+          float yearOn = smoothstep(0.2, 0.3, latN0), yr0 = fract(uYearPh + (1.0 - hemi) * 0.5 + mix(0.1, 0.0, smoothstep(0.38, 0.5, latN0)));
+          vec3 tintB = fieldYear(flB, fract(yr0 + (hash21(bigId + 13.7) - 0.5) * 0.12), yearOn);
           #ifdef USE_GROUND
           #define FT(L, sw) ltex(L, L == 5.0 ? 256.0 : 128.0, sw)
           #else
           #define FT(L, sw) gtexS(uLanduse, L, L == 5.0 ? 16.0 : 8.0, sw)
           #endif
-          vec3 ft = FT(flB, step(0.5, hsB)) * (0.9 + 0.2 * hash21(bigId + 7.7));
+          vec3 ft = FT(flB, step(0.5, hsB)) * (0.9 + 0.2 * hash21(bigId + 7.7)) * tintB;
           if (own > 0.01) {
             float hc = hash21(smallId + 5.3), hs = hash21(smallId + 9.1);
             float fl = (wet > 0.5 && hc < 0.6) ? 3.0 : hc < 0.35 ? 0.0 : hc < 0.55 ? 1.0 : hc < 0.68 ? 2.0 : hc < 0.84 ? 6.0 : (latN0 > 0.3 && latN0 < 0.55 && hc < 0.92) ? 4.0 : 5.0;
-            ft = mix(ft, FT(fl, step(0.5, hs)) * (0.9 + 0.2 * hash21(smallId + 7.7)), own);
+            vec3 tintS = fieldYear(fl, fract(yr0 + (hash21(smallId + 13.7) - 0.5) * 0.12), yearOn);
+            ft = mix(ft, FT(fl, step(0.5, hs)) * (0.9 + 0.2 * hash21(smallId + 7.7)) * tintS, own);
           }
           #undef FT
           fieldCol = mix(fieldCol, ft * (1.0 + (hash21(smallId + 4.4) - 0.5) * 0.14 * fine), gOn); fieldA = mix(0.7, 0.92, gOn);
