@@ -108,6 +108,13 @@ city_latam   | tools/scenes/town.js | {lon:-99.13,lat:19.43,tech:0.86,pop:3000,w
 city_latam_edge | tools/scenes/town.js | {lon:-99.13,lat:19.43,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | __sceneLook('shacks',3.5,1.05,0.8) | 55
 city_mena    | tools/scenes/town.js | {lon:31.24,lat:30.04,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | __sceneLook('town',0.5,1.15,0.3) | 55
 city_soviet  | tools/scenes/town.js | {lon:37.62,lat:55.75,tech:0.86,pop:3000,walls:0,special:14,alt:4000,tilt:1.1,out:1.0} | __sceneLook('town',0.5,1.15,0.3) | 55
+# --- the Space Age: garden towers, arcologies, vertical farms, solar fields, a spaceport, the space elevator (special 318: a wonder of the age) ---
+city_space   | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('town',0.55,1.15,0.9), 7000); | 55
+city_space_green | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('greentower',4,1.0,0.6), 7000); | 55
+city_space_arco | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('arcology',2.2,1.1,0.4), 7000); | 55
+city_space_lift | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('landmark',0.6,1.35,0.5), 7000); | 55
+city_space_port | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0} | setTimeout(() => __sceneLook('spaceport',3,1.1,0.3), 7000); | 55
+city_space_night | tools/scenes/town.js | {lon:-0.12,lat:51.5,tech:1.08,pop:6000,walls:0,special:318,alt:4000,tilt:1.1,out:1.0,sun:[-0.2,4.6]} | setTimeout(() => __sceneLook('town',0.4,1.15,0.9), 7000); | 55
 # --- shrines and wonders that are models ---
 mena_temple  | tools/scenes/town.js | {lon:44.4,lat:32.5,tech:0.1,pop:8,walls:2,special:14} | setTimeout(() => __sceneLook('temple', 5, 1.05, 0.3), 7000); | 32
 iron_med_wonder | tools/scenes/town.js | {lon:22.35,lat:39.55,tech:0.2,pop:10,walls:2,special:94} | setTimeout(() => __sceneLook('town', 0.9, 1.0, 0.3), 7000); | 32

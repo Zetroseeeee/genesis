@@ -409,8 +409,15 @@ Conventions that matter:
   plot it is one house of the sort. The plots beside a street come up to it, and a city street is fifteen to thirty metres
   across (`street`). Trees stand in the gardens and courts of those blocks (`GARDEN`, `gardenAt` in `trees.js`) and in the
   parks. A plot not yet rebuilt in a new age keeps a block of the age before. A city of millions is some twenty thousand plots
-  (`maxN`), drawn one by one to 0.85 of its radius (`coarseFrom`). `node tools/towns/census.js` says what each city is made
+  (`maxN`), drawn one by one to 0.95 of its radius (`coarseFrom`). `node tools/towns/census.js` says what each city is made
   of; look at `city_*` on the Mac after touching any of it.
+  *The Space Age* (style era 9, since 0.43) houses everyone (the self-built edges are rebuilt): towers with gardens on every few
+  floors (`greentower`), farms forty floors high (`vertfarm`, their glass lit green), flats round planted courts, houses under
+  solar tiles (half the slate and flat roofs of the age: `roofLayer`); a downtown of turning towers (`twist`) and needles; one to
+  three arcologies (cities in one building, terraces of gardens to a crown) about a great city's middle, a spaceport with its pads
+  beyond a capital, fields of solar panels in the country (a thing in glass: the shader draws its panels), and in a capital that
+  raised it the space elevator, its cable twelve kilometres into the sky with a light at its head. The garden flag (`FLAG.garden`,
+  128) greens whatever lies flat on a building.
 - **The market** (`econ.js`; `sim.market`). 63 goods: 42 the land yields (a cell has one, `sim.goods[i]`, and the age
   in which that place begins to yield it, `sim.gera[i]`: cocoa is old in Mesoamerica and came to West Africa with the
   plantations) and 21 made by recipes. A quantity is in lots, a price in coin per lot: the treasury's coin. Every year,

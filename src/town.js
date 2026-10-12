@@ -481,7 +481,7 @@
     const oldSpec = (k) => { const e = pickW(OLDH, hash(i, k + 4)), q2 = hash(i, k + 22);
       if (s >= 30) return CK === 'mena' ? ['medina', WALL.plaster, ROOF.flat, s * 0.96, s * 0.96, 12 + 3 * q2, FLAG.block, OLDP] : ['oldtown', e[2], e[3], s * 0.96, s * 0.96, 17 + 4 * q2, FLAG.block, OLDP];
       return [e[0], e[2], e[3], s * 0.86, s * 0.84, 12 + 4 * q2, 0, OLDP]; };
-    const TALL = { tower: 1, podium: 1, skyscraper: 1, cyltower: 1, taper: 1 };
+    const TALL = { tower: 1, podium: 1, skyscraper: 1, cyltower: 1, taper: 1, twist: 1, greentower: 1 };
     // parks: a block of the grid left to grass and trees here and there, more of them the later the age, and more in the middle
     const parkP = planned && era >= 6 ? [0, 0, 0, 0, 0, 0, 0.05, 0.085, 0.11, 0.13][era] : 0;
     const parks = [], parkOf = new Map();
