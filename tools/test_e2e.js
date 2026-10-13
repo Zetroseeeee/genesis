@@ -13,7 +13,8 @@ async function fresh(viewport, opts) {
   if (page) await page.close();
   page = await browser.newPage({ viewport: viewport || { width: 1024, height: 640 } });
   await page.addInitScript(() => { window.GENESIS_TEX_URL = 'data/tex/atlas_local.json'; });   // the CDN atlases are unreachable from the test box: use the labelled synthetic set
-  if (!(opts && opts.sound)) await page.addInitScript(() => { window.GENESIS_MUTE = 1; });      // (the sound of the world only where a scenario listens: on a software renderer it is time taken from the picture)
+  if (!(opts && opts.sound)) await page.addInitScript(() => { window.GENESIS_MUTE = 1; });
+  if (opts && opts.store) await page.addInitScript((kv) => { for (const [k, v] of kv) localStorage.setItem(k, v); }, opts.store);      // (what a page before it kept: a new page is a new browser context)      // (the sound of the world only where a scenario listens: on a software renderer it is time taken from the picture)
   page.on('pageerror', e => errors.push('PAGEERROR ' + e.message)); page.on('console', m => { if (m.type() === 'error' && !/fonts|ERR_TUNNEL|googleapis/.test(m.text())) errors.push('CONSOLE ' + m.text().slice(0, 300)); else if (/THREE.WebGLProgram|Shader Error|GL_INVALID/.test(m.text())) errors.push('GL ' + m.text().slice(0, 300)); });
   await page.goto(`http://127.0.0.1:${port}/local.html`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__G && window.__G.sim && document.getElementById('loading').hidden, null, { timeout: 60000 });
@@ -422,6 +423,35 @@ server.listen(0, async () => {
     check((await state()).toasts.some(t => /No saved world/.test(t)), 'no-save toast');
     await ev(() => { localStorage.setItem('genesis-save-v2', '{"v":2,"year":1'); document.getElementById('m-load').click(); });
     check((await state()).toasts.some(t => /could not be read/.test(t)), 'corrupt-save toast'); await ev(() => { localStorage.removeItem('genesis-save-v2'); document.getElementById('m-close').click(); });
+  });
+
+  await scenario('save/load: a long game is packed, read back as it was, and found again by a new page', async (check) => {
+    // (GENESIS_PACK packs a save whatever its length: the game packs one of four million characters and more)
+    const before = await ev(() => { const S = __G.sim; return { year: S.year, name: S.fullName(S.playerCiv()) }; });
+    await ev(() => { window.GENESIS_PACK = 1; window.__toasts.length = 0; document.getElementById('btn-menu').click(); document.getElementById('m-save').click(); });
+    await page.waitForFunction(() => (window.__toasts || []).some((t) => /World saved/.test(t)), null, { timeout: 30000 });
+    const st = await ev(() => { const raw = localStorage.getItem('genesis-save-v2'); return { packed: raw.startsWith('gz1:'), len: raw.length, json: JSON.stringify(__G.sim.save()).length }; });
+    check(st.packed && st.len < st.json / 2.5, `the save is packed (${st.len} characters for ${st.json})`);
+    await ev(() => { window.__toasts.length = 0; if (!document.getElementById('menu').open) document.getElementById('btn-menu').click(); document.getElementById('m-load').click(); }); await frames(2);
+    const a = await ev(() => ({ year: __G.sim.year, name: __G.sim.fullName(__G.sim.playerCiv()), toasts: window.__toasts.slice() }));
+    check(a.year === before.year && a.name === before.name && a.toasts.some((t) => /Welcome back/.test(t)), `read back as it was (${a.name}, ${a.year}; ${a.toasts.join(' / ')})`);
+    // a new page: the packed save is unpacked as the game starts, shown on the home screen, and continued
+    const keep = await ev(() => localStorage.getItem('genesis-save-v2'));
+    await fresh(undefined, { store: [['genesis-save-v2', keep]] });
+    const h = await ev(() => ({ mode: document.body.dataset.mode, cont: !document.getElementById('btn-load').hidden, line: document.getElementById('home-save').textContent }));
+    check(h.mode === 'intro' && h.cont && h.line.includes(before.name), `a new page finds it on the home screen ('${h.line}')`);
+    await ev(() => document.getElementById('btn-load').click()); await page.waitForFunction(() => document.body.dataset.mode === 'play', null, { timeout: 60000 }); await frames(3);
+    const c = await ev(() => ({ year: __G.sim.year, name: __G.sim.fullName(__G.sim.playerCiv()) }));
+    check(c.year === before.year && c.name === before.name, `and goes on with it (${c.name}, ${c.year})`);
+  });
+
+  await scenario('picture: Shift+S gives a picture of the world without the interface, named for the realm and the year', async (check) => {
+    await ev(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (document.activeElement) document.activeElement.blur();
+      const c0 = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { window.__picAs = this.download; HTMLAnchorElement.prototype.click = c0; return c0.call(this); }; });      // (the name the game gives it: a browser under load has been seen to offer the file as 'download')
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.keyboard.press('Shift+S')]);
+    const offered = dl.suggestedFilename(), file = await dl.path(), size = file ? require('fs').statSync(file).size : 0, head = file ? require('fs').readFileSync(file).subarray(0, 8).toString('hex') : '';
+    const q = await ev(() => ({ as: window.__picAs || '', year: __G.sim.fmtYear(__G.sim.year) }));
+    check(/^Holocene - .+\.png$/.test(q.as) && q.as.includes(q.year) && head === '89504e470d0a1a0a' && size > 20000, `a picture: '${q.as}' (offered as '${offered}'), ${size} bytes`);
   });
 
   // ---------- camera, labels, minimap, keys ----------
@@ -1195,7 +1225,7 @@ server.listen(0, async () => {
     await ev(() => { __G.weather.extra = { rain: 1, storm: 1 }; __G.weather.strike(__G.mapcam, {}); }); await frames(2);
     const s = await ev(() => ({ flash: __G.weather.last && __G.weather.last.flash, strikes: __G.weather.strikes }));
     check(s.flash > 0.5 && s.strikes >= 1, 'lightning flashes: ' + JSON.stringify(s));
-    await ev(() => { __G.weather.extra = { rain: 0, storm: 0 }; }); await wait(12000); await frames(3);
+    await ev(() => { __G.weather.extra = { rain: 0, storm: 0 }; }); await page.waitForFunction(() => __G.weather.state.rain < 0.15, null, { timeout: 45000 }).catch(() => {}); await frames(3);      // (a shower goes over some seconds of the game's frames: a slow renderer has fewer of them)
     const d = await ev(() => ({ rain: __G.weather.state.rain, n: __G.weather.mesh.geometry.instanceCount, wet: __G.globals.uWet.value }));
     check(d.rain < 0.15 && d.wet > d.rain, 'the rain passes and the ground dries more slowly: ' + JSON.stringify(d));
     await ev(() => { __G.weather.extra = null; });
@@ -1220,7 +1250,9 @@ server.listen(0, async () => {
     const y0 = q.year; await wait(1600); await frames(3); q = await look();
     check(q.year !== y0, `it plays: ${y0} -> ${q.year}`);
     // space stops it, End goes to the last map, the left arrow to the one before
-    await page.keyboard.press('Space'); await frames(2); q = await look(); check(q.play !== 'Pause' && q.open, `space stops it (${q.play})`);
+    { const p0 = (await look()).play; await page.keyboard.press('Space'); await frames(2); q = await look();      // (a short history may have played to its end already: then space plays it again)
+      check(q.open && (p0 === 'Pause' ? q.play !== 'Pause' : q.play === 'Pause'), `space plays and stops it (${p0} -> ${q.play})`);
+      if (q.play === 'Pause') { await page.keyboard.press('Space'); await frames(2); } }
     const ys = await ev(() => __G.sim.replay.frames.map((f) => __G.sim.fmtYear(f.y)));
     await page.keyboard.press('End'); await frames(2); q = await look(); check(q.year === ys[ys.length - 1], `End goes to the last map (${q.year}, ${ys[ys.length - 1]})`);
     await page.keyboard.press('ArrowLeft'); await frames(2); q = await look(); check(q.year === ys[ys.length - 2], `the left arrow to the one before (${q.year}, ${ys[ys.length - 2]})`);

@@ -1757,6 +1757,21 @@ into the dark. A saved world is loaded for show (`previewSave`): its lands and l
 picture back to the centre and sets the sun to mid-morning where the camera goes (`sunFor`). The typefaces are
 carried with the game (`vendor/fonts`, linked by `local.html`); the published web page still takes them from Google.
 
+## Saves
+
+- A world is kept in the page's storage (`localStorage`, `genesis-save-v2`), which holds some 5.2 million characters for the whole
+  game (Chromium's limit; the app is Chromium too). A long game's save is more than four million: in AD 2150 4.2 (seed 12345) and 4.5
+  (777) - the realms (their events, rule, diplomacy, legacy), culture, dynasties, the names of places, the people place by place. So a
+  save past `PACK_AT` (4 million characters) is packed (`packSave` in `main.js`: gzip by the page's own `CompressionStream`, a byte to a
+  character after `gz1:`; 1.3 million for 777's), in the background; what it says is kept beside it (`saveCache`, checked against what
+  is stored), so that it is read back at once, and one already packed is unpacked as the game starts (`primeSave`, before the home
+  screen shows it). At the window's last moment (`beforeunload`) there is no background: the save is written as it is if there is room
+  for it, and if not, the one before stands (the autosave is a minute old at most). An update waits for its save before the page goes
+  (`applyUpdate`). `window.GENESIS_PACK = 1` packs whatever the length (the end-to-end scenario 'save/load: a long game is packed').
+  A string of bytes as characters comes back whole from the storage after the browser is closed and opened again (measured, NUL and all).
+- A picture of the world (Shift+S, the menu's Take a picture) is the canvas alone, read in the frame it is drawn in (`picture`), and
+  given as a file named for the realm and the year; in the app a download asks where to keep it.
+
 ## Updates (how a push reaches a copy already installed)
 
 - The app carries a list of every file it serves with its SHA-256 (`desktop/content.json`, made from the packed app

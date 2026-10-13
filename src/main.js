@@ -186,7 +186,7 @@
       window.__G = { settings, loadSettings, get sim() { return sim; }, climateRefresh: () => { climYear = NaN; climateUniforms(); }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, get troops() { return troops; }, get fauna() { return fauna; }, get birds() { return birds; }, get weather() { return weather; }, selectHost: (id) => selectHost(id), get hostSel() { return hostSel; }, startTurn, endTurn, turnRun, attention: () => computeAttention(), terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
       buildEconomy(); buildDock(); buildMinimapBase(); bindUI();
       newWorld((Math.random() * 2 ** 31) | 0);
-      previewSave(); homeAim(false);                // a saved world is shown on the home screen as it was left
+      await primeSave(); previewSave(); homeAim(false);                // a saved world is shown on the home screen as it was left
       setLoad(80, 'first light');
       await versionReady; homeRefresh();
       // an update was just put to use while a world was being played: straight back into it
@@ -1230,7 +1230,7 @@
     $('btn-rename').addEventListener('click', () => { sim.renamePlayer($('in-name').value); refreshAll(true); });
     $('btn-menu').addEventListener('click', () => openMenu());
     $('m-close').addEventListener('click', () => $('menu').close()); $('m-resume').addEventListener('click', () => $('menu').close());
-    $('m-save').addEventListener('click', () => { saveLocal(true); $('menu').close(); }); $('m-load').addEventListener('click', () => { if (loadLocal()) $('menu').close(); });
+    $('m-save').addEventListener('click', () => { saveLocal(true); $('menu').close(); }); $('m-pic').addEventListener('click', () => { $('menu').close(); pictureWanted = true; }); $('m-load').addEventListener('click', () => { if (loadLocal()) $('menu').close(); });
     $('m-new').addEventListener('click', () => { $('menu').close(); goHomeScreen(true); });
     $('ui-scale').value = settings.uiScale; $('ui-scale-v').textContent = settings.uiScale.toFixed(2); $('ui-scale').addEventListener('input', (e) => { settings.uiScale = +e.target.value; $('ui-scale-v').textContent = settings.uiScale.toFixed(2); applySettings(); });
     $('tip-delay').value = settings.tipDelay; $('tip-delay-v').textContent = settings.tipDelay; $('tip-delay').addEventListener('input', (e) => { settings.tipDelay = +e.target.value; $('tip-delay-v').textContent = settings.tipDelay; applySettings(); });
@@ -1300,7 +1300,7 @@
       else if (e.key === '`') { const d = $('debug'); d.style.display = d.style.display === 'block' ? 'none' : 'block'; }
       else if (e.key === 'P' && e.shiftKey) $('v-sick').click(); else if (e.key === 'p' || e.key === 'P') $('v-pol').click(); else if (e.key === 'l' || e.key === 'L') $('v-labels').click(); else if (e.key === 't' || e.key === 'T') $('v-trade').click(); else if (e.key === 'o' || e.key === 'O') $('v-gov').click(); else if (e.key === 'x' || e.key === 'X') $('v-rel').click(); else if (e.key === 'i' || e.key === 'I') $('v-ppl').click(); else if (e.key === 'j' || e.key === 'J') $('v-fth').click();
       else if (e.key === 'n' || e.key === 'N') mapcam.tHeading = 0; else if (e.key === 'u' || e.key === 'U') { mapcam.tTilt = 0; mapcam.tLift = 0; mapcam.autoTilt = false; }
-      else if (e.key === 'W' && e.shiftKey) $('v-wds').click(); else if (e.key === 'H' && e.shiftKey) $('v-hrv').click(); else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'y' || e.key === 'Y') { if (mode === 'play') findHost(); } else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
+      else if (e.key === 'S' && e.shiftKey) { if (mode === 'play') pictureWanted = true; } else if (e.key === 'W' && e.shiftKey) $('v-wds').click(); else if (e.key === 'H' && e.shiftKey) $('v-hrv').click(); else if (e.key === 'h' || e.key === 'H') goHome(); else if (e.key === 'y' || e.key === 'Y') { if (mode === 'play') findHost(); } else if (e.key === 'F9') { e.preventDefault(); document.body.classList.toggle('hidehud'); }
     });
     $('btn-chronicle').addEventListener('click', writeChronicle); $('btn-chronicle-stop').addEventListener('click', () => { if (chronCtl) chronCtl.abort(); });
     let compassIdle = 0; const wake = () => { $('compass').classList.remove('idle'); clearTimeout(compassIdle); compassIdle = setTimeout(() => $('compass').classList.add('idle'), 3000); }; renderer.domElement.addEventListener('pointermove', wake); renderer.domElement.addEventListener('wheel', wake, { passive: true }); wake();
@@ -1308,6 +1308,17 @@
     labelLayer.addEventListener('dblclick', (e) => { const el = e.target.closest('.lbl'); if (!el) return; const id = el.dataset.id;
       if (id[0] === 'p') { if (view.fth && sim.playerCiv() && mode === 'play') GOV.openFaith(+id.slice(1)); return; }      // (a faith's name, under its lens: its page; a people's: nothing)
       if (id[0] === 'h') { const X = sim.faith && sim.faith.list[+id.slice(1)]; if (X) { const [lon, lat] = placeOf(X.home); mapcam.flyTo(lon, lat, viewDist(X.home)); select(X.home); } return; } if (id[0] === 'c') { const i = +id.slice(1); const [lon, lat] = placeOf(i); mapcam.flyTo(lon, lat, viewDist(i)); select(i); } else { const c = sim.civs[+id.slice(1)]; if (c && c.capital >= 0) { const [lon, lat] = placeOf(c.capital); mapcam.flyTo(lon, lat, 0.15); select(c.capital); } } });
+  }
+  // a picture of the world as it is drawn (Shift+S, or the menu): the picture alone, without the interface, named for the realm and the
+  // year; read off the canvas in the frame it was drawn in (the card keeps no picture once it has shown it), and given as a file to keep
+  let pictureWanted = false;
+  function picture() {
+    const c = sim && sim.playerCiv(), name = `Holocene - ${c ? sim.fullName(c) + ', ' : ''}${sim ? sim.fmtYear(sim.year) : ''}`.replace(/[\\/:*?"<>|]+/g, ' ').trim();
+    renderer.domElement.toBlob((b) => {
+      if (!b) { toast('The picture could not be taken'); return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name + '.png'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000); toast('A picture of your world');
+    }, 'image/png');
   }
   // the atlas of history (atlas.js): the world through the ages, played as a film
   function openAtlas(at) { if (!window.ATLAS || !sim) return; if (!ATLAS.open(at ? { at } : undefined)) toast('The atlas has no maps yet: it keeps one as each age goes by'); }
@@ -1494,7 +1505,7 @@
   }
   // put a fetched update to use: the world is saved, the page comes up again on the new files, and play carries on
   async function applyUpdate() {
-    try { sessionStorage.setItem('holocene-updated', VERSION.commit || '?'); if (mode === 'play') { if (turnRun.active) endTurn('stopped'); saveLocal(false); sessionStorage.setItem('holocene-resume', '1'); } } catch (e) {}
+    try { sessionStorage.setItem('holocene-updated', VERSION.commit || '?'); if (mode === 'play') { if (turnRun.active) endTurn('stopped'); await saveLocal(false); sessionStorage.setItem('holocene-resume', '1'); } } catch (e) {}
     $('up-go').disabled = true;
     let ok = false; try { ok = await desktop.update.apply(); } catch (e) {}
     if (!ok) { try { sessionStorage.removeItem('holocene-updated'); sessionStorage.removeItem('holocene-resume'); } catch (e) {} $('up-go').disabled = false; toast('The update could not be put to use. Try fetching it again'); }
@@ -1506,12 +1517,45 @@
   }
 
   // ---------- persistence ----------
-  const SAVE_KEY = 'genesis-save-v2';
-  function saveLocal(announce) {
-    if (!sim || mode !== 'play') { if (announce) toast('Nothing to save yet'); return; }
-    try { const s = sim.save(); s.cam = { lon: mapcam.lon, lat: mapcam.lat, dist: mapcam.dist, tilt: mapcam.tilt, heading: mapcam.heading }; localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (announce) toast('World saved'); } catch (e) { if (announce) toast('Could not save here (storage blocked or full)'); }
+  // A world is kept in the page's storage, which holds some 5.2 million characters for the whole game. The save of a long game is four
+  // million and more (in AD 2150 some 4.2: the realms, their culture and dynasties, the names of their places, the people place by
+  // place), so one past PACK_AT is packed (gzip, a byte to a character: a quarter of the room or less), in the background, as packing
+  // takes a moment. What a packed save says is kept in hand beside it (saveCache), so that it is read back at once; one already packed
+  // is unpacked as the game starts (primeSave). At the window's last moment there is no background: the save is written as it is if
+  // there is room for it, and if there is not, the one before stands (a minute old at most).
+  const SAVE_KEY = 'genesis-save-v2', PACK_AT = 4.0e6, PACKED = 'gz1:';
+  let saveCache = null, saveSeq = 0;      // ({ raw: the packed save as it is kept, json: what it says })
+  const canPack = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+  async function packSave(json) {
+    const z = new Uint8Array(await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+    const parts = [PACKED]; for (let i = 0; i < z.length; i += 8192) parts.push(String.fromCharCode.apply(null, z.subarray(i, i + 8192)));
+    return parts.join('');
   }
-  function readSave() { const raw = localStorage.getItem(SAVE_KEY); return raw ? JSON.parse(raw) : null; }
+  async function unpackSave(raw) {
+    const b = new Uint8Array(raw.length - PACKED.length); for (let i = 0; i < b.length; i++) b[i] = raw.charCodeAt(i + PACKED.length);
+    return new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  }
+  async function primeSave() {
+    try { const raw = localStorage.getItem(SAVE_KEY); if (raw && raw.startsWith(PACKED) && canPack) saveCache = { raw, json: await unpackSave(raw) }; } catch (e) { console.warn('the saved world could not be unpacked', e); }
+  }
+  // (last: the window is closing - written now, as it is, or not at all; the promise says whether it was kept)
+  function saveLocal(announce, last) {
+    if (!sim || mode !== 'play') { if (announce) toast('Nothing to save yet'); return Promise.resolve(false); }
+    const fail = () => { if (announce) toast('Could not save here (storage blocked or full)'); return false; };
+    let json;
+    try { const s = sim.save(); s.cam = { lon: mapcam.lon, lat: mapcam.lat, dist: mapcam.dist, tilt: mapcam.tilt, heading: mapcam.heading }; json = JSON.stringify(s); } catch (e) { return Promise.resolve(fail()); }
+    const seq = ++saveSeq;
+    if (!canPack || last || !(json.length > PACK_AT || window.GENESIS_PACK)) {
+      try { localStorage.setItem(SAVE_KEY, json); if (announce) toast('World saved'); return Promise.resolve(true); } catch (e) { return Promise.resolve(fail()); }
+    }
+    return packSave(json).then((z) => { if (seq !== saveSeq) return false; localStorage.setItem(SAVE_KEY, z); saveCache = { raw: z, json }; if (announce) toast('World saved'); return true; }).catch(fail);      // (a save made while this one was packed is the one kept)
+  }
+  function readSave() {
+    const raw = localStorage.getItem(SAVE_KEY); if (!raw) return null;
+    if (!raw.startsWith(PACKED)) return JSON.parse(raw);
+    if (saveCache && saveCache.raw === raw) return JSON.parse(saveCache.json);
+    throw new Error('a packed save not unpacked');
+  }
   function loadLocal(quiet) {
     try {
       const s = readSave(); if (!s) { toast('No saved world here'); return false; }
@@ -1538,7 +1582,7 @@
   }
   function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
   setInterval(() => saveLocal(false), 60000);
-  window.addEventListener('beforeunload', () => saveLocal(false));      // closing the window or restarting the game keeps the world as it is
+  window.addEventListener('beforeunload', () => saveLocal(false, true));      // closing the window or restarting the game keeps the world as it is
 
   // ---------- loop ----------
   let modalNow = false;
@@ -1663,6 +1707,7 @@
     tpsT += dt; if (tpsT > 1) { $('yps').textContent = tpsCount + ' yr/s'; tpsCount = 0; tpsT = 0; const d = $('debug'); if (d.style.display === 'block') d.textContent = `elev ${JSON.stringify(terrain.stats.elevLevels)} tiles ${terrain.stats.tiles} sse ${terrain.stats.sse | 0} packs i${terrain.stats.packsI} e${terrain.stats.packsE} loading ${terrain.stats.loading} buildings ${world.buildingCount} trees ${trees ? trees.count : 0} labels ${labelEls.size} movers ${movers ? movers.stats.agents + '/' + movers.stats.walkers + '/' + movers.stats.ships : 0} beasts ${fauna ? fauna.stats.herds + '/' + fauna.stats.beasts : 0} birds ${birds ? birds.stats.flocks + '/' + birds.stats.birds : 0} alt ${(mapcam.alt * 6371).toFixed(1)}km dist ${(mapcam.dist * 6371).toFixed(1)}km tilt ${(mapcam.tilt * 57.3).toFixed(0)}`; }
     if (trees) trees.uCover.value = !trees.coverOff && (posted ? POST.samples > 1 : msaa) ? 1 : 0;      // (cut-out trees: several samples a pixel smooth their outlines)
     if (!modalOpen || (now | 0) % 6 === 0) { if (posted) POST.render(renderer, scene, camera, mapcam.alt, now / 1000); else renderer.render(scene, camera); }
+    if (pictureWanted && !modalOpen) { pictureWanted = false; picture(); }
     if (++framesDrawn === 3 && desktop) desktop.ready();      // the game is up: an update put to use just now is kept
   }
   boot();

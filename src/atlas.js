@@ -22,14 +22,15 @@ window.ATLAS = (function () {
     d.addEventListener('click', (e) => { const b = e.target.closest('[data-at]'); if (!b) return; const a = b.dataset.at;
       if (a === 'close') close(); else if (a === 'play') toggle(); else if (a === 'speed') { speed = (speed + 1) % SPEEDS.length; ui(); } });
     d.addEventListener('close', () => { playing = false; cancelAnimationFrame(raf); raf = 0; if (ctx.onClose) ctx.onClose(); });
-    d.addEventListener('keydown', (e) => {
-      if (e.target.closest && e.target.closest('button') && (e.code === 'Space' || e.key === 'Enter')) return;      // (a button's own)
+    window.addEventListener('keydown', (e) => {      // (on the window, before the game's own: the keys are the atlas's wherever the focus has gone)
+      if (!isOpen() || e.target.tagName === 'INPUT') return;
+      if (e.target.closest && e.target.closest('#atlas button') && (e.code === 'Space' || e.key === 'Enter')) return;      // (a button's own)
       if (e.code === 'Space') { e.preventDefault(); toggle(); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); seek(Math.floor(k + t) + 1); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(Math.ceil(k + t) - 1); }
       else if (e.key === 'Home') { e.preventDefault(); seek(0); }
       else if (e.key === 'End') { e.preventDefault(); seek(RP.frames.length - 1); }
-    });
+    }, true);
     const bar = $('at-bar'); let drag = false;
     const toBar = (e) => { const r = bar.getBoundingClientRect(); seekPos(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))); };
     bar.addEventListener('pointerdown', (e) => { drag = true; bar.setPointerCapture(e.pointerId); playing = false; toBar(e); ui(); });
