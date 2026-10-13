@@ -664,6 +664,20 @@
   .ep-none { color: var(--text-3); font-size: var(--fs-body); font-style: italic; margin: 0; }
   .ep-rulers { color: var(--text-2); font-size: var(--fs-cap); margin: 0; }
   .ep-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 16px; }
+  /* ----- the worlds kept (main.js: keepWorld): each with its picture, its realm, year and age, when it was kept ----- */
+  #worlds .modal { width: min(820px, calc(100vw - 32px)); }
+  .wd-keep { display: flex; gap: 8px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+  .wd-keep input { flex: 1; min-width: 0; }
+  .wd-list { display: flex; flex-direction: column; gap: 8px; }
+  .wd-card { display: grid; grid-template-columns: calc(128px * var(--ui-scale)) minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 8px; background: rgb(255 255 255 / 0.03); border: 1px solid var(--rule); border-radius: 4px; }
+  .wd-pic { aspect-ratio: 8 / 5; background: #0c161f; border-radius: 2px; overflow: hidden; }
+  .wd-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .wd-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: var(--fs-body); color: var(--text-2); }
+  .wd-txt b { font-family: var(--display); font-weight: 600; font-size: var(--fs-key); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wd-at { font-size: var(--fs-cap); color: var(--text-3); }
+  .wd-act { display: flex; flex-direction: column; gap: 6px; }
+  .wd-none { color: var(--text-3); font-style: italic; margin: 6px 0; }
+  @media (max-width: 640px) { .wd-card { grid-template-columns: 1fr; } .wd-act { flex-direction: row; } }
   /* ----- the atlas of history (atlas.js): the world through the ages, who held the land, played as a film ----- */
   #atlas .modal { width: min(1480px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
   .at-stage { position: relative; flex: 1 1 auto; min-height: 0; background: #0c161f; border-bottom: 1px solid var(--rule); }
@@ -1468,10 +1482,18 @@
   <div class="at-stats" id="at-stats"></div>
 </div></dialog>
 
+<dialog id="worlds" aria-labelledby="wd-title"><div class="modal panel" tabindex="-1">
+  <div class="phead"><h2 class="display" id="wd-title">Your worlds</h2><span class="micro" id="wd-sub"></span><button class="btn icon ghost" data-wd="close" title="Close (Esc)">✕</button></div>
+  <div class="pbody">
+    <div class="wd-keep" id="wd-keep"><input type="text" id="wd-name" maxlength="60" aria-label="A name for this world"><button class="btn primary" data-wd="keep">Keep a copy of this world</button></div>
+    <div class="wd-list" id="wd-list"></div>
+  </div>
+</div></dialog>
+
 <dialog id="menu"><div class="modal panel">
   <div class="phead"><h2 class="display" id="m-title">Menu</h2><button class="btn icon ghost" id="m-close">✕</button></div>
   <div class="pbody">
-    <div class="row ingame"><button class="btn" id="m-resume">Resume</button><button class="btn" id="m-save">Save now</button><button class="btn" id="m-pic" title="A picture of the world as it is, without the interface (Shift+S)">Take a picture</button><button class="btn" id="m-load">Load save</button><button class="btn" id="m-new">Save and go to the main menu</button></div>
+    <div class="row ingame"><button class="btn" id="m-resume">Resume</button><button class="btn" id="m-save">Save now</button><button class="btn" id="m-pic" title="A picture of the world as it is, without the interface (Shift+S)">Take a picture</button><button class="btn" id="m-load">Load save</button><button class="btn" id="m-worlds" title="Keep a copy of this world, or go to one kept">Your worlds</button><button class="btn" id="m-new">Save and go to the main menu</button></div>
     <div class="slider"><span class="micro">UI scale</span><input type="range" id="ui-scale" min="0.75" max="2" step="0.05" value="1"><span class="num" id="ui-scale-v">1.00</span></div>
     <div class="slider"><span class="micro">Tooltips</span><input type="range" id="tip-delay" min="0" max="600" step="150" value="300"><span class="num" id="tip-delay-v">300</span></div>
     <div class="slider"><span class="micro">Sound</span><input type="range" id="vol-master" min="0" max="1" step="0.05" value="0.8"><span class="num" id="vol-master-v">80</span></div>
@@ -1510,6 +1532,7 @@
     <div class="eras" id="home-eras" hidden aria-hidden="true"></div>
     <button class="hm" id="btn-choose"><span class="hm-t">New world</span><span class="hm-s" id="home-new-s">Choose where your people begin</span></button>
     <button class="hm" id="btn-random"><span class="hm-t">Random start</span><span class="hm-s">A new world, in one of the great river valleys</span></button>
+    <button class="hm" id="btn-worlds" hidden><span class="hm-t">Your worlds</span><span class="hm-s" id="home-worlds-s"></span></button>
     <div class="gap"></div>
     <button class="hm quiet" id="btn-settings"><span class="hm-t">Settings</span></button>
     <button class="hm quiet" id="btn-news"><span class="hm-t">What’s new</span></button>
