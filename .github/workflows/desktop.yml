@@ -48,6 +48,8 @@ jobs:
       - run: npm ci
       - name: The updater's own tests
         run: node tools/test_update.js
+      - name: The saves' own tests
+        run: node tools/test_saves.js
       - name: Fetch art and models
         env:
           GROUND_STRICT: '1'      # (the ground's materials must be the pack of the list in this commit, or the build stops)

@@ -19,13 +19,13 @@
     let best = S.player, bv = -1; for (const c of S.civs) { if (!c || c.capital < 0 || !c.mig) continue; const v = (c.mig.li || 0) + (c.mig.lo || 0); if (v > bv) { bv = v; best = c.id; } }
     return best;
   };
-  // (a save with another realm in the player's hands, loaded as the menu's Load does)
+  // (a save with another realm in the player's hands, entered as the menu's Load does)
   const take = () => {
     const S = G.sim, id = pick();
     if (id >= 0 && id !== S.player) {
       const s = S.save(); if (s.civs[s.player]) s.civs[s.player].player = false; s.civs[id].player = true; s.player = id;
       const [lon, lat] = G.world.siteOf(S.civs[id].capital); s.cam = { lon, lat, dist: P.alt / 6371000, tilt: P.tilt, heading: P.heading };
-      try { localStorage.setItem('genesis-save-v2', JSON.stringify(s)); document.getElementById('m-load').click(); } catch (e) { window.__mig = { error: String(e) }; return; }
+      try { G.enter(JSON.parse(JSON.stringify(s))); } catch (e) { window.__mig = { error: String(e) }; return; }
     }
     setTimeout(show, 1500);
   };
