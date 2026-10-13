@@ -34,7 +34,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   back to the kit, for a capital of every culture with every work built. Run it after touching the manifest or the
   planner: eras 0–2 must show nothing but `stall` (the market model brings its own) and `rubble`, and so must the
   later eras of the peoples who keep the old ways (`node tools/coverage.js 3,4,5`). `node tools/density.js` reports
-  how much of a town's ground its houses cover.
+  how much of a town's ground its houses cover. `node tools/models/sides.cjs <id> ...` draws a model from its four
+  sides as the game has it (`shots/models/<id>.png`; front is +Z, the side a plan turns to its street or square): look
+  at it before believing a new model's facing, and set `yaw` (degrees) in the manifest where it is wrong.
 - `node tools/towns/census.js [eras] [peoples] [sizes in thousands]` — what a town of each people, age and size is made of,
   from the planner alone (seconds): how many buildings of each kind, its parks, the tallest thing in it, how long its plan took
   (a city of millions some tens of milliseconds: keep it under a tenth of a second). Run it after touching how cities are laid
@@ -416,7 +418,11 @@ Conventions that matter:
   where people went on building as their forebears had (`OLD_UNTIL` in `town.js`: the north and the steppe through
   the Classical era, the mud-brick lands, India and China likewise, Africa and south-east Asia until the Renaissance,
   the Americas until the conquest) a later town keeps its Iron Age houses, walls, shrines and lanes, so it stays fully
-  modelled. Greece and Rome build anew (the kit, until their sets are generated). The medieval north and east are
+  modelled. Greece and Rome build anew, in the classical set (`classical_med_*`, since 0.56: a small house, a house with a
+  shop, an atrium house, an apartment block, the city wall with its round towers and gate, a market stoa, a palace, a farm
+  granary, a fountain, the Colosseum for the age's wonder); its walls, towers, gate, small houses, granary and fountain serve
+  the Mediterranean's medieval towns too, which have a town house and a Romanesque cathedral of their own
+  (`medieval_med_*`; `node tools/coverage.js 3,4`: what is left is one of each great building). The medieval north and east are
   `timberTown`s: half-timbered and log houses gable by gable inside a palisade, round a great hall, a well and a
   shrine of the old kind - all models. `L.era` is the style era, `L.eraReal` the civilisation's; the world picks
   models by `it.era` if set (old houses in a new age, a wonder of an earlier one), else by `L.era`. A model's `eras`
