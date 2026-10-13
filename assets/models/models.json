@@ -41,7 +41,7 @@
     3
    ],
    "anchor": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
-   "note": "Pilot only so far."
+   "note": "Greek and Roman towns, about 300 BC to AD 200: the Doric temple (the anchor), houses (a small house, a house with a shop, an atrium house, an apartment block), the city wall with its towers and gate, a market stoa, a palace, a farm granary, a fountain and the Colosseum. Dressed limestone and marble, lime plaster, brick-faced concrete, red terracotta tiles. No glass in windows."
   },
   "medieval": {
    "eras": [
@@ -1556,6 +1556,18 @@
       "north",
       "east"
      ]
+    },
+    {
+     "kinds": [
+      "well"
+     ],
+     "eras": [
+      3,
+      3
+     ],
+     "cultures": [
+      "med"
+     ]
     }
    ]
   },
@@ -1864,6 +1876,284 @@
    "tree": {
     "bareOf": "tree_oak_a"
    }
+  },
+  {
+   "id": "classical_med_house_a",
+   "title": "Roman town house",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "hip"
+   ],
+   "h": 5.5,
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a small Roman town house of about AD 100, single storey, about 9 by 8 m and 5.5 m high, walls of stone rubble rendered with lime plaster washed pale ochre and worn at the base, a low hipped roof of red-orange terracotta tiles (flat tegulae with rounded imbrices over the joints), two small shuttered windows, a plain wooden door in a dressed stone frame",
+   "concept": "718a7302-b99e-47c1-91a4-426cb05437b0",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075301_718a7302-b99e-47c1-91a4-426cb05437b0.png",
+   "mesh": "e3fedb53-2189-41ff-be74-9d864211895e",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075603_e3fedb53-2189-41ff-be74-9d864211895e.glb",
+   "site": "bronze_mudbrick_site"
+  },
+  {
+   "id": "classical_med_house_b",
+   "title": "Roman house with a shop",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "gable"
+   ],
+   "h": 8.5,
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a two-storey Roman house with a shop of about AD 100, about 8 by 10 m and 8.5 m high, the ground floor an open shop front with a masonry counter and folding wooden shutters, the upper storey rendered with lime plaster washed white, a gabled roof of red terracotta tiles (tegulae and imbrices), a small timber balcony on wooden brackets, shuttered windows",
+   "concept": "1f864906-5b1a-4e8e-b8eb-5d6540e3ba51",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075302_1f864906-5b1a-4e8e-b8eb-5d6540e3ba51.png",
+   "mesh": "5f79f480-8981-4d44-9529-2797e4785dbf",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075611_5f79f480-8981-4d44-9529-2797e4785dbf.glb",
+   "site": "bronze_mudbrick_site"
+  },
+  {
+   "id": "classical_med_domus_a",
+   "title": "Roman atrium house",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "courtyard"
+   ],
+   "h": 6,
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a Roman atrium house (domus) of about AD 100, single storey, about 18 by 26 m and 6 m high, plain lime-plastered street walls with few small high windows, a deep entrance doorway flanked by two small shops with wooden shutters, roofs of red terracotta tiles sloping inward to a rectangular opening over the atrium, a second open garden court with a colonnade at the back",
+   "concept": "a07246ea-57cd-4957-afc3-4f1e83931cb4",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075301_a07246ea-57cd-4957-afc3-4f1e83931cb4.png",
+   "mesh": "30313685-6406-48cb-8b52-9bd89c6d3d8c",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075616_30313685-6406-48cb-8b52-9bd89c6d3d8c.glb",
+   "site": "bronze_mudbrick_site"
+  },
+  {
+   "id": "classical_med_insula_a",
+   "title": "Roman apartment block",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "tenement"
+   ],
+   "h": 18,
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a Roman apartment block (insula) of about AD 100 as at Ostia, four storeys, about 16 by 14 m and 17 m high, walls of brick-faced concrete in warm red brick with bands of tile, arched shop openings at street level with wooden shutters, rows of small windows, a timber-railed balcony running along the second storey, a low roof of red terracotta tiles",
+   "concept": "c279865d-f7ab-43f5-9ea2-3f09ef828b39",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075301_c279865d-f7ab-43f5-9ea2-3f09ef828b39.png",
+   "mesh": "4449bb89-b820-4f4e-bb83-13127520db8b",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075621_4449bb89-b820-4f4e-bb83-13127520db8b.glb",
+   "site": "bronze_mudbrick_site"
+  },
+  {
+   "id": "classical_med_wall_a",
+   "title": "Roman city wall",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "wall_stone"
+   ],
+   "h": 8,
+   "fit": "run",
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a straight free-standing section of a Roman city wall of about AD 100, about 12 m long, 8 m high and 3 m thick, faced with squared limestone blocks in regular courses, a wall-walk behind a parapet with square crenellations, both ends cut flat so sections join end to end",
+   "concept": "b9c040ce-a1c0-4c73-b2e3-c970d93d9028",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075342_b9c040ce-a1c0-4c73-b2e3-c970d93d9028.png",
+   "mesh": "75eacc8a-8006-446a-a85e-ab748ac21ad1",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075713_75eacc8a-8006-446a-a85e-ab748ac21ad1.glb"
+  },
+  {
+   "id": "classical_med_tower_a",
+   "title": "Roman wall tower",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "tower_stone",
+    "roundtower"
+   ],
+   "h": 13,
+   "ref": "b9c040ce-a1c0-4c73-b2e3-c970d93d9028",
+   "prompt": "a free-standing round tower of this same wall, about 8 m across and 13 m high, built of the same squared limestone blocks in regular courses, two rows of narrow arched windows, a crenellated fighting platform at the top like the wall's",
+   "concept": "db82877b-d61e-4557-b033-53fe63999989",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075530_db82877b-d61e-4557-b033-53fe63999989.png",
+   "mesh": "e0383b74-df3a-4a0a-b08c-0dcb2788fafa",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075723_e0383b74-df3a-4a0a-b08c-0dcb2788fafa.glb"
+  },
+  {
+   "id": "classical_med_gate_a",
+   "title": "Roman city gate",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "gate_stone"
+   ],
+   "w": 22,
+   "scaleBy": "w",
+   "fit": "gate",
+   "sides": "classical_med_wall_a",
+   "ref": "1ed39ca7-1318-4bcf-8c7e-cde5083d678c",
+   "prompt": "the gate of this same wall: a double arched gateway of the same squared limestone, two carriage arches about 4 m wide side by side between two projecting semicircular towers about 14 m high with narrow arched windows and crenellated tops, a gallery of small arched windows above the two arches, the whole about 22 m wide, both side ends cut flat at the wall's height and thickness (first drawn square from the front from the wall's concept, 1ed39ca7, then turned to three-quarters)",
+   "concept": "5e366a5e-2b54-410d-a656-0f45d82f52c1",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075708_5e366a5e-2b54-410d-a656-0f45d82f52c1.png",
+   "mesh": "fd9a4a69-eb71-4235-9249-45b8e19b636e",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075847_fd9a4a69-eb71-4235-9249-45b8e19b636e.glb"
+  },
+  {
+   "id": "classical_med_stoa_a",
+   "title": "Market stoa",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "market"
+   ],
+   "w": 32,
+   "scaleBy": "w",
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a Greek stoa of the second century BC used as a market hall, about 40 by 12 m and 9 m high, a front colonnade of Doric columns in white limestone, a back wall of dressed stone with a row of shop doorways, a pitched roof of red terracotta tiles with a low pediment at each end, a few amphorae and baskets of goods along the colonnade",
+   "concept": "e332614a-c3db-431f-b64c-6cda2ef5a48e",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075210_e332614a-c3db-431f-b64c-6cda2ef5a48e.png",
+   "mesh": "9f387fda-8fa6-4841-af08-43b9c685ebbf",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075739_9f387fda-8fa6-4841-af08-43b9c685ebbf.glb",
+   "site": "bronze_mudbrick_site"
+  },
+  {
+   "id": "classical_med_palace_a",
+   "title": "Hellenistic palace",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "palace"
+   ],
+   "w": 36,
+   "scaleBy": "w",
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "the palace of a Hellenistic king of the second century BC as at Vergina and Pella, about 45 by 40 m: a long single-storey front of dressed limestone with plain plastered walls and no windows, in its middle a monumental two-storey gateway porch with Doric columns below, Ionic columns above and a pediment, behind it a great square courtyard surrounded on all four sides by Doric colonnades, low-pitched roofs of red terracotta tiles over the ranges of rooms; no glass anywhere (a first try, 028bf5ee, looked like a building of the nineteenth century)",
+   "concept": "b0e3e670-17c9-4bf8-a7a3-61341f750c73",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075419_b0e3e670-17c9-4bf8-a7a3-61341f750c73.png",
+   "mesh": "eae23080-ec83-4a76-b9b6-a264feb76637",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075732_eae23080-ec83-4a76-b9b6-a264feb76637.glb",
+   "site": "bronze_mudbrick_site"
+  },
+  {
+   "id": "classical_med_granary_a",
+   "title": "Roman farm granary",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "granary"
+   ],
+   "h": 6,
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a small Roman farm granary of about AD 100, about 6 by 6 m and 6 m high, stone walls rendered with lime plaster, the floor raised on low stone piers against damp with air vents between them, narrow slit windows, one wooden door reached by stone steps, a pitched roof of red terracotta tiles",
+   "concept": "d122c46a-eced-4a86-8650-67de76f68ebd",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075209_d122c46a-eced-4a86-8650-67de76f68ebd.png",
+   "mesh": "2a6646bd-0ded-40c9-987f-ad9163caea2d",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075744_2a6646bd-0ded-40c9-987f-ad9163caea2d.glb",
+   "site": "bronze_mudbrick_site"
+  },
+  {
+   "id": "classical_med_fountain_a",
+   "title": "Roman public fountain",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "fountain"
+   ],
+   "h": 5,
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a Roman public fountain of about AD 100, about 6 m wide and 5 m high, a semicircular marble niche between two Corinthian columns carrying a small pediment, a bronze spout above a rectangular marble basin raised on a step",
+   "concept": "17496052-db30-4546-920b-04429f1f7d36",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075210_17496052-db30-4546-920b-04429f1f7d36.png",
+   "mesh": "758f0462-7d2d-4b24-a355-b30467f24b3b",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075749_758f0462-7d2d-4b24-a355-b30467f24b3b.glb"
+  },
+  {
+   "id": "classical_med_colosseum",
+   "title": "The Flavian Amphitheatre",
+   "set": "classical",
+   "eras": [
+    3,
+    3
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "colosseum"
+   ],
+   "h": 48,
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "the Flavian Amphitheatre in Rome as it was when new in AD 80, an elliptical amphitheatre about 188 by 156 m and 48 m high, three storeys of travertine arcades framed by engaged Tuscan, Ionic and Corinthian half-columns and a solid attic storey with small square windows and corbels for the awning masts, tiers of seating and the sand arena visible inside",
+   "concept": "cfd24bd8-91ba-4b86-90f7-4634478b3e7c",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075342_cfd24bd8-91ba-4b86-90f7-4634478b3e7c.png",
+   "mesh": "22d65ac3-652e-442b-b0f4-4b1b14f71a70",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075728_22d65ac3-652e-442b-b0f4-4b1b14f71a70.glb"
   }
  ]
 }
