@@ -11,7 +11,7 @@ window.ATLAS = (function () {
   const METAL = ['#b08a5c', '#c58a4a', '#8f9aa6', '#d8b45c', '#c9a14f', '#cfa65a', '#b87a4b', '#b89b5e', '#9fc4d8', '#a8d6e8'];      // (each age's metal: index.html, body[data-age])
   // the map: the grid's places one degree each (replay.js), shown from 80 N to 58 S (nobody holds the ice of the south), drawn on a
   // grid twice as fine (each place split in four by its neighbours, Scale2x: the stairs of a border become slopes)
-  const LAT0 = 80, LAT1 = -58, GW = 720;
+  const LAT0 = 80, LAT1 = -58, GW = 720, ICE = [176, 190, 202];      // (the ice: Greenland's, and the great sheets of the first millennia)
   const SPEEDS = [1, 2, 4], FPS = 4;      // (frames a second at the first speed: a whole history in a minute)
   let ctx = null, R = null, RP = null, k = 0, t = 0, playing = false, speed = 0, raf = 0, last = 0;
   let base = null, events = [], shown = [];
@@ -45,7 +45,7 @@ window.ATLAS = (function () {
   function open(o) {
     const s = ctx && ctx.sim(); RP = s && s.replay; R = window.REPLAY;
     if (!RP || !R || RP.frames.length < 2) return false;
-    $('atlas').showModal(); size(); baseMap(); FA = FB = null; walk.n = -1; statsN = -1; newsKey = ''; iceYear = null; iceFor = NaN; collect();
+    $('atlas').showModal(); size(); baseMap(); FA = FB = null; walk.n = -1; statsN = -1; newsKey = null; iceYear = null; iceFor = NaN; collect();
     const end = RP.frames.length - 1; k = o && o.at === 'end' ? end : o && typeof o.at === 'number' ? Math.max(0, Math.min(end, o.at)) : 0; t = 0; shown = []; playing = !(o && o.at !== undefined);
     $('at-sub').textContent = `${s.fmtYear(RP.frames[0].y)} to ${s.fmtYear(RP.frames[RP.frames.length - 1].y)} · ${RP.frames.length} maps`;
     ui(); draw(); last = performance.now(); loop(); $('atlas').querySelector('.modal').focus({ preventScroll: true });
@@ -83,7 +83,7 @@ window.ATLAS = (function () {
       const coast = (wd.land[i + 1] === 0 || wd.land[i - 1] === 0 || wd.land[i + 720] === 0 || wd.land[i - 720] === 0) ? 1 : 0;
       const ice = wd.flags && (wd.flags[i] & 8) ? 1 : 0;
       let r = 50 - 10 * fe + 40 * el, gg = 48 + 6 * fe + 34 * el, b = 38 - 2 * fe + 30 * el;
-      if (ice) { r = 120; gg = 128; b = 134; }
+      if (ice) { r = ICE[0]; gg = ICE[1]; b = ICE[2]; }
       if (coast) { r += 26; gg += 24; b += 20; }
       d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255;
     }
@@ -102,11 +102,15 @@ window.ATLAS = (function () {
   function iceLayer(yr) {
     const a = iceYears(); if (!a) return null;
     if (iceFor !== yr) {
-      iceFor = yr; iceAny = false; const H2 = (LAT0 - LAT1) | 0;
-      if (!iceCv) { iceCv = document.createElement('canvas'); iceCv.width = 360; iceCv.height = H2; }
-      const g = iceCv.getContext('2d'), img = g.createImageData(360, H2), d = img.data;
-      for (let i = 0; i < a.length; i++) if (yr < a[i]) { iceAny = true; const p = i * 4; d[p] = 206; d[p + 1] = 220; d[p + 2] = 230; d[p + 3] = 225; }
-      g.putImageData(img, 0, 0);
+      iceFor = yr; iceAny = false; const H2 = (LAT0 - LAT1) | 0, m = new Int16Array(360 * H2);
+      for (let i = 0; i < a.length; i++) if (yr < a[i]) { m[i] = 1; iceAny = true; }
+      if (iceAny) {
+        const big = scale2x(m, 360, H2);      // (its edge in slopes, as the realms' are)
+        if (!iceCv) { iceCv = document.createElement('canvas'); iceCv.width = 720; iceCv.height = H2 * 2; }
+        const g = iceCv.getContext('2d'), img = g.createImageData(720, H2 * 2), d = img.data;
+        for (let i = 0; i < big.length; i++) if (big[i]) { const p = i * 4; d[p] = ICE[0]; d[p + 1] = ICE[1]; d[p + 2] = ICE[2]; d[p + 3] = 235; }
+        g.putImageData(img, 0, 0);
+      }
     }
     return iceAny ? iceCv : null;
   }
@@ -131,7 +135,8 @@ window.ATLAS = (function () {
     const grid = old ? old.grid : new Int16Array(R.RN); grid.set(g0);
     const big = scale2x(g0, RW, R.RH);
     const lives = realmsAt(n), col = new Map(), mine = new Set();
-    for (const [id, L] of lives) { const c = L[4]; col.set(id, [(c >> 16) & 255, (c >> 8) & 255, c & 255]); if (L[5] & 1) mine.add(id); }
+    // (a realm's colour as an atlas inks it: a quarter of its brightness's grey in it, a little darker)
+    for (const [id, L] of lives) { const c = L[4], r = (c >> 16) & 255, gg = (c >> 8) & 255, b = c & 255, l = 0.3 * r + 0.55 * gg + 0.15 * b; col.set(id, [0.92 * (r + (l - r) * 0.25), 0.92 * (gg + (l - gg) * 0.25), 0.92 * (b + (l - b) * 0.25)]); if (L[5] & 1) mine.add(id); }
     const cv = old ? old.cv : document.createElement('canvas'); if (cv.width !== GW || cv.height !== H) { cv.width = GW; cv.height = H; }
     const g = cv.getContext('2d'), img = g.createImageData(GW, H), d = img.data;
     for (let y = 0; y < H; y++) {
@@ -142,7 +147,7 @@ window.ATLAS = (function () {
         const edge = right !== o || down !== o || up !== o || left !== o, p = (y * GW + x) * 4;
         if (mine.has(o) && edge) { d[p] = 240; d[p + 1] = 204; d[p + 2] = 110; d[p + 3] = 255; }
         else if (edge) { d[p] = c[0] * 0.45; d[p + 1] = c[1] * 0.45; d[p + 2] = c[2] * 0.45; d[p + 3] = 235; }
-        else { d[p] = c[0] * 0.82 + 20; d[p + 1] = c[1] * 0.82 + 20; d[p + 2] = c[2] * 0.82 + 16; d[p + 3] = 205; }
+        else { d[p] = c[0] * 0.86 + 14; d[p + 1] = c[1] * 0.86 + 14; d[p + 2] = c[2] * 0.86 + 12; d[p + 3] = 200; }
       }
     }
     g.putImageData(img, 0, 0);
@@ -217,7 +222,7 @@ window.ATLAS = (function () {
     readout(F);
   }
   // the year and its age, the bar, what came to pass, the greatest realms
-  let statsN = -1, newsKey = '';
+  let statsN = -1, newsKey = null;
   function readout(F) {
     const n = F.n, s = ctx.sim(), f = RP.frames[n], fa = RP.frames[k], fb = RP.frames[Math.min(k + 1, RP.frames.length - 1)], yr = Math.round(fa.y + (fb.y - fa.y) * t), a = R.ageOf(yr);
     $('at-year').textContent = s.fmtYear(yr); const ag = $('at-age'); ag.textContent = AGES[a]; ag.style.color = METAL[a];
