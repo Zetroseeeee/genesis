@@ -1187,6 +1187,19 @@ server.listen(0, async () => {
     await ev(() => { const m = document.getElementById('menu'); if (m.open) m.close(); });
     await fresh();      // (back to a page without sound for what follows)
   });
+  await scenario('weather: rain about the eye under thick cloud, the ground wet, the lightning of a storm, the rain passing', async (check) => {
+    await ev(() => { const [lon, lat] = __T.capital(); __T.cam(lon, lat, 600 / 6371000, 1.2, 0.4); __G.weather.extra = { rain: 1 }; }); await wait(6000); await frames(4);
+    const r = await ev(() => { const W = __G.weather; return { rain: W.state.rain, n: W.mesh.geometry.instanceCount, vis: W.mesh.visible, wet: __G.globals.uWet.value, murk: W.state.murk }; });
+    check(r.rain > 0.5 && r.vis && r.n > 1000, 'it rains about the eye: ' + JSON.stringify(r));
+    check(r.wet > 0.3 && r.murk > 0.2, 'the ground is wet and the distance in murk: ' + JSON.stringify(r));
+    await ev(() => { __G.weather.extra = { rain: 1, storm: 1 }; __G.weather.strike(__G.mapcam, {}); }); await frames(2);
+    const s = await ev(() => ({ flash: __G.weather.last && __G.weather.last.flash, strikes: __G.weather.strikes }));
+    check(s.flash > 0.5 && s.strikes >= 1, 'lightning flashes: ' + JSON.stringify(s));
+    await ev(() => { __G.weather.extra = { rain: 0, storm: 0 }; }); await wait(12000); await frames(3);
+    const d = await ev(() => ({ rain: __G.weather.state.rain, n: __G.weather.mesh.geometry.instanceCount, wet: __G.globals.uWet.value }));
+    check(d.rain < 0.15 && d.wet > d.rain, 'the rain passes and the ground dries more slowly: ' + JSON.stringify(d));
+    await ev(() => { __G.weather.extra = null; });
+  });
   await scenario('render: long live run (continuous, 30 s real time) stays error-free', async (check) => {
     await ev(() => { __G.mapcam.fly = null; const [lon, lat] = __T.capital(); __T.cam(lon, lat, 0.02, 0.6, 0); document.getElementById('opt-continuous').click(); document.getElementById('turn').click(); for (let k = 0; k < 4; k++) document.getElementById('btn-faster').click(); });
     const y0 = await ev(() => __G.sim.year); await wait(30000);

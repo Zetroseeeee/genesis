@@ -513,7 +513,8 @@
         const kW = sm(0.02, 0.42, sunUp), k = sm(-0.03, 0.05, sunUp) * (1 + 1.1 * (1 - sm(0.04, 0.5, sunUp)));
         bu.uSunCol.value.set(k, k * (0.56 + 0.44 * kW), k * (0.30 + 0.70 * kW)); bu.uDusk.value = sm(-0.12, 0.02, sunUp) * (1 - sm(0.08, 0.4, sunUp)); bu.uDay.value = sm(-0.1, 0.16, sunUp);
         // (and under a cloud the sun is dimmed for whatever stands there as it is for the ground: by the cloud over the place the eye is at - a town is small under a sky)
-        if (this.cloudVis && cam.alt < 0.03) { this.cloudShade = 0.6 * this.cloudVis * sm(0.12, 0.7, SKY.less(SKY.cloudAt(cam.lon, cam.lat, this.cloudShift), this.cloudNear)); bu.uSunCol.value.multiplyScalar(1 - this.cloudShade); } else this.cloudShade = 0; }
+        if (this.cloudVis && cam.alt < 0.03) { this.cloudShade = 0.6 * this.cloudVis * sm(0.12, 0.7, SKY.less(SKY.cloudAt(cam.lon, cam.lat, this.cloudShift), this.cloudNear)); bu.uSunCol.value.multiplyScalar(1 - this.cloudShade); } else this.cloudShade = 0;
+        if (this.rainShade > 0.01) bu.uSunCol.value.multiplyScalar(1 - this.rainShade); }      // (and under the rain: weather.js, main.js)
       this.sunLight.intensity = 1.5 * day; this.hemi.intensity = 0.25 + 0.8 * day;
       return day;
     }

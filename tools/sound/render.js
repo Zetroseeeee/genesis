@@ -28,6 +28,10 @@ const SCENES = {
   herds: { secs: 30, scene: { agl: 400, zone: 'temperate', day: 1, summerish: 0.8, grass: 0.7, herds: [{ kind: 'cattle', k: 1 }, { kind: 'sheep', k: 1 }], town: { k: 0.15, era: 2, style: 2, cul: 0, size: 0.3 }, era: 2 } },
   birds: { secs: 0, scene: { mode: 'menu' }, calls: [] },
   beasts: { secs: 0, scene: { mode: 'menu' }, calls: [] },
+  // (a scene may also carry thunder: [[t, metres, bolt], ...])
+  rain_wood: { secs: 25, scene: { agl: 220, zone: 'temperate', day: 0.8, summerish: 0.8, woods: 0.8, grass: 0.2, rain: 0.9 } },
+  rain_town: { secs: 25, scene: { agl: 700, zone: 'temperate', day: 0.8, summerish: 0.6, woods: 0.2, grass: 0.4, rain: 1, town: { k: 0.85, era: 4, style: 4, cul: 1, size: 1 }, era: 4 } },
+  storm: { secs: 36, scene: { agl: 300, zone: 'rain', day: 0.6, summerish: 1, warmth: 1, heat: 0.95, woods: 0.9, rain: 1 }, thunder: [[1, 900, true], [10, 4000, false], [22, 9000, false]] },
   stings_stone: { secs: 34, era: 0, cul: 4, scene: { mode: 'menu' }, ui: [[0.5, 'click'], [1, 'tab'], [1.5, 'open'], [2.2, 'close'], [2.8, 'deny'], [3.3, 'ok']], stings: [[4, 'turn'], [5.5, 'stop'], [7, 'know'], [9.5, 'age'], [15, 'war'], [18.5, 'peace'], [21, 'great'], [23, 'wonder'], [27, 'disaster'], [30.5, 'found'], [32, 'story']] },
   stings_medieval: { secs: 34, era: 4, cul: 0, scene: { mode: 'menu' }, ui: [[0.5, 'click'], [1, 'tab'], [1.5, 'open'], [2.2, 'close'], [2.8, 'deny'], [3.3, 'ok']], stings: [[4, 'turn'], [5.5, 'stop'], [7, 'know'], [9.5, 'age'], [15, 'war'], [18.5, 'peace'], [21, 'great'], [23, 'wonder'], [27, 'golden'], [30.5, 'found'], [32, 'story']] },
   stings_modern: { secs: 34, era: 7, cul: 9, scene: { mode: 'menu' }, ui: [[0.5, 'click'], [1, 'tab'], [1.5, 'open'], [2.2, 'close'], [2.8, 'deny'], [3.3, 'ok']], stings: [[4, 'turn'], [5.5, 'stop'], [7, 'know'], [9.5, 'age'], [15, 'war'], [18.5, 'peace'], [21, 'great'], [23, 'wonder'], [27, 'fall'], [31, 'story']] },

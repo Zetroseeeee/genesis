@@ -115,6 +115,8 @@ window.POST = (function () {
   const FINAL = `
     ${DEPTH}
     uniform sampler2D tScene, tShade, tGlow; uniform float uShade, uGlow, uDevelop, uTime, uShow; uniform vec2 uRes, uHalf; varying vec2 vUv;
+    uniform vec4 uMurk; uniform float uFlash;      // the weather (weather.js): the rain's murk (rgb its grey, a how thick) and its reach (uMurkD), a lightning flash
+    uniform float uMurkD;
     // the shade, brought up from half size to the full picture: from the four half-size pixels round each pixel, by how near each is
     // and whether it lies as deep as the pixel does (so the edge of a roof stays as sharp as the roof)
     float shadeAt() {
@@ -134,7 +136,14 @@ window.POST = (function () {
         float sh = shadeAt(); sh = mix(sh, 1.0, 0.5 * smoothstep(0.45, 0.95, dot(c, vec3(0.3, 0.6, 0.1)))); sh = mix(1.0, sh, uShade * smoothstep(0.1, 0.6, sc.a));      // (not on open water: the ground's shader says where that is in the picture's fourth channel)
         c *= mix(vec3(sh), vec3(sh * sh, sh * sqrt(sh), sqrt(sh)), 0.22);
       }
-      c += texture2D(tGlow, vUv).rgb * uGlow;
+      // rain: what is far goes into the grey of the falling rain (all of the sky, at the far plane), and the lightning lights everything
+      // (and under it the light is flat and grey: colour goes out of everything, near as well as far)
+      if (uMurk.a > 0.0) { float z = viewZ(vUv); c = mix(c, uMurk.rgb, min(1.0, uMurk.a * (1.0 - exp(-z / uMurkD)) * (z > uProj.w * 0.9 ? 1.4 : 1.0)));
+        float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c = mix(c, vec3(l) * vec3(0.96, 0.99, 1.04), 0.5 * uMurk.a) * (1.0 + 0.06 * uMurk.a); }      // (the eye opens a little to the dim day)
+      // the glow after the murk (it is the eye's, not the air's: a bolt in the rain, a lit window, bloom where the murk lies over the sky
+      // round them; a little less of it in the rain, whose murk took some of what makes it)
+      c += texture2D(tGlow, vUv).rgb * uGlow * (1.0 - 0.4 * uMurk.a);
+      c *= 1.0 + uFlash;
       // develop: contrast about a middle grey, a little more colour, the shoulder, the corners, the grain
       vec3 g = (c - 0.30) * (1.0 + 0.09 * uDevelop) + 0.30 + 0.012 * uDevelop; g = max(g, 0.0);      // (about a dark grey: the shadows stay where they were, what is lit gains)
       float l = dot(g, vec3(0.2126, 0.7152, 0.0722)); g = max(mix(vec3(l), g, 1.0 + 0.10 * uDevelop), 0.0);
@@ -150,12 +159,13 @@ window.POST = (function () {
     bright: { tScene: { value: null }, uPx: { value: new THREE.Vector2() }, uKnee: { value: 1.04 } },
     down: { tSrc: { value: null }, uPx: { value: new THREE.Vector2() } },
     up: { tSrc: { value: null }, tAdd: { value: null }, uPx: { value: new THREE.Vector2() }, uAdd: { value: 1 }, uSrc: { value: 1 } },
-    fin: { tDepth: { value: null }, uProj: { value: null }, tScene: { value: null }, tShade: { value: null }, tGlow: { value: null }, uShade: { value: 1 }, uGlow: { value: 1 }, uDevelop: { value: 1 }, uTime: { value: 0 }, uShow: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uHalf: { value: new THREE.Vector2(1, 1) } },
+    fin: { tDepth: { value: null }, uProj: { value: null }, tScene: { value: null }, tShade: { value: null }, tGlow: { value: null }, uShade: { value: 1 }, uGlow: { value: 1 }, uDevelop: { value: 1 }, uTime: { value: 0 }, uShow: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uHalf: { value: new THREE.Vector2(1, 1) }, uMurk: { value: new THREE.Vector4(0.5, 0.52, 0.55, 0) }, uMurkD: { value: 0.0005 }, uFlash: { value: 0 } },
   };
   U.fin.uProj = U.smooth.uProj = U.shade.uProj;
   let M = null, black = null;
 
   // can this renderer do it? (WebGL 2, and targets that hold half floats: every Mac the game is for)
+  P.weather = U.fin;      // (weather.js sets uMurk, uMurkD and uFlash here)
   P.init = function (renderer) {
     if (P.ready) return true;
     if (!renderer.capabilities.isWebGL2 || !THREE.WebGLMultisampleRenderTarget || !THREE.DepthTexture) return false;
