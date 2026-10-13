@@ -48,7 +48,7 @@
     4
    ],
    "anchor": "368ff7b1-22cb-42ac-ac04-49248222f1c6",
-   "note": "Pilot only so far."
+   "note": "Pilot so far: the timber house of the north; for the Mediterranean a town house and a Romanesque cathedral (its walls, towers, gate, small houses, granary and fountain are the classical set's)."
   },
   "bronze": {
    "eras": [
@@ -2258,6 +2258,51 @@
     165,
     140
    ]
+  },
+  {
+   "id": "medieval_med_townhouse_a",
+   "title": "Medieval Italian town house",
+   "set": "medieval",
+   "eras": [
+    4,
+    4
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "townhouse"
+   ],
+   "h": 13,
+   "ref": "1f864906-5b1a-4e8e-b8eb-5d6540e3ba51",
+   "prompt": "its descendant (from the Roman house with a shop), a town house of a medieval Italian town of about AD 1250: three storeys, about 7 m wide, 12 m deep and 13 m high, a narrow front of rough stone and brick partly rendered with weathered lime plaster, a shop on the ground floor behind a wide round arch with wooden shutters, small arched windows with wooden shutters above, a low-pitched roof of red terracotta tiles with deep eaves on timber brackets, both side walls plain and windowless so that houses can stand wall to wall",
+   "concept": "a200eb1d-6277-4563-a291-9641f73551b8",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_081932_a200eb1d-6277-4563-a291-9641f73551b8.png",
+   "mesh": "fe57a4ff-2208-4835-81e5-77fd0dfe67e5",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_082044_fe57a4ff-2208-4835-81e5-77fd0dfe67e5.glb"
+  },
+  {
+   "id": "medieval_med_cathedral_a",
+   "title": "Romanesque cathedral",
+   "set": "medieval",
+   "eras": [
+    4,
+    4
+   ],
+   "cultures": [
+    "med"
+   ],
+   "kinds": [
+    "cathedral",
+    "church"
+   ],
+   "h": 45,
+   "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
+   "prompt": "a Romanesque cathedral of a city of central Italy of about AD 1150, about 30 by 75 m and 25 m high, a nave with lower aisles under red terracotta tile roofs, a facade of white and grey-green striped marble with tiers of small blind arches and a round window, a semicircular apse at the far end, and a square bell tower about 45 m high standing beside the nave with rows of round-arched openings and a low pyramidal tile roof",
+   "concept": "e481e56b-0b27-4a73-8b6b-db5b1bf2cbf1",
+   "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_081932_e481e56b-0b27-4a73-8b6b-db5b1bf2cbf1.png",
+   "mesh": "423bc470-4a96-4953-9784-12cadb090d7f",
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_082049_423bc470-4a96-4953-9784-12cadb090d7f.glb"
   }
  ]
 }

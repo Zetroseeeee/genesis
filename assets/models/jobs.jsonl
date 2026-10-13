@@ -108,3 +108,5 @@
 {"id":"classical_med_granary_a","concept":"d122c46a-eced-4a86-8650-67de76f68ebd","cts":"20261013_075209","ref":"190f769d-bbe0-4baa-9ae4-870d8bf10cea","mesh":"2a6646bd-0ded-40c9-987f-ad9163caea2d","mts":"20261013_075744"}
 {"id":"classical_med_fountain_a","concept":"17496052-db30-4546-920b-04429f1f7d36","cts":"20261013_075210","ref":"190f769d-bbe0-4baa-9ae4-870d8bf10cea","mesh":"758f0462-7d2d-4b24-a355-b30467f24b3b","mts":"20261013_075749"}
 {"id":"classical_med_colosseum","concept":"cfd24bd8-91ba-4b86-90f7-4634478b3e7c","cts":"20261013_075342","ref":"190f769d-bbe0-4baa-9ae4-870d8bf10cea","mesh":"22d65ac3-652e-442b-b0f4-4b1b14f71a70","mts":"20261013_075728"}
+{"id":"medieval_med_townhouse_a","concept":"a200eb1d-6277-4563-a291-9641f73551b8","cts":"20261013_081932","ref":"1f864906-5b1a-4e8e-b8eb-5d6540e3ba51","mesh":"fe57a4ff-2208-4835-81e5-77fd0dfe67e5","mts":"20261013_082044"}
+{"id":"medieval_med_cathedral_a","concept":"e481e56b-0b27-4a73-8b6b-db5b1bf2cbf1","cts":"20261013_081932","ref":"190f769d-bbe0-4baa-9ae4-870d8bf10cea","mesh":"423bc470-4a96-4953-9784-12cadb090d7f","mts":"20261013_082049"}
