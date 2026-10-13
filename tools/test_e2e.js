@@ -1252,7 +1252,7 @@ server.listen(0, async () => {
     await ev(() => { __G.weather.extra = { rain: 1, storm: 1 }; __G.weather.strike(__G.mapcam, {}); }); await frames(2);
     const s = await ev(() => ({ flash: __G.weather.last && __G.weather.last.flash, strikes: __G.weather.strikes }));
     check(s.flash > 0.5 && s.strikes >= 1, 'lightning flashes: ' + JSON.stringify(s));
-    await ev(() => { __G.weather.extra = { rain: 0, storm: 0 }; }); await wait(12000); await frames(3);
+    await ev(() => { __G.weather.extra = { rain: 0, storm: 0 }; }); await page.waitForFunction(() => __G.weather.state.rain < 0.15, null, { timeout: 45000 }).catch(() => {}); await frames(3);      // (a shower goes over some seconds of the game's frames: a slow renderer has fewer of them)
     const d = await ev(() => ({ rain: __G.weather.state.rain, n: __G.weather.mesh.geometry.instanceCount, wet: __G.globals.uWet.value }));
     check(d.rain < 0.15 && d.wet > d.rain, 'the rain passes and the ground dries more slowly: ' + JSON.stringify(d));
     await ev(() => { __G.weather.extra = null; });
@@ -1277,7 +1277,9 @@ server.listen(0, async () => {
     const y0 = q.year; await wait(1600); await frames(3); q = await look();
     check(q.year !== y0, `it plays: ${y0} -> ${q.year}`);
     // space stops it, End goes to the last map, the left arrow to the one before
-    await page.keyboard.press('Space'); await frames(2); q = await look(); check(q.play !== 'Pause' && q.open, `space stops it (${q.play})`);
+    { const p0 = (await look()).play; await page.keyboard.press('Space'); await frames(2); q = await look();      // (a short history may have played to its end already: then space plays it again)
+      check(q.open && (p0 === 'Pause' ? q.play !== 'Pause' : q.play === 'Pause'), `space plays and stops it (${p0} -> ${q.play})`);
+      if (q.play === 'Pause') { await page.keyboard.press('Space'); await frames(2); } }
     const ys = await ev(() => __G.sim.replay.frames.map((f) => __G.sim.fmtYear(f.y)));
     await page.keyboard.press('End'); await frames(2); q = await look(); check(q.year === ys[ys.length - 1], `End goes to the last map (${q.year}, ${ys[ys.length - 1]})`);
     await page.keyboard.press('ArrowLeft'); await frames(2); q = await look(); check(q.year === ys[ys.length - 2], `the left arrow to the one before (${q.year}, ${ys[ys.length - 2]})`);
