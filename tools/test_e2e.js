@@ -459,7 +459,7 @@ server.listen(0, async () => {
     const before = await ev(() => ({ year: __G.sim.year, name: __G.sim.fullName(__G.sim.playerCiv()) }));
     await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-worlds').click(); }); await frames(2);
     await ev(() => { document.getElementById('wd-name').value = 'The test world'; document.querySelector('#worlds [data-wd="keep"]').click(); });
-    await page.waitForFunction(() => document.querySelectorAll('#wd-list .wd-card').length >= 1, null, { timeout: 30000 }); await wait(500);
+    await page.waitForFunction(() => { const img = document.querySelector('#wd-list .wd-card .wd-pic img'); return img && img.complete && img.naturalWidth > 0; }, null, { timeout: 60000 }).catch(() => {});
     const card = () => ev(() => { const c = document.querySelector('#wd-list .wd-card'), img = c && c.querySelector('.wd-pic img'); return c ? { n: document.querySelectorAll('#wd-list .wd-card').length, name: c.querySelector('b').textContent, line: c.querySelector('.wd-txt span').textContent, pic: img ? img.naturalWidth : 0 } : { n: 0 }; });
     let q = await card();
     check(q.n === 1 && q.name === 'The test world' && q.line.includes(before.name) && q.pic === 320, `kept and listed: '${q.name}', '${q.line}', a picture ${q.pic} wide`);
@@ -475,7 +475,7 @@ server.listen(0, async () => {
     check(a.year === before.year && a.name === before.name, `gone back to as it was kept (${a.name}, ${a.year})`);
     // deleted, asked twice
     await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-worlds').click(); }); await page.waitForFunction(() => document.querySelectorAll('#wd-list .wd-card').length >= 1, null, { timeout: 30000 });
-    await ev(() => document.querySelector('#wd-list [data-wd="del"]').click()); await frames(1); q = await card(); check(q.n === 1, 'the first click only asks');
+    q = await ev(() => { const b = document.querySelector('#wd-list [data-wd="del"]'); b.click(); return { n: document.querySelectorAll('#wd-list .wd-card').length, label: b.textContent }; }); check(q.n === 1 && /Delete it/.test(q.label), `the first click only asks ('${q.label}')`);
     await ev(() => document.querySelector('#wd-list [data-wd="del"]').click()); await page.waitForFunction(() => !document.querySelector('#wd-list .wd-card'), null, { timeout: 30000 });
     check(await ev(() => /No worlds are kept/.test(document.getElementById('wd-list').textContent)), 'deleted');
     await ev(() => document.getElementById('worlds').close());

@@ -1236,7 +1236,7 @@
       const b = e.target.closest('[data-wd]'); if (!b) return; const a = b.dataset.wd, card = b.closest('.wd-card'), id = card && card.dataset.id;
       if (a === 'close') { $('worlds').close(); return; }
       if (a === 'keep') { b.disabled = true; try { if (await keepWorld($('wd-name').value)) toast('This world is kept, as it is now'); } catch (err) { console.warn(err); toast('The world could not be kept here'); } b.disabled = false; $('wd-name').value = ''; renderWorlds(); return; }
-      const ask = (text) => { if (b.dataset.sure) return true; b.dataset.sure = '1'; const was = b.textContent; b.textContent = text; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = was; } }, 3500); return false; };
+      const ask = (text) => { if (b.dataset.sure) return true; b.dataset.sure = '1'; const was = b.textContent; b.textContent = text; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = was; } }, 6000); return false; };
       if (a === 'del') { if (!ask('Delete it?')) return; try { await WORLDS.del(id); } catch (err) {} renderWorlds(); return; }
       if (a === 'load') {
         if (sim && mode === 'play' && !ask('Leave this world?')) return;
@@ -1617,7 +1617,7 @@
   async function keepWorld(name) {
     if (!sim || mode !== 'play') return false;
     const c = sim.playerCiv(), st = sim.save(); st.cam = { lon: mapcam.lon, lat: mapcam.lat, dist: mapcam.dist, tilt: mapcam.tilt, heading: mapcam.heading };
-    const json = JSON.stringify(st), thumb = await Promise.race([smallPicture(), new Promise((r) => setTimeout(() => r(null), 3000))]);
+    const json = JSON.stringify(st), thumb = await Promise.race([smallPicture(), new Promise((r) => setTimeout(() => r(null), 10000))]);
     const data = canPack ? await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).blob() : new Blob([json]);
     const realm = c ? sim.fullName(c) : sim.fallen ? (sim.fallen.fell && sim.fallen.fell[2]) || sim.fallen.name : '';
     await WORLDS.put({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: (name || '').trim().slice(0, 60) || `${realm || 'A world'}, ${sim.fmtYear(sim.year)}`, realm, year: sim.year, when: sim.fmtYear(sim.year), age: c ? c.era : -1, at: Date.now(), thumb, data, packed: canPack ? 1 : 0, size: data.size });
@@ -1685,7 +1685,7 @@
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    const modalOpen = $('chron').open || $('menu').open || $('news').open || $('market').open || $('know').open || $('gov').open || $('dip').open || $('cult').open || $('tale').open;
+    const modalOpen = $('chron').open || $('menu').open || $('news').open || $('market').open || $('know').open || $('gov').open || $('dip').open || $('cult').open || $('tale').open || $('atlas').open || $('worlds').open;
     modalNow = modalOpen || !!($('epi') && $('epi').open);
     mapcam.update(dt);
     camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();      // everything this frame (sun in view space, shadow lookup) works from the camera where it now is
