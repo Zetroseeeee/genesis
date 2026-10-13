@@ -22,7 +22,7 @@
     if (id >= 0 && id !== S.player) {
       const s = S.save(); if (s.civs[s.player]) s.civs[s.player].player = false; s.civs[id].player = true; s.player = id;
       const [lon, lat] = P.look === 'tab' ? G.world.siteOf(S.civs[id].capital) : [P.lon, P.lat]; s.cam = { lon, lat, dist: P.alt / 6371000, tilt: P.tilt, heading: P.heading };
-      try { localStorage.setItem('genesis-save-v2', JSON.stringify(s)); document.getElementById('m-load').click(); } catch (e) { window.__woods = { error: String(e) }; return; }
+      try { G.enter(JSON.parse(JSON.stringify(s))); } catch (e) { window.__woods = { error: String(e) }; return; }
     }
     setTimeout(show, 1500);
   };
