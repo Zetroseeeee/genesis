@@ -455,14 +455,15 @@ server.listen(0, async () => {
   });
 
   await scenario('worlds: a copy of this world kept with its picture, listed, gone back to from the home screen, deleted', async (check) => {
-    await ev(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
+    await ev(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); __T.cam(__G.mapcam.lon, __G.mapcam.lat, 2.5, 0, 0); }); await frames(3);      // (from far out: a software renderer draws a town's frame in more seconds than the picture is waited for)
     const before = await ev(() => ({ year: __G.sim.year, name: __G.sim.fullName(__G.sim.playerCiv()) }));
     await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-worlds').click(); }); await frames(2);
     await ev(() => { document.getElementById('wd-name').value = 'The test world'; document.querySelector('#worlds [data-wd="keep"]').click(); });
     await page.waitForFunction(() => { const img = document.querySelector('#wd-list .wd-card .wd-pic img'); return img && img.complete && img.naturalWidth > 0; }, null, { timeout: 60000 }).catch(() => {});
     const card = () => ev(() => { const c = document.querySelector('#wd-list .wd-card'), img = c && c.querySelector('.wd-pic img'); return c ? { n: document.querySelectorAll('#wd-list .wd-card').length, name: c.querySelector('b').textContent, line: c.querySelector('.wd-txt span').textContent, pic: img ? img.naturalWidth : 0 } : { n: 0 }; });
     let q = await card();
-    check(q.n === 1 && q.name === 'The test world' && q.line.includes(before.name) && q.pic === 320, `kept and listed: '${q.name}', '${q.line}', a picture ${q.pic} wide`);
+    const kept = await ev(() => new Promise((res) => { const r = indexedDB.open('holocene', 1); r.onsuccess = () => { const g = r.result.transaction('worlds').objectStore('worlds').getAll(); g.onsuccess = () => res(g.result.map((w) => ({ thumb: w.thumb ? w.thumb.size : null, size: w.size }))); g.onerror = () => res('get failed'); }; r.onerror = () => res('open failed'); }));
+    check(q.n === 1 && q.name === 'The test world' && q.line.includes(before.name) && q.pic === 320, `kept and listed: '${q.name}', '${q.line}', a picture ${q.pic} wide (${JSON.stringify(kept)})`);
     // the world goes on, and is left for the main menu; the copy is there, as it was
     await ev(() => { document.getElementById('worlds').close(); __G.run(300); }); await frames(2);
     await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-new').click(); }); await frames(3);
