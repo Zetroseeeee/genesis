@@ -41,7 +41,7 @@
     3
    ],
    "anchor": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
-   "note": "Greek and Roman towns, about 300 BC to AD 200: the Doric temple (the anchor), houses (a small house, a house with a shop, an atrium house, an apartment block), the city wall with its towers and gate, a market stoa, a palace, a farm granary, a fountain and the Colosseum. Dressed limestone and marble, lime plaster, brick-faced concrete, red terracotta tiles. No glass in windows."
+   "note": "Greek and Roman towns, about 300 BC to AD 200: the Doric temple (the anchor), houses (a small house, a house with a shop, an atrium house, an apartment block), the city wall with its towers and gate, a market stoa, a palace, a farm granary, a fountain and the Colosseum. Dressed limestone and marble, lime plaster, brick-faced concrete, red terracotta tiles. No glass in windows. The walls, towers and gate, the small houses, the granary and the fountain serve the medieval towns of the Mediterranean too: their walls were Rome's, and their houses were still built so."
   },
   "medieval": {
    "eras": [
@@ -1563,7 +1563,7 @@
      ],
      "eras": [
       3,
-      3
+      4
      ],
      "cultures": [
       "med"
@@ -1898,7 +1898,21 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075301_718a7302-b99e-47c1-91a4-426cb05437b0.png",
    "mesh": "e3fedb53-2189-41ff-be74-9d864211895e",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075603_e3fedb53-2189-41ff-be74-9d864211895e.glb",
-   "site": "bronze_mudbrick_site"
+   "site": "bronze_mudbrick_site",
+   "also": [
+    {
+     "kinds": [
+      "hip"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "classical_med_house_b",
@@ -1921,7 +1935,21 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075302_1f864906-5b1a-4e8e-b8eb-5d6540e3ba51.png",
    "mesh": "5f79f480-8981-4d44-9529-2797e4785dbf",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075611_5f79f480-8981-4d44-9529-2797e4785dbf.glb",
-   "site": "bronze_mudbrick_site"
+   "site": "bronze_mudbrick_site",
+   "also": [
+    {
+     "kinds": [
+      "gable"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "classical_med_domus_a",
@@ -1990,7 +2018,21 @@
    "concept": "b9c040ce-a1c0-4c73-b2e3-c970d93d9028",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075342_b9c040ce-a1c0-4c73-b2e3-c970d93d9028.png",
    "mesh": "75eacc8a-8006-446a-a85e-ab748ac21ad1",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075713_75eacc8a-8006-446a-a85e-ab748ac21ad1.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075713_75eacc8a-8006-446a-a85e-ab748ac21ad1.glb",
+   "also": [
+    {
+     "kinds": [
+      "wall_stone"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "classical_med_tower_a",
@@ -2013,7 +2055,22 @@
    "concept": "db82877b-d61e-4557-b033-53fe63999989",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075530_db82877b-d61e-4557-b033-53fe63999989.png",
    "mesh": "e0383b74-df3a-4a0a-b08c-0dcb2788fafa",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075723_e0383b74-df3a-4a0a-b08c-0dcb2788fafa.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075723_e0383b74-df3a-4a0a-b08c-0dcb2788fafa.glb",
+   "also": [
+    {
+     "kinds": [
+      "tower_stone",
+      "roundtower"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "classical_med_gate_a",
@@ -2038,7 +2095,21 @@
    "concept": "5e366a5e-2b54-410d-a656-0f45d82f52c1",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075708_5e366a5e-2b54-410d-a656-0f45d82f52c1.png",
    "mesh": "fd9a4a69-eb71-4235-9249-45b8e19b636e",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075847_fd9a4a69-eb71-4235-9249-45b8e19b636e.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075847_fd9a4a69-eb71-4235-9249-45b8e19b636e.glb",
+   "also": [
+    {
+     "kinds": [
+      "gate_stone"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "classical_med_stoa_a",
@@ -2109,7 +2180,21 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075209_d122c46a-eced-4a86-8650-67de76f68ebd.png",
    "mesh": "2a6646bd-0ded-40c9-987f-ad9163caea2d",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075744_2a6646bd-0ded-40c9-987f-ad9163caea2d.glb",
-   "site": "bronze_mudbrick_site"
+   "site": "bronze_mudbrick_site",
+   "also": [
+    {
+     "kinds": [
+      "granary"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "classical_med_fountain_a",
@@ -2131,7 +2216,21 @@
    "concept": "17496052-db30-4546-920b-04429f1f7d36",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075210_17496052-db30-4546-920b-04429f1f7d36.png",
    "mesh": "758f0462-7d2d-4b24-a355-b30467f24b3b",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075749_758f0462-7d2d-4b24-a355-b30467f24b3b.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075749_758f0462-7d2d-4b24-a355-b30467f24b3b.glb",
+   "also": [
+    {
+     "kinds": [
+      "fountain"
+     ],
+     "eras": [
+      4,
+      4
+     ],
+     "cultures": [
+      "med"
+     ]
+    }
+   ]
   },
   {
    "id": "classical_med_colosseum",
