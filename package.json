@@ -7,7 +7,7 @@
   "main": "desktop/main.js",
   "holocene": {
     "feed": "https://github.com/Zetroseeeee/genesis/releases/download",
-    "shellApi": 1
+    "shellApi": 2
   },
   "scripts": {
     "build": "node tools/build.js",

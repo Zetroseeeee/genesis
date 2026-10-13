@@ -76,6 +76,8 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   The build Mac is a virtual GPU, 1680 by 1050 with one pixel to a point: its numbers hold one build against another
   (two starts of the app differ too much: compare inside one page), they do not say how fast a real Mac is.
 - `npm start` — desktop window (Electron).
+- `node tools/test_saves.js` — the worlds on disk (`desktop/saves.js`) under plain Node, seconds; `xvfb-run -a -s "-screen 0 1600x1000x24"
+  node tools/saves/app.js` — the same in the real app over three starts (see Saves). Run both after touching how the game saves.
 - `node tools/test_update.js` — the updater under plain Node: small games in folders, the publishing step writing a
   feed, a web server that misbehaves on demand (270 checks, a few seconds). Run it after touching `desktop/updater.js`
   or `tools/update/`.
@@ -321,9 +323,11 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/folk.js` | `FOLK` | The Peoples tab, the laws screen's tab before the Land: the realm's peoples, its rulers' people abroad, who came and who left in the last ten years, the world's great migrations, the policies of borders and of leaving |
 | `src/works.js` | `WORKS` | The culture screen: renown against the age, the next great person, the golden age, patronage, the living great people (commissions), the works held and lost; the world's renowned realms, golden ages, great people of late and greatest works |
 | `src/envoys.js` | `ENVOYS` | The diplomacy screen: the realms within reach and what they think, a realm's page (what can be proposed and how it would be answered, war and its price, peace and its terms), envoys waiting, the wars, the realm's standing |
+| `src/disk.js` | `DISK` | Where the worlds and the settings are kept: in the app files in the game's folder (through the shell), on the web the page's storage; moves the worlds of 0.54 and before into files |
 | `src/main.js` | `__G` | Boot, home screen, camera, HUD, turn loop, build panel, saves, what the player sees of updates |
-| `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`) |
+| `desktop/main.js`, `preload.js` | | The app's shell: one window, the game served over `genesis://`, the bridge the page may call (`window.desktop`: updates, the worlds, the settings) |
 | `desktop/updater.js` | | Keeps the game's files current without replacing the app (plain Node, no Electron inside) |
+| `desktop/saves.js` | | The worlds on disk: a file each in `Saves/`, written beside itself, checked and put in place; the world in play kept aside when another takes its place (plain Node) |
 | `tools/update/` | | `manifest.js` (the list of a build's files), `publish.js` (the build gives an update out), `drill.js`, `walk.js`, `realwalk.js`, `mirror.mjs` |
 
 Conventions that matter:
@@ -1768,24 +1772,39 @@ carried with the game (`vendor/fonts`, linked by `local.html`); the published we
 
 ## Saves
 
-- A world is kept in the page's storage (`localStorage`, `genesis-save-v2`), which holds some 5.2 million characters for the whole
-  game (Chromium's limit; the app is Chromium too). A long game's save is more than four million: in AD 2150 4.2 (seed 12345) and 4.5
-  (777) - the realms (their events, rule, diplomacy, legacy), culture, dynasties, the names of places, the people place by place. So a
-  save past `PACK_AT` (4 million characters) is packed (`packSave` in `main.js`: gzip by the page's own `CompressionStream`, a byte to a
-  character after `gz1:`; 1.3 million for 777's), in the background; what it says is kept beside it (`saveCache`, checked against what
-  is stored), so that it is read back at once, and one already packed is unpacked as the game starts (`primeSave`, before the home
-  screen shows it). At the window's last moment (`beforeunload`) there is no background: the save is written as it is if there is room
-  for it, and if not, the one before stands (the autosave is a minute old at most). An update waits for its save before the page goes
-  (`applyUpdate`). `window.GENESIS_PACK = 1` packs whatever the length (the end-to-end scenario 'save/load: a long game is packed').
-  A string of bytes as characters comes back whole from the storage after the browser is closed and opened again (measured, NUL and all).
-- A picture of the world (Shift+S, the menu's Take a picture) is the canvas alone, read in the frame it is drawn in (`picture`), and
-  given as a file named for the realm and the year; in the app a download asks where to keep it.
-- **The worlds kept** (`keepWorld`, `WORLDS` in `main.js`; the menu's and the home screen's Your worlds). Beside the world in play, which
-  the autosave keeps, a player may keep copies: each in the page's database (IndexedDB `holocene`, store `worlds`: what the disk allows),
-  packed (gzip), with a small picture of the world as it was (320 by 200, taken in the next frame drawn: `smallPicture`, which draws a
-  frame even behind a page), its name, realm, year and age, when it was kept. Going to one makes it the world in play (asked twice when a
-  world is in play: the one left is kept only by the autosave, and the autosave keeps the new one from then on); deleting is asked twice.
-  The end-to-end scenario 'worlds' keeps one, leaves for the main menu, goes back to it and deletes it.
+- **In the app every world is a file** (`desktop/saves.js` in the shell, `src/disk.js` in the page; since 0.55): `Saves/` in the
+  game's folder (`~/Library/Application Support/GENESIS/Saves` on a Mac), as any game keeps its saves - nothing of a world is in the
+  page's storage. `Autosave.holocene` is the world in play: written every minute, when the player leaves it for the main menu (with a
+  new picture), before an update is put to use, with Cmd+S and the menu's Save now, and as the window closes (`writeNow`: the page
+  waits on a synchronous message until the file is written; quitting, closing the window and the menu's Restart all go through it).
+  Every other file is a world kept: a copy the player kept (Your worlds), or the world in play itself, moved aside under its own
+  name when another takes its place - a new people founded (`startPlayer`), a kept world gone back to (`enterKept`) - unless it is
+  that very world on that very day (`retire`; a write of another world, or of an earlier day, over the world in play does the same,
+  as a net under it). So no world is lost by starting or loading another, and nothing is asked first.
+  A file is "HOLOCENE", the format, a head (JSON: name, realm, year, when, age, seed, when it was saved, the game's version, its
+  length unpacked), a picture (a JPEG of 320 by 200 taken in the next frame drawn, `smallPicture`: the world in play's anew every five
+  minutes and as it is left) and the world as `sim.save()` gives it, gzipped: a long game is a megabyte or two. A list reads the heads
+  and pictures alone. Every write is made beside its file, flushed, read back and unpacked, and only then put in its place; writes go
+  one at a time in the order asked, and the window's last write goes at once and lets go of any still on its way (`gen`): an older
+  save landing after it would stand over the newest. Deleting sends a world to the Trash. Your worlds lists every file, the world in
+  play first, and opens the folder in Finder; the app's Game menu shows the saves and the pictures.
+- **The settings** are a file beside them (`Settings.json`: the settings, the news read, the version last seen, that the old worlds
+  were moved), read once as the page starts (`store:all`, synchronous) and written 0.4 s after a change and as the app quits.
+- **Worlds of 0.54 and before** were in the page's storage: the world in play in `localStorage` (`genesis-save-v2`; past four million
+  characters gzipped, as `gz1:` and a byte to a character), the worlds kept in IndexedDB (`holocene`, store `worlds`). The first start
+  of an app with files moves them (`moveOld` in `disk.js`), each into its file and out of the page's storage only once its file is
+  written and read back; what failed stays there and is tried again at the next start (`savesMoved` in Settings.json says all went).
+  The world in play comes with a bare head (its year and seed) and is said for what it is once the home screen has shown it
+  (`relabelAuto`). **A new name, a new folder or a new scheme must never strand them**: the page's storage belongs to the origin
+  `genesis://app`, in the GENESIS folder.
+- **On the web** (the preview, and the end-to-end suite, which has no shell) `disk.js` keeps the page's storage as it always was: one
+  world in play, the copies kept in IndexedDB, a new world replaces the world in play (Go to it asks twice), a picture is a download.
+- A picture of the world (Shift+S, the menu's Take a picture) is the canvas alone, read in the frame it is drawn in (`picture`): in the
+  app a PNG in `~/Pictures/Holocene` named for the realm and the year (`GENESIS_PICTURES` puts them elsewhere for a test).
+- `node tools/test_saves.js` tries `desktop/saves.js` under plain Node (30 checks, seconds); `xvfb-run -a -s "-screen 0 1600x1000x24"
+  node tools/saves/app.js` the real app over three starts (what 0.54 left moved into files, saved, kept, a picture, quit in the
+  middle of play, continued, a new world founded, a world deleted, nothing in the page's storage: 21 checks, some fifteen minutes).
+  Run both after touching either file or how the game saves.
 
 ## Updates (how a push reaches a copy already installed)
 

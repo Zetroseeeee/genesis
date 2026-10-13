@@ -677,6 +677,9 @@
   .wd-at { font-size: var(--fs-cap); color: var(--text-3); }
   .wd-act { display: flex; flex-direction: column; gap: 6px; }
   .wd-none { color: var(--text-3); font-style: italic; margin: 6px 0; }
+  .wd-card.auto { background: rgb(255 255 255 / 0.055); }
+  .wd-foot { display: flex; justify-content: flex-end; padding-top: 10px; }
+  .wd-foot:has(> [hidden]:only-child) { display: none; }
   @media (max-width: 640px) { .wd-card { grid-template-columns: 1fr; } .wd-act { flex-direction: row; } }
   /* ----- the dawn of an age (dawn.js): the painting, the age in history, what it brings the realm, its ambitions, the world in it ----- */
   #dawn .modal { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow-y: auto; position: relative; }
@@ -1520,6 +1523,7 @@
   <div class="pbody">
     <div class="wd-keep" id="wd-keep"><input type="text" id="wd-name" maxlength="60" aria-label="A name for this world"><button class="btn primary" data-wd="keep">Keep a copy of this world</button></div>
     <div class="wd-list" id="wd-list"></div>
+    <div class="wd-foot"><button class="btn ghost" data-wd="reveal" id="wd-reveal" hidden title="The folder the worlds are kept in: every world is a file of its own">Show in Finder</button></div>
   </div>
 </div></dialog>
 
@@ -1649,4 +1653,5 @@
 <script src="weather.js"></script>
 <script src="sound.js"></script>
 <script src="music.js"></script>
+<script src="disk.js"></script>
 <script src="main.js"></script>

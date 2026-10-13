@@ -1,5 +1,6 @@
-// Holocene desktop shell: one window, the game served from disk over a private scheme (so fetch, textures and saves
-// behave exactly as they do on the web). World data and models live beside the app, not inside its archive.
+// Holocene desktop shell: one window, the game served from disk over a private scheme (so fetch and textures behave exactly
+// as they do on the web). World data and models live beside the app, not inside its archive. The worlds and the settings
+// are files in the game's folder (saves.js), as any game keeps them: the page asks for them through preload.js.
 // The game's files can be newer than the app that carries them: updater.js fetches changed files into a store beside
 // the saves and this shell serves them in place of the app's own (see updater.js). The shell itself - this folder -
 // only changes with a new app; package.json's holocene.shellApi is raised when the game comes to need a newer one.
@@ -9,6 +10,7 @@ const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { Updater } = require('./updater.js');
+const { Saves, savePicture } = require('./saves.js');
 const PKG = require('../package.json');
 
 const ROOT = path.join(__dirname, '..');
@@ -23,6 +25,21 @@ const DRILL = SMOKE && process.env.GENESIS_SMOKE_UPDATE === '1';      // the sel
 // (The self-check works in a folder of its own that it throws away: it never sees or touches anyone's worlds.)
 if (SMOKE && !process.env.GENESIS_USERDATA) { try { for (const f of fs.readdirSync(os.tmpdir())) { const p = path.join(os.tmpdir(), f); if (f.startsWith('holocene-check-') && Date.now() - fs.statSync(p).mtimeMs > 3600e3) fs.rmSync(p, { recursive: true, force: true }); } } catch (e) {} }      // (and those of earlier checks, an hour on)
 app.setPath('userData', process.env.GENESIS_USERDATA || (SMOKE ? fs.mkdtempSync(path.join(os.tmpdir(), 'holocene-check-')) : path.join(app.getPath('appData'), 'GENESIS')));
+
+// ---- the worlds and the settings: files in that folder, as any game keeps them (none of it in the page's storage) ----
+// Saves/: every world a file of its own (saves.js); Settings.json: the settings and what the game remembers between starts
+// (the news read, the version last seen). Pictures of the world go to the player's Pictures, in a folder of the game's name.
+const SAVES = path.join(app.getPath('userData'), 'Saves');
+const saves = new Saves({ dir: SAVES, trash: (f) => shell.trashItem(f), log: (m) => console.log('[saves] ' + m) });
+const PREFS = path.join(app.getPath('userData'), 'Settings.json');
+let prefs = null, prefsT = null;
+const prefsNow = () => { if (!prefs) { try { const p = JSON.parse(fs.readFileSync(PREFS, 'utf8')); prefs = p && typeof p === 'object' && !Array.isArray(p) ? p : {}; } catch (e) { prefs = {}; } } return prefs; };
+function flushPrefs() {
+  clearTimeout(prefsT); prefsT = null; if (!prefs) return;
+  const part = PREFS + '.' + process.pid + '.part';
+  try { fs.mkdirSync(path.dirname(PREFS), { recursive: true }); fs.writeFileSync(part, JSON.stringify(prefs, null, 2)); fs.renameSync(part, PREFS); } catch (e) { console.log('[settings] could not be written: ' + e.message); try { fs.unlinkSync(part); } catch (x) {} }
+}
+const picturesDir = () => process.env.GENESIS_PICTURES || path.join(app.getPath('pictures'), NAME);      // (GENESIS_PICTURES: a folder of a test's own)
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'genesis', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 // this is a game: take the fast GPU and do not let the system throttle it
@@ -171,6 +188,20 @@ handle('update:app', async () => { const file = await updater.getApp(app.getPath
 hear('update:app-cancel', () => updater.cancelApp());
 handle('update:app-show', () => { const f = updater.snapshot().app.file; if (f && fs.existsSync(f)) { shell.showItemInFolder(f); return true; } return false; });
 hear('update:ack', () => updater.ackNotice());
+// the worlds (saves.js) and the settings
+handle('saves:list', () => saves.list());
+handle('saves:read', (e, id) => saves.read(id));
+handle('saves:write', (e, o) => saves.write(o || {}));
+handle('saves:retire', (e, w) => saves.retire(w || {}));
+handle('saves:relabel', (e, id, patch, pic) => saves.relabel(id, patch, pic));
+handle('saves:remove', (e, id) => saves.remove(id));
+handle('saves:reveal', (e, id) => { if (id) { const f = saves.fileOf(id); if (fs.existsSync(f)) { shell.showItemInFolder(f); return true; } } fs.mkdirSync(SAVES, { recursive: true }); return shell.openPath(SAVES).then((err) => !err); });
+handle('saves:picture', (e, bytes, name) => savePicture(picturesDir(), name, bytes));
+handle('saves:where', () => ({ saves: SAVES, pictures: picturesDir(), settings: PREFS }));
+// (the window's last moment: the page waits until its world is on the disk)
+ipcMain.on('saves:write-now', (e, o) => { if (!fromGame(e)) { e.returnValue = null; return; } try { e.returnValue = saves.writeNow(o || {}); } catch (x) { console.log('[saves] the last save failed: ' + x.message); e.returnValue = { error: x.message }; } });
+ipcMain.on('store:all', (e) => { e.returnValue = fromGame(e) ? prefsNow() : {}; });
+hear('store:set', (e, k, v) => { if (typeof k !== 'string' || !k || k.length > 100) return; const p = prefsNow(); if (v === null || v === undefined) delete p[k]; else p[k] = v; clearTimeout(prefsT); prefsT = setTimeout(flushPrefs, 400); });
 
 if (!SMOKE && !app.requestSingleInstanceLock()) app.quit();      // two copies would fight over one store of updates
 else {
@@ -182,7 +213,7 @@ else {
     const checkItem = { label: 'Check for Updates…', enabled: updater.phase !== 'off', click: () => { if (mainWin) mainWin.webContents.send('update:open'); check(true).catch(() => {}); } };
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       ...(isMac ? [{ label: NAME, submenu: [{ role: 'about' }, checkItem, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] }] : []),
-      { label: 'Game', submenu: [{ role: 'togglefullscreen' }, { role: 'reload', label: 'Restart' }, { type: 'separator' }, { role: 'toggleDevTools' }, ...(isMac ? [] : [checkItem, { type: 'separator' }, { role: 'quit' }])] },
+      { label: 'Game', submenu: [{ role: 'togglefullscreen' }, { role: 'reload', label: 'Restart' }, { type: 'separator' }, { label: isMac ? 'Show Saved Worlds in Finder' : 'Show Saved Worlds', click: () => { fs.mkdirSync(SAVES, { recursive: true }); shell.openPath(SAVES); } }, { label: 'Show Pictures', click: () => { fs.mkdirSync(picturesDir(), { recursive: true }); shell.openPath(picturesDir()); } }, { type: 'separator' }, { role: 'toggleDevTools' }, ...(isMac ? [] : [checkItem, { type: 'separator' }, { role: 'quit' }])] },
       { role: 'windowMenu' },
     ]));
     // (a game just put to use at this start is never read from anything Chromium kept of the one before)
@@ -191,4 +222,5 @@ else {
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   });
   app.on('window-all-closed', () => app.quit());
+  app.on('will-quit', flushPrefs);
 }
