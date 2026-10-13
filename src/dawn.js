@@ -60,10 +60,10 @@ window.DAWN = (function () {
     // where the realm stands in it among the world's peoples
     let first = null; if (L && LG) { const F = L.save().f, k = LG.FIRSTS.findIndex((f) => f.key === 'age' + e); if (k >= 0 && F[k]) first = F[k]; }
     let there = 0, all = 0; for (const o of s.civs) if (o) { all++; if (o.era >= e) there++; }
-    $('dw-world').textContent = first ? (first[1] === c.id ? `${s.fullName(c)} is the first people of the world to enter it. ` : `The first into it was ${first[2]}, in ${s.fmtYear(first[0])}. `) + `${there} of the world's ${all} peoples are in it now.`
-      : e === 0 ? '' : `${there} of the world's ${all} peoples are in it now.`;
+    const now = there === 1 ? `Of the world's ${all} peoples, only yours is in it now.` : `${there} of the world's ${all} peoples are in it now.`;
+    $('dw-world').textContent = e === 0 ? '' : (first ? (first[1] === c.id ? `${s.fullName(c)} is the first people of the world to enter it. ` : `The first into it was ${first[2]}, in ${s.fmtYear(first[0])}. `) : '') + now;
     $('dw-actions').innerHTML = '<button class="btn primary" data-dw="close">Onward</button><button class="btn" data-dw="know">What to discover</button>' + (s.replay && s.replay.frames.length > 1 ? '<button class="btn" data-dw="atlas">The world through the ages</button>' : '');
-    const d = $('dawn'); if (!d.open) d.showModal(); d.querySelector('.dw-page').scrollTop = 0; const b = d.querySelector('[data-dw="close"]'); if (b) b.focus({ preventScroll: true });
+    const d = $('dawn'); if (!d.open) d.showModal(); d.querySelector('.dw-page').scrollTop = 0; const b = d.querySelector('#dw-actions [data-dw="close"]'); if (b) b.focus({ preventScroll: true });
     return true;
   }
   return { init, open, close, isOpen, AGES, TEXT };

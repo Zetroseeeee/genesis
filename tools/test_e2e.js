@@ -234,12 +234,12 @@ server.listen(0, async () => {
     await ev(() => { const S = __G.sim; const c = S.playerCiv(); document.getElementById('turn').click(); setTimeout(() => { c.tech = 0.09; }, 300); });
     await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 60000 }); await frames(2);
     // (a warning that came in the same turn - a drought's hunger, say - outranks the new age on the button; the age is then next in line)
-    const s = await state(); const eraQ = await ev(() => __G.attention().map((a) => a.id)); check((/state-good/.test(s.turn) && s.t1 === 'New era') || (/state-warn/.test(s.turn) && eraQ.includes('era')), 'green New era state, or the age next after a warning: ' + s.turn + ' ' + s.t1 + ' [' + eraQ.join(' ') + ']');
+    const s = await state(); const eraQ = await ev(() => __G.attention().map((a) => a.id)); check((/state-good/.test(s.turn) && s.t1 === 'New era') || eraQ.includes('era'), 'green New era state, or the age in line after something more pressing (a warning, a choice of study): ' + s.turn + ' ' + s.t1 + ' [' + eraQ.join(' ') + ']');
     let dawn = null;
     for (let k = 0; k < 4 && (await state()).t1 !== 'Advance'; k++) { const q = await ev(() => { document.getElementById('turn').click(); const D = document.getElementById('dawn'), seen = D && D.open ? { title: document.getElementById('dw-title').textContent, rows: document.querySelectorAll('#dw-brings .dw-row').length, amb: document.querySelectorAll('#dw-amb .dw-amb').length, world: document.getElementById('dw-world').textContent, acts: [...document.querySelectorAll('#dw-actions .btn')].map((b) => b.textContent) } : null;
       for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (window.TALES && TALES.isOpen()) TALES.close(); return seen; }); if (q) dawn = q; await frames(2); }
     check((await state()).t1 === 'Advance', 'back to Advance after acknowledging');
-    check(!!dawn && /Bronze/.test(dawn.title) && dawn.rows >= 3 && dawn.amb === 6 && /peoples are in it/.test(dawn.world) && dawn.acts[0] === 'Onward', `the dawn of the age: ${JSON.stringify(dawn)}`);
+    check(!!dawn && /Bronze/.test(dawn.title) && dawn.rows >= 3 && dawn.amb === 6 && /peoples are in it|only yours is in it/.test(dawn.world) && dawn.acts[0] === 'Onward', `the dawn of the age: ${JSON.stringify(dawn)}`);
     check((await ev(() => document.getElementById('id-era').textContent)).includes('BRONZE') || /Bronze/i.test(await ev(() => document.getElementById('id-era').textContent)), 'identity strip shows Bronze Age');
   });
   await scenario('turn: disaster on your land interrupts with an amber alert', async (check) => {
