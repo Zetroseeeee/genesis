@@ -1208,6 +1208,34 @@ server.listen(0, async () => {
   });
 
   // (last: it ends the player's people)
+  await scenario('atlas: the world through the ages from the Chronicle, played and stepped, a realm under the pointer', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
+    // history runs until the atlas has some maps (a frame every 280 years while the Stone Age lasts)
+    await ev(() => { for (let y = 0; y < 1200 && __G.sim.replay.frames.length < 5; y++) __G.sim.tick(); });
+    const look = () => ev(() => { const c = document.getElementById('at-map'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let lit = 0; const hues = new Set(); for (let i = 0; i < d.length; i += 4 * 97) { if (d[i] + d[i + 1] + d[i + 2] > 90) lit++; hues.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4)); }
+      return { open: document.getElementById('atlas').open, w: c.width, h: c.height, lit, hues: hues.size, year: document.getElementById('at-year').textContent, age: document.getElementById('at-age').textContent, stats: document.getElementById('at-stats').textContent, frames: __G.sim.replay.frames.length, play: document.querySelector('#atlas [data-at="play"]').textContent, focus: document.activeElement && document.activeElement.tagName }; });
+    await ev(() => __G.openChronicle('log')); await frames(1); await ev(() => document.getElementById('chron-atlas').click()); await frames(4);
+    let q = await look();
+    check(q.open && q.w > 300 && q.lit > 50 && q.hues > 12 && /BC/.test(q.year) && q.age === 'Stone Age' && /realms/.test(q.stats) && q.play === 'Pause' && q.frames >= 5, `the atlas opens on the first map and plays (${q.w}x${q.h}, ${q.hues} colours, ${q.year}, ${q.age}, '${q.stats.slice(0, 60)}', ${q.frames} maps)`);
+    const y0 = q.year; await wait(1600); await frames(3); q = await look();
+    check(q.year !== y0, `it plays: ${y0} -> ${q.year}`);
+    // space stops it, End goes to the last map, the left arrow to the one before
+    await page.keyboard.press('Space'); await frames(2); q = await look(); check(q.play !== 'Pause' && q.open, `space stops it (${q.play})`);
+    const ys = await ev(() => __G.sim.replay.frames.map((f) => __G.sim.fmtYear(f.y)));
+    await page.keyboard.press('End'); await frames(2); q = await look(); check(q.year === ys[ys.length - 1], `End goes to the last map (${q.year}, ${ys[ys.length - 1]})`);
+    await page.keyboard.press('ArrowLeft'); await frames(2); q = await look(); check(q.year === ys[ys.length - 2], `the left arrow to the one before (${q.year}, ${ys[ys.length - 2]})`);
+    // the realm under the pointer: your own, where your capital stood
+    const at = await ev(() => { const S = __G.sim, c = S.playerCiv(), R = window.REPLAY, f = S.replay.frames[S.replay.frames.length - 2]; if (!c || f.c < 0) return null; const cv = document.getElementById('at-map'), r = cv.getBoundingClientRect(), dpr = cv.width / r.width;
+      const r0 = 20, H = 276, sc = Math.min(cv.width / 720, cv.height / H), ox = (cv.width - 720 * sc) / 2, oy = (cv.height - H * sc) / 2, cy = Math.floor(f.c / R.RW), cx = f.c - cy * R.RW;
+      return { x: r.left + (ox + (cx + 0.5) * 2 * sc) / dpr, y: r.top + (oy + ((cy + 0.5) * 2 - r0) * sc) / dpr, name: c.name }; });
+    if (at) { await page.mouse.move(at.x, at.y); await frames(2); const tip = await ev(() => ({ hidden: document.getElementById('at-tip').hidden, text: document.getElementById('at-tip').textContent }));
+      check(!tip.hidden && tip.text.includes(at.name) && /Your people/.test(tip.text), `the realm under the pointer: '${tip.text.slice(0, 80)}'`); }
+    else check(false, 'your capital is kept with the maps');
+    await page.keyboard.press('Escape'); await frames(2); check(!(await ev(() => document.getElementById('atlas').open)), 'Esc closes it');
+    // Shift+C opens it again
+    await page.keyboard.press('Shift+C'); await frames(3); q = await look(); check(q.open, 'Shift+C opens it'); await ev(() => ATLAS.close()); await frames(1);
+  });
+
   await scenario('epilogue: your story from the Chronicle, the end of the Holocene, a people that falls', async (check) => {
     await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
     const page1 = () => ev(() => ({ open: document.getElementById('epi').open, title: document.getElementById('ep-title').textContent, kicker: document.getElementById('ep-kicker').textContent, text: document.getElementById('ep-text').textContent,
@@ -1215,7 +1243,7 @@ server.listen(0, async () => {
     // the Chronicle's 'Your story': the story so far
     await ev(() => __G.openChronicle('log')); await frames(1); await ev(() => document.getElementById('chron-story').click()); await frames(3);
     let q = await page1();
-    check(q.open && q.title.length > 3 && /story so far/i.test(q.kicker) && q.tiles === 6 && q.paths === 6 && q.acts.join() === 'Close' && /Founded in/.test(q.text) && q.annals > 0, `the Chronicle's 'Your story' (${q.title}: ${q.tiles} figures, ${q.paths} paths, ${q.annals} annals; ${q.acts.join(', ')})`);
+    check(q.open && q.title.length > 3 && /story so far/i.test(q.kicker) && q.tiles === 6 && q.paths === 6 && q.acts[0] === 'Close' && /Founded in/.test(q.text) && q.annals > 0, `the Chronicle's 'Your story' (${q.title}: ${q.tiles} figures, ${q.paths} paths, ${q.annals} annals; ${q.acts.join(', ')})`);
     await ev(() => document.querySelector('#ep-actions [data-ep="close"]').click()); await frames(1);
     // the end of the Holocene: the page offers to play on
     await ev(() => EPILOGUE.open('end')); await frames(3); q = await page1();
