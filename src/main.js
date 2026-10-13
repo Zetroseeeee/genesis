@@ -543,7 +543,7 @@
     { const g = GOV.tile(); if (g && g.demand && !seen.ack.has('demand' + g.demand.since)) out.push({ id: 'demand', kind: 'demand', cls: 'warn', t1: 'A demand', t2: `${g.demand.who} demand a new law: ${g.demand.law.name}`, body: 'Grant it and they are content for a while; refuse and they remember. Unanswered, it lapses as a refusal.', act: () => { seen.ack.add('demand' + g.demand.since); GOV.open('estates'); } });
       if (g && g.rose > -1e8 && sim.year - g.rose <= TURN_YEARS[c.era] && !seen.ack.has('rose' + g.rose)) out.push({ id: 'rising', kind: 'rising', cls: 'war', t1: 'A rising', t2: (c.events.slice().reverse().find(e => e.type === 'law' && e.year === g.rose) || { text: 'An estate has risen against you' }).text, body: 'See who is angry, and why: open the estates.', act: () => { seen.ack.add('rose' + g.rose); GOV.open('estates'); } });
       const yb = Math.floor(sim.year / (TURN_YEARS[c.era] * 3)); if (g && g.army && !seen.ack.has('army' + yb)) out.push({ id: 'army', kind: 'rising', cls: 'warn', t1: 'The army is watching', t2: `Stability ${Math.round(c.stability * 100)}: where a government cannot hold, ${g.army.who.toLowerCase()} march on the capital`, body: 'Steady the realm (lower taxes, end a war, content the estates) before someone else offers to.', act: () => { seen.ack.add('army' + yb); GOV.open('estates'); } }); }
-    if (seen.era >= 0 && c.era > seen.era) out.push({ id: 'era', kind: 'era', cls: 'good', t1: 'New era', t2: `Your people enter the ${sim.ERAS[c.era][0]}`, act: () => { seen.era = c.era; bigBanner(sim.ERAS[c.era][0], sim.fullName(c) + ' · ' + sim.fmtYear(sim.year), eraArt(c.era)); } });
+    if (seen.era >= 0 && c.era > seen.era) out.push({ id: 'era', kind: 'era', cls: 'good', t1: 'New era', t2: `Your people enter the ${sim.ERAS[c.era][0]}`, act: () => { seen.era = c.era; if (!(window.DAWN && DAWN.open(c.era))) bigBanner(sim.ERAS[c.era][0], sim.fullName(c) + ' · ' + sim.fmtYear(sim.year), eraArt(c.era)); } });
     const dis = c.events.slice(-12).filter(e => e.type === 'disaster' && !e.calm && sim.year - e.year <= 6 && !seen.ack.has('dis' + e.year + e.loc));
     for (const e of dis.slice(0, 2)) out.push({ id: 'dis' + e.year, kind: 'disaster', cls: 'warn', t1: 'Disaster', t2: e.text, body: 'Fly there to see the damage. Treasuries rebuild walls and works.', act: () => { seen.ack.add('dis' + e.year + e.loc); if (e.loc >= 0) { const [lon, lat] = placeOf(e.loc); mapcam.flyTo(lon, lat, Math.max(viewDist(e.loc), 0.0012)); select(e.loc); } } });
     return out;
@@ -1221,6 +1221,7 @@
     TALES.init({ sim: () => sim, toast, afterAct: () => { refreshAll(true); updateTurnButton(); }, onClose: () => updateTurnButton(), artOf });
     if (window.EPILOGUE) EPILOGUE.init({ sim: () => sim, artOf, icons: FEED_ICON, face: (cv, c) => faceOf(cv, c), onNew: () => { goHomeScreen(true); chooseMode(); }, onMenu: () => goHomeScreen(true), onClose: () => updateTurnButton(), onAtlas: () => openAtlas() });
     if (window.ATLAS) ATLAS.init({ sim: () => sim, world: () => worldData, onClose: () => updateTurnButton() });
+    if (window.DAWN) DAWN.init({ sim: () => sim, artOf: (e) => eraArt(e), onAtlas: () => openAtlas(), onKnow: () => TREE.open(), onClose: () => updateTurnButton() });
     $('chron-atlas').addEventListener('click', () => { $('chron').close(); openAtlas(); });
     $('chron-story').addEventListener('click', () => { $('chron').close(); if (window.EPILOGUE && !EPILOGUE.open(sim.playerCiv() ? 'story' : 'fall')) toast('Found your people first: their story begins then'); });
     $('opt-continuous').checked = settings.continuous; $('opt-continuous').addEventListener('change', (e) => { settings.continuous = e.target.checked; if (turnRun.active) endTurn('stopped'); paused = true; applySettings(); updateTurnButton(); updateClock(); });
@@ -1303,7 +1304,7 @@
       if (mode === 'intro') { homeKey(e); return; }
       if ($('tale').open || e.defaultPrevented) return;      // (a story has the keyboard while it is open: 1, 2, 3 choose, Esc puts it off; the Enter that closes it is its own, not the turn button's)
       if ($('atlas').open) return;      // (the atlas has the keyboard while it is open: space plays, the arrows go a frame at a time)
-      if ($('worlds').open) return;      // (and the worlds kept theirs: a name is typed there)
+      if ($('worlds').open || $('dawn').open) return;      // (and the worlds kept theirs: a name is typed there; the page of a new age its buttons)
       if ($('market').open) { if (e.key === 'm' || e.key === 'M') MARKET.close(); return; }      // (the market has the keyboard while it is open; Esc closes it, as it does any dialog)
       if ($('know').open) { if (e.key === 'k' || e.key === 'K') TREE.close(); return; }
       if ($('gov').open) { if (e.key === 'v' || e.key === 'V') GOV.close(); return; }
@@ -1685,7 +1686,7 @@
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    const modalOpen = $('chron').open || $('menu').open || $('news').open || $('market').open || $('know').open || $('gov').open || $('dip').open || $('cult').open || $('tale').open || $('atlas').open || $('worlds').open;
+    const modalOpen = $('chron').open || $('menu').open || $('news').open || $('market').open || $('know').open || $('gov').open || $('dip').open || $('cult').open || $('tale').open || $('atlas').open || $('worlds').open || $('dawn').open;
     modalNow = modalOpen || !!($('epi') && $('epi').open);
     mapcam.update(dt);
     camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();      // everything this frame (sun in view space, shadow lookup) works from the camera where it now is

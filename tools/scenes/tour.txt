@@ -468,3 +468,5 @@ costr_rain   | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:0.45,pop:8,walls:1
 atlas_mid    | tools/scenes/atlas.js | {years:11500,at:110} | | 300
 atlas_end    | tools/scenes/atlas.js | {years:12160} | | 320
 worlds_page  | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:0.45,pop:8,walls:1,special:12,clear:0.75,season:0.4} | setTimeout(() => __sceneLook('town', 1.6, 1.25, 2.4), 4000); setTimeout(() => { document.getElementById('btn-menu').click(); document.getElementById('m-worlds').click(); document.getElementById('wd-name').value = 'The walled town, before the plague'; document.querySelector('#worlds [data-wd="keep"]').click(); }, 125000); | 150
+dawn_bronze  | tools/scenes/town.js | {lon:31.25,lat:29.9,tech:0.1,pop:8,walls:1,special:12} | setTimeout(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); DAWN.open(1); }, 30000); | 70
+dawn_space   | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:1.02,pop:120,walls:0,special:14} | setTimeout(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); DAWN.open(9); }, 30000); | 70

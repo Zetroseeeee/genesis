@@ -678,6 +678,23 @@
   .wd-act { display: flex; flex-direction: column; gap: 6px; }
   .wd-none { color: var(--text-3); font-style: italic; margin: 6px 0; }
   @media (max-width: 640px) { .wd-card { grid-template-columns: 1fr; } .wd-act { flex-direction: row; } }
+  /* ----- the dawn of an age (dawn.js): the painting, the age in history, what it brings the realm, its ambitions, the world in it ----- */
+  #dawn .modal { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow-y: auto; position: relative; }
+  .dawn .tl-fig { aspect-ratio: 2.4 / 1; flex: none; }
+  .dw-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; margin-top: 2px; }
+  .dw-cols h3 { font-family: var(--display); font-size: var(--fs-key); color: var(--gold-2); letter-spacing: 0.04em; margin: 0 0 10px; font-weight: 600; }
+  .dw-brings { display: flex; flex-direction: column; gap: 9px; }
+  .dw-row { display: grid; grid-template-columns: calc(92px * var(--ui-scale)) minmax(0, 1fr); gap: 10px; font-size: var(--fs-body); line-height: 1.45; }
+  .dw-k { color: var(--text-3); font-size: var(--fs-cap); padding-top: 2px; }
+  .dw-v { color: rgb(236 233 226 / 0.9); }
+  .dw-n { color: var(--text-3); }
+  .dw-ambl { display: flex; flex-direction: column; gap: 8px; }
+  .dw-amb { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; font-size: var(--fs-body); line-height: 1.35; }
+  .dw-amb b { color: var(--text); font-weight: 600; }
+  .dw-amb span { grid-column: 1; color: var(--text-2); font-size: var(--fs-cap); }
+  .dw-amb i { grid-column: 2; grid-row: 1; font-style: normal; color: var(--gold); font-size: var(--fs-cap); white-space: nowrap; }
+  .dw-world { color: var(--text-2); font-size: var(--fs-body); margin: 18px 0 0; }
+  @media (max-width: 760px) { .dw-cols { grid-template-columns: 1fr; } }
   /* ----- the atlas of history (atlas.js): the world through the ages, who held the land, played as a film ----- */
   #atlas .modal { width: min(1480px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
   .at-stage { position: relative; flex: 1 1 auto; min-height: 0; background: #0c161f; border-bottom: 1px solid var(--rule); }
@@ -1466,6 +1483,22 @@
   </div>
 </div></dialog>
 
+<dialog id="dawn" aria-labelledby="dw-title"><div class="modal panel tale dawn" tabindex="-1">
+  <button class="btn icon ghost tl-x" data-dw="close" title="Close (Esc)">✕</button>
+  <figure class="tl-fig" id="dw-fig"><img id="dw-img" alt=""></figure>
+  <div class="tl-page dw-page">
+    <div class="tl-date" id="dw-kicker"></div>
+    <h2 class="tl-title" id="dw-title"></h2>
+    <p class="tl-text" id="dw-text"></p>
+    <div class="dw-cols">
+      <section><h3>What it brings</h3><div class="dw-brings" id="dw-brings"></div></section>
+      <section id="dw-ambs"><h3>Ambitions of the age</h3><div class="dw-ambl" id="dw-amb"></div></section>
+    </div>
+    <p class="dw-world" id="dw-world"></p>
+    <div class="ep-actions" id="dw-actions"></div>
+  </div>
+</div></dialog>
+
 <dialog id="atlas" aria-labelledby="at-title"><div class="modal panel atlas" tabindex="-1">
   <div class="phead"><h2 class="display" id="at-title">The world through the ages</h2><span class="micro" id="at-sub"></span><button class="btn icon ghost" data-at="close" title="Close (Esc)">✕</button></div>
   <div class="at-stage">
@@ -1609,6 +1642,7 @@
 <script src="country.js"></script>
 <script src="tales.js"></script>
 <script src="epilogue.js"></script>
+<script src="dawn.js"></script>
 <script src="atlas.js"></script>
 <script src="troops.js"></script>
 <script src="fauna.js"></script>

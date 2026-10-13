@@ -312,6 +312,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
+| `src/dawn.js` | `DAWN` | The dawn of an age: the page that opens when the player's people enter a new age (the New era seal) - its painting, the age in history, what it brings (the towns' manner of building, works, discoveries, forms and laws), its ambitions, the world in it |
 | `src/replay.js` | `REPLAY` | The map of who held the land through the ages: a frame as each age goes (24 an age), kept as what changed since the one before, and the life of every realm seen in one; pure data |
 | `src/atlas.js` | `ATLAS` | The atlas of history (Shift+C, the Chronicle's Atlas, the epilogue): the world through the ages played as a film - the realms, the ice sheets, the names of the greatest, your realm in gold, the world's firsts, the bar of the ages |
 | `src/epilogue.js` | `EPILOGUE` | The story of the player's people: told when the realm falls, when the Holocene ends (AD 2150), or from the Chronicle's 'Your story' |
@@ -799,6 +800,14 @@ Conventions that matter:
   after its fall is not told again) and when the year reaches 2150 with the realm alive (once: `c.epilogue`; the world may be played
   on). A world saved before 0.46 begins its annals when it is loaded. `tools/scenes/epilogue.js` runs a world and opens the page
   (`epi_*` in the tour); the simulation's tests (section 26) and the last end-to-end scenario hold it.
+- **The dawn of an age** (`dawn.js`). When the player's realm enters an age the New era seal opens a page (in place of the old
+  banner): the age's painting (`eraArt`), a few lines of what the age was in the world's history (`DAWN.TEXT`), and what it brings the
+  realm - how its towns will be built (`TOWN.styleEra` against the age: the old ways last for some peoples), the works its discoveries
+  bring within reach and what each stands on (`KNOW.WORK_BY`), how many discoveries it has and how many the realm knows, the forms of
+  government and the laws it opens (`RULE.age()`: each form and law is of the age of its latest discovery) - its six ambitions
+  (`legacy.view`), and the world in it: the first into it (the legacy's firsts) and how many of the world's peoples are there now. Onward,
+  What to discover (the knowledge screen), The world through the ages (the atlas). The end-to-end 'turn: new era' scenario holds it;
+  `dawn_bronze` and `dawn_space` in the tour.
 - **The atlas of history** (`replay.js`; `sim.replay`; the page is `atlas.js`). Every year the simulation asks the recorder whether a
   frame is due (`step`): 24 in each age by the world's dates of the ages (`AGE_AT`, sim.js's `HIST`), every 280 years in the Stone Age
   and every two and a half in the Information Age, one in 25 years past 2150. A frame is the map at its date on a grid of 360 by 180
