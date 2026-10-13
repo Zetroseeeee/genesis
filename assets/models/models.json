@@ -2133,7 +2133,8 @@
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075210_e332614a-c3db-431f-b64c-6cda2ef5a48e.png",
    "mesh": "9f387fda-8fa6-4841-af08-43b9c685ebbf",
    "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075739_9f387fda-8fa6-4841-af08-43b9c685ebbf.glb",
-   "site": "bronze_mudbrick_site"
+   "site": "bronze_mudbrick_site",
+   "yaw": 90
   },
   {
    "id": "classical_med_palace_a",
@@ -2246,13 +2247,17 @@
    "kinds": [
     "colosseum"
    ],
-   "h": 48,
+   "h": 46,
    "ref": "190f769d-bbe0-4baa-9ae4-870d8bf10cea",
    "prompt": "the Flavian Amphitheatre in Rome as it was when new in AD 80, an elliptical amphitheatre about 188 by 156 m and 48 m high, three storeys of travertine arcades framed by engaged Tuscan, Ionic and Corinthian half-columns and a solid attic storey with small square windows and corbels for the awning masts, tiers of seating and the sand arena visible inside",
    "concept": "cfd24bd8-91ba-4b86-90f7-4634478b3e7c",
    "conceptUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075342_cfd24bd8-91ba-4b86-90f7-4634478b3e7c.png",
    "mesh": "22d65ac3-652e-442b-b0f4-4b1b14f71a70",
-   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075728_22d65ac3-652e-442b-b0f4-4b1b14f71a70.glb"
+   "src": "https://d8j0ntlcm91z4.cloudfront.net/user_3EdDR1X9D9foMDc9Ifvh8eZytCQ/hf_20261013_075728_22d65ac3-652e-442b-b0f4-4b1b14f71a70.glb",
+   "plan": [
+    165,
+    140
+   ]
   }
  ]
 }
