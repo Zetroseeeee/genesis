@@ -1771,6 +1771,12 @@ carried with the game (`vendor/fonts`, linked by `local.html`); the published we
   A string of bytes as characters comes back whole from the storage after the browser is closed and opened again (measured, NUL and all).
 - A picture of the world (Shift+S, the menu's Take a picture) is the canvas alone, read in the frame it is drawn in (`picture`), and
   given as a file named for the realm and the year; in the app a download asks where to keep it.
+- **The worlds kept** (`keepWorld`, `WORLDS` in `main.js`; the menu's and the home screen's Your worlds). Beside the world in play, which
+  the autosave keeps, a player may keep copies: each in the page's database (IndexedDB `holocene`, store `worlds`: what the disk allows),
+  packed (gzip), with a small picture of the world as it was (320 by 200, taken in the next frame drawn: `smallPicture`, which draws a
+  frame even behind a page), its name, realm, year and age, when it was kept. Going to one makes it the world in play (asked twice when a
+  world is in play: the one left is kept only by the autosave, and the autosave keeps the new one from then on); deleting is asked twice.
+  The end-to-end scenario 'worlds' keeps one, leaves for the main menu, goes back to it and deletes it.
 
 ## Updates (how a push reaches a copy already installed)
 

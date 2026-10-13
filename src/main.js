@@ -186,7 +186,7 @@
       window.__G = { settings, loadSettings, get sim() { return sim; }, climateRefresh: () => { climYear = NaN; climateUniforms(); }, get decal() { return decal; }, get trees() { return trees; }, get life() { return life; }, get movers() { return movers; }, get fx() { return fx; }, get troops() { return troops; }, get fauna() { return fauna; }, get birds() { return birds; }, get weather() { return weather; }, selectHost: (id) => selectHost(id), get hostSel() { return hostSel; }, startTurn, endTurn, turnRun, attention: () => computeAttention(), terrain, world, mapcam, camera, renderer, globals, select, cellOf, openChronicle, start: (lon, lat, name) => { const i = cellOf(lon, lat); const y = (i / W) | 0, x = i - y * W; startPlayer(i, name || '', [(lon + 180) / 360 * W - x, (90 - lat) / 180 * H - y], true); mapcam.fly = null; }, run: (n) => { for (let k = 0; k < n; k++) sim.tick(); world.refreshTextures(); world.updateBuildings(mapcam, true); refreshAll(true); }, setPaused: (p) => { paused = p; updateClock(); }, setSeason: (p) => { seasonPhase = p; }, get season() { return seasonPhase; }, get labelDbg() { return labelDbg; } };
       buildEconomy(); buildDock(); buildMinimapBase(); bindUI();
       newWorld((Math.random() * 2 ** 31) | 0);
-      await primeSave(); previewSave(); homeAim(false);                // a saved world is shown on the home screen as it was left
+      await primeSave(); previewSave(); homeAim(false); countWorlds();                // a saved world is shown on the home screen as it was left
       setLoad(80, 'first light');
       await versionReady; homeRefresh();
       // an update was just put to use while a world was being played: straight back into it
@@ -1230,7 +1230,22 @@
     $('btn-rename').addEventListener('click', () => { sim.renamePlayer($('in-name').value); refreshAll(true); });
     $('btn-menu').addEventListener('click', () => openMenu());
     $('m-close').addEventListener('click', () => $('menu').close()); $('m-resume').addEventListener('click', () => $('menu').close());
-    $('m-save').addEventListener('click', () => { saveLocal(true); $('menu').close(); }); $('m-pic').addEventListener('click', () => { $('menu').close(); pictureWanted = true; }); $('m-load').addEventListener('click', () => { if (loadLocal()) $('menu').close(); });
+    $('m-save').addEventListener('click', () => { saveLocal(true); $('menu').close(); }); $('m-worlds').addEventListener('click', () => { $('menu').close(); openWorlds(); }); $('btn-worlds').addEventListener('click', () => openWorlds());
+    // the worlds kept: keep this one, go to one (leaving this one: asked twice), delete one (asked twice)
+    $('worlds').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-wd]'); if (!b) return; const a = b.dataset.wd, card = b.closest('.wd-card'), id = card && card.dataset.id;
+      if (a === 'close') { $('worlds').close(); return; }
+      if (a === 'keep') { b.disabled = true; try { if (await keepWorld($('wd-name').value)) toast('This world is kept, as it is now'); } catch (err) { console.warn(err); toast('The world could not be kept here'); } b.disabled = false; $('wd-name').value = ''; renderWorlds(); return; }
+      const ask = (text) => { if (b.dataset.sure) return true; b.dataset.sure = '1'; const was = b.textContent; b.textContent = text; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = was; } }, 3500); return false; };
+      if (a === 'del') { if (!ask('Delete it?')) return; try { await WORLDS.del(id); } catch (err) {} renderWorlds(); return; }
+      if (a === 'load') {
+        if (sim && mode === 'play' && !ask('Leave this world?')) return;
+        let w = null; try { w = (await WORLDS.list()).find((x) => x.id === id); } catch (err) {}
+        if (!w) { toast('That world could not be read'); return; }
+        $('worlds').close(); try { await enterKept(w); } catch (err) { console.warn(err); toast('That world could not be read'); }
+      }
+    });
+    $('wd-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); document.querySelector('#worlds [data-wd="keep"]').click(); } }); $('m-pic').addEventListener('click', () => { $('menu').close(); pictureWanted = true; }); $('m-load').addEventListener('click', () => { if (loadLocal()) $('menu').close(); });
     $('m-new').addEventListener('click', () => { $('menu').close(); goHomeScreen(true); });
     $('ui-scale').value = settings.uiScale; $('ui-scale-v').textContent = settings.uiScale.toFixed(2); $('ui-scale').addEventListener('input', (e) => { settings.uiScale = +e.target.value; $('ui-scale-v').textContent = settings.uiScale.toFixed(2); applySettings(); });
     $('tip-delay').value = settings.tipDelay; $('tip-delay-v').textContent = settings.tipDelay; $('tip-delay').addEventListener('input', (e) => { settings.tipDelay = +e.target.value; $('tip-delay-v').textContent = settings.tipDelay; applySettings(); });
@@ -1288,6 +1303,7 @@
       if (mode === 'intro') { homeKey(e); return; }
       if ($('tale').open || e.defaultPrevented) return;      // (a story has the keyboard while it is open: 1, 2, 3 choose, Esc puts it off; the Enter that closes it is its own, not the turn button's)
       if ($('atlas').open) return;      // (the atlas has the keyboard while it is open: space plays, the arrows go a frame at a time)
+      if ($('worlds').open) return;      // (and the worlds kept theirs: a name is typed there)
       if ($('market').open) { if (e.key === 'm' || e.key === 'M') MARKET.close(); return; }      // (the market has the keyboard while it is open; Esc closes it, as it does any dialog)
       if ($('know').open) { if (e.key === 'k' || e.key === 'K') TREE.close(); return; }
       if ($('gov').open) { if (e.key === 'v' || e.key === 'V') GOV.close(); return; }
@@ -1422,6 +1438,7 @@
   function homeRefresh() {
     const has = hasSave(); const pc = has && previewing && sim ? sim.playerCiv() : null;
     $('btn-load').hidden = !has; $('btn-load').classList.toggle('first', has); $('btn-choose').classList.toggle('first', !has);
+    $('btn-worlds').hidden = !worldsN; $('home-worlds-s').textContent = worldsN === 1 ? 'One world kept' : `${worldsN} worlds kept`;
     $('home-save').textContent = !has ? '' : pc ? `${sim.fullName(pc)}, ${sim.fmtYear(sim.year)}${pc.ruler ? ' · ' + pc.ruler.title + ' ' + pc.ruler.name : ''}` : previewing && sim ? `Your world, ${sim.fmtYear(sim.year)}` : 'Your saved world';      // (who rules it now)
     $('home-eras').hidden = !pc; if (pc) $('home-eras').innerHTML = sim.ERAS.map((e, k) => `<i class="${k < pc.era ? 'past' : k === pc.era ? 'now' : ''}"></i>`).join('') + `<span>${esc(sim.ERAS[pc.era][0])}</span>`;
     { const tape = $('home-tape'); const line = pc ? MARKET.homeLine() : ''; tape.hidden = !line; if (line) tape.innerHTML = line; }
@@ -1557,8 +1574,14 @@
     throw new Error('a packed save not unpacked');
   }
   function loadLocal(quiet) {
+    let s = null;
+    try { s = readSave(); } catch (e) { console.warn('save could not be read', e); toast('The saved world could not be read'); return false; }
+    if (!s) { toast('No saved world here'); return false; }
+    return enterWorld(s, quiet);
+  }
+  // a world entered from what its save says (the last one, or one of the worlds kept: keepWorld)
+  function enterWorld(s, quiet) {
     try {
-      const s = readSave(); if (!s) { toast('No saved world here'); return false; }
       sim = createSim(worldData, s.seed || 1); sim.load(s); world.setSim(sim); previewing = false; fallTold = !!sim.fallen; if (sim.setStories) sim.setStories(settings.stories !== false);
       const fromHome = mode === 'intro';
       setMode('play'); $('intro').hidden = true; banner(null); mapcam.locked = false; mapcam.idleSpin = false; mapcam.fly = null; paused = true;
@@ -1571,6 +1594,58 @@
       feedIdx = sim.worldEvents.length; seen.wars.clear(); seen.ack.clear(); seen.era = -1; seen.turns = 1; turnRun.active = false; turnRun.townSet = null; turnRun.capital = -1; paused = true; snapshotTurn(); refreshAll(true); world.updateBuildings(mapcam, true);
       if (!quiet) toast(`Welcome back. It is ${sim.fmtYear(sim.year)}.`); return true;
     } catch (e) { console.warn('save could not be read', e); toast('The saved world could not be read'); return false; }
+  }
+  // ---------- the worlds kept (beside the one in play, which the autosave keeps): the page's database, each with a picture ----------
+  // A world is kept packed (gzip) with a small picture of it as it was, its realm, year and age; a long game is a megabyte or so, and the
+  // database holds what the disk allows. Entering one makes it the world in play (the autosave keeps it from then on).
+  const WORLDS = (() => {
+    let dbp = null;
+    const db = () => dbp || (dbp = new Promise((res, rej) => { const r = indexedDB.open('holocene', 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('worlds')) r.result.createObjectStore('worlds', { keyPath: 'id' }); }; r.onsuccess = () => res(r.result); r.onerror = () => { dbp = null; rej(r.error); }; }));
+    const tx = async (mode, fn) => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction('worlds', mode), q = fn(t.objectStore('worlds')); t.oncomplete = () => res(q ? q.result : undefined); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); };
+    return { list: () => tx('readonly', (st) => st.getAll()), put: (w) => tx('readwrite', (st) => st.put(w)), del: (id) => tx('readwrite', (st) => st.delete(id)), ok: () => typeof indexedDB !== 'undefined' };
+  })();
+  let worldsN = 0;      // (how many are kept: the home screen offers them when there are any)
+  function countWorlds() { if (!WORLDS.ok()) return; WORLDS.list().then((l) => { worldsN = l.length; homeRefresh(); }).catch(() => {}); }
+  // a small picture of the world as it is drawn (the next frame drawn gives it)
+  let shotWanted = null;
+  const smallPicture = () => new Promise((res) => { shotWanted = res; });
+  function takeSmall(cb) {
+    const src = renderer.domElement, c = document.createElement('canvas'); c.width = 320; c.height = 200;
+    const k = Math.max(320 / src.width, 200 / src.height), w = src.width * k, h = src.height * k; c.getContext('2d').drawImage(src, (320 - w) / 2, (200 - h) / 2, w, h);
+    c.toBlob((b) => cb(b), 'image/jpeg', 0.82);
+  }
+  async function keepWorld(name) {
+    if (!sim || mode !== 'play') return false;
+    const c = sim.playerCiv(), st = sim.save(); st.cam = { lon: mapcam.lon, lat: mapcam.lat, dist: mapcam.dist, tilt: mapcam.tilt, heading: mapcam.heading };
+    const json = JSON.stringify(st), thumb = await Promise.race([smallPicture(), new Promise((r) => setTimeout(() => r(null), 3000))]);
+    const data = canPack ? await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).blob() : new Blob([json]);
+    const realm = c ? sim.fullName(c) : sim.fallen ? (sim.fallen.fell && sim.fallen.fell[2]) || sim.fallen.name : '';
+    await WORLDS.put({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: (name || '').trim().slice(0, 60) || `${realm || 'A world'}, ${sim.fmtYear(sim.year)}`, realm, year: sim.year, when: sim.fmtYear(sim.year), age: c ? c.era : -1, at: Date.now(), thumb, data, packed: canPack ? 1 : 0, size: data.size });
+    return true;
+  }
+  async function enterKept(w) {
+    const json = w.packed ? await new Response(w.data.stream().pipeThrough(new DecompressionStream('gzip'))).text() : await w.data.text();
+    return enterWorld(JSON.parse(json));
+  }
+  let worldUrls = [];
+  async function openWorlds() {
+    const dlg = $('worlds'); if (!WORLDS.ok()) { toast('Worlds cannot be kept here'); return; }
+    const inPlay = !!sim && mode === 'play'; $('wd-keep').hidden = !inPlay;
+    if (inPlay) { const c = sim.playerCiv(); $('wd-name').value = ''; $('wd-name').placeholder = `${c ? sim.fullName(c) + ', ' : ''}${sim.fmtYear(sim.year)}`; }
+    if (!dlg.open) dlg.showModal();
+    await renderWorlds();
+  }
+  async function renderWorlds() {
+    let list = []; try { list = await WORLDS.list(); } catch (e) { $('wd-list').innerHTML = '<p class="wd-none">The worlds kept here cannot be read.</p>'; return; }
+    list.sort((a, b) => b.at - a.at); worldsN = list.length;
+    for (const u of worldUrls) URL.revokeObjectURL(u); worldUrls = [];
+    const inPlay = !!sim && mode === 'play', date = (t) => new Date(t).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    $('wd-sub').textContent = list.length ? `${list.length} kept` : '';
+    $('wd-list').innerHTML = list.length ? list.map((w) => { const u = w.thumb ? URL.createObjectURL(w.thumb) : ''; if (u) worldUrls.push(u);
+      return `<div class="wd-card" data-id="${esc(w.id)}"><div class="wd-pic">${u ? `<img src="${u}" alt="">` : ''}</div><div class="wd-txt"><b>${esc(w.name)}</b><span>${esc(w.realm ? w.realm + ' · ' : '')}${esc(w.when)}${w.age >= 0 && sim && sim.ERAS && sim.ERAS[w.age] ? ' · ' + esc(sim.ERAS[w.age][0]) : ''}</span><span class="wd-at">Kept ${esc(date(w.at))} · ${(w.size / 1048576).toFixed(1)} MB</span></div>`
+        + `<div class="wd-act"><button class="btn primary" data-wd="load">${inPlay ? 'Go to it' : 'Continue it'}</button><button class="btn ghost" data-wd="del">Delete</button></div></div>`; }).join('')
+      : `<p class="wd-none">No worlds are kept yet.${inPlay ? ' Keep a copy of this one to come back to it as it is now, whatever becomes of it.' : ''}</p>`;
+    homeRefresh();
   }
   // the saved world, shown on the home screen without being entered: its lands, its towns, its lights after dark
   function previewSave() {
@@ -1706,8 +1781,10 @@
     if (now - mmT > 700) { mmT = now; updateMinimap(false); }
     tpsT += dt; if (tpsT > 1) { $('yps').textContent = tpsCount + ' yr/s'; tpsCount = 0; tpsT = 0; const d = $('debug'); if (d.style.display === 'block') d.textContent = `elev ${JSON.stringify(terrain.stats.elevLevels)} tiles ${terrain.stats.tiles} sse ${terrain.stats.sse | 0} packs i${terrain.stats.packsI} e${terrain.stats.packsE} loading ${terrain.stats.loading} buildings ${world.buildingCount} trees ${trees ? trees.count : 0} labels ${labelEls.size} movers ${movers ? movers.stats.agents + '/' + movers.stats.walkers + '/' + movers.stats.ships : 0} beasts ${fauna ? fauna.stats.herds + '/' + fauna.stats.beasts : 0} birds ${birds ? birds.stats.flocks + '/' + birds.stats.birds : 0} alt ${(mapcam.alt * 6371).toFixed(1)}km dist ${(mapcam.dist * 6371).toFixed(1)}km tilt ${(mapcam.tilt * 57.3).toFixed(0)}`; }
     if (trees) trees.uCover.value = !trees.coverOff && (posted ? POST.samples > 1 : msaa) ? 1 : 0;      // (cut-out trees: several samples a pixel smooth their outlines)
-    if (!modalOpen || (now | 0) % 6 === 0) { if (posted) POST.render(renderer, scene, camera, mapcam.alt, now / 1000); else renderer.render(scene, camera); }
+    const drawn = !modalOpen || (now | 0) % 6 === 0 || !!shotWanted;      // (behind a page the world is drawn now and then; for its picture, now)
+    if (drawn) { if (posted) POST.render(renderer, scene, camera, mapcam.alt, now / 1000); else renderer.render(scene, camera); }
     if (pictureWanted && !modalOpen) { pictureWanted = false; picture(); }
+    if (shotWanted && drawn) { const cb = shotWanted; shotWanted = null; takeSmall(cb); }
     if (++framesDrawn === 3 && desktop) desktop.ready();      // the game is up: an update put to use just now is kept
   }
   boot();

@@ -454,6 +454,33 @@ server.listen(0, async () => {
     check(/^Holocene - .+\.png$/.test(q.as) && q.as.includes(q.year) && head === '89504e470d0a1a0a' && size > 20000, `a picture: '${q.as}' (offered as '${offered}'), ${size} bytes`);
   });
 
+  await scenario('worlds: a copy of this world kept with its picture, listed, gone back to from the home screen, deleted', async (check) => {
+    await ev(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); });
+    const before = await ev(() => ({ year: __G.sim.year, name: __G.sim.fullName(__G.sim.playerCiv()) }));
+    await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-worlds').click(); }); await frames(2);
+    await ev(() => { document.getElementById('wd-name').value = 'The test world'; document.querySelector('#worlds [data-wd="keep"]').click(); });
+    await page.waitForFunction(() => document.querySelectorAll('#wd-list .wd-card').length >= 1, null, { timeout: 30000 }); await wait(500);
+    const card = () => ev(() => { const c = document.querySelector('#wd-list .wd-card'), img = c && c.querySelector('.wd-pic img'); return c ? { n: document.querySelectorAll('#wd-list .wd-card').length, name: c.querySelector('b').textContent, line: c.querySelector('.wd-txt span').textContent, pic: img ? img.naturalWidth : 0 } : { n: 0 }; });
+    let q = await card();
+    check(q.n === 1 && q.name === 'The test world' && q.line.includes(before.name) && q.pic === 320, `kept and listed: '${q.name}', '${q.line}', a picture ${q.pic} wide`);
+    // the world goes on, and is left for the main menu; the copy is there, as it was
+    await ev(() => { document.getElementById('worlds').close(); __G.run(300); }); await frames(2);
+    await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-new').click(); }); await frames(3);
+    const h = await ev(() => ({ shown: !document.getElementById('btn-worlds').hidden, line: document.getElementById('home-worlds-s').textContent, year: __G.sim.year }));
+    check(h.shown && /One world kept/.test(h.line) && h.year > before.year, `the home screen offers it ('${h.line}'; the world in play is at ${h.year})`);
+    await ev(() => document.getElementById('btn-worlds').click()); await page.waitForFunction(() => document.querySelectorAll('#wd-list .wd-card').length >= 1, null, { timeout: 30000 });
+    await ev(() => document.querySelector('#wd-list [data-wd="load"]').click());
+    await page.waitForFunction(() => document.body.dataset.mode === 'play', null, { timeout: 60000 }); await frames(3);
+    const a = await ev(() => ({ year: __G.sim.year, name: __G.sim.fullName(__G.sim.playerCiv()) }));
+    check(a.year === before.year && a.name === before.name, `gone back to as it was kept (${a.name}, ${a.year})`);
+    // deleted, asked twice
+    await ev(() => { document.getElementById('btn-menu').click(); document.getElementById('m-worlds').click(); }); await page.waitForFunction(() => document.querySelectorAll('#wd-list .wd-card').length >= 1, null, { timeout: 30000 });
+    await ev(() => document.querySelector('#wd-list [data-wd="del"]').click()); await frames(1); q = await card(); check(q.n === 1, 'the first click only asks');
+    await ev(() => document.querySelector('#wd-list [data-wd="del"]').click()); await page.waitForFunction(() => !document.querySelector('#wd-list .wd-card'), null, { timeout: 30000 });
+    check(await ev(() => /No worlds are kept/.test(document.getElementById('wd-list').textContent)), 'deleted');
+    await ev(() => document.getElementById('worlds').close());
+  });
+
   // ---------- camera, labels, minimap, keys ----------
   await scenario('camera: zoom limits, pick, fly, compass buttons, minimap click', async (check) => {
     const r = await ev(() => { const M = __G.mapcam; const out = {}; M.fly = null; M.tDist = 1e-9; M.update(0.1); out.min = M.tDist >= M.minDist; M.tDist = 99; M.update(0.1); out.max = M.tDist <= M.maxDist; M.tDist = M.dist = 0.05; M.update(0.1);
