@@ -155,6 +155,9 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   fulfilled and left undone, the firsts and when they were taken, the heritages chosen, the most remembered realms against the
   middle one, which ambitions are common and which rare, how long a year of legacies takes. Run it after touching `legacy.js`
   or what it asks of a realm; the header says what to hold it to.
+- `node tools/replay/probe.js [seed] [last year]` — the atlas of history in numbers: how many maps a world keeps age by age and how many
+  bytes they take, how many realms' lives, what the frames cost, the save with them, and a round trip through a save. Measured over
+  12345 to AD 2150: 232 maps of 0.2 to 0.7 KB, 304 lives, 83 KB of the save's 3,965 KB, 142 ms in a whole history.
 - `node tools/intrigue/probe.js [seed,seed] [last year]` — spies and schemes through the ages: how many schemes the world's realms
   begin and of which kind, how many succeed, fail and are found out, how many wars are fought over agents caught, how strong the
   networks are age by age, how long a year of it takes. Run it after touching `intrigue.js` or the deeds in `sim.js`, then the
@@ -309,6 +312,8 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/legacy.js` | `LEGACY` | What a people is remembered for: six ambitions an age in six paths (arms, wealth, splendour, learning, faith, reach), the world's firsts, the great legacies of fallen realms; one world's legacies: what each realm has fulfilled, the races for a discovery, the heritage of each age (a story of the realm's own); pure data |
 | `src/story.js` | `STORY` | The stories that come before a realm's court: forty of them, each told from the realm as it is, with two or three choices that say what they do (coin, stability, authority, the estates, learning, renown, people, opinion, claims, what lasts some years, deeds of the family); follow-ups; the autopilot's choices; pure data |
 | `src/tales.js` | `TALES` | A story's page: the painting, the story in the chronicle's voice, the choices with what they cost, what came of it; keys 1-3, Esc puts it off |
+| `src/replay.js` | `REPLAY` | The map of who held the land through the ages: a frame as each age goes (24 an age), kept as what changed since the one before, and the life of every realm seen in one; pure data |
+| `src/atlas.js` | `ATLAS` | The atlas of history (Shift+C, the Chronicle's Atlas, the epilogue): the world through the ages played as a film - the realms, the ice sheets, the names of the greatest, your realm in gold, the world's firsts, the bar of the ages |
 | `src/epilogue.js` | `EPILOGUE` | The story of the player's people: told when the realm falls, when the Holocene ends (AD 2150), or from the Chronicle's 'Your story' |
 | `src/court.js` | `COURT` | The Court, the laws screen's last tab: the ruling family as a tree of faces (parents, the throne and consort, brothers and sisters, children, grandchildren), the line of succession, a regency, the house and its reigns; a person's page (raise as, pass over, marry) |
 | `src/country.js` | `COUNTRY` | The Land tab, the laws screen's tab before the Court: the realm's woods against nature's (by the bands of the lens), its kinds of land, the year's harvest, its timber, the world's woods and who keeps most and least of theirs, the word on the woods |
@@ -794,6 +799,21 @@ Conventions that matter:
   after its fall is not told again) and when the year reaches 2150 with the realm alive (once: `c.epilogue`; the world may be played
   on). A world saved before 0.46 begins its annals when it is loaded. `tools/scenes/epilogue.js` runs a world and opens the page
   (`epi_*` in the tour); the simulation's tests (section 26) and the last end-to-end scenario hold it.
+- **The atlas of history** (`replay.js`; `sim.replay`; the page is `atlas.js`). Every year the simulation asks the recorder whether a
+  frame is due (`step`): 24 in each age by the world's dates of the ages (`AGE_AT`, sim.js's `HIST`), every 280 years in the Stone Age
+  and every two and a half in the Information Age, one in 25 years past 2150. A frame is the map at its date on a grid of 360 by 180
+  (two by two of the simulation's regions: the holder of most of them, a realm before nobody, so that an island keeps its holder),
+  kept as runs of what changed since the frame before (a skip, a length and the holder, each a varint), with where the player's
+  capital stood (`c`). A realm's life ([id, from, to, name, colour, flags]) begins and ends at the frames: an id is given again, and a
+  frame's holder is the life of that id that began last before it. A whole history is some 230 frames and 300 lives, 80 KB of a save
+  (`save().replay`; a world saved before has none, and keeps one from where it is loaded). The page: the realms in their colours on a
+  grid twice as fine (Scale2x: the stairs of a border become slopes), their borders darker and the player's gold, the names of the
+  sixteen greatest as large as their lands and none over another, the ice sheets of the first millennia (`CLIMATE.iceLeftAt`, worked out
+  once a page), the year and its age, a dissolve from frame to frame (the two layers added as light: `copy`, then `lighter`), four
+  frames a second (a history in a minute; 2x and 4x), the bar of the ages each as wide as the next with the player's moments on it, the
+  world's firsts and the player's founding, ages, golden ages and fall as captions, the realm under the pointer. Opened from the
+  Chronicle (Atlas), the epilogue and Shift+C; space plays, the arrows step, Home and End. `tools/scenes/atlas.js` runs a world and
+  opens it (`atlas_*` in the tour); the simulation's tests (section 27) and the end-to-end scenario 'atlas' hold it.
 - **Legacies** (`legacy.js`; `sim.legacy`; the Legacy tab of the Chronicle in `main.js`). Every age sets every realm six
   ambitions, one in each path (arms, wealth, splendour, learning, faith, reach: `LEGACY.OF[era]`); each is a test on what the
   realm has (`x`: the host's answers, on a prototype made once a world, what costs a search counted once in five years: workshops, trade,

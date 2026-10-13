@@ -664,6 +664,34 @@
   .ep-none { color: var(--text-3); font-size: var(--fs-body); font-style: italic; margin: 0; }
   .ep-rulers { color: var(--text-2); font-size: var(--fs-cap); margin: 0; }
   .ep-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 16px; }
+  /* ----- the atlas of history (atlas.js): the world through the ages, who held the land, played as a film ----- */
+  #atlas .modal { width: min(1480px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+  .at-stage { position: relative; flex: 1 1 auto; min-height: 0; background: #0c161f; border-bottom: 1px solid var(--rule); }
+  #at-map { display: block; width: 100%; aspect-ratio: 720 / 276; max-height: calc(100vh - 230px); cursor: crosshair; }
+  .at-when { position: absolute; left: 22px; top: 16px; pointer-events: none; text-shadow: 0 2px 12px rgb(0 0 0 / 0.85), 0 0 2px rgb(0 0 0 / 0.9); }
+  .at-year { font-family: var(--display); font-weight: 600; font-size: calc(40px * var(--ui-scale)); color: #F4ECD8; line-height: 1; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .at-agen { font-family: var(--display); font-size: var(--fs-key); letter-spacing: 0.08em; margin-top: 5px; font-weight: 600; }
+  .at-news { position: absolute; left: 22px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; pointer-events: none; max-width: 60ch; }
+  .at-n { font-size: var(--fs-body); color: var(--text); background: rgb(8 10 14 / 0.74); padding: 4px 10px 5px; border-left: 2px solid color-mix(in srgb, var(--gold) 55%, transparent); border-radius: 2px; }
+  .at-n.me { border-left-color: #F2D27A; color: #F7E7B8; }
+  .at-ny { color: var(--text-3); font-size: var(--fs-cap); margin-right: 8px; font-variant-numeric: tabular-nums; }
+  .at-tip { position: absolute; pointer-events: none; background: rgb(10 13 18 / 0.94); border: 1px solid var(--rule); padding: 6px 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 1px; font-size: var(--fs-cap); color: var(--text-2); z-index: 2; max-width: 32ch; }
+  .at-tip b { color: var(--text); font-size: var(--fs-body); font-weight: 600; }
+  .at-ctl { display: flex; align-items: center; gap: 10px; padding: 12px 18px 4px; }
+  .at-ctl .btn[data-at="play"] { min-width: 76px; }
+  .at-track { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .at-bar { position: relative; height: 24px; cursor: pointer; touch-action: none; }
+  .at-ticks { position: absolute; left: 0; right: 0; top: 8px; height: 8px; display: flex; gap: 2px; }
+  .at-age { flex: 1; background: color-mix(in srgb, var(--m) 50%, rgb(255 255 255 / 0.04)); border-radius: 2px; }
+  .at-tick { position: absolute; top: -5px; width: 2px; height: 18px; background: #F2D27A; transform: translateX(-1px); opacity: 0.75; border-radius: 1px; }
+  .at-head { position: absolute; top: 0; bottom: 0; width: 3px; background: #F4ECD8; box-shadow: 0 0 8px rgb(255 255 255 / 0.55); transform: translateX(-1px); border-radius: 2px; pointer-events: none; }
+  .at-names { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; font-size: calc(10px * var(--ui-scale)); color: var(--text-3); }
+  .at-names span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 2px; }
+  .at-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 6px 18px 14px; font-size: var(--fs-cap); color: var(--text-2); min-height: 32px; }
+  .at-stats b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .at-r i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .at-r.me { color: #F2D27A; }
+  @media (max-width: 760px) { .at-names { display: none; } .at-year { font-size: calc(28px * var(--ui-scale)); } .at-news { display: none; } }
   @media (max-width: 760px) { .ep-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ep-cols { grid-template-columns: 1fr; } .ep-page { padding: 0 16px 16px; margin-top: -40px; } }
 
   #news .pbody { gap: 18px; }
@@ -1322,7 +1350,7 @@
 </div>
 
 <dialog id="chron"><div class="modal panel">
-  <div class="phead"><h2 class="display">Chronicle</h2><span class="micro" id="chron-sub"></span><button class="btn" id="chron-story" title="The story of your people: its life, its moments, what it is remembered for">Your story</button><button class="btn icon ghost" id="chron-close">✕</button></div>
+  <div class="phead"><h2 class="display">Chronicle</h2><span class="micro" id="chron-sub"></span><button class="btn" id="chron-atlas" title="The world through the ages: who held the land, played as a film (Shift+C)">Atlas</button><button class="btn" id="chron-story" title="The story of your people: its life, its moments, what it is remembered for">Your story</button><button class="btn icon ghost" id="chron-close">✕</button></div>
   <div class="tabs"><button class="on" data-ctab="log">Log</button><button data-ctab="legacy">Legacy</button><button data-ctab="powers">Powers</button><button data-ctab="graphs">Graphs</button><button data-ctab="stats">Statistics</button></div>
   <div class="pbody">
     <div data-cpane="log" class="sect" style="gap:10px"><div class="filters" id="logfilters"></div><div class="log" id="log"></div></div>
@@ -1424,6 +1452,22 @@
   </div>
 </div></dialog>
 
+<dialog id="atlas" aria-labelledby="at-title"><div class="modal panel atlas" tabindex="-1">
+  <div class="phead"><h2 class="display" id="at-title">The world through the ages</h2><span class="micro" id="at-sub"></span><button class="btn icon ghost" data-at="close" title="Close (Esc)">✕</button></div>
+  <div class="at-stage">
+    <canvas id="at-map" aria-label="Who held the land at this date"></canvas>
+    <div class="at-when"><div class="at-year" id="at-year"></div><div class="at-agen" id="at-age"></div></div>
+    <div class="at-news" id="at-news" aria-live="polite"></div>
+    <div class="at-tip" id="at-tip" hidden></div>
+  </div>
+  <div class="at-ctl">
+    <button class="btn primary" data-at="play">Play</button><button class="btn ghost" data-at="speed" title="How fast the years go">1×</button>
+    <div class="at-track"><div class="at-bar" id="at-bar" title="Drag to any date"><div class="at-ticks" id="at-ticks"></div><i class="at-head" id="at-head"></i></div>
+    <div class="at-names"><span>Stone</span><span>Bronze</span><span>Iron</span><span>Classical</span><span>Middle</span><span>Renaissance</span><span>Industrial</span><span>Modern</span><span>Information</span><span>Space</span></div></div>
+  </div>
+  <div class="at-stats" id="at-stats"></div>
+</div></dialog>
+
 <dialog id="menu"><div class="modal panel">
   <div class="phead"><h2 class="display" id="m-title">Menu</h2><button class="btn icon ghost" id="m-close">✕</button></div>
   <div class="pbody">
@@ -1440,7 +1484,7 @@
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-textures" checked> Painted materials on buildings and ground (needs WebGL2)</label>
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-continuous"> Continuous time (WorldBox style) instead of turns</label>
     <label class="hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="opt-stories" checked> Stories: now and then something comes before your court and asks you to choose</label>
-    <div class="hint">Controls · Enter or space: advance / stop · B: city · R: realm · M: market · K: knowledge · V: laws · F: diplomacy · Y: your host · G: powers · C: chronicle · T, O, X, I: trade, government, relations and peoples on the map · drag: move · scroll: zoom to cursor · right-drag or shift-drag: tilt and turn · WASD/arrows: move · Q E: turn · Page Up/Down: tilt · N: north up · U: top-down · H: home · Esc: cancel/close · F9: hide HUD</div>
+    <div class="hint">Controls · Enter or space: advance / stop · B: city · R: realm · M: market · K: knowledge · V: laws · F: diplomacy · Y: your host · G: powers · C: chronicle · Shift+C: the world through the ages · T, O, X, I: trade, government, relations and peoples on the map · drag: move · scroll: zoom to cursor · right-drag or shift-drag: tilt and turn · WASD/arrows: move · Q E: turn · Page Up/Down: tilt · N: north up · U: top-down · H: home · Esc: cancel/close · F9: hide HUD</div>
     <details class="hint sources" id="m-sources"><summary>Where the world comes from</summary>
       <p><b>The picture of the Earth.</b> NASA's Blue Marble Next Generation (R. Stöckli, E. Vermote, N. Saleous, R. Simmon and D. Herring, NASA Earth Observatory, 2005): the land as the MODIS instrument saw it through 2004, at 500 m. Each hemisphere is shown in its summer; the towns of our own day are painted over with the country round them.</p>
       <p><b>Winter.</b> Where snow lies and for how long is read from the twelve months of the same Blue Marble. Where the sea freezes and for how long is from the Sea Ice Index, Version 4 (F. Fetterer, K. Knowles, W. N. Meier, M. Savoie and A. K. Windnagel; National Snow and Ice Data Center, Boulder, Colorado; doi:10.7265/a98x-0f50): the usual year of its first ten, 1979 to 1988.</p>
@@ -1516,6 +1560,7 @@
 <script src="climate.js"></script>
 <script src="migrate.js"></script>
 <script src="woods.js"></script>
+<script src="replay.js"></script>
 <script src="sim.js"></script>
 <script src="terrain.js"></script>
 <script src="camera.js"></script>
@@ -1541,6 +1586,7 @@
 <script src="country.js"></script>
 <script src="tales.js"></script>
 <script src="epilogue.js"></script>
+<script src="atlas.js"></script>
 <script src="troops.js"></script>
 <script src="fauna.js"></script>
 <script src="weather.js"></script>

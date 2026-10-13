@@ -4,7 +4,7 @@ global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('bina
 require('../dist/geo.js'); require('../dist/town.js');
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
-(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8')); (0, eval)(fs.readFileSync('src/climate.js', 'utf8')); (0, eval)(fs.readFileSync('src/migrate.js', 'utf8')); (0, eval)(fs.readFileSync('src/woods.js', 'utf8'));
+(0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8')); (0, eval)(fs.readFileSync('src/climate.js', 'utf8')); (0, eval)(fs.readFileSync('src/migrate.js', 'utf8')); (0, eval)(fs.readFileSync('src/woods.js', 'utf8')); (0, eval)(fs.readFileSync('src/replay.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/sim.js', 'utf8')); // indirect eval: global scope, so Math/typed-array lookups stay fast
 const W = 720, H = 360, N = W * H;
 const png = PNG.sync.read(fs.readFileSync('data/world.png'));
@@ -1672,6 +1672,45 @@ log('26. the epilogue');
   // the annals stay small in a long game
   { const a = []; P2.annals = a; for (let k = 0; k < 1300; k++) a.push([k * 10, 1, 1, 0]); s2.tick(); for (let y = 0; y < 10; y++) s2.tick();
     check(P2.annals.length <= 640, `a long game's annals are thinned (${P2.annals.length} kept of 1,300)`); }
+}
+}
+if (want(27)) {
+log('27. the atlas of history');
+{
+  const at = (lon, lat) => Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
+  const sim = createSim(wd, 2701); sim.setStories(false);
+  const P = sim.setPlayer(at(31.25, 29.9), 'Kemet'); P.aggression = 0; if (P.dip) P.dip.think = 1e12;
+  for (let k = 0; k < 24; k++) sim.spawnTribe(sim.LI[Math.floor(sim.rnd() * sim.LI.length)], {});
+  const RP = sim.replay, R = window.REPLAY;
+  check(!!RP && !!R, 'the world keeps an atlas');
+  const t0 = Date.now(); for (let y = 0; y < 1200; y++) sim.tick();
+  // a frame at the start and then every 279 years while the Stone Age lasts (its 6,700 years over 24)
+  { const gap = RP.frames.length > 1 ? RP.frames[1].y - RP.frames[0].y : 0; check(RP.frames.length === 5 && gap === Math.ceil((R.AGE_AT[1] - R.AGE_AT[0]) / R.FRAMES), `a frame as the age goes: ${RP.frames.length} in 1,200 years of the Stone Age, ${gap} years apart`); }
+  // a frame taken now is the world as it is: each place's holder one of its four regions' (a realm before nobody)
+  RP.take(sim.year); const g = RP.at(RP.frames.length - 1); let bad = 0, held = 0;
+  for (let y = 0; y < R.RH; y++) for (let x = 0; x < R.RW; x++) {
+    const q = [sim.owner[(y * 2) * W + x * 2], sim.owner[(y * 2) * W + x * 2 + 1], sim.owner[(y * 2 + 1) * W + x * 2], sim.owner[(y * 2 + 1) * W + x * 2 + 1]], o = g[y * R.RW + x];
+    if (o >= 0) held++; if (o >= 0 ? !q.includes(o) : q.some((v) => v >= 0)) bad++;
+  }
+  check(bad === 0 && held > 50, `each place of the map has the holder of its regions (${bad} wrong of ${held} held)`);
+  // whose each holder was: the life of that id that began last before the frame, named as the realm is
+  { let named = 0, wrong = 0; const ids = new Set(g); ids.delete(-1); for (const o of ids) { const L = RP.lifeOf(o, sim.year); if (L && L[3] === sim.civs[o].name) named++; else wrong++; }
+    const mine = RP.lives.filter((L) => L[5] & 1); check(wrong === 0 && named === ids.size && mine.length === 1 && mine[0][0] === P.id, `every holder has its life, named as it is (${named} realms; yours ${mine.length ? mine[0][3] : 'missing'})`); }
+  check(RP.frames[RP.frames.length - 1].c >= 0 && g[RP.frames[RP.frames.length - 1].c] === P.id, 'where your capital stood is kept with the frame, and it is yours');
+  // an id given again is a new life: the old one ends at the frame that finds it gone
+  { const other = sim.civs.find((c) => c && !c.player); const id = other.id, n0 = RP.lives.filter((L) => L[0] === id).length;
+    for (const i of sim.LI) if (sim.owner[i] === id) sim.owner[i] = -1; sim.recount(); for (let y = 0; y < 3; y++) sim.tick(); RP.take(sim.year);
+    const gone = RP.lives.filter((L) => L[0] === id); check(gone.length >= n0 && gone.every((L) => L[2] !== null || (sim.civs[id] && sim.civs[id] !== other)), `a realm that is gone has its life ended (${gone.map((L) => L[3] + ' ' + L[1] + '..' + L[2]).join(', ')})`); }
+  // the size: small for a short game, and the same history after the world is saved and loaded
+  const sv = JSON.parse(JSON.stringify(sim.save())); const js = JSON.stringify(sv.replay || {});
+  check(js.length < 120 * 1024, `the atlas of 1,200 years is small in a save (${(js.length / 1024).toFixed(1)} KB, ${RP.stats().bytes} bytes of frames)`);
+  const s2 = createSim(wd, 1); s2.load(sv); const R2 = s2.replay, g2 = R2.at(R2.frames.length - 1); let diff = 0; const gl = RP.at(RP.frames.length - 1); for (let i = 0; i < gl.length; i++) if (gl[i] !== g2[i]) diff++;
+  check(R2.frames.length === RP.frames.length && diff === 0 && R2.lives.length === RP.lives.length && R2.frames.every((f, k) => f.y === RP.frames[k].y && f.c === RP.frames[k].c), `saved and loaded: ${R2.frames.length} frames, the last the same place for place (${diff} differ), ${R2.lives.length} lives`);
+  const n2 = R2.frames.length; for (let y = 0; y < 600; y++) s2.tick(); check(R2.frames.length > n2 && R2.frames[R2.frames.length - 1].y > RP.frames[RP.frames.length - 1].y, `and the loaded world goes on keeping it (${R2.frames.length - n2} frames more in 600 years)`);
+  // a world saved before the atlas has none, and keeps one from where it is loaded
+  const old = JSON.parse(JSON.stringify(sv)); delete old.replay; const s3 = createSim(wd, 1); s3.load(old); check(s3.replay.frames.length === 0, 'a world saved before the atlas has no frames');
+  s3.tick(); check(s3.replay.frames.length === 1 && s3.replay.at(0).some((o) => o >= 0), 'and takes its first when its next year runs');
+  log(`   1,200 years with the atlas: ${Date.now() - t0} ms`);
 }
 }
 log(`\n${checks} checks, ${fails.length} failures`);

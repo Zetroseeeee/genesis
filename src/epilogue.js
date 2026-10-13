@@ -24,6 +24,7 @@ window.EPILOGUE = (function () {
       if (k === 'close' || k === 'on') { close(); return; }
       if (k === 'new') { close(); if (ctx.onNew) ctx.onNew(); return; }
       if (k === 'menu') { close(); if (ctx.onMenu) ctx.onMenu(); }
+      if (k === 'atlas') { close(); if (ctx.onAtlas) ctx.onAtlas(); }
     });
     $('epi').addEventListener('close', () => { if (ctx.onClose) ctx.onClose(mode); });
     let rt = 0; window.addEventListener('resize', () => { if (!isOpen()) return; clearTimeout(rt); rt = setTimeout(() => drawChart(S() && S().epilogue()), 120); });
@@ -128,9 +129,9 @@ window.EPILOGUE = (function () {
     $('ep-firsts').innerHTML = fs.length ? fs.map(([y, n]) => `<div class="ep-first"><span class="ep-y">${esc(s.fmtYear(y))}</span><span>${esc(n)}</span></div>`).join('') : '<div class="ep-none">None: others were first.</div>';
     $('ep-rulers').textContent = f.rulers ? `${f.rulers} ruler${f.rulers > 1 ? 's' : ''} came to the throne in the years the chronicle keeps` : '';
     // what may be done now
-    const acts = mode === 'end' ? [['on', 'Play on', 'primary'], ['new', 'A new world', ''], ['menu', 'The main menu', '']]
+    const acts = (mode === 'end' ? [['on', 'Play on', 'primary'], ['new', 'A new world', ''], ['menu', 'The main menu', '']]
       : mode === 'fall' ? [['new', 'A new world', 'primary'], ['close', 'Watch the world go on', ''], ['menu', 'The main menu', '']]
-      : [['close', 'Close', 'primary']];
+      : [['close', 'Close', 'primary']]).concat(s.replay && s.replay.frames.length > 1 ? [['atlas', 'The world through the ages', '']] : []);
     $('ep-actions').innerHTML = acts.map(([k, t, c]) => `<button class="btn ${c}" data-ep="${k}">${esc(t)}</button>`).join('');
   }
 
