@@ -446,11 +446,12 @@ server.listen(0, async () => {
   });
 
   await scenario('picture: Shift+S gives a picture of the world without the interface, named for the realm and the year', async (check) => {
-    await ev(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (document.activeElement) document.activeElement.blur(); });
+    await ev(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); if (document.activeElement) document.activeElement.blur();
+      const c0 = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { window.__picAs = this.download; HTMLAnchorElement.prototype.click = c0; return c0.call(this); }; });      // (the name the game gives it: a browser under load has been seen to offer the file as 'download')
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.keyboard.press('Shift+S')]);
-    const name = dl.suggestedFilename(), file = await dl.path(), size = file ? require('fs').statSync(file).size : 0, head = file ? require('fs').readFileSync(file).subarray(0, 8).toString('hex') : '';
-    const want = await ev(() => __G.sim.fmtYear(__G.sim.year));
-    check(/^Holocene - .+\.png$/.test(name) && name.includes(want) && head === '89504e470d0a1a0a' && size > 20000, `a picture: '${name}', ${size} bytes`);
+    const offered = dl.suggestedFilename(), file = await dl.path(), size = file ? require('fs').statSync(file).size : 0, head = file ? require('fs').readFileSync(file).subarray(0, 8).toString('hex') : '';
+    const q = await ev(() => ({ as: window.__picAs || '', year: __G.sim.fmtYear(__G.sim.year) }));
+    check(/^Holocene - .+\.png$/.test(q.as) && q.as.includes(q.year) && head === '89504e470d0a1a0a' && size > 20000, `a picture: '${q.as}' (offered as '${offered}'), ${size} bytes`);
   });
 
   // ---------- camera, labels, minimap, keys ----------
