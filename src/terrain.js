@@ -1216,7 +1216,7 @@
         // (and where feet go most, along the lanes and across the yards, it is beaten pale and bare)
         float trod = smoothstep(0.24, 0.4, dec.b);
         vec3 earth = vec3(0.5);
-        if (paved < 0.996) { earth = gnd(14.0).rgb * mix(mix(vec3(0.40, 0.345, 0.27), vec3(0.53, 0.46, 0.36), trod), vec3(0.68, 0.565, 0.395), arid); float uw = smoothstep(0.04, 0.22, dec.b) * (1.0 - ice); gRel = mix(gRel, gndN(14.0), uw);
+        if (paved < 0.996) { earth = gnd(14.0).rgb * mix(mix(vec3(0.43, 0.385, 0.315), vec3(0.55, 0.49, 0.40), trod), vec3(0.70, 0.59, 0.41), arid); float uw = smoothstep(0.04, 0.22, dec.b) * (1.0 - ice); gRel = mix(gRel, gndN(14.0), uw);
           if (desertK > 0.01) earth = mix(earth, gnd(3.0).rgb * vec3(0.70, 0.61, 0.43), desertK * 0.75); }
         urbanCol = mix(urbanCol, mix(earth, flags, paved), gOn);
         gRelK *= 1.0 - 0.85 * paved * smoothstep(0.04, 0.22, dec.b) * (1.0 - ice);
@@ -1227,8 +1227,14 @@
       #endif
       #ifdef USE_GROUND
       // (between the houses of a town that is not paved the ground is not all bare: off the beaten ways grass and weeds hold on, in patches)
-      { float green0 = (1.0 - paves) * (1.0 - arid) * smoothstep(0.42, 0.6, nMic.b * 0.6 + nFin.r * 0.4 + nFin.b * 0.25) * (1.0 - smoothstep(0.2, 0.34, dec.b));
-        land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * mix(mix(0.72, 0.88, arid) - 0.42 * green0, 0.9, smoothstep(0.3, 0.45, dec.b)) * (1.0 - ice)); }
+      // (and in a paved town the yards and gardens behind the houses keep their green in patches, outside its worn heart: the ground
+      //  between a town's houses is earth and gardens, never a lawn - laid at 0.72 of a dark earth over the grass it was an olive wash)
+      //  (patches the size of a few plots of a town as it is drawn - the noise of a hundred and fifty metres and of twenty: of the finest
+      //  sizes alone they were a speckle that the eye made one colour of from a mile up)
+      //  (in its worn heart fewer: courts and a garden here and there. Gardens are watered: only true desert has none)
+      { float pat = smoothstep(0.47, 0.54, nMid.g * 0.6 + nMic.b * 0.3 + nFin.r * 0.1), heart = smoothstep(0.3, 0.4, dec.b);
+        float green0 = (1.0 - clamp(wDesert * 1.6, 0.0, 1.0)) * pat * (1.0 - 0.7 * heart) * mix(1.0, 0.85, paves);
+        land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * (mix(mix(0.84, 0.9, arid), 0.93, smoothstep(0.3, 0.45, dec.b)) - 0.62 * green0) * (1.0 - ice)); }
       #else
       land = mix(land, urbanCol * (0.8 + 0.4 * dl2), smoothstep(0.04, 0.22, dec.b) * mix(0.7, 0.9, smoothstep(0.3, 0.45, dec.b)) * (1.0 - ice));
       #endif
