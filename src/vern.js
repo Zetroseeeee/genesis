@@ -15,6 +15,18 @@
   // a small generator: the same seed gives the same house
   function rng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const pickT = (t, r) => { if (!t || typeof t !== 'object' || Array.isArray(t)) return t; let s = 0; for (const k in t) s += t[k]; let x = r * s; for (const k in t) { x -= t[k]; if (x <= 0) return k; } return Object.keys(t)[0]; };
+  // What had not been made yet: a material is not laid before its age (roofing iron and zinc with the machine age, concrete and
+  // plate glass with the modern one, solar tiles in the last). A style that runs on through several ages takes them only once
+  // they are there: the izba of Novgorod had planks and shingles on its roof, the iron came in the nineteenth century.
+  const SINCE_R = { tin: 6, zinc: 6, solar: 9 }, SINCE_W = { tin: 6, concrete: 7, glass: 7 };
+  const eraClass = (era) => era == null || era >= 9 ? 9 : era >= 7 ? 7 : era >= 6 ? 6 : 0;      // (the ages at which anything above changes)
+  const pickE = (t, r, eg, since) => {
+    if (eg >= 9 || !t || typeof t !== 'object' || Array.isArray(t)) return pickT(t, r);
+    let s = 0; for (const k in t) if (!(since[k] > eg)) s += t[k];
+    if (s <= 0) return pickT(t, r);
+    let x = r * s; for (const k in t) { if (since[k] > eg) continue; x -= t[k]; if (x <= 0) return k; }
+    for (const k in t) if (!(since[k] > eg)) return k;
+  };
   const inR = (a, r) => Array.isArray(a) ? a[0] + (a[1] - a[0]) * r : a;
   const HEXN = new Map(); const hexN = (s) => { let v = HEXN.get(s); if (v === undefined) { v = parseInt(s.slice(1), 16); HEXN.set(s, v); } return v; };      // (a town asks for its colours thousands of times)
 
@@ -229,8 +241,8 @@
   def('rus_izba', 'house', {      // the izba: a log house gable to the street, its window frames carved and painted, a roof of planks or thatch, the yard beside it under one roof
     plan: { rect: 5, L: 2 }, w: [6, 8], d: [7, 10], fl: [1, 1], fh: [2.5, 2.8], pb: [0.5, 0.9], loft: 0.8, roof: { gable: 8, hip: 1 }, pitch: [40, 50], over: [0.4, 0.6], gover: [0.4, 0.6], ridge: 0.15,
     wall: { logs: 1 }, roofm: { shingle: 4, thatch: 4, tin: 1 }, ww: [0.7, 0.9], wh: [1.0, 1.2], bay: [1.6, 2.2], shut: 0.6, carv: 0.9, chim: { 1: 1 }, chat: { ridge: 1 }, annex: 0.6, pal: 'rus',
-    urban: { fl: [1, 2], w: [7, 10], d: [8, 11], wall: { logs: 6, plaster: 3 }, roofm: { shingle: 3, tin: 4, slate: 1 }, shop: 0.2 },
-    rich: { fl: [2, 2], w: [12, 18], d: [10, 14], roof: { hip: 6, gable: 3 }, wall: { plaster: 6, brick: 2, logs: 2 }, roofm: { tin: 6, slate: 2 }, corn: 0.6, pal: 'russtucco', carv: 0.3, gal: 0.25 },
+    urban: { fl: [1, 2], w: [7, 10], d: [8, 11], wall: { logs: 6, plaster: 3 }, roofm: { shingle: 5, tin: 4, thatch: 1 }, shop: 0.2 },
+    rich: { fl: [2, 2], w: [12, 18], d: [10, 14], roof: { hip: 6, gable: 3 }, wall: { plaster: 6, brick: 2, logs: 2 }, roofm: { tin: 6, shingle: 3, slate: 1 }, corn: 0.6, pal: 'russtucco', carv: 0.3, gal: 0.25 },
   });
   def('rus_town', 'cont_block', { fl: [2, 3], w: [12, 18], d: [11, 15], fh: [3.4, 4.0], roof: { hip: 8, gable: 2 }, pitch: [18, 26], roofm: { tin: 6, zinc: 3, slate: 1 }, wall: { plaster: 9, brick: 1 }, balc: 0.3, pal: 'russtucco', shut: 0, corn: 0.95, quoin: 0.4 });
   def('balt_med', 'rus_izba', { ridge: 0.6, roofm: { thatch: 6, shingle: 3 }, roof: { hip: 4, gable: 4, half: 2 }, pal: 'balt', carv: 0.4,
@@ -697,11 +709,14 @@
   };
   const PITCHED = { thatch: 1, reed: 1, tile: 1, slate: 1, slab: 1, greytile: 1, bluetile: 1, shingle: 1, plain: 1, glaze: 1, yglaze: 1, palm: 1, roman: 1, blackpan: 1, turf: 0, tin: 0, copper: 0, zinc: 0 };
   const typeCache = new Map();
-  // n types of a style in a context, for a place (the key says which: the same town asks again and again)
-  function types(styleKey, ctx, st, n) {
-    const key = styleKey + '|' + ctx + '|' + (st ? st.region + st.sub + ':' + st.mount + ':' + Math.round(st.snow * 4) + ':' + Math.round(st.wet * 4) + ':' + (st.wood < 0 ? 'x' : Math.round(st.wood * 4)) : '') + '|' + n;
-    let out = typeCache.get(key); if (out) return out;
+  // n types of a style in a context, for a place, in an age (the key says which: the same town asks again and again)
+  function types(styleKey, ctx, st, n, era) {
     const base = S[styleKey] || S.house; const sty = Object.assign({}, base, base[ctx] || {});
+    // the age counts only where the style has something it had not yet (else its houses are the same in every age it lasts)
+    let eg = eraClass(era); const late = (t, since) => { if (t && typeof t === 'object') for (const k in t) if (since[k] > eg) return true; return false; };
+    if (eg < 9 && !late(sty.roofm, SINCE_R) && !late(sty.wall, SINCE_W) && !late(sty.wall2, SINCE_W)) eg = 9;
+    const key = styleKey + '|' + ctx + '|' + (st ? st.region + st.sub + ':' + st.mount + ':' + Math.round(st.snow * 4) + ':' + Math.round(st.wet * 4) + ':' + (st.wood < 0 ? 'x' : Math.round(st.wood * 4)) : '') + '|' + n + (eg < 9 ? '|' + eg : '');
+    let out = typeCache.get(key); if (out) return out;
     out = []; const R0 = strHash(key);
     for (let t = 0; t < n; t++) {
       const r = rng(R0 + t * 7919);
@@ -711,7 +726,7 @@
         fl: Math.round(inR([sty.fl[0] - 0.49, sty.fl[1] + 0.49], clamp(q * 0.6 + r() * 0.4, 0, 1))), fh: inR(sty.fh, r()), pb: inR(sty.pb, r()),
         stilt: r() < (sty.pStilt || 0) ? inR(sty.stilt, r()) : 0, loft: r() < sty.loft,
         roof: pickT(sty.roof, r()), pitch: inR(sty.pitch, r()), over: inR(sty.over, r()), gover: inR(sty.gover, r()), ridge: r() < sty.ridge ? 'x' : 'z', par: inR(sty.par, r()), cren: r() < sty.cren,
-        wall: pickT(sty.wall, r()), wall2: null, w2on: sty.w2on, roofm: pickT(sty.roofm, r()), chimm: pickT(sty.chimm, r()), frame: +pickT(sty.frame, r()),
+        wall: pickE(sty.wall, r(), eg, SINCE_W), wall2: null, w2on: sty.w2on, roofm: pickE(sty.roofm, r(), eg, SINCE_R), chimm: pickT(sty.chimm, r()), frame: +pickT(sty.frame, r()),
         ww: inR(sty.ww, r()), wh: inR(sty.wh, r()), sill: inR(sty.sill, r()), bay: inR(sty.bay, r()), arch: r() < sty.arch, shut: r() < sty.shut, mull: r() < sty.mull, grille: r() < sty.grille, wfr: sty.wfr,
         dw: inR(sty.dw, r()), dh: inR(sty.dh, r()), dpos: pickT(sty.dpos, r()), darch: r() < sty.darch, shop: r() < sty.shop,
         chim: { n: +pickT(sty.chim, r()), at: pickT(sty.chat, r()) }, dorm: +pickT(sty.dorm, r()), balc: r() < sty.balc ? { k: pickT(sty.balk, r()), full: r() < sty.bfull } : null,
@@ -719,8 +734,8 @@
         stepg: r() < sty.stepg, toron: r() < sty.toron, wind: r() < sty.wind, tower: r() < sty.tower, oriel: r() < sty.oriel, stair: r() < sty.stair, annex: r() < sty.annex,
         corn: r() < sty.corn, quoin: r() < sty.quoin, strc: r() < sty.strc, batter: inR(sty.batter, r()), domes: +pickT(sty.domes, r()), carv: r() < sty.carv, lattice: r() < sty.lattice,
         pal: sty.pal, rank: ctx === 'rich' ? 2 : ctx === 'urban' ? 1 : 0 };
-      if (sty.wall2 && r() < (sty.pW2 || 0)) g.wall2 = pickT(sty.wall2, r());
-      g.fam = st ? st.fam : '';
+      if (sty.wall2 && r() < (sty.pW2 || 0)) g.wall2 = pickE(sty.wall2, r(), eg, SINCE_W);
+      g.fam = st ? st.fam : ''; g.eg = eg;
       if (st) MODS(st, g, r);
       if (g.frame && g.wall !== 'daub' && g.wall !== 'plaster' && g.wall !== 'cob') g.frame = 0;      // (a timber frame is filled with daub or plaster, never brick or stone laid over)
       // what goes together: a flat roof has no chimney stack on a gable; a round house no shop; a tall narrow house no annex

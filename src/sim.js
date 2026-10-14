@@ -1055,7 +1055,7 @@ function createSim(world, seed) {
         if (level[i] && (prevLvl !== level[i] || ((year + i) & 15) === 0) && !cellName.has(i)) cellName.set(i, people.nameAt(i, c) || makeName(c.style, 2, 3));      // (asked when a place becomes a settlement or changes rank, and of every place now and then: the map of names is slow to ask)
         if (level[i] && siteU[i] < 0) { siteU[i] = 0.25 + rnd() * 0.5; siteV[i] = 0.25 + rnd() * 0.5; }
         if (level[i]) { let tr = tRec.get(i); if (!tr) { tr = [year, c.era, c.home >= 0 ? c.home : c.capital, 0, walls[i] ? gBand[i] : 0]; tRec.set(i, tr); } if (level[i] >= 3 && c.era >= 6 && !tr[3]) tr[3] = Math.max(1, gBand[i]); }
-      } else if (level[i]) level[i] = 0;
+      } else if (level[i]) { level[i] = 0; tRec.delete(i); }      // (a place given up: whoever settles it again lays out a town of their own)
     }
     // per-civ bookkeeping
     for (let c = 0; c < MAXC; c++) if (civs[c]) mightOf[c] = strength(civs[c], popOf[c], mines[c]);
