@@ -478,21 +478,24 @@ dawn_space   | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:1.02,pop:120,walls
 # Yoruba town of compounds, a camp of the steppe, a village of the first farmers, a Bronze Age city, Kyoto, Novgorod; the founding
 tw_fes        | tools/scenes/town.js | {lon:-4.98,lat:34.06,tech:0.52,pop:8,walls:1,special:12,alt:900,tilt:1.1,out:1.0} |  | 34
 tw_fes_c      | tools/scenes/town.js | {lon:-4.98,lat:34.06,tech:0.52,pop:8,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
-tw_fes_low    | tools/scenes/town.js | {lon:-4.98,lat:34.06,tech:0.52,pop:8,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_fes_low    | tools/scenes/town.js | {lon:-4.98,lat:34.06,tech:0.52,pop:8,walls:1,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
 tw_xian_c     | tools/scenes/town.js | {lon:108.94,lat:34.26,tech:0.52,pop:20,walls:1,special:14} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
-tw_xian_low   | tools/scenes/town.js | {lon:108.94,lat:34.26,tech:0.52,pop:20,walls:1,special:14} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_xian_low   | tools/scenes/town.js | {lon:108.94,lat:34.26,tech:0.52,pop:20,walls:1,special:14,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
 tw_cots_c     | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0.5,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
-tw_cots_low   | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0.5,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_cots_low   | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0.5,pop:3,walls:0,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
 tw_ibadan_c   | tools/scenes/town.js | {lon:3.9,lat:7.38,tech:0.52,pop:8,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
-tw_ibadan_low | tools/scenes/town.js | {lon:3.9,lat:7.38,tech:0.52,pop:8,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_ibadan_low | tools/scenes/town.js | {lon:3.9,lat:7.38,tech:0.52,pop:8,walls:1,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
 tw_karakorum_c| tools/scenes/town.js | {lon:102.83,lat:47.2,tech:0.48,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
-tw_karakorum_low| tools/scenes/town.js | {lon:102.83,lat:47.2,tech:0.48,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_karakorum_low| tools/scenes/town.js | {lon:102.83,lat:47.2,tech:0.48,pop:3,walls:0,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
 tw_ur_c       | tools/scenes/town.js | {lon:46.1,lat:30.96,tech:0.15,pop:6,walls:1,special:14} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
-tw_ur_low     | tools/scenes/town.js | {lon:46.1,lat:30.96,tech:0.15,pop:6,walls:1,special:14} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_ur_low     | tools/scenes/town.js | {lon:46.1,lat:30.96,tech:0.15,pop:6,walls:1,special:14,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
 tw_kyoto_c    | tools/scenes/town.js | {lon:135.76,lat:35.01,tech:0.62,pop:12,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
-tw_kyoto_low  | tools/scenes/town.js | {lon:135.76,lat:35.01,tech:0.62,pop:12,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_kyoto_low  | tools/scenes/town.js | {lon:135.76,lat:35.01,tech:0.62,pop:12,walls:0,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
 tw_novgorod_c | tools/scenes/town.js | {lon:31.27,lat:58.52,tech:0.5,pop:6,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
-tw_novgorod_low| tools/scenes/town.js | {lon:31.27,lat:58.52,tech:0.5,pop:6,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_novgorod_low| tools/scenes/town.js | {lon:31.27,lat:58.52,tech:0.5,pop:6,walls:1,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
+tw_rome_c     | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0.62,pop:14,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_rome_low   | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0.62,pop:14,walls:1,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
+cost_vh       | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0.52,pop:14,walls:1,special:12} | setTimeout(() => { __sceneLook('town', 0.6, 1.05, 0.3); __T.costs(); }, 9000); | 64
 tw_jericho    | tools/scenes/town.js | {lon:35.44,lat:31.87,tech:0.03,pop:0.5,walls:0,special:0} | setTimeout(() => __sceneLook('town', 1.0, 1.05, 0.3), 7000); | 36
 tw_camp_a     | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0,pop:0.3,walls:0,special:0,camp:1,grow:false,settled:false} | setTimeout(() => __sceneLook('town', 1.6, 1.05, 0.3), 2500); | 16
 tw_camp_b     | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0,pop:0.3,walls:0,special:0,camp:1,grow:false,settled:false} | setTimeout(() => __sceneLook('town', 1.6, 1.05, 0.3), 2500); | 50

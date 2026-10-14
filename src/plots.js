@@ -181,7 +181,7 @@
       // further rings broken here and there; and short lanes out from each ring to the next
       // (every ring that could come in among the plots a smaller plan keeps is laid out in every plan: they wander by a fifth; and
       // a lane round the middle half a ring out, the back lane of the houses about the square)
-      const ring = 72 + rnd(5) * 40; const nR = Math.ceil((R * 1.35 + 100) / ring);
+      const ring = 58 + rnd(5) * 26; const nR = Math.ceil((R * 1.35 + 100) / ring);      // (two plots deep between one lane and the next: a town is built up, not gardens with houses about them)
       const order = angs.map((a, k) => [((a % TAU) + TAU) % TAU, k]).sort((p, q) => p[0] - q[0]);
       const rings = [];
       for (let jj = 0; jj <= nR; jj++) for (let q = 0; q < order.length; q++) {
@@ -197,7 +197,7 @@
       }
       const lanes = [];
       if (over()) yield;
-      for (const rg of rings) { const n = rg.pts.length; const step = Math.max(4, Math.round((60 + h(i, 85000 + rg.j) * 60) / 14));
+      for (const rg of rings) { const n = rg.pts.length; const step = Math.max(3, Math.round((45 + h(i, 85000 + rg.j) * 45) / 14));
         for (let k = step; k < n - step / 2; k += step) { if (h(i, 86000 + rg.j * 211 + k) < 0.3) continue; const [x, z] = rg.pts[k]; const a = Math.atan2(z, x); const pts = []; let px = x, pz = z;
           for (let s = 0; s < ring * 0.95; s += 12) { pts.push([px, pz]); const hd = a + 0.25 * Math.sin(s / 40 + k); px += Math.cos(hd) * 12; pz += Math.sin(hd) * 12; }
           if (beyond(pts, farSt2)) continue; const l = addStreet(pts, 2.2, 2); l.r = rg.r; lanes.push(l); } }
@@ -300,7 +300,7 @@
         const rc = sp * (0.26 + 0.1 * h(i, 94000 + k)); const nh = 3 + Math.floor(h(i, 94500 + k) * 4);
         for (let q = 0; q < nh; q++) { const b = a + Math.PI + (q - (nh - 1) / 2) * (TAU / (nh + 1.5)); const hx = x + Math.cos(b) * rc * 0.62, hz = z + Math.sin(b) * rc * 0.62;
           const fa = b + Math.PI; const nx = Math.cos(b), nz = Math.sin(b);      // each hut's door to the yard
-          plots.push({ x: hx - nx * 2.5, z: hz - nz * 2.5, yaw: Math.atan2(-nz, -nx) + Math.PI / 2, f: 6, dep: 6, key: r + q * 2 + h(i, 95000 + k * 13 + q) * 3, rank: 2, tx: -nz, tz: nx, nx, nz, cell: 1, comp: k, cx: x, cz: z, cr: rc }); void fa; }
+          plots.push({ x: hx - nx * 2.5, z: hz - nz * 2.5, yaw: Math.atan2(-nz, -nx) + Math.PI / 2, f: 6, dep: 6, key: r + q * 2 + h(i, 95000 + k * 13 + q) * 3, rank: 2, tx: -nz, tz: nx, nx, nz, cell: 1, comp: k, cx: x, cz: z, cr: rc, nh }); void fa; }
       }
       // paths: from the middle out between the yards
       for (let k = 0; k < 6; k++) { const a0 = axis + k * TAU / 6 + (rnd(50 + k) - 0.5) * 0.5; const pts = []; for (let s = 6; s < R; s += 16) { const hd = a0 + 0.3 * Math.sin(s / 70 + k); pts.push([Math.cos(hd) * s, Math.sin(hd) * s]); } streets.push({ pts, hw: 1.3, rank: 2 }); }

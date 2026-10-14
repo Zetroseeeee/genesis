@@ -118,7 +118,8 @@
     updateBuildings(cam, force) {
       const sim = this.sim; if (!sim) { return; }
       // the plans of towns still to be made, a few milliseconds a frame (plots.js); a town that has its plan now is drawn anew
-      if (window.PLOTS && PLOTS.pending()) PLOTS.pump(this.planMs || 5);
+      // (a share of the frame: five milliseconds at sixty frames a second, more where frames are slow anyway)
+      { const t = performance.now(), dtF = this._pumpT ? t - this._pumpT : 16; this._pumpT = t; if (window.PLOTS && PLOTS.pending()) PLOTS.pump(this.planMs || Math.min(40, Math.max(5, dtF * 0.25))); }
       if (window.PLOTS && PLOTS.version !== this._plotsV) { this._plotsV = PLOTS.version; force = true; }
       const dist = cam.dist; const now = performance.now();
       const show = dist < 0.12;   // towns are drawn at strategy-map scale, so they read from ~750 km up
@@ -305,8 +306,9 @@
         // the founding: the camp is pitched, then the houses go up one after another about the fire
         let t = now + 7; R.camp = { t0: now, until: 0, x: 0, z: 0 }; let nh = 0; for (const r of seen.values()) if (!r.it.prop && !r.it.as && !r.it.tag) nh++;
         const gap = Math.max(0.45, Math.min(6, 80 / Math.max(1, nh)));      // (a minute or so for the whole village, however many households came)
-        for (const r of seen.values()) { if (r.it.kind === 'stall' || r.it.as || r.it.tag) continue; r.t0 = t; t += r.it.prop ? 0.1 : gap * (0.75 + 0.5 * hash(i, 6100 + nh--)); }
-        R.camp.until = t + 12;
+        const tGreat = t + nh * gap * 0.4; let ng = 0;      // (what they raise together - the stones, the hall - once a few houses stand)
+        for (const r of seen.values()) { if (r.it.kind === 'stall') continue; if (r.it.as || r.it.tag) { r.t0 = tGreat + 3 * ng++; continue; } r.t0 = t; t += r.it.prop ? 0.1 : gap * (0.75 + 0.5 * hash(i, 6100 + nh--)); }
+        R.camp.until = Math.max(t, tGreat + 3 * ng) + 12;
       } else if (!first) {
         // one after another, the nearest the middle first: a second or so apart, half a minute for a turn's worth
         const gap = Math.min(1.3, 26 / Math.max(1, changes.length)); let t = now + 0.6;
