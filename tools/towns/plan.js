@@ -60,7 +60,11 @@ for (const name of places) {
     // a scale bar of 100 m in the corner
     for (let px = 10; px < 10 + 100 / mpp; px++) for (let py = SZ - 14; py < SZ - 10; py++) put(Math.round(px), py, [30, 30, 30]);
     const file = `shots/towns/plan_${name}_e${era}_${popK}k.png`; fs.writeFileSync(file, PNG.sync.write(img)); tiles.push({ file, img });
-    console.log(`${name.padEnd(9)} e${era} ${String(popK).padStart(5)}k ${L.morph.padEnd(8)} R ${String(Math.round(L.Rt)).padStart(5)} m  n ${String(L.n).padStart(5)} houses ${String(nVh).padStart(5)} models ${String(nModel).padStart(4)} props ${String(nProp).padStart(5)}  ${ms} ms  -> ${file}  (100 m = ${Math.round(100 / mpp)} px)`);
+    // how much of its ground the buildings cover, in its middle third, the third about it and the third at its edge (an old town's
+    // middle a third and more, a medina's half to four fifths, a village's edge a twentieth)
+    const cov = [0, 0, 0]; for (const it of L.items) { if (it.prop && it.kind !== 'vh') continue; const r = Math.hypot(it.x / k, it.z / k) / L.Rt; const b = r < 1 / 3 ? 0 : r < 2 / 3 ? 1 : r < 1 ? 2 : -1; if (b >= 0) cov[b] += (it.w / k) * (it.d / k); }
+    const bandA = [1, 3, 5].map((m) => Math.PI * L.Rt * L.Rt * m / 9), covS = cov.map((a, b) => Math.round(a / bandA[b] * 100) + '%').join(' ');
+    console.log(`${name.padEnd(9)} e${era} ${String(popK).padStart(5)}k ${L.morph.padEnd(8)} R ${String(Math.round(L.Rt)).padStart(5)} m  n ${String(L.n).padStart(5)} houses ${String(nVh).padStart(5)} models ${String(nModel).padStart(4)} props ${String(nProp).padStart(5)}  covered ${covS}  ${ms} ms  -> ${file}  (100 m = ${Math.round(100 / mpp)} px)`);
   }
 }
 // all of them on one sheet, four across, at half size
