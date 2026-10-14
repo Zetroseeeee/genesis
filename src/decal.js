@@ -244,7 +244,13 @@
             // (a city of the Modern age and after is paved in the middle and green at the edge: its suburbs are houses with
             // gardens, the grass beside the streets - town.js plans them so)
             if (se >= 7) { const core = 0.58 - 0.06 * Math.min(1, (lvl - 1) / 3); disc(sx, sy, spread * core / r.cl, spread * core, val, 1, 20, 0.85); disc(sx, sy, spread / r.cl, spread, 0.1, 1, 20, 0.85); }
-            else disc(sx, sy, spread * (se < 6 ? 0.8 : 1) / r.cl, spread * (se < 6 ? 0.8 : 1), val, 1, 20, 0.85); }
+            else {
+              disc(sx, sy, spread * (se < 6 ? 0.8 : 1) / r.cl, spread * (se < 6 ? 0.8 : 1), val, 1, 20, 0.85);
+              // (the heart of a town is worn bare by its feet and carts - and, from the Classical age, flagged in its streets and squares -
+              // where its yards and gardens about it keep their green in patches: a disc of beaten, then paved, ground about the middle.
+              // Below 0.4, which is a road's.)
+              if (lvl >= 2 && se >= 1) { const cv = se >= 3 ? 0.37 : 0.3, cr = spread * (0.42 + 0.05 * Math.min(2, lvl - 2)); disc(sx, sy, cr / r.cl, cr, Math.max(val, cv), 1, 20, 0.6); }
+            } }
           // the town's own streets and square, once we are close enough for them to be more than a pixel
           if (mpp < 420) { // streets are drawn at the town's representational scale, so they show from region height
             const L = TOWN.layout(sim, i, c, { coarse: false }); const mLon = 1 / (R_M * r.cl), mLat = 1 / R_M;
