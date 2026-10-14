@@ -171,6 +171,11 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
 - `node tools/replay/probe.js [seed] [last year]` — the atlas of history in numbers: how many maps a world keeps age by age and how many
   bytes they take, how many realms' lives, what the frames cost, the save with them, and a round trip through a save. Measured over
   12345 to AD 2150: 232 maps of 0.2 to 0.7 KB, 304 lives, 83 KB of the save's 3,965 KB, 142 ms in a whole history.
+- `node tools/learn/probe.js [seed] [start year] [turns] [kinds]` — what the world learns of the player and what it does about it
+  (`learn.js`): a world run to a date, a realm of middling size made the player's and played by a script (peace, bully, traitor),
+  and every five turns how many courts know much of him, how many fear him and how much, the leagues sworn against him, the offers
+  and demands that came to him, what his neighbours think, his word and his friendship as the world believes them. Hold it to its
+  header; run it after touching `learn.js` or what diplomacy reads of it.
 - `node tools/intrigue/probe.js [seed,seed] [last year]` — spies and schemes through the ages: how many schemes the world's realms
   begin and of which kind, how many succeed, fail and are found out, how many wars are fought over agents caught, how strong the
   networks are age by age, how long a year of it takes. Run it after touching `intrigue.js` or the deeds in `sim.js`, then the
@@ -319,6 +324,7 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/gov.js` | `GOV` | The laws screen: the fields and their laws, the forms of government, the estates, the reform under way, a demand; the faith; the court (`court.js`) |
 | `src/troops.js` | `TROOPS` | The hosts and fleets on the map: soldiers in their ranks, standards, camps, ships, the banners on the screen, the road of the selected host |
 | `src/bank.js` | `BANK` | The Treasury, the market screen's last tab: debts and who holds them, borrowing and repaying, repudiation, the coin, the price of money, banking houses and companies (shares bought and sold), panics of late |
+| `src/learn.js` | `LEARN` | What the world learns of the player: a logistic model of whom he falls on, fitted once a turn to every realm he could have fallen on (Newton's method, the old turns fading), his word, his friendship, whether he gives in, what becomes of the beaten, his agents; how much each court has heard; his own court's habits (a conditional logit of his story choices, the branches he studies); pure data |
 | `src/intrigue.js` | `INTRIGUE` | Spies and schemes: six schemes (steal learning, sow discord, forge a claim, set back works, stir a rising, murder an heir) and what a network is made of; one world's intrigue: each realm's agents and the scheme they are on, the foreign agents it caught, the autopilot's schemes; pure data (the deeds are the host's) |
 | `src/disease.js` | `DISEASE` | Pestilence that travels: six kinds (smallpox, measles, plague, typhus, influenza, cholera), the age that breeds each, how readily it passes and kills; one world's sickness: outbreaks and where they burn, what every people has lived through, who is spared, quarantines; pure data (the dead are taken by the host) |
 | `src/climate.js` | `CLIMATE` | The weather of the Holocene: the ice sheets that withdraw from the north, the green Sahara of the wet centuries, the great droughts and colds history remembers, every year's droughts and good years; one world's weather: every place's harvest this year, the ice, the green lands; pure data |
@@ -932,6 +938,42 @@ Conventions that matter:
   are due to think (two flat arrays, a filter on what is on the realms: after setting a realm's record by hand, `sync()`).
   Saved with the realm (`civ.intrigue`) and the world (`save().intrigue`: its dice and counts); a world saved before intrigue
   has no agents abroad.
+- **What the world learns of the player** (`learn.js`; `sim.learn`; the diplomacy screen's Your name tab and a realm's page in
+  `envoys.js`; since 0.58). The world's courts watch the player's realm and only his: a world without a player is the very world
+  it was, and the autopilot's realms deal with one another by the rules every world was fitted to. Once a turn of his age
+  (`step`, from the simulation's year) they reckon again from everything they remember of him. *Whom he falls on* is a logistic
+  model (`WAR`: weaker, stronger, another faith, a claim held, at war elsewhere, in turmoil, sworn to him, his own people, holding
+  what he lacks, a realm that wronged him, one he has fallen on before, beyond his borders - each between 0 and 1 - and the bias),
+  fitted by Newton's method (`newton`, a Cholesky solve) to the examples of every turn watched: each realm he could have fallen on
+  (`eligible`: diplomacy's `cannotFight`), and whether he did (`declared`, from `declare`); his neighbours all, four realms further
+  off standing for the rest. What is old counts for half in `HALF` (12) turns, and the model is pulled toward what a court assumes
+  of any realm (the prior weights, `LAM` an example's worth each): with little to go on it says what they would say of anyone, and a
+  conqueror who keeps the peace thirty turns is believed. *His word* is a rate (oaths broken - a pact thrown over, a sworn realm
+  attacked, a lord defied, an ally left or a call refused - over the pact-turns his oaths stood: `OATH0` its prior); *his
+  friendship* calls answered (`ALLY0`), *when pressed* demands met (`GIVE0`), *the beaten* the terms of his peaces and vassals
+  joined to his crown (`HARSH0`), *his agents* schemes found out (`PLOT0`); all fade as the examples do. A court believes between
+  what it would of anyone and what the world has learned, as far as it has heard of him (`heard`, a byte a realm: at war with him,
+  his neighbour, sworn to him or trading with him it hears most, within its envoys' reach a little, more once books are printed
+  and more again with the wireless; beyond its reach it forgets). What it changes, only toward the player (`diplo.js`): their dread
+  in what they think of him (`fear`: the chance he falls on them within a turn against what they would reckon of anyone in his
+  place: 'They fear you will fall on them', or 'They count you a peaceful neighbour'), whom they dread (`threatTo`, by how much more
+  or less than anyone), what they will swear with him (`judge`: 'Your oaths are worth little to them', 'You stand by your
+  friends', 'They would have your oath against your appetite', 'They know what becomes of those you beat'), *leagues* (a court that
+  dreads him as it would nobody else - or much, whatever it would think of anyone - swears to defend one another with another that
+  does: `fearful`, 'You both dread ...', and the player's chronicle hears of it), and how readily the strong demand his submission
+  (one who gives in is pressed sooner); intrigue's odds against a court that watches for his agents (`watchOf`: his caught there
+  within three turns, or many anywhere). *His own court* learns his choices (`habit`): a story's choices as vectors of what each
+  does (`phiOf` in `story.js`: quiet at home, coin, authority, the estates, learning, renown, people, friends abroad, the bold
+  course, arms), fitted as a softmax to his choices (`chose`, `softmaxFit`, the prior the autopilot's own weighing); when stories
+  are off the court decides as he would (`habit` in `story.js`), and a story's page marks the choice it expects ('As you are
+  wont', `tales.js`); his scholars, left to choose, lean to the branches he chose himself (`studied`, `taste`, in `know.js`). The
+  page: a realm's page says what that court has learned of him and why it dreads him (`why`: what in the model moves its dread);
+  the Your name tab the world's picture (`profile`: how many times likelier than of anyone each kind of realm is to be fallen on,
+  his oaths, his friendship, the beaten, his agents), who fears him most, the leagues against him and what his court has learned.
+  Saved with the world (`save().learn`: the examples as bytes, the weights, the evidence, who has heard what; a few tens of KB in a
+  long game); a world saved before has heard nothing of him. A turn's reckoning is some ten milliseconds over a full memory
+  (test section 28). After touching it run `tools/learn/probe.js` and test_sim 28; look at `dip_name`, `dip_learned` and
+  `tale_wont` on the Mac.
 - **The land** (`land.js`; `data/soil.png`, made by `tools/climate/soil.py`; the simulation's `capacity`). Every cell of the
   grid is one of sixteen kinds of land, from the climate's class (Koppen-Geiger, `data/climate.png`), where woods would stand by
   nature (`data/veg.jpg`) and the heights: ice, tundra, boreal forest, desert, steppe, grassland (open grass in a climate that could

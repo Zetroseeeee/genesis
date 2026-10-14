@@ -515,3 +515,7 @@ ren_namerica | tools/scenes/town.js | {lon:-90,lat:38.6,tech:0.58,pop:12,walls:2
 med_easia    | tools/scenes/town.js | {lon:113,lat:35,tech:0.45,pop:12,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 ind_med      | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0.7,pop:40,walls:0,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 ind_easia    | tools/scenes/town.js | {lon:113,lat:35,tech:0.7,pop:40,walls:0,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
+# what the courts have learned of the player (learn.js): the diplomacy screen's Your name, a realm's page that dreads him, a story his court expects
+dip_name     | tools/scenes/dip.js tools/scenes/learn.js | {tab:'name'} | | 20
+dip_learned  | tools/scenes/dip.js tools/scenes/learn.js | {pick:'cold'} | | 20
+tale_wont    | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'raid',wont:'stab'} | | 170

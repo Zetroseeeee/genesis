@@ -20,6 +20,7 @@ function createSim(world, seed) {
   const STORY = window.STORY;      // the stories that come before a realm's court (story.js; a tool that does not load it runs without them)
   const LEGACY = window.LEGACY;      // what a people is remembered for: the ambitions of every age, the world's firsts (legacy.js; likewise)
   const INTRIGUE = window.INTRIGUE;      // spies and schemes (intrigue.js; likewise)
+  const LEARN = window.LEARN;      // what the world learns of the player (learn.js; likewise)
   const DISEASE = window.DISEASE;      // pestilence that travels (disease.js; likewise)
   const LAND = window.LAND;      // what the land feeds (land.js; a tool that does not load it, or a world without data/soil.png, feeds by the old map)
   const CLIMATE = window.CLIMATE;      // the ice, the green Sahara, droughts and good years (climate.js; only in a world whose land has kinds)
@@ -482,9 +483,12 @@ function createSim(world, seed) {
     faithLaw: (cv) => rule.ruleOf(cv).laws.faith, tradeLaw: (cv) => rule.ruleOf(cv).laws.trade, covets: (a, b) => { const g = covetOf(a, b); return g ? GOODS[g].name : ''; }, absorb, formFor,
     setForm: (cv, key) => { const F = RULE.FORM[key]; if (!F) return; if (!rule.known(cv.id, F)) rule.ruleOf(cv).brought = key; rule.setForm(cv.id, cv, F, 'imposed'); },
     alarm: () => {}, trait: (cv) => cv.ruler ? cv.ruler.trait : '', aggression: (cv) => cv.player ? (cv.policy.stance === 'aggressive' ? 0.9 : cv.policy.stance === 'consolidate' ? 0.25 : 0.5) : cv.aggression,      /* (the player's appetite is what his stance says, not a number he cannot see) */ ruler: (cv) => cv.ruler ? `${cv.ruler.title} ${cv.ruler.name}` : fullName(cv), nameOf: (cv) => fullName(cv), income: (cv) => cv.income || 0, fmtYear,
-    married: (a, b) => { if (dynasty) dynasty.married(a, b); }, learn: () => learn });      // (a royal marriage weds two of the houses' people: dynasty.js; what the world learns of the player: learn.js)
+    married: (a, b) => { if (dynasty) dynasty.married(a, b); }, learn: () => learn,
+    // (the player is told a story of it, when stories are on and he has not been told one of the kind lately; when another waits, it follows that one)
+    tell: (cv, key, d) => { if (!story || !cv.player || !storiesOn) return; const S0 = cv.story; if (S0 && S0.s && S0.s[key] !== undefined && year - S0.s[key] < 3 * RULE.PACE[cv.era]) return; if (S0 && S0.q) story.view(cv.id);
+      const why = story.tell(cv, key, d); if (why === 'Another story waits' && cv.story && !cv.story.f.some((f) => f[0] === key)) cv.story.f.push([key, year + 1, d]); } });      // (a royal marriage weds two of the houses' people: dynasty.js; what the world learns of the player: learn.js)
   // what the world learns of the player (learn.js): from diplomacy's own reckonings
-  learn = window.LEARN ? LEARN.create({ MAXC, civs, year: () => year, player: () => playerCiv(), ratio: (a, b) => diplo.ratio(a, b), bound: (a, b) => diplo.bound(a, b), claimed: (a, b) => diplo.holds(a, b.id) > year,
+  learn = LEARN ? LEARN.create({ MAXC, civs, year: () => year, player: () => playerCiv(), ratio: (a, b) => diplo.ratio(a, b), bound: (a, b) => diplo.bound(a, b), claimed: (a, b) => diplo.holds(a, b.id) > year,
     wronged: (a, b) => diplo.memOf(a, b.id), touches: (a, b) => diplo.touches(a, b.id), faith: (cv) => (faith ? faith.faithOf(cv) : cv.religion || 0), folk: (cv) => (people && people.ruling[cv.id]) || 0,
     covets: (a, b) => !!covetOf(a, b), busy: (b, a) => { for (const k in b.wars) if (+k !== a.id) return true; return false; }, eligible: (a, b) => !diplo.cannotFight(a, b), reach: (cv) => diplo.reach(cv.id),
     nb: (cv) => nearNb[cv.id] || lastNb[cv.id] || [], atWar: (a, bid) => a.wars[bid] !== undefined, sworn: (a, b) => diplo.anyPact(a, b.id) || diplo.D(a).lord === b.id || diplo.D(b).lord === a.id,

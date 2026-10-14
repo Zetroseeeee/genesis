@@ -437,6 +437,18 @@
       { t: () => 'Keep them waiting a month', hint: () => 'Let them know who they are dealing with.', fx: (x, d) => ({ auth: 4, op: [[d.o, -8]] }), log: () => '' },
     ], lapse: 1 });
 
+  // a league against the player: two courts that dread him as they would dread nobody else have sworn to defend one another (diplo.js,
+  // from what they have learned of him: learn.js); told when it is sworn, no oftener than once in three turns
+  S({ k: 'league', art: 'st_envoys', who: 'player', w: () => 0, follow: true,
+    make: (x, d) => (d && x.civ(d.a) && x.civ(d.b) ? { a: d.a, b: d.b } : null), still: (x, d) => !!x.civ(d.a) && !!x.civ(d.b),
+    title: () => 'A league against you',
+    text: (x, d) => `Your envoys bring word that ${x.name(x.civ(d.a))} and ${x.name(x.civ(d.b))} have sworn to defend one another, and that it is you they fear. In their halls your wars are spoken of as a flood that stops at no border.`,
+    opts: [
+      { t: () => 'Send gifts and fair words to both courts', hint: () => 'Show them you mean them no harm.', fx: (x, d) => ({ coin: -0.6, op: [[d.a, 14], [d.b, 14]] }), log: (x, d) => `Gifts and fair words go out from ${x.cap} to ${x.name(x.civ(d.a))} and ${x.name(x.civ(d.b))}` },
+      { t: () => 'Let them league: man the borders', hint: () => 'The soldiers are pleased; the merchants pay for it.', fx: (x) => ({ est: { soldiers: 0.05, merchants: -0.03 }, mod: { k: 'borders', str: 0.05, inc: -0.02, y: 2 * x.turn } }), log: (x) => `The borders of ${x.realm} are manned against the league` },
+      { t: () => 'Laugh at them before your court', hint: () => 'Your court is proud of you, and the league the prouder.', fx: (x, d) => ({ auth: 6, op: [[d.a, -8], [d.b, -8]] }), log: () => '' },
+    ], lapse: 1 });
+
   S({ k: 'plot', art: 'st_plot', w: (x) => (x.era >= 1 && x.rp && (x.cv.stability < 0.5 || x.trait() === 'tyrant' || x.regent()) ? 0.6 : 0),
     make: (x, d) => { const by = d && d.by && x.living(d.by) ? x.P(d.by) : null; const h = x.heir(); return { a: x.freshName(), b: x.freshName(), who: by ? by.n : h ? styled(x, h) : 'a cousin of the house', r: x.rp ? x.rp.id : 0 }; },
     still: (x, d) => !!x.rp && x.rp.id === d.r,

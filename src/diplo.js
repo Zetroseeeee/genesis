@@ -521,7 +521,7 @@ window.DIPLO = (function () {
       if (pl && pl !== a && !host.atWar(a, pl.id) && host.knows(c, PACT.defence.need) && host.rnd() < 0.5) { const f = L.fear(a);
         if (f && f[0] > 0.12 && (f[0] > 1.5 * f[1] || f[0] > 0.25)) { const R = reach(c);
           for (const [b] of L.fearful(0.1)) { if (b === a || b.player || lordOf(b) || bound(a, b) || host.atWar(a, b.id) || R.indexOf(b.id) < 0 || !ok(b, 'defence')) continue;
-            if (go(b, 'defence')) { host.event(pl, `Fearing ${nameOf(pl)}, ${nameOf(a)} and ${nameOf(b)} swear to defend one another`, false, a); return; } break; } } }
+            if (go(b, 'defence')) { host.event(pl, `Fearing ${nameOf(pl)}, ${nameOf(a)} and ${nameOf(b)} swear to defend one another`, false, a); if (host.tell) host.tell(pl, 'league', { a: a.id, b: b.id }); return; } break; } } }
       for (const bid of order) {
         const b = civs[bid]; if (!b || host.atWar(a, bid)) continue; const o = opinion(a, b), near = nb.indexOf(bid) >= 0, r = ratio(a, b);
         if (D(b).lord === c) {      // its own vassal: in time, and where there is goodwill, joined to the crown

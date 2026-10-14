@@ -990,6 +990,33 @@ server.listen(0, async () => {
     r = await ev(() => [...document.querySelectorAll('#log .fe')].map((e) => e.textContent).join(' | ')); check(/caught in/.test(r), 'the chronicle keeps it, under Intrigue: ' + r.slice(0, 120));
     await ev(() => { document.querySelector('#logfilters [data-f="all"]').click(); document.getElementById('chron').close(); __T.quiet(); });
   });
+  await scenario('the world learns your ways: a war begun is watched; the courts reckon each turn; Your name tells what they learned, who fears you, the leagues; a realm\'s page says what it learned; a story marks the choice your court expects', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    // a weak neighbour set down beside the player's land (this scenario can run by itself), and a war on it begun and ended
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), W = S.W, L = S.learn; if (!L) return { none: true }; const mine = (i) => S.owner[i] === c.id; let t = null;
+      for (const i of S.LI) { if (t) break; const o = S.owner[i]; if (!S.land[i] || (S.flags[i] & 8) || S.fert[i] <= 0.05 || ![i - 1, i + 1, i - W, i + W].some(mine)) continue; if (o >= 0 && (o === c.id || S.civs[o].capital === i)) continue; S.owner[i] = -1; t = S.spawnTribe(i, {}); if (!t) S.owner[i] = o; }
+      if (!t) return { made: false }; t.tech = c.tech; t.era = c.era; t.aggression = 0; t.dip.think = 1e12; for (const k of Object.keys(c.wars)) { const e = S.civs[+k]; if (e) S.diplo.conclude(c, e, 'white'); }
+      S.recount(); S.touchAll(); __G.run(1); const T0 = L.st.T; const why = S.diplo.declare(c, t); const watched = L.st.cand.some((e) => e.b === t.id && e.y === 1); S.diplo.conclude(c, t, 'white');
+      window.__prey = t.id; L.st.next = -1e12; __G.run(1); return { made: true, why, watched, T: L.st.T - T0, n: L.st.n, prey: L.st.prey[t.id] }; });
+    check(!r.none && r.made && !r.why && r.watched && r.T >= 1 && r.n >= 1 && r.prey >= 1, `a war he begins is watched, and the courts reckon again (${JSON.stringify(r)})`);
+    // the world's picture: as if it had seen him fall on the weak again and again
+    await ev(() => { const L = __G.sim.learn, FK = LEARN.FK; L.st.w[FK.weak] = 4; L.st.w[FK.again] = 3; L.st.w[FK.bias] = -2.2; for (let k = 0; k < L.st.heard.length; k++) if (__G.sim.civs[k]) L.st.heard[k] = 230; L.oath(1); L.called(false, 1); });
+    await ev(() => ENVOYS.open('name')); await frames(2);
+    r = await ev(() => { const el = document.getElementById('dp-name'); return { tab: (document.querySelector('#dp-tabs button.on') || {}).textContent, text: el.textContent, stats: el.querySelectorAll('.dp-stat').length, lines: el.querySelectorAll('.dp-line').length }; });
+    check(r.tab === 'Your name' && /Your appetite/.test(r.text) && /What they have learned of your wars/.test(r.text) && /times as likely/.test(r.text) && /Your oaths/.test(r.text) && /Who fears you most/.test(r.text) && /Leagues against you/.test(r.text) && /What your court has learned of you/.test(r.text) && r.stats >= 3,
+      `Your name: what they learned of your wars, your oaths, who fears you, the leagues, your court (${r.stats} panels, ${r.lines} lines)`);
+    await ev(() => ENVOYS.open('realms', window.__prey)); await frames(2);
+    r = await ev(() => { const el = document.getElementById('dp-info'); const t = el.textContent; return { learned: /What they have learned of you/.test(t), fear: /They reckon you fall on them within a turn/.test(t), word: /holds to its end/.test(t), why: [...el.querySelectorAll('.gv-why span')].map((x) => x.textContent).join(' | ') }; });
+    check(r.learned && r.fear && r.word && /fear you will fall on them/.test(r.why), `a realm's page: what that court has learned, and its dread among its reasons (${r.why.slice(0, 140)})`);
+    await ev(() => ENVOYS.close());
+    // a story: once his court has seen him choose, it marks the choice it expects of him
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), H = S.learn.st.habit; S.setStories(true); if (c.story) { c.story.q = null; c.story.s = {}; } H.n = 8; H.th[LEARN.HAB.findIndex((f) => f[0] === 'stab')] += 5;
+      let why = 'none'; for (const k of ['omen', 'festival', 'petition', 'bandits', 'monument', 'fair', 'raid']) { why = S.storyTell(k); if (!why) break; } const v = S.storyView(); return { why, wont: v && v.wont ? v.wont.i : -1, k: v ? v.k : '' }; });
+    if (!r.why) { await ev(() => TALES.open()); await frames(2); }
+    const tag = await ev(() => { const b = document.querySelector('#tl-choices .tl-wont'); return b ? { text: b.textContent, i: +b.closest('.tl-choice').dataset.tl } : null; });
+    check(!r.why && r.wont >= 0 && !!tag && tag.text === 'As you are wont' && tag.i === r.wont, `the story's page marks the choice his court expects (${r.k}: ${JSON.stringify(tag)})`);
+    await ev(() => { if (TALES.isOpen()) TALES.close(); const c = __G.sim.playerCiv(); if (c.story) c.story.q = null; __T.quiet(); });
+  });
   await scenario('pestilence: an outbreak reaches the realm and the court is asked; the tracker opens the lens of sickness, its key shuts and opens the realm; the realm\'s panel names it', async (check) => {
     await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
     // smallpox begun in the player's capital, with stories on (this scenario can run by itself)
