@@ -262,7 +262,7 @@
   // how far out n plots reach (true metres), without making the plan (measured on plans of every kind: tools/towns/census.js)
   function approxR(morph, opt, n) {
     if (n <= 0) return 30;
-    if (morph === 'organic') return 14.5 * Math.sqrt(n * (opt.front[0] + opt.front[1]) / 17) + 12;
+    if (morph === 'organic') return 4.52 * Math.pow(n * (opt.front[0] + opt.front[1]) / 17, 0.645) + 41.4;      // (fitted to where the first n plots of organic plans reach: the old town packed, the outskirts looser - faster than the root of n)
     if (morph === 'grid') return 12.4 * Math.sqrt(n * (opt.front[0] + opt.front[1]) / 17 * (opt.block || 90) / 100) + 22;
     if (morph === 'medina') return 0.62 * opt.cell * Math.sqrt(n) + 12;
     if (morph === 'compound') return 0.29 * opt.spacing * Math.sqrt(n) + 6;
@@ -508,7 +508,7 @@
         let prog = 1;
         if (growing && p >= nPrev) { const t0 = hash(i, 7050 + p) * T * 0.7; prog = clamp((age - t0) / (T * 0.45), 0, 1); if (prog <= 0) continue; }
         const r1 = hash(i, 7100 + p), r2 = hash(i, 7150 + p), r3 = hash(i, 7250 + p);
-        const ctx0 = town && pl.rank === 3 ? 'rich' : town && (pl.rank <= 1 && dC < Rplan * 0.55 || morph === 'medina' && dC < Rplan * 0.85 || morph === 'grid' && dC < Rplan * 0.7) ? 'urban' : 'rural';
+        const ctx0 = town && pl.rank === 3 ? 'rich' : town && (pl.rank <= 1 && dC < Rplan * 0.55 || pl.rank === 2 && dC < Rplan * 0.35 || morph === 'medina' && dC < Rplan * 0.85 || morph === 'grid' && dC < Rplan * 0.7) ? 'urban' : 'rural';      // (the alleys of an old town are built up too)
         const ctx = ctx0 === 'urban' && lvl >= 3 && pl.rank === 0 && dC < Rplan * 0.35 && r3 < 0.25 ? 'rich' : ctx0;
         let it = null, hx = 0, hw = 0, hd = 0, setback = 0;      // (the house's place on its plot: across, wide, deep, back from the street)
         if (quake >= 0 && hash(i, 7300 + p) < 0.35 * (1 - quake / 3)) {      // (fallen in the earthquake)
@@ -615,14 +615,19 @@
               }
               if (!g && !attached) { let bw = 1e9; for (const gq of types) { const Fq = window.VERN.foot(gq); const fw = Fq.x1 - Fq.x0; if (fw < bw) { bw = fw; g = gq; F = Fq; } }
                 const fd = F.z1 - F.z0; sc = Math.min(1, wMax / bw, (room - 0.3) / fd); sb = Math.min(sb, 0.3); if (sc < 0.55) g = null; }
+              // (a row's house on a shallow plot: the shallowest of the row's types, its depth taken in to the plot - the backs of an old
+              // town's houses meet across its blocks, and a plot of them was a gap in the row)
+              let sz = 1;
+              if (!g && attached) { let bd = 1e9; for (const gq of types) { if (!rowOK(gq)) continue; const Fq = window.VERN.foot(gq); const fd = Fq.z1 - Fq.z0; if (fd < bd) { bd = fd; g = gq; F = Fq; } }
+                if (g) { sx = clamp(fS / g.w, 0.72, 1.38); sc = 1; sb = Math.min(sb, 0.3); sz = Math.min(1, (room - sb) / bd); if (sz < 0.6) g = null; } }
               if (!g) continue;      // (nothing of the place's would stand on so mean a plot: it stays a yard)
-              const fw = (F.x1 - F.x0) * sc * sx, fd = (F.z1 - F.z0) * sc;
+              const fw = (F.x1 - F.x0) * sc * sx, fd = (F.z1 - F.z0) * sc * sz;
               const along = (j + 0.5) * fS - F0 * 0.5 + (attached ? 0 : (r2 - 0.5) * Math.max(0, wMax - fw) * 0.8); const D0 = sb + fd * 0.5;
               const cols = window.VERN.colours(g, (Math.imul(i, 7919) + Math.imul(p, 104729) + j * 7) >>> 0);
               it = push('vh', ax + nxx * D0 + xd * along, az + nzz * D0 + zd * along, fw, window.VERN.heightOf(g) * sc, fd, yaw, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0), 0, prog);
-              it.g = g; it.sc = sc; if (sx !== 1) it.sx = sx; it.pal = cols; it.pk = m > 1 ? p + j / 16 : p; it.era = eE; it.u = 1;
+              it.g = g; it.sc = sc; if (sx !== 1) it.sx = sx; if (sz !== 1) it.sz = sz; it.pal = cols; it.pk = m > 1 ? p + j / 16 : p; it.era = eE; it.u = 1;
               // (the type's own middle is not its footprint's: where its origin lies from the footprint's middle, in its own frame)
-              it.ofx = -(F.x0 + F.x1) * 0.5 * sc * sx; it.ofz = -(F.z0 + F.z1) * 0.5 * sc;
+              it.ofx = -(F.x0 + F.x1) * 0.5 * sc * sx; it.ofz = -(F.z0 + F.z1) * 0.5 * sc * sz;
               if (!placed) { hx = along; hw = fw; hd = fd; setback = sb; } else { hw = Math.abs(along - hx) + fw; hx = (hx + along) * 0.5; hd = Math.max(hd, fd); }
               placed++; if (placed > 1) nHouses++;
             }
@@ -678,7 +683,7 @@
         // where a town's plot runs deep, a building at its back across the yard: a workshop, a back house, a store (the burgage
         // plot's rear, the second court of a house in China); else a shed or a byre
         let backB = false;
-        if (!rural && eR >= 4 && eR <= 8 && room > 10 && it && it.g && ye(31) < 0.75) {
+        if (!rural && eR >= 4 && eR <= 8 && room > 6.5 && it && it.g && ye(31) < (dC < Rplan * 0.4 ? 0.92 : 0.75)) {      // (in the old town nearly every plot has one: its blocks are built up through)
           const tl = typesOf(it.g.style, 'rural', nT, it.g.eg); const g2 = tl[Math.floor(ye(32) * tl.length) % tl.length]; const F2 = window.VERN.foot(g2); const fw2 = F2.x1 - F2.x0, fd2 = F2.z1 - F2.z0;
           const s2 = Math.min(1, (pl.f - 1.2) / fw2, (room - 3) / fd2);
           if (s2 >= 0.6) { const D = back1 - fd2 * s2 * 0.5 - 0.4, al = (ye(33) - 0.5) * Math.max(0, pl.f - fw2 * s2 - 1) * 0.8; const [bx, bz] = at(al, D); const yb = pl.yaw + Math.PI;

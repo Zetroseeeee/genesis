@@ -495,6 +495,8 @@ tw_novgorod_c | tools/scenes/town.js | {lon:31.27,lat:58.52,tech:0.5,pop:6,walls
 tw_novgorod_low| tools/scenes/town.js | {lon:31.27,lat:58.52,tech:0.5,pop:6,walls:1,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
 tw_rome_c     | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0.62,pop:14,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
 tw_rome_low   | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0.62,pop:14,walls:1,special:12,alt:260,tilt:1.32,out:0.5,turn:0.4} |  | 36
+tw_rome_top   | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0.62,pop:14,walls:1,special:12} | setTimeout(() => __sceneLook('town', 1.25, 0.05, 0.3), 7000); | 36
+tw_cots_top   | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0.5,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 1.25, 0.05, 0.3), 7000); | 36
 cost_vh       | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0.52,pop:14,walls:1,special:12} | setTimeout(() => { __sceneLook('town', 0.6, 1.05, 0.3); __T.costs(); }, 9000); | 64
 tw_jericho    | tools/scenes/town.js | {lon:35.44,lat:31.87,tech:0.03,pop:0.5,walls:0,special:0} | setTimeout(() => __sceneLook('town', 1.0, 1.05, 0.3), 7000); | 36
 tw_camp_a     | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0,pop:0.3,walls:0,special:0,camp:1,grow:false,settled:false} | setTimeout(() => __sceneLook('town', 1.6, 1.05, 0.3), 2500); | 16

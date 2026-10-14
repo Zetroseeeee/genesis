@@ -461,6 +461,17 @@ Conventions that matter:
   town of lanes about it (the zone grid, of the place's own houses). In a page a plan is asked for and made a few milliseconds a
   frame (`world.updateBuildings` drives `PLOTS.pump`; `PLOTS.version` makes the towns and the decal be drawn again); the tools
   and tests make it at once (`TOWN.budget.on = false`). `node tools/towns/plan.js` draws plans from above.
+  *The old town* (organic plans; since 0.60): about the square the lanes lie closer (`SPC`: three fifths of a ring apart for the
+  first three, a ring from the sixth out; `rAt(j)` where the j-th lies), their plots meet back to back (`dIn`, `dOut`: half the
+  block each way), and out to the fourth ring a plot runs back as far as there is ground behind it (the pass after the lanes,
+  in the order the plots are taken, only those the plan keeps: a larger plan gives them the very same depths). A ring is never
+  broken in the old town, nor twice running between the same two roads (`broke`: the dice of neighbouring rings are not free of
+  one another, and a quarter of Florence's middle was bare). There the alleys are built up as the streets are (`ctx`), nearly
+  every plot has its back house, and a row's house on a shallow plot is the shallowest of the row's types taken in to fit (`sz`)
+  rather than a gap in the row. Laid out so, the buildings cover a third of an old town's middle and more (a quarter before;
+  the medina's half to four fifths: `node tools/towns/plan.js` prints it, `covered` in the middle, about it and at the edge). `approxR` for organic plans is fitted to where
+  their first n plots reach (`4.52 x^1.29 + 41`, x the root of n times the frontage over 17): denser in the middle, looser out,
+  a town grows faster than the root of its households.
 - **Houses of the place's own** (`vern.js`, `houses.js`; since 0.57). From the Middle Ages (a plot's own era 4) a house is a type
   of its place and age: the building region (`VERN.regionOf`), its timeline of styles (`T`: a style gives way to the next some
   share into an age), the style's ranges drawn into ten to twenty-four types for a town (more in a city), the place's snow,

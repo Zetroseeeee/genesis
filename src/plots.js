@@ -181,33 +181,56 @@
       // further rings broken here and there; and short lanes out from each ring to the next
       // (every ring that could come in among the plots a smaller plan keeps is laid out in every plan: they wander by a fifth; and
       // a lane round the middle half a ring out, the back lane of the houses about the square)
-      const ring = 58 + rnd(5) * 26; const nR = Math.ceil((R * 1.35 + 100) / ring);      // (two plots deep between one lane and the next: a town is built up, not gardens with houses about them)
+      // (two plots deep between one lane and the next: a town is built up, not gardens with houses about them. About its middle, its
+      // old town, the lanes lie closer still - three fifths of a ring for the first three, a ring from the sixth out - and their plots
+      // meet back to back: the blocks of an old town are built up through, and its gardens are further out. SPC: how far the m-th
+      // ring lies beyond the one before it, in rings; rAt(j): how far the j-th lies from the square's edge)
+      const ring = 58 + rnd(5) * 26; const SPC = (m) => 0.6 + 0.4 * clamp((m - 3) / 3, 0, 1);
+      const rAt = (j) => { const J = Math.floor(j); let g = 0; for (let m = 1; m <= J; m++) g += SPC(m); return g + (j - J) * SPC(J + 1); };
+      let nR = 0; while (rAt(nR) * ring < R * 1.35 + 100) nR++;
+      // (the depth a ring's plots may have on either side: half the block between it and the ring beyond, a lane's width apart)
+      const dIn = (j) => clamp(((rAt(j) - rAt(Math.max(0, j - 1))) * ring - 7) / 2, 12, 26), dOut = (j) => clamp(((rAt(j + 1) - rAt(j)) * ring - 7) / 2, 12, 26);
       const order = angs.map((a, k) => [((a % TAU) + TAU) % TAU, k]).sort((p, q) => p[0] - q[0]);
       const rings = [];
+      // (a ring is broken here and there between two roads, a garden, an orchard, a convent's ground: never in the old town, and never
+      // two running between the same two roads - the dice of neighbouring rings are not free of one another, and a town had a
+      // quarter of its middle bare)
+      const broke = new Uint8Array(order.length);
       for (let jj = 0; jj <= nR; jj++) for (let q = 0; q < order.length; q++) {
         if (q === 0 && over()) yield;
         const j = jj || 0.5, jk = jj || 99;
         const a0 = order[q][0], a1 = order[(q + 1) % order.length][0] + (q + 1 === order.length ? TAU : 0); if (a1 - a0 < 0.25) continue;
-        if ((j >= 2 || !jj) && h(i, 82000 + jk * 17 + q) < (jj ? 0.18 : 0.3)) continue;
-        const r0 = (Math.max(sqW, sqD) * 0.5 + j * ring) * (1 + (h(i, 83000 + jk * 17 + q) - 0.5) * 0.24); const ph = h(i, 84000 + jk * 17 + q) * TAU;
+        if (!jj) { if (h(i, 82000 + jk * 17 + q) < 0.3) continue; }
+        else { const b = jj >= 5 && !broke[q] && h(i, 82000 + jk * 17 + q) < 0.18; broke[q] = b ? 1 : 0; if (b) continue; }
+        const r0 = (Math.max(sqW, sqD) * 0.5 + rAt(j) * ring) * (1 + (h(i, 83000 + jk * 17 + q) - 0.5) * 0.24); const ph = h(i, 84000 + jk * 17 + q) * TAU;
         if (r0 * 0.88 > farSt) continue;      // (it wanders by a ninth at most: wholly beyond)
         const pts = []; const n = Math.max(4, Math.ceil((a1 - a0) * r0 / 14));
         for (let k = 0; k <= n; k++) { const a = a0 + (a1 - a0) * k / n; const rr = r0 * (1 + 0.07 * Math.sin(a * 3 + ph) + 0.04 * Math.sin(a * 7 + ph * 2)); pts.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
-        const s = addStreet(pts, !jj ? 2.4 : j <= 2 ? 3 : 2.6, 1); s.j = jk; s.r = r0; rings.push(s);
+        const s = addStreet(pts, !jj ? 2.4 : j <= 2 ? 3 : 2.6, 1); s.j = jk; s.r = r0; s.dIn = dIn(j); s.dOut = dOut(j); s.span = (rAt(j + (jj ? 1 : 0.5)) - rAt(j)) * ring; rings.push(s);
       }
       const lanes = [];
       if (over()) yield;
-      for (const rg of rings) { const n = rg.pts.length; const step = Math.max(3, Math.round((45 + h(i, 85000 + rg.j) * 45) / 14));
+      for (const rg of rings) { const n = rg.pts.length; const step = Math.max(3, Math.round((45 + h(i, 85000 + rg.j) * 45) * rg.span / ring / 14));      // (closer where the rings are)
         for (let k = step; k < n - step / 2; k += step) { if (h(i, 86000 + rg.j * 211 + k) < 0.3) continue; const [x, z] = rg.pts[k]; const a = Math.atan2(z, x); const pts = []; let px = x, pz = z;
-          for (let s = 0; s < ring * 0.95; s += 12) { pts.push([px, pz]); const hd = a + 0.25 * Math.sin(s / 40 + k); px += Math.cos(hd) * 12; pz += Math.sin(hd) * 12; }
+          for (let s = 0; s < rg.span * 0.95; s += 12) { pts.push([px, pz]); const hd = a + 0.25 * Math.sin(s / 40 + k); px += Math.cos(hd) * 12; pz += Math.sin(hd) * 12; }
           if (beyond(pts, farSt2)) continue; const l = addStreet(pts, 2.2, 2); l.r = rg.r; lanes.push(l); } }
       // plots: round the square first, then the through road, the other roads, the rings, the lanes
       const sqPlots = (key0) => { const hw = sqW / 2, hd = sqD / 2; const sides = [[[-hw, hd], [hw, hd]], [[hw, -hd], [-hw, -hd]], [[-hw, -hd], [-hw, hd]], [[hw, hd], [hw, -hd]]];
         for (let q = 0; q < 4; q++) { const [a, b] = sides[q]; const pts = [[a[0] * ca - a[1] * sa, a[0] * sa + a[1] * ca], [b[0] * ca - b[1] * sa, b[0] * sa + b[1] * ca]]; along(pts, 2.1, 1, 3, key0, 0.2, (s, k) => frontage(0, 0, q * 50 + k), 22, 900 + q); } };
       sqPlots(0);
       for (const m of mains) for (const side of [1, -1]) { along(m.pts, m.hw, side, 0, 10 + m.k * 55, 1, (s, k) => frontage(s, 0, m.k * 10000 + side * 5000 + k), 30, 100 + m.k * 2 + (side > 0 ? 1 : 0), m.id); if (over()) yield; }
-      for (const rg of rings) for (const side of [1, -1]) { along(rg.pts, rg.hw, side, 1, rg.r + 35, 0.35, (s, k) => frontage(rg.r, 1, rg.j * 7000 + side * 3000 + k), 26, 300 + rg.j * 2 + (side > 0 ? 1 : 0), rg.id); if (over()) yield; }
+      for (const rg of rings) for (const side of [1, -1]) { along(rg.pts, rg.hw, side, 1, rg.r + 35, 0.35, (s, k) => frontage(rg.r, 1, rg.j * 7000 + side * 3000 + k), side > 0 ? rg.dIn : rg.dOut, 300 + rg.j * 2 + (side > 0 ? 1 : 0), rg.id); if (over()) yield; }      // (side 1 is inward: the rings run anticlockwise)
       for (const ln of lanes) for (const side of [1, -1]) { along(ln.pts, ln.hw, side, 2, ln.r + 60, 1, (s, k) => frontage(ln.r + s, 2, k + side * 900), 20, 600 + (side > 0 ? 1 : 0), ln.id); if (over()) yield; }
+      // In the old town (out to the fourth ring) a plot runs back as far as there is ground behind it, up to the plots of the next
+      // lane: its house's yard, its back house, its workshop (laid out, the plots of an old town's blocks left a third of it to
+      // nobody: rectangles along curving lanes, a ring's width apart). In the order the plots are taken, and only those the plan
+      // keeps: nothing laid out beyond `far` lies near them, so a larger plan gives them the very depths a smaller one did.
+      { const lim = Math.max(sqW, sqD) * 0.5 + rAt(4) * ring, ord = [];
+        for (let k = 0; k < plots.length; k++) { const p = plots[k]; if (p.key < keepR && p.rank <= 2 && p.x * p.x + p.z * p.z < lim * lim) ord.push(k); }
+        ord.sort((a, b) => plots[a].key - plots[b].key || a - b);
+        for (let q = 0; q < ord.length; q++) { if ((q & 255) === 255 && over()) yield; const p = plots[ord[q]]; let d = p.dep; const dMax = Math.min(40, p.dep + 18);
+          while (d + 2 <= dMax && !occ.rect(p.x + p.nx * (d + 1), p.z + p.nz * (d + 1), p.tx, p.tz, p.f / 2 - 0.25, 0.75, 0, 1)) d += 2;
+          if (d > p.dep) { occ.rect(p.x + p.nx * (p.dep + d) / 2, p.z + p.nz * (p.dep + d) / 2, p.tx, p.tz, p.f / 2, (d - p.dep) / 2, 1); p.dep = d; } } }
     } else if (morph === 'grid') {
       // blocks between straight streets on the town's axis; plots round each block's edges, the blocks nearest the square first
       const B = opt.block || 90, sw = opt.streetW || 9; const step = B + sw; const n = Math.ceil(R / step) + 1;
