@@ -254,35 +254,42 @@
           for (let s = 0; s <= len; s += 6) { ap.push([x, z]); hd += (h(i, 88900 + s0.id * 101 + q * 13 + s) - 0.5) * 0.9; x += Math.cos(hd) * 6; z += Math.sin(hd) * 6; }
           if (ap.length > 2 && Math.hypot(x, z) < R * 1.05 && !beyond(ap, farSt2)) addStreet(ap, 1.2, 2); }
         if (over()) yield; }
-      const C = opt.cell || 13, J = 0.32; const nC = Math.ceil(R / C) + 2;
-      const vB = (k) => k * C + (h(i, 89500 + k * 7) - 0.5) * J * C;      // the rows' edges
-      const uB = (k, j) => j * C + h(i, 89300 + k * 13) * C + (h(i, 89000 + j * 977 + k * 31) - 0.5) * J * C;      // the joints along row k
+      // (each quarter between two main streets its own lay of the houses, a few degrees turned from the next: where two quarters
+      // meet, at a street or not, the houses of one give way to the other's)
+      const C = opt.cell || 13, J = 0.32; const nC = Math.ceil(Math.min(R, far) / C) + 2;
+      const secA = []; for (let k = 0; k < nMain; k++) secA.push(((axis + k * TAU / nMain + (rnd(10 + k) - 0.5) * 0.7) % TAU + TAU) % TAU); secA.sort((a, b) => a - b);
+      const secOf = (x, z) => { const a = ((Math.atan2(z, x) % TAU) + TAU) % TAU; for (let q = secA.length - 1; q >= 0; q--) if (a >= secA[q]) return q; return secA.length - 1; };
       const cells = [];
-      for (let k = -nC; k < nC; k++) { if ((k & 15) === 0 && over()) yield; const v0 = vB(k), v1 = vB(k + 1);
-        for (let j = -nC - 1; j < nC; j++) {
-          // (two cells one house: a pair is j even and the next, so that whether they are one does not hang on where the rows begin)
-          const pair = (j & 1) === 0 && h(i, 91500 + j * 977 + k * 31) < 0.13; if ((j & 1) === 1 && h(i, 91500 + (j - 1) * 977 + k * 31) < 0.13) continue;
-          const u0 = uB(k, j), u1 = uB(k, j + (pair ? 2 : 1)); const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2; const d = Math.hypot(uc, vc); if (d > R || d > far) continue;
-          cells.push([d + h(i, 90000 + j * 977 + k * 31) * 22, u0, u1, v0, v1, j, k]); } }
-      cells.sort((a, b) => a[0] - b[0]); let nc = 0;
-      for (const [d, u0, u1, v0, v1, j, k] of cells) {
+      for (let sct = 0; sct < nMain; sct++) {
+        const rot = axis + (h(i, 89900 + sct) - 0.5) * 0.5, cr = Math.cos(rot), sr = Math.sin(rot); const hk = sct * 7919;
+        const vB = (k) => k * C + (h(i, 89500 + k * 7 + hk) - 0.5) * J * C;      // the rows' edges
+        const uB = (k, j) => j * C + h(i, 89300 + k * 13 + hk) * C + (h(i, 89000 + j * 977 + k * 31 + hk) - 0.5) * J * C;      // the joints along row k
+        for (let k = -nC; k < nC; k++) { if ((k & 15) === 0 && over()) yield; const v0 = vB(k), v1 = vB(k + 1);
+          for (let j = -nC - 1; j < nC; j++) {
+            // (two cells one house: a pair is j even and the next, so that whether they are one does not hang on where the rows begin)
+            const pair = (j & 1) === 0 && h(i, 91500 + j * 977 + k * 31 + hk) < 0.13; if ((j & 1) === 1 && h(i, 91500 + (j - 1) * 977 + k * 31 + hk) < 0.13) continue;
+            const u0 = uB(k, j), u1 = uB(k, j + (pair ? 2 : 1)); const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2; const d = Math.hypot(uc, vc); if (d > R || d > far) continue;
+            if (nMain > 1 && secOf(uc * cr - vc * sr, uc * sr + vc * cr) !== sct) continue;      // (the quarter's own)
+            cells.push([d + h(i, 90000 + j * 977 + k * 31 + hk) * 22, u0, u1, v0, v1, j, k + hk * 3, cr, sr, rot]); } } }
+      cells.sort((a, b) => a[0] - b[0] || a[6] - b[6] || a[5] - b[5]); let nc = 0;
+      for (const [d, u0, u1, v0, v1, j, k, cr, sr, rot] of cells) {
         if ((++nc & 63) === 0 && over()) yield;
         if (h(i, 91000 + j * 977 + k * 31) < 0.05) continue;      // a little square, a garden, a well
-        // the ground the streets leave it: the whole cell, else the part of it away from the street (the half, or a third)
+        // the ground the streets and the houses before it leave it: the whole cell, else the part of it away from what is there
         let a0 = u0, a1 = u1, b0 = v0, b1 = v1, ok = false;
-        const fits = (p0, p1, q0, q1) => { const uc = (p0 + p1) / 2, vc = (q0 + q1) / 2; return p1 - p0 > 5 && q1 - q0 > 5 && !occ.rect(uc * ca - vc * sa, uc * sa + vc * ca, ca, sa, (p1 - p0) / 2 - 0.15, (q1 - q0) / 2 - 0.15, 0, 2); };
+        const fits = (p0, p1, q0, q1) => { const uc = (p0 + p1) / 2, vc = (q0 + q1) / 2; return p1 - p0 > 5 && q1 - q0 > 5 && !occ.rect(uc * cr - vc * sr, uc * sr + vc * cr, cr, sr, (p1 - p0) / 2 - 0.15, (q1 - q0) / 2 - 0.15, 0, 1); };
         if (fits(a0, a1, b0, b1)) ok = true;
         else { const r0 = Math.floor(h(i, 92000 + j * 977 + k * 31) * 4);
           for (const cut of [0.45, 0.65]) { for (let q = 0; q < 4 && !ok; q++) { const s = (r0 + q) & 3; const du = (u1 - u0) * cut, dv = (v1 - v0) * cut;
             const c = s === 0 ? [u0 + du, u1, v0, v1] : s === 1 ? [u0, u1 - du, v0, v1] : s === 2 ? [u0, u1, v0 + dv, v1] : [u0, u1, v0, v1 - dv];
             if (fits(c[0], c[1], c[2], c[3])) { [a0, a1, b0, b1] = c; ok = true; } } if (ok) break; } }
         if (!ok) continue;
-        const uc = (a0 + a1) / 2, vc = (b0 + b1) / 2; const x = uc * ca - vc * sa, z = uc * sa + vc * ca; const hu = (a1 - a0) / 2, hv = (b1 - b0) / 2;
-        occ.rect(x, z, ca, sa, hu, hv, 1);
+        const uc = (a0 + a1) / 2, vc = (b0 + b1) / 2; const x = uc * cr - vc * sr, z = uc * sr + vc * cr; const hu = (a1 - a0) / 2, hv = (b1 - b0) / 2;
+        occ.rect(x, z, cr, sr, hu, hv, 1);
         // its door on the side a street or an alley runs by (the nearest such); else on whichever side its dice say
         let best = Math.floor(h(i, 92500 + j * 977 + k * 31) * 4), bd = 1e9;
-        for (let q = 0; q < 4; q++) { const a = axis + q * Math.PI / 2; const half = q & 1 ? hv : hu; for (const reach of [1.8, 4.5]) { const kk = occ.idx(x + Math.cos(a) * (half + reach), z + Math.sin(a) * (half + reach)); if (kk >= 0 && occ.a[kk] === 2 && reach < bd) { bd = reach; best = q; } } }
-        const fa = axis + best * Math.PI / 2; const nx = -Math.cos(fa), nz = -Math.sin(fa);      // n: from the front into the house
+        for (let q = 0; q < 4; q++) { const a = rot + q * Math.PI / 2; const half = q & 1 ? hv : hu; for (const reach of [1.8, 4.5]) { const kk = occ.idx(x + Math.cos(a) * (half + reach), z + Math.sin(a) * (half + reach)); if (kk >= 0 && occ.a[kk] === 2 && reach < bd) { bd = reach; best = q; } } }
+        const fa = rot + best * Math.PI / 2; const nx = -Math.cos(fa), nz = -Math.sin(fa);      // n: from the front into the house
         const dep = best & 1 ? hv * 2 : hu * 2, f = best & 1 ? hu * 2 : hv * 2;
         plots.push({ x: x - nx * dep / 2, z: z - nz * dep / 2, yaw: fa + Math.PI / 2, f, dep, key: d, rank: d < 120 ? 1 : 2, tx: -nz, tz: nx, nx, nz, cell: 1, open: bd < 1e9 ? 1 : 0 });
       }

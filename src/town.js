@@ -270,6 +270,7 @@
   // what a town is now: its place, its record, its kind, its plan's options, how far into its age its people are, how many
   // households, whether it is a city of the machine age (its old town on the plan, the rest by zone), how far out it reaches
   const SPRAWL = { cluster: 900, compound: 4000 };
+  const TOL_ROW = [[0.86, 1.16], [0.72, 1.38]], TOL_APART = [[0.8, 1]];      // (how far a house of a row may be stretched to its share: first a little, then more)
   const tpCache = new Map();
   function townPlan(sim, i, c) {
     const people = peopleOf(sim, i); const rec = sim.townRec ? sim.townRec(i) : null; const cul = civCulture(sim, c); const P = progressOf(c);
@@ -493,7 +494,7 @@
       const bnd = boundOf(st, era); const cold = st.snow > 0.3, dryL = st.dry > 0.5;
       const compDone = new Set();
       for (let p = 0; p < nPlots; p++) {
-        const pl = Pp.plots[p];
+        const pl = Pp.plots[p]; let pq = 0;      // (pq: the yard's things one after another, each its own key)
         const dm = Math.min(pl.dep, 14) * 0.5; const cx = pl.x + pl.nx * dm, cz = pl.z + pl.nz * dm; const dC = Math.hypot(cx, cz);
         // the ground a quarter, the great building, a wall or a city's towers have taken
         if (lmPlot && Math.hypot(cx - lmPlot.x, cz - lmPlot.z) < lmPlot.r + Math.max(pl.f, dm) * 0.5 + 3) continue;
@@ -527,7 +528,7 @@
             const two = z[0] * 1.9 + 0.6 <= pl.f; const nA = two ? 2 : 1; const fS = pl.f / nA; hd = pl.dep - 0.3; setback = 0.15; hw = pl.f - 0.3; hx = 0;
             for (let j = 0; j < nA; j++) { const along = (j + 0.5) * fS - pl.f * 0.5; const D0 = setback + hd * 0.5;
               const q = push(e[0], pl.x + pl.nx * D0 + xd * along, pl.z + pl.nz * D0 + zd * along, fS - 0.3, heightOf(e[0], clamp(1 - dC / R, 0, 1)), hd, pl.yaw, colorOfP(pl2, 7400 + p * 3 + j), packStyle(e[2], e[3], cul, 0), 0, prog);
-              q.era = sE; q.pk = nA > 1 ? p + '.' + j : p; it = q; if (j) nHouses++; }
+              q.era = sE; q.pk = nA > 1 ? p + j / 16 : p; it = q; if (j) nHouses++; }
           } else {
             hw = Math.min(z[0], pl.f - 0.8); hd = Math.min(z[1], pl.dep - 1.5);
             setback = eE === 0 ? 2 + 6 * r2 : eE <= 2 ? 1 + 3 * r2 : morph === 'grid' || ctx !== 'rural' ? 0.3 : 1.5 + 2 * r2;
@@ -572,14 +573,14 @@
             hx = 0; hw = fw; hd = fd; setback = sb; placed = 1;
             // what the house leaves of its cell, walled in: a garden behind it, a strip beside it (a riad's, a court's)
             const back = D1 - sb - fd, side = F0 - fw; const wc = st.dry > 0.5 || bnd === 'mud' ? 0xb08a5c : 0xa49c90, wsty = packStyle(bnd === 'mud' || st.dry > 0.5 ? WALL.adobe : WALL.stone, ROOF.flat, cul, FLAG.thing);
-            const wall = (along, depth, w, yw) => { const q = push('yardwall', ax + nxx * depth + xd * along, az + nzz * depth + zd * along, w, 2.6, 0.45, yw, wc, wsty); q.u = 1; q.prop = 1; q.pk = 'm' + p + ':' + Math.round(along * 10) + ':' + Math.round(depth * 10); return q; };
+            const wall = (along, depth, w, yw) => { const q = push('yardwall', ax + nxx * depth + xd * along, az + nzz * depth + zd * along, w, 2.6, 0.45, yw, wc, wsty); q.u = 1; q.prop = 1; q.pk = 1e6 + p * 32 + (pq++ & 31); return q; };
             if (morph !== 'medina') { /* (a family's yard: its wall is the compound's, below) */ }
-            else if (back > 1.6) { wall(0, D1 - 0.25, F0 - 0.3, yaw); for (const sd of [-1, 1]) wall(sd * (F0 * 0.5 - 0.25), sb + fd + back * 0.5, back, yaw + Math.PI / 2); if (back > 3 && !dryL && hash(i, 7290 + p) < 0.6) { const q = push('garden', ax + nxx * (sb + fd + back * 0.5), az + nzz * (sb + fd + back * 0.5), F0 - 2, 0.3, back - 1.4, yaw, 0x5a6a3a, packStyle(WALL.adobe, ROOF.flat, cul, FLAG.garden | FLAG.thing)); q.u = 1; q.prop = 1; q.pk = 'm' + p + 'g'; } }
+            else if (back > 1.6) { wall(0, D1 - 0.25, F0 - 0.3, yaw); for (const sd of [-1, 1]) wall(sd * (F0 * 0.5 - 0.25), sb + fd + back * 0.5, back, yaw + Math.PI / 2); if (back > 3 && !dryL && hash(i, 7290 + p) < 0.6) { const q = push('garden', ax + nxx * (sb + fd + back * 0.5), az + nzz * (sb + fd + back * 0.5), F0 - 2, 0.3, back - 1.4, yaw, 0x5a6a3a, packStyle(WALL.adobe, ROOF.flat, cul, FLAG.garden | FLAG.thing)); q.u = 1; q.prop = 1; q.pk = 1e6 + p * 32 + (pq++ & 31); } }
             if (side > 1.6 && morph === 'medina') for (const sd of [-1, 1]) wall(sd * (F0 * 0.5 - 0.25), sb + fd * 0.5, fd, yaw + Math.PI / 2);
           } else {
             let m = 1;
             if (attached) { let sw = 0, nw = 0; for (const gq of types) if (rowOK(gq)) { sw += gq.w; nw++; } if (nw) m = clamp(Math.round(F0 / (sw / nw)), 1, 8); else attached = false; }
-            const fS = F0 / m;
+            const fS = F0 / m; const tls = ctx === 'rich' ? [types, typesOf(sk, 'urban', nT)] : [types];
             for (let j = 0; j < m; j++) {
               const rj = j ? hash(i, 7270 + p * 7 + j) : r3;
               let sb = attached ? 0 : ctx === 'urban' ? 0.8 + 2 * r2 : (st.fam === 'nam' || st.fam === 'amer') && eE >= 6 ? 5 + 5 * r2 : morph === 'medina' || morph === 'compound' || morph === 'cluster' ? 0.4 : 1.5 + 4 * r2;
@@ -587,8 +588,7 @@
               let g = null, sc = 1, sx = 1, F = null;
               // a row: the first type whose width is near its share (then any that will stretch to it); apart: the first that fits
               // its plot (then the smallest, made smaller), so that no plot is left empty for want of a house of its size
-              const tls = ctx === 'rich' ? [types, typesOf(sk, 'urban', nT)] : [types];
-              for (const tol of attached ? [[0.86, 1.16], [0.72, 1.38]] : [[0.8, 1]]) {
+              for (const tol of attached ? TOL_ROW : TOL_APART) {
                 for (const tl of tls) {
                   const nt = tl.length; const q0 = Math.floor(rj * nt);
                   for (let q = 0; q < nt && !g; q++) {
@@ -609,7 +609,7 @@
               const along = (j + 0.5) * fS - F0 * 0.5 + (attached ? 0 : (r2 - 0.5) * Math.max(0, wMax - fw) * 0.8); const D0 = sb + fd * 0.5;
               const cols = window.VERN.colours(g, (Math.imul(i, 7919) + Math.imul(p, 104729) + j * 7) >>> 0);
               it = push('vh', ax + nxx * D0 + xd * along, az + nzz * D0 + zd * along, fw, window.VERN.heightOf(g) * sc, fd, yaw, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0), 0, prog);
-              it.g = g; it.sc = sc; if (sx !== 1) it.sx = sx; it.pal = cols; it.pk = m > 1 ? p + '.' + j : p; it.era = eE; it.u = 1;
+              it.g = g; it.sc = sc; if (sx !== 1) it.sx = sx; it.pal = cols; it.pk = m > 1 ? p + j / 16 : p; it.era = eE; it.u = 1;
               // (the type's own middle is not its footprint's: where its origin lies from the footprint's middle, in its own frame)
               it.ofx = -(F.x0 + F.x1) * 0.5 * sc * sx; it.ofz = -(F.z0 + F.z1) * 0.5 * sc;
               if (!placed) { hx = along; hw = fw; hd = fd; setback = sb; } else { hw = Math.abs(along - hx) + fw; hx = (hx + along) * 0.5; hd = Math.max(hd, fd); }
@@ -624,7 +624,7 @@
         const ye = (k) => hash(i, 20000 + p * 17 + k);
         const xd = Math.cos(pl.yaw), zd = Math.sin(pl.yaw);
         const at = (along, depth) => [pl.x + pl.nx * depth + xd * along, pl.z + pl.nz * depth + zd * along];
-        const prop = (kind, along, depth, w, h, d, yaw, col, style) => { const [x, z] = at(along, depth); const q = push(kind, x, z, w, h, d, yaw, col, style); q.u = 1; q.prop = 1; q.pk = 'y' + p + kind; return q; };
+        const prop = (kind, along, depth, w, h, d, yaw, col, style) => { const [x, z] = at(along, depth); const q = push(kind, x, z, w, h, d, yaw, col, style); q.u = 1; q.prop = 1; q.pk = 1e6 + p * 32 + (pq++ & 31); return q; };
         const back0 = setback + hd + 0.8, back1 = pl.dep - 0.6, room = back1 - back0;      // the yard behind the house
         const sideL = hx - hw * 0.5 - 0.6, sideR = hx + hw * 0.5 + 0.6, edgeL = -pl.f * 0.5 + 0.4, edgeR = pl.f * 0.5 - 0.4;
         const rural = ctx === 'rural', eR = eE;
@@ -632,9 +632,9 @@
           // a family's yard: its fence of reeds or wall of mud all round, the granaries, the fire in the middle
           if (!compDone.has(pl.comp)) { compDone.add(pl.comp); const R0 = pl.cr + 4.5, ns = 12, mud = dryL || eR >= 6;
             for (let k = 0; k < ns; k++) { if (k === Math.floor(ye(1) * ns)) continue; const a0 = k / ns * Math.PI * 2, a1 = (k + 1) / ns * Math.PI * 2; const x0 = pl.cx + Math.cos(a0) * R0, z0 = pl.cz + Math.sin(a0) * R0, x1 = pl.cx + Math.cos(a1) * R0, z1 = pl.cz + Math.sin(a1) * R0;
-              const q = push(mud ? 'yardwall' : 'fence', (x0 + x1) / 2, (z0 + z1) / 2, Math.hypot(x1 - x0, z1 - z0) * 1.02, mud ? 1.6 : 1.8, mud ? 0.45 : 0.2, Math.atan2(z1 - z0, x1 - x0), mud ? 0xa8804e : 0xb39a62, packStyle(mud ? WALL.adobe : WALL.wood, ROOF.flat, cul, FLAG.thing)); q.u = 1; q.prop = 1; q.pk = 'c' + pl.comp + ':' + k; }
-            for (let k = 0; k < 2; k++) { const a = ye(2) * 6.28 + k * 0.9; const q = push('granary', pl.cx + Math.cos(a) * pl.cr * 0.35, pl.cz + Math.sin(a) * pl.cr * 0.35, 2.6, 3.2, 2.6, 0, 0xb08a5a, packStyle(WALL.adobe, ROOF.thatch, cul, 0)); q.u = 1; q.prop = 1; q.pk = 'c' + pl.comp + 'g' + k; }
-            if (eR <= 6) { const q = push('firepit', pl.cx, pl.cz, 1.6, 0.4, 1.6, 0, 0x6f6a62, packStyle(WALL.stone, ROOF.flat, cul, FLAG.thing)); q.u = 1; q.prop = 1; q.pk = 'c' + pl.comp + 'f'; } }
+              const q = push(mud ? 'yardwall' : 'fence', (x0 + x1) / 2, (z0 + z1) / 2, Math.hypot(x1 - x0, z1 - z0) * 1.02, mud ? 1.6 : 1.8, mud ? 0.45 : 0.2, Math.atan2(z1 - z0, x1 - x0), mud ? 0xa8804e : 0xb39a62, packStyle(mud ? WALL.adobe : WALL.wood, ROOF.flat, cul, FLAG.thing)); q.u = 1; q.prop = 1; q.pk = 2e6 + pl.comp * 16 + k; }
+            for (let k = 0; k < 2; k++) { const a = ye(2) * 6.28 + k * 0.9; const q = push('granary', pl.cx + Math.cos(a) * pl.cr * 0.35, pl.cz + Math.sin(a) * pl.cr * 0.35, 2.6, 3.2, 2.6, 0, 0xb08a5a, packStyle(WALL.adobe, ROOF.thatch, cul, 0)); q.u = 1; q.prop = 1; q.pk = 2e6 + pl.comp * 16 + 12 + k; }
+            if (eR <= 6) { const q = push('firepit', pl.cx, pl.cz, 1.6, 0.4, 1.6, 0, 0x6f6a62, packStyle(WALL.stone, ROOF.flat, cul, FLAG.thing)); q.u = 1; q.prop = 1; q.pk = 2e6 + pl.comp * 16 + 14; } }
           continue;
         }
         if (eR <= 1) {
@@ -865,7 +865,7 @@
     // --- market day: stalls on the square of a town that has a market (the square's own, before the market hall's quarter) ---
     if (fine && era >= 1 && era <= 6 && (lvl >= 2 || dist.market)) { const nS = Math.min(14, 3 + lvl * 3); const sc2 = packStyle(WALL.wood, ROOF.thatch, cul, 0);
       for (let k = 0; k < nS; k++) { const t = (k + 0.5) / nS; const ax2 = (t - 0.5) * square.w * 0.7, az2 = (hash(i, 8800 + k) - 0.5) * square.d * 0.55; if (Math.hypot(ax2, az2) < 6) continue;
-        const q = push('stall', ax2 * ca - az2 * sa, ax2 * sa + az2 * ca, 3.2, 2.8, 2.4, axis + (hash(i, 8820 + k) < 0.5 ? 0 : Math.PI), [0xc84a3a, 0xd9a94a, 0x5a8a5a, 0xe6dcc4, 0x4a6aa8][k % 5], sc2); q.u = 1; q.pk = 'st' + k; } }
+        const q = push('stall', ax2 * ca - az2 * sa, ax2 * sa + az2 * ca, 3.2, 2.8, 2.4, axis + (hash(i, 8820 + k) < 0.5 ? 0 : Math.PI), [0xc84a3a, 0xd9a94a, 0x5a8a5a, 0xe6dcc4, 0x4a6aa8][k % 5], sc2); q.u = 1; q.pk = 3e6 + k; } }
     // --- districts ---
     const quarter = (d, main, mainSize, mainCol, wm, rm) => {
       const yaw = d.a - Math.PI / 2;                    // the head of a quarter faces the middle of the town (a building's front is its local +z)
@@ -980,9 +980,9 @@
         // the yard: the house, its barn across the yard from the long side, a granary past one gable end, a mill on the far side
         const fy = rnd(980 + k) * 3, ux = Math.cos(fy), uz = Math.sin(fy);
         if (era >= 4 && fine) { const st = tp.st; const sk = window.VERN.styleAt(st, era, tp.P - era, window.VERN.CULFAM[cul], rnd(985 + k)); const ty = typesOf(sk, 'rural', window.VERN.nTypes(lvl)); const g = ty[Math.floor(rnd(986 + k) * ty.length) % ty.length]; const F = window.VERN.foot(g);
-          const cols = window.VERN.colours(g, (Math.imul(i, 31) + k * 977) >>> 0); const it = push('vh', fx, fz, F.x1 - F.x0, window.VERN.heightOf(g), F.z1 - F.z0, fy, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0), 0, pp); it.g = g; it.sc = 1; it.pal = cols; it.pk = 'farm' + k; it.era = era; it.u = 1; it.ofx = -(F.x0 + F.x1) * 0.5; it.ofz = -(F.z0 + F.z1) * 0.5; }
-        else { const e = pickW(houses, rnd(970 + k)); push(e[0] === 'block' || e[0] === 'tower' || e[0] === 'skyscraper' || e[0] === 'tenement' ? 'gable' : e[0], fx, fz, 9, 6, 7, fy, colorOf(990 + k), packStyle(e[2], e[3], cul, 0), 0, pp).pk = 'farm' + k; }
-        if (era >= 1) push('barn', fx - uz * 21, fz + ux * 21, 14, 6.5, 8, fy + (rnd(981 + k) < 0.5 ? 0 : Math.PI / 2), era >= 5 ? 0x8a3f33 : 0x7a6247, packStyle(WALL.wood, era >= 5 ? ROOF.metal : ROOF.thatch, cul, 0), 0, pp).pk = 'farmb' + k;
+          const cols = window.VERN.colours(g, (Math.imul(i, 31) + k * 977) >>> 0); const it = push('vh', fx, fz, F.x1 - F.x0, window.VERN.heightOf(g), F.z1 - F.z0, fy, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0), 0, pp); it.g = g; it.sc = 1; it.pal = cols; it.pk = 4e6 + k; it.era = era; it.u = 1; it.ofx = -(F.x0 + F.x1) * 0.5; it.ofz = -(F.z0 + F.z1) * 0.5; }
+        else { const e = pickW(houses, rnd(970 + k)); push(e[0] === 'block' || e[0] === 'tower' || e[0] === 'skyscraper' || e[0] === 'tenement' ? 'gable' : e[0], fx, fz, 9, 6, 7, fy, colorOf(990 + k), packStyle(e[2], e[3], cul, 0), 0, pp).pk = 4e6 + k; }
+        if (era >= 1) push('barn', fx - uz * 21, fz + ux * 21, 14, 6.5, 8, fy + (rnd(981 + k) < 0.5 ? 0 : Math.PI / 2), era >= 5 ? 0x8a3f33 : 0x7a6247, packStyle(WALL.wood, era >= 5 ? ROOF.metal : ROOF.thatch, cul, 0), 0, pp).pk = 4.5e6 + k;
         if (era >= 4 && era <= 6 && rnd(995 + k) < 0.3) push('windmill', fx + uz * 24, fz - ux * 24, 7, 16, 7, rnd(996 + k) * 3, 0xd9d0bd, packStyle(WALL.stone, ROOF.thatch, cul, 0), 0, pp);
         if (era >= 1 && infra >= 3 && rnd(997 + k) < 0.5) push('granary', fx + ux * 19, fz + uz * 19, 6, 6, 6, 0, 0xc9b48c, packStyle(WALL.adobe, ROOF.thatch, cul, 0), 0, pp);
         if (era >= 1 && era <= 6 && fine) { const q = push('haystack', fx - ux * 14 + uz * 6, fz - uz * 14 - ux * 6, 4, 4.2, 4, fy, 0xc7a85e, packStyle(WALL.plaster, ROOF.thatch, cul, 0)); q.u = 1; q.prop = 1; }
