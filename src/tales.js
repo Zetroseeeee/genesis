@@ -42,7 +42,9 @@ window.TALES = (function () {
     $('tl-date').textContent = `${s.fmtYear(v.year)} · ${v.realm}`;
     $('tl-title').textContent = v.title;
     $('tl-text').textContent = v.text;
-    $('tl-choices').innerHTML = v.opts.map((o) => `<button class="tl-choice" data-tl="${o.i}"${o.why ? ' aria-disabled="true"' : ''}><span class="tl-n">${o.i + 1}</span><span class="tl-c"><span class="tl-t">${esc(o.t)}</span>${o.hint ? `<span class="tl-h">${esc(o.hint)}</span>` : ''}<span class="tl-chips">${o.why ? `<span class="tl-chip why">${esc(o.why)}</span>` : ''}${chipsHtml(o.chips)}</span></span></button>`).join('');
+    // (the choice his court expects of him, once it has seen enough of his choices: learn.js)
+    const wont = v.wont && v.wont.p >= 0.4 ? v.wont.i : -1;
+    $('tl-choices').innerHTML = v.opts.map((o) => `<button class="tl-choice" data-tl="${o.i}"${o.why ? ' aria-disabled="true"' : ''}><span class="tl-n">${o.i + 1}</span><span class="tl-c"><span class="tl-t">${esc(o.t)}</span>${o.hint ? `<span class="tl-h">${esc(o.hint)}</span>` : ''}${o.i === wont && !o.why ? `<span class="tl-wont" title="Your court has learned which way you lean, and expects this of you (${Math.round(v.wont.p * 100)}%)">As you are wont</span>` : ''}<span class="tl-chips">${o.why ? `<span class="tl-chip why">${esc(o.why)}</span>` : ''}${chipsHtml(o.chips)}</span></span></button>`).join('');
     $('tl-choices').hidden = false; $('tl-out').hidden = true;
     const L = v.opts[v.lapse]; $('tl-foot').textContent = L ? `Unanswered by ${s.fmtYear(v.until)}, the court decides for you: ${L.t.charAt(0).toLowerCase() + L.t.slice(1)}.` : ''; $('tl-foot').hidden = !L;
   }

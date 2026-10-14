@@ -333,7 +333,8 @@
       return w;
     }
     function pick(c, cv) {
-      const av = available(c, cv.era); if (!av.length) return -1; let sum = 0; const ws = av.map((d) => { const w = weight(c, cv, d); sum += w; return w; });
+      // (the player's scholars, choosing for themselves, lean as he has leant: the branches he chose, learn.js)
+      const av = available(c, cv.era); if (!av.length) return -1; let sum = 0; const ws = av.map((d) => { const w = weight(c, cv, d) * (cv.player && host.taste ? host.taste(LIST[d].branch) : 1); sum += w; return w; });
       let r = rnd() * sum; for (let k = 0; k < av.length; k++) { r -= ws[k]; if (r <= 0) return av[k]; } return av[av.length - 1];
     }
     // the player's realm keeps a queue (and what it has put into discoveries it then set aside)
@@ -403,13 +404,13 @@
       study(c, cv, key) {
         const d = ID[key]; if (d === undefined) return 'No such discovery'; if (has[c * ND + d]) return 'Already known'; const D = LIST[d];
         if (D.era > cv.era) return `That belongs to a later age`; for (const n of D.need) if (!has[c * ND + n]) return `First ${LIST[n].name}`;
-        const m = mind(cv); if (cur[c] >= 0 && cur[c] !== d && prog[c] > 0) m.part[LIST[cur[c]].key] = prog[c];
+        const m = mind(cv); if (cur[c] >= 0 && cur[c] !== d && prog[c] > 0) m.part[LIST[cur[c]].key] = prog[c]; if (host.studied) host.studied(D.branch);
         cur[c] = d; prog[c] = m.part[key] || 0; delete m.part[key]; m.q = m.q.filter((k) => k !== key); m.idle = 0; m.left = false; m.self = null;
         step(c, cv, 0); return null;
       },
       // add to the queue, with whatever it stands on that is not yet known in front of it
       enqueue(c, cv, key) {
-        const d0 = ID[key]; if (d0 === undefined || has[c * ND + d0]) return; const m = mind(cv); const order = [];
+        const d0 = ID[key]; if (d0 === undefined || has[c * ND + d0]) return; const m = mind(cv); const order = []; if (host.studied) host.studied(LIST[d0].branch);
         const visit = (d) => { if (has[c * ND + d] || order.indexOf(d) >= 0) return; for (const n of LIST[d].need) visit(n); order.push(d); }; visit(d0);
         for (const d of order) { const k = LIST[d].key; if (cur[c] === d || m.q.indexOf(k) >= 0) continue; m.q.push(k); }
         m.idle = 0; m.left = false;
