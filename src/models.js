@@ -44,6 +44,9 @@
     }
     void main() {
       float era = floor(vInfo.x + 0.5), seed = vInfo.y, flags = floor(vInfo.z + 0.5), prog = vInfo.w;
+      // (as you look, a house that is built rises over some seconds: progress 2 and more is the page's clock when it began; one that
+      // is pulled down to make way stands until minus the progress less 2)
+      if (prog > 1.5) prog = clamp((uTime - (prog - 2.0)) / 8.0, 0.0, 1.0); else if (prog < -1.5) { if (uTime > -prog - 2.0) discard; prog = 1.0; }
       // a building going up: nothing above the build line, and the line is ragged, course by course
       if (prog < 0.999) { float rag = (vnoise(vec2(vLocal.x * 1.7 + vLocal.z * 1.3, seed * 40.0)) - 0.5) * 0.08 * uH; if (vLocal.y > prog * uH * 1.03 + rag) discard; }
       vec3 col = texture2D(uMap, vUv).rgb; float lum0 = dot(col, vec3(0.3, 0.6, 0.1));

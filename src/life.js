@@ -6,7 +6,7 @@
   const MAXP = 9000, PER_PLUME = 30;
   function hash(i, k) { let h = (i * 374761393 + k * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
   // where a fire burns under the roof: the kinds of building people live in
-  const DWELLING = new Set(['hut', 'longhouse', 'courtyard', 'adobe', 'gable', 'hip', 'tenement', 'townhouse', 'palazzo', 'mansard', 'terrace', 'halftimber', 'domehouse', 'curved', 'courtyardc', 'stilt', 'tipi', 'pueblo']);
+  const DWELLING = new Set(['vh', 'hut', 'longhouse', 'courtyard', 'adobe', 'gable', 'hip', 'tenement', 'townhouse', 'palazzo', 'mansard', 'terrace', 'halftimber', 'domehouse', 'curved', 'courtyardc', 'stilt', 'tipi', 'pueblo']);
 
   // A plume is a string of puffs leaving the smoke hole one after another: each climbs fast and slows as it cools,
   // widens, leans over with the wind and thins to nothing. Close together and nearly transparent, they read as one
@@ -49,7 +49,7 @@
     void main() {
       vec2 d = vQ; float r = length(d) * 2.0;
       if (vHeat > 1.5) {                                        // fires in the open are lit as the light goes and burn till morning
-        float lit = 1.0 - smoothstep(0.3, 0.62, uDay); if (lit < 0.02) discard;
+        float lit = vHeat > 2.2 && vHeat < 2.45 ? 1.0 : 1.0 - smoothstep(0.3, 0.62, uDay); if (lit < 0.02) discard;      // (a camp's fire burns by day as well)
         if (vHeat > 2.5) {                                      // the light on the ground: strongest at the fire's foot, gone ten paces out
           float f = max(1.0 - r, 0.0); f = f * f * (0.55 + 0.45 * f);
           gl_FragColor = vec4(vec3(1.0, 0.5, 0.19) * (f * 0.6 * lit * vAge), 0.0); return;
@@ -117,7 +117,7 @@
         const [sLon, sLat] = TOWN.siteOf(sim, i, c, T, null);
         if (GEO.distKm(cam.lon, cam.lat, sLon, sLat) > 120) continue;
         const L = TOWN.layout(sim, i, c, { coarse: false }); if (!L.items.length) continue;
-        towns.push({ i, lvl, y, sLon, sLat, L }); sig += i + '|' + L.key + '|' + (L.fitEra || '') + (L.mask ? 'm' : '') + ';';
+        towns.push({ i, lvl, y, sLon, sLat, L }); sig += i + '|' + L.key + '|' + (L.fitEra || '') + (L.mask ? 'm' : '') + (L.camp ? 'c' : '') + ';';
       }
       if (!force && sig === this.sig) return false; this.sig = sig;
       for (const tw of towns) {
@@ -126,6 +126,11 @@
         // only what is really standing smokes: not a plot left empty for its neighbour's model, nor one in the river
         const chimneys = []; const houses = [];
         for (let k = 0; k < items.length; k++) { const it = items[k]; if (it.prog !== undefined || it.off || (L.fit && L.fit[k]) || (L.mask && L.mask[k])) continue; if (it.kind === 'chimney') chimneys.push(k); else if (DWELLING.has(it.kind) && !it.as && !it.tag) houses.push(k); }
+        // a people's first camp (world.js): the fire in the middle smokes, and burns by day as well (seed.w 2.3)
+        const camp = L.camp && performance.now() / 1000 < L.camp.until;
+        if (camp && n + PER_PLUME <= MAXP) { const lon = sLon, lat = sLat; const h = T.heightAt(lon, lat); const f = GEO.enu(lon, lat); const base = f.up.clone().multiplyScalar(1 + (h * exag + 1.5 * kS) / R_M);
+          for (let q = 0; q < PER_PLUME; q++) { const j = n * 3; this.pos[j] = base.x; this.pos[j + 1] = base.y; this.pos[j + 2] = base.z; this.up[j] = f.up.x; this.up[j + 1] = f.up.y; this.up[j + 2] = f.up.z; this.east[j] = f.east.x; this.east[j + 1] = f.east.y; this.east[j + 2] = f.east.z; this.north[j] = f.north.x; this.north[j + 1] = f.north.y; this.north[j + 2] = f.north.z;
+            const s4 = n * 4; const ph = (q + 0.7 * hash(i, 610 + q)) / PER_PLUME; this.seed[s4] = ph - Math.floor(ph); this.seed[s4 + 1] = 34 * kS; this.seed[s4 + 2] = 5 * kS; this.seed[s4 + 3] = 1; n++; } }
         const hearths = Math.min(houses.length, Math.round((4 + lvl * 4) * this.budget)), stacks = Math.min(chimneys.length, 4);
         for (let k = 0; k < hearths + stacks && n + PER_PLUME <= MAXP; k++) {
           const industrial = k >= hearths; const pool = industrial ? chimneys : houses;
@@ -149,7 +154,7 @@
         // each gate and before the great buildings, and a few before the doors of houses where there is room to sit round one
         if (L.era <= 5) {
           const spots = [];      // x, z (drawn metres from the centre), the flame's height in true metres
-          const sq = (L.axis || 0) + Math.PI * 0.9; spots.push([Math.cos(sq) * L.plaza * 0.24, Math.sin(sq) * L.plaza * 0.24, 2.3]);      // on the landmark's side of the square (the well stands on the other)
+          const sq = L.lmAngle !== undefined ? L.lmAngle : (L.axis || 0) + Math.PI * 0.9; if (camp) spots.push([0, 0, 1.6, 1]); else spots.push([Math.cos(sq) * L.plaza * 0.24, Math.sin(sq) * L.plaza * 0.24, 2.3]);      // on the landmark's side of the square (the well stands on the other)
           for (let k = 0; k < items.length; k++) {
             const it = items[k]; if (it.prog !== undefined || it.off || (L.mask && L.mask[k])) continue;
             if (it.kind === 'gatehouse') { const r = Math.hypot(it.x, it.z) || 1, ox = it.x / r, oz = it.z / r; for (const sd of [-1, 1]) spots.push([it.x + ox * 3.5 * kS - oz * sd * 4.2 * kS, it.z + oz * 3.5 * kS + ox * sd * 4.2 * kS, 1.2]); }
@@ -165,7 +170,7 @@
           const put = (b, e, nn, u, sx, sy, sz, sw) => { const j = n * 3; this.pos[j] = b.x; this.pos[j + 1] = b.y; this.pos[j + 2] = b.z; this.up[j] = u.x; this.up[j + 1] = u.y; this.up[j + 2] = u.z; this.east[j] = e.x; this.east[j + 1] = e.y; this.east[j + 2] = e.z; this.north[j] = nn.x; this.north[j + 1] = nn.y; this.north[j + 2] = nn.z; const s4 = n * 4; this.seed[s4] = sx; this.seed[s4 + 1] = sy; this.seed[s4 + 2] = sz; this.seed[s4 + 3] = sw; this.hq[s4] = _h[0]; this.hq[s4 + 1] = _h[1]; this.hq[s4 + 2] = _h[2]; this.hq[s4 + 3] = _h[3]; n++; };
           const _u = new THREE.Vector3(), _h = [0, 0, 0, 0];
           for (let k = 0; k < spots.length; k++) {
-            const [fx, fz, fh] = spots[k]; const lon = sLon + fx / (R_M * cl * D2R), lat = sLat + fz / (R_M * D2R);
+            const [fx, fz, fh, day] = spots[k]; const lon = sLon + fx / (R_M * cl * D2R), lat = sLat + fz / (R_M * D2R);
             if (T.isWater(lon, lat)) continue;                   // not on the water
             const f = GEO.enu(lon, lat); const h = T.heightAt(lon, lat) * exag; const base = f.up.clone().multiplyScalar(1 + h / R_M);
             // the light on the ground: eight flame-heights out each way, in pieces whose corners stand on the ground
@@ -177,7 +182,7 @@
               _u.set((a + 0.5) / N - 0.5, (b + 0.5) / N - 0.5, 1 / N);
               put(base, f.east, f.north, _u, ph, 0, rad * 2, 3);
             }
-            _h[0] = _h[1] = _h[2] = _h[3] = 0; put(base, f.east, f.north, f.up, ph, 0, fh * 1.25 * kS, 2);
+            _h[0] = _h[1] = _h[2] = _h[3] = 0; put(base, f.east, f.north, f.up, ph, 0, fh * 1.25 * kS, day ? 2.3 : 2);      // (a camp's fire burns by day too)
           }
         }
       }
