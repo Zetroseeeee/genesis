@@ -44,6 +44,9 @@ function createSim(world, seed) {
   const peak = new Uint8Array(N);        // the most people a town ever held (log-quantised, as in save()); sizes its ruins
   const slotA = new Uint16Array(N);      // where the player (or the AI) put each work, 4 bits each: temple | academy<<4 | market<<8 | wonder<<12 (0 = unplaced, else slot+1)
   const slotB = new Uint8Array(N);       // mine slot (+1) in the low nibble
+  // what each settlement's plan stands on (town.js, plots.js): [the year it was founded, the age of its founders, their home cell, its
+  // size band when it became a city of the machine age (0: not yet), its size band when its walls were last raised (0: none)]
+  const tRec = new Map();
   const gBand = new Uint8Array(N), gPrev = new Uint8Array(N); const gYear = new Int32Array(N).fill(-1e9); // a town's size band now, the band before, and when it changed: the planner builds the new ring over the years after
   // (a band and a peak are logarithms of how many live there, asked of every settlement every year: so each cell remembers between which
   //  numbers its band stays what it is, and above which its peak would rise, a hair inside the true bounds, and the logarithm is only
@@ -1051,6 +1054,7 @@ function createSim(world, seed) {
         if (c.capital === i && level[i] < 1) level[i] = 1;
         if (level[i] && (prevLvl !== level[i] || ((year + i) & 15) === 0) && !cellName.has(i)) cellName.set(i, people.nameAt(i, c) || makeName(c.style, 2, 3));      // (asked when a place becomes a settlement or changes rank, and of every place now and then: the map of names is slow to ask)
         if (level[i] && siteU[i] < 0) { siteU[i] = 0.25 + rnd() * 0.5; siteV[i] = 0.25 + rnd() * 0.5; }
+        if (level[i]) { let tr = tRec.get(i); if (!tr) { tr = [year, c.era, c.home >= 0 ? c.home : c.capital, 0, walls[i] ? gBand[i] : 0]; tRec.set(i, tr); } if (level[i] >= 3 && c.era >= 6 && !tr[3]) tr[3] = Math.max(1, gBand[i]); }
       } else if (level[i]) level[i] = 0;
     }
     // per-civ bookkeeping
@@ -1343,7 +1347,7 @@ function createSim(world, seed) {
     for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
       const yy = y0 + dy; if (yy < 0 || yy >= H) continue; const i = yy * W + ((x0 + dx + W) % W);
       if (!land[i]) continue; const o = owner[i]; if (o >= 0 && civs[o]) hit = civs[o]; if (level[i] >= 2 && o >= 0 && civs[o]) markRuin(i, civs[o].era, civs[o].culture);
-      pop[i] = 0; owner[i] = -1; infra[i] = 0; walls[i] = 0; special[i] = 0; level[i] = 0; ind.delete(i); bonusFert[i] = Math.max(-0.5, bonusFert[i] - 0.4);
+      pop[i] = 0; owner[i] = -1; infra[i] = 0; walls[i] = 0; special[i] = 0; level[i] = 0; ind.delete(i); bonusFert[i] = Math.max(-0.5, bonusFert[i] - 0.4); tRec.delete(i);
     }
     if (hit) logEvent(hit, `Fire falls from the sky upon ${fullName(hit)}`, true); else pushWorld({ year, text: `A meteor strikes ${describeCell(center)}`, civ: -1, type: 'disaster', loc: center });
   }
@@ -1359,7 +1363,7 @@ function createSim(world, seed) {
     const o = owner[i]; let to = -1;
     if (o >= 0) for (let k = 0; k < 8; k++) { const n = nbOf(i, k); if (n >= 0 && land[n] && owner[n] === o && !iced(n)) { to = n; break; } }
     if (to >= 0) pop[to] += pop[i];
-    pop[i] = 0; owner[i] = -1; infra[i] = 0; walls[i] = 0; special[i] = 0; level[i] = 0; ind.delete(i);
+    pop[i] = 0; owner[i] = -1; infra[i] = 0; walls[i] = 0; special[i] = 0; level[i] = 0; ind.delete(i); tRec.delete(i);
   }
   function bounty(center) {
     const radius = 4; const y0 = (center / W) | 0, x0 = center - y0 * W; let hit = null;
@@ -1478,7 +1482,7 @@ function createSim(world, seed) {
     return `${kind === 'mine' ? workName(i) : B.name} under construction · ${dur} year${dur === 1 ? '' : 's'}`;
   }
   function applyWork(c, i, w) {
-    const k = w.k; if (k === 'farm') infra[i] = Math.min(5, infra[i] + 1); else if (k === 'walls') walls[i] = Math.min(3, walls[i] + 1); else if (k === 'port') special[i] |= 1; else if (k === 'academy') special[i] |= 2; else if (k === 'temple') special[i] |= 4; else if (k === 'market') special[i] |= 8; else if (k === 'mine') special[i] |= 512;
+    const k = w.k; if (k === 'farm') infra[i] = Math.min(5, infra[i] + 1); else if (k === 'walls') { walls[i] = Math.min(3, walls[i] + 1); const tr = tRec.get(i); if (tr) tr[4] = Math.max(1, gBand[i]); } else if (k === 'port') special[i] |= 1; else if (k === 'academy') special[i] |= 2; else if (k === 'temple') special[i] |= 4; else if (k === 'market') special[i] |= 8; else if (k === 'mine') special[i] |= 512;
     else if (BUILD[k].ind) { let a = ind.get(i); if (!a) ind.set(i, a = new Uint8Array(IND.length)); a[IND.indexOf(k)] = Math.max(1, w.slot + 1); }
     else if (k === 'wonder') { special[i] = (special[i] & ~(15 << 5)) | 16 | ((c ? c.era : 0) << 5); if (c) logEvent(c, `${fullName(c)} completes a wonder at ${cellName.get(i)}`, true, 'state', i); }
     if (w.slot >= 0) setSlot(i, k, w.slot);
@@ -1585,6 +1589,7 @@ function createSim(world, seed) {
       v: 2, year, tickCount, player, rs, seed,
       pop: b64(p8), owner: runs, infra: sparse(infra), walls: sparse(walls), special: sparse(special), peak: sparse(peak), slotA: sparse(slotA), slotB: sparse(slotB), bonus, names, sites,
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
+      towns: (() => { const t = []; for (const [i, r] of tRec) if (level[i]) t.push(i, r[0], r[1], r[2], r[3], r[4]); return t; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(c.player ? -30 : cellsOf[c.id] > 20 ? -15 : -6), rulers: c.rulers.slice(-3) } : null), fallen: fallen ? { ...fallen, events: [], rulers: (fallen.rulers || []).slice(-3) } : undefined, /* (the reigns of a realm are its houses' lines now: dynasty.js; a save is better small) */ worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
       econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, woods: woods && landOn ? woods.save() : undefined, climate: climate && landOn ? climate.save() : undefined, replay: replay ? replay.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : foodTab === FOOD_039 ? 39 : undefined, land: landOn ? 1 : undefined,
@@ -1607,6 +1612,7 @@ function createSim(world, seed) {
     ind.clear(); if (s.ind) for (const [i, a] of s.ind) { const u = new Uint8Array(IND.length); u.set(a.slice(0, IND.length)); ind.set(+i, u); }
     works.clear(); if (s.works) for (const [i, l] of s.works) works.set(+i, l.map(([k, slot, start, dur]) => ({ k, slot, start, dur })));
     gBand.fill(0); gPrev.fill(0); gYear.fill(-1e9); if (s.grow) for (let k = 0; k < s.grow.length; k += 4) { gBand[s.grow[k]] = s.grow[k + 1]; gPrev[s.grow[k]] = s.grow[k + 2]; gYear[s.grow[k]] = s.grow[k + 3]; }
+    tRec.clear(); if (s.towns) for (let k = 0; k < s.towns.length; k += 6) tRec.set(s.towns[k], [s.towns[k + 1], s.towns[k + 2], s.towns[k + 3], s.towns[k + 4], s.towns[k + 5]]);
     ruins.clear(); if (s.ruins) for (const [k, v] of s.ruins) ruins.set(+k, v); if (s.volc) s.volc.forEach((v, k) => { if (volcanoes[k]) { volcanoes[k].last = v[0]; volcanoes[k].erupting = v[1]; } }); if (s.comet !== undefined) comet = s.comet;
     fires.length = 0; floods.length = 0; quakes.length = 0; battles.length = 0; plagues.length = 0; rubble.clear();
     for (let k = 0; k < s.bonus.length; k += 2) bonusFert[s.bonus[k]] = s.bonus[k + 1] / 100;
@@ -1618,6 +1624,9 @@ function createSim(world, seed) {
     // what each realm knows; a world saved before there were discoveries is given what its knowledge is worth, the way the autopilot would have learned it
     const hadKnow = know.load(s.know); if (!hadKnow) for (let c = 0; c < MAXC; c++) if (civs[c]) { know.born(c, -1, civs[c].tech); know.settle(c, civs[c]); }
     recount(); countIndustry(); st.year = year; st.civCount = civCount; st.player = player;
+    // (a world saved before its towns were planned for good: each town as founded long ago in the old ways, a city of the machine
+    // age keeping a sixteenth of its people's ground as its old town, its walls where it stands now)
+    if (!s.towns) for (let k = 0; k < LI.length; k++) { const i = LI[k]; if (!level[i] || owner[i] < 0) continue; const cv = civs[owner[i]]; if (!cv) continue; tRec.set(i, [-1e9, Math.min(cv.era, 2), cv.home >= 0 ? cv.home : cv.capital, cv.era >= 6 && level[i] >= 3 ? Math.max(1, gBand[i] - 12) : 0, walls[i] ? gBand[i] : 0]); }
     calShift = hadKnow ? s.cal || 0 : Math.max(0, histYearOf(frontTech) - year);      // (a world from before the calendar keeps its own: see calShift)
     // how each realm is governed; a world saved before there were laws is given the form its old name says and the laws of its age
     for (let c = 0; c < MAXC; c++) if (civs[c]) { if (!rule.wake(c, civs[c])) rule.settle(c, civs[c]); } rule.hear(s.heard);
@@ -1669,7 +1678,7 @@ function createSim(world, seed) {
 
   return {
     W, H, N, MAXC, pop, owner, infra, walls, special, level, cellName, civs, LI, fert, land, flags, elev, bonusFert, siteU, siteV,
-    BUILD, works, slotA, slotB, gBand, gPrev, gYear, NSLOTS, slotOf, freeSlots, inProgress, durOf, cannot(kind, i) { const c = playerCiv(); return c ? cannot(c, kind, i) : 'No state'; },
+    BUILD, works, slotA, slotB, gBand, gPrev, gYear, townRec: (i) => tRec.get(i) || null, NSLOTS, slotOf, freeSlots, inProgress, durOf, cannot(kind, i) { const c = playerCiv(); return c ? cannot(c, kind, i) : 'No state'; },
     popOf, cellsOf, strengthOf, mightOf, acad, temples, ports, markets, wonders, worldEvents, allEvents, history, ERAS, COST,
     volcanoes, fires, floods, quakes, battles, plagues, ruins, rubble, get comet() { return comet; },
     goods, gera, GOODS, GOOD_ID, market, rawPop, held, urban, satOf, touchAll, IND, ind, indN, indAt, workName, eff,
