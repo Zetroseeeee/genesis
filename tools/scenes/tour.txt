@@ -474,6 +474,29 @@ atlas_end    | tools/scenes/atlas.js | {years:12160} | | 320
 worlds_page  | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:0.45,pop:8,walls:1,special:12,clear:0.75,season:0.4} | setTimeout(() => __sceneLook('town', 1.6, 1.25, 2.4), 4000); setTimeout(() => { document.getElementById('btn-menu').click(); document.getElementById('m-worlds').click(); document.getElementById('wd-name').value = 'The walled town, before the plague'; document.querySelector('#worlds [data-wd="keep"]').click(); }, 125000); | 150
 dawn_bronze  | tools/scenes/town.js | {lon:31.25,lat:29.9,tech:0.1,pop:8,walls:1,special:12} | setTimeout(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); DAWN.open(1); }, 30000); | 70
 dawn_space   | tools/scenes/town.js | {lon:-1.5,lat:52.5,tech:1.02,pop:120,walls:0,special:14} | setTimeout(() => { for (const d of document.querySelectorAll('dialog[open]')) d.close(); DAWN.open(9); }, 30000); | 70
+# the towns of the place's own (plots.js, vern.js, houses.js): a medina, a Chinese city of wards, a market town of the Cotswolds, a
+# Yoruba town of compounds, a camp of the steppe, a village of the first farmers, a Bronze Age city, Kyoto, Novgorod; the founding
+tw_fes        | tools/scenes/town.js | {lon:-4.98,lat:34.06,tech:0.52,pop:8,walls:1,special:12,alt:900,tilt:1.1,out:1.0} |  | 34
+tw_fes_c      | tools/scenes/town.js | {lon:-4.98,lat:34.06,tech:0.52,pop:8,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_fes_low    | tools/scenes/town.js | {lon:-4.98,lat:34.06,tech:0.52,pop:8,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_xian_c     | tools/scenes/town.js | {lon:108.94,lat:34.26,tech:0.52,pop:20,walls:1,special:14} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_xian_low   | tools/scenes/town.js | {lon:108.94,lat:34.26,tech:0.52,pop:20,walls:1,special:14} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_cots_c     | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0.5,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_cots_low   | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0.5,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_ibadan_c   | tools/scenes/town.js | {lon:3.9,lat:7.38,tech:0.52,pop:8,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_ibadan_low | tools/scenes/town.js | {lon:3.9,lat:7.38,tech:0.52,pop:8,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_karakorum_c| tools/scenes/town.js | {lon:102.83,lat:47.2,tech:0.48,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_karakorum_low| tools/scenes/town.js | {lon:102.83,lat:47.2,tech:0.48,pop:3,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_ur_c       | tools/scenes/town.js | {lon:46.1,lat:30.96,tech:0.15,pop:6,walls:1,special:14} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_ur_low     | tools/scenes/town.js | {lon:46.1,lat:30.96,tech:0.15,pop:6,walls:1,special:14} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_kyoto_c    | tools/scenes/town.js | {lon:135.76,lat:35.01,tech:0.62,pop:12,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_kyoto_low  | tools/scenes/town.js | {lon:135.76,lat:35.01,tech:0.62,pop:12,walls:0,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_novgorod_c | tools/scenes/town.js | {lon:31.27,lat:58.52,tech:0.5,pop:6,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.7, 1.0, 0.3), 7000); | 36
+tw_novgorod_low| tools/scenes/town.js | {lon:31.27,lat:58.52,tech:0.5,pop:6,walls:1,special:12} | setTimeout(() => __sceneLook('town', 0.22, 1.22, 0.8), 7000); | 36
+tw_jericho    | tools/scenes/town.js | {lon:35.44,lat:31.87,tech:0.03,pop:0.5,walls:0,special:0} | setTimeout(() => __sceneLook('town', 1.0, 1.05, 0.3), 7000); | 36
+tw_camp_a     | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0,pop:0.3,walls:0,special:0,camp:1,grow:false,settled:false} | setTimeout(() => __sceneLook('town', 1.6, 1.05, 0.3), 2500); | 16
+tw_camp_b     | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0,pop:0.3,walls:0,special:0,camp:1,grow:false,settled:false} | setTimeout(() => __sceneLook('town', 1.6, 1.05, 0.3), 2500); | 50
+tw_camp_c     | tools/scenes/town.js | {lon:-1.9,lat:51.9,tech:0,pop:0.3,walls:0,special:0,camp:1,grow:false,settled:false} | setTimeout(() => __sceneLook('town', 1.6, 1.05, 0.3), 2500); | 110
 # the survey of the towns of the later ages (the kit's houses): renaissance and industrial towns of every people
 ren_med      | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0.58,pop:14,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.8, 1.0, 0.3), 7000); | 32
 ren_med_near | tools/scenes/town.js | {lon:11.25,lat:43.77,tech:0.58,pop:14,walls:2,special:14} | setTimeout(() => __sceneLook('town', 0.35, 1.08, 0.6), 7000); | 32

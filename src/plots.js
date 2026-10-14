@@ -130,16 +130,19 @@
       for (const m of mains) m.id = addStreet(m.pts, m.hw, 0).id;
       // lanes round the middle: arcs between neighbouring roads at a ring's distance, each its own radius and wobble, the
       // further rings broken here and there; and short lanes out from each ring to the next
-      const ring = 72 + rnd(5) * 40; const nR = Math.ceil(R / ring);
+      // (every ring that could come in among the plots a smaller plan keeps is laid out in every plan: they wander by a fifth; and
+      // a lane round the middle half a ring out, the back lane of the houses about the square)
+      const ring = 72 + rnd(5) * 40; const nR = Math.ceil((R * 1.35 + 100) / ring);
       const order = angs.map((a, k) => [((a % TAU) + TAU) % TAU, k]).sort((p, q) => p[0] - q[0]);
       const rings = [];
-      for (let j = 1; j <= nR; j++) for (let q = 0; q < order.length; q++) {
+      for (let jj = 0; jj <= nR; jj++) for (let q = 0; q < order.length; q++) {
+        const j = jj || 0.5, jk = jj || 99;
         const a0 = order[q][0], a1 = order[(q + 1) % order.length][0] + (q + 1 === order.length ? TAU : 0); if (a1 - a0 < 0.25) continue;
-        if (j >= 2 && h(i, 82000 + j * 17 + q) < 0.18) continue;
-        const r0 = (Math.max(sqW, sqD) * 0.5 + j * ring) * (1 + (h(i, 83000 + j * 17 + q) - 0.5) * 0.24); const ph = h(i, 84000 + j * 17 + q) * TAU;
+        if ((j >= 2 || !jj) && h(i, 82000 + jk * 17 + q) < (jj ? 0.18 : 0.3)) continue;
+        const r0 = (Math.max(sqW, sqD) * 0.5 + j * ring) * (1 + (h(i, 83000 + jk * 17 + q) - 0.5) * 0.24); const ph = h(i, 84000 + jk * 17 + q) * TAU;
         const pts = []; const n = Math.max(4, Math.ceil((a1 - a0) * r0 / 14));
         for (let k = 0; k <= n; k++) { const a = a0 + (a1 - a0) * k / n; const rr = r0 * (1 + 0.07 * Math.sin(a * 3 + ph) + 0.04 * Math.sin(a * 7 + ph * 2)); pts.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
-        const s = addStreet(pts, j <= 2 ? 3 : 2.6, 1); s.j = j; s.r = r0; rings.push(s);
+        const s = addStreet(pts, !jj ? 2.4 : j <= 2 ? 3 : 2.6, 1); s.j = jk; s.r = r0; rings.push(s);
       }
       const lanes = [];
       for (const rg of rings) { const n = rg.pts.length; const step = Math.max(4, Math.round((60 + h(i, 85000 + rg.j) * 60) / 14));
@@ -161,35 +164,71 @@
       blocks.sort((a, b) => a[0] - b[0]);
       for (const [d, u, v, bx, bz] of blocks) {
         if (bx === 0 && bz === 0) continue;      // (the square's block)
-        const hb = B / 2; const sides = [[[-hb, hb], [hb, hb]], [[hb, hb], [hb, -hb]], [[hb, -hb], [-hb, -hb]], [[-hb, -hb], [-hb, hb]]];
-        for (let q = 0; q < 4; q++) { const [a, b] = sides[q]; const P = (p) => { const x = u + p[0], z = v + p[1]; return [x * ca - z * sa, x * sa + z * ca]; };
-          // the plots stand on the block's edge, facing out to the street that runs round it
-          along([P(a), P(b)], 0.3, -1, 1, d, 0.25, (s, k) => frontage(d, 1, bx * 4000 + bz * 40 + q * 10 + k), hb * 0.95, 400 + ((bx * 31 + bz * 17 + q) & 255)); }
+        const hb = B / 2; const P = (p) => { const x = u + p[0], z = v + p[1]; return [x * ca - z * sa, x * sa + z * ca]; };
+        // most blocks have a lane down the middle (a hutong, a back lane, the alley between two rows of houses' yards), so that
+        // a block is two halves with houses round each and none of them deeper than half the block
+        const hk = bx * 977 + bz; const lane = h(i, 87700 + hk) < 0.8, ldir = h(i, 87800 + hk) < 0.5 ? 0 : 1, lw = 1.6;
+        const halves = !lane ? [[-hb, hb, -hb, hb]] : ldir === 0 ? [[-hb, hb, -hb, -lw], [-hb, hb, lw, hb]] : [[-hb, -lw, -hb, hb], [lw, hb, -hb, hb]];
+        if (lane) addStreet(ldir === 0 ? [P([-hb - 2, 0]), P([hb + 2, 0])] : [P([0, -hb - 2]), P([0, hb + 2])], lw, 2);
+        halves.forEach(([u0, u1, v0, v1], hh) => {
+          const sides = [[[u0, v1], [u1, v1]], [[u1, v1], [u1, v0]], [[u1, v0], [u0, v0]], [[u0, v0], [u0, v1]]]; const dep = Math.min(u1 - u0, v1 - v0) * 0.5 * 0.95;
+          for (let q = 0; q < 4; q++) { const [a, b] = sides[q];
+            // the plots stand on the edge, facing out to the street (or the lane) that runs by it
+            along([P(a), P(b)], 0.3, -1, 1, d, 0.25, (s, k) => frontage(d, 1, bx * 4000 + bz * 40 + q * 10 + hh * 5 + k), dep, 400 + ((bx * 31 + bz * 17 + q * 3 + hh) & 255)); } });
       }
       // (taken nearest the square first, whichever block they belong to: a village of the grid is the plaza's four sides)
       for (let k = 0; k < plots.length; k++) { const p = plots[k]; p.key = Math.hypot(p.x, p.z) + h(i, 87500 + k) * 10; }
     } else if (morph === 'medina') {
-      // a few winding streets out of the middle, then the ground between them packed with houses round their courts, each a
-      // cell of a grid turned to the town's axis, a lane left here and there
+      // a few winding streets out of the middle and pieces of rings between them, alleys off them that end among the houses,
+      // and the ground between packed with houses round their courts: rows of cells a house wide, each row's joints its own
+      // (as bricks are laid), now and then two cells one house, a cell cut back where a street runs by, a few left open
       const nMain = 3 + Math.floor(rnd(1) * 2);
       for (let k = 0; k < nMain; k++) { const a0 = axis + k * TAU / nMain + (rnd(10 + k) - 0.5) * 0.7, ph = rnd(20 + k) * TAU; const pts = []; let x = Math.cos(a0) * sqW * 0.55, z = Math.sin(a0) * sqW * 0.55;
         for (let s = 0; s < R * 1.1; s += 12) { pts.push([x, z]); const hd = a0 + 0.35 * Math.sin(s / 150 + ph) + 0.15 * Math.sin(s / 45 + ph * 1.7); x += Math.cos(hd) * 12; z += Math.sin(hd) * 12; }
         addStreet(pts, 3.2, 0); }
-      const ring = 110 + rnd(5) * 50; for (let j = 1; j * ring < R; j++) { const r0 = sqW * 0.5 + j * ring; const n = Math.max(12, Math.round(TAU * r0 / 14)); const ph = rnd(40 + j) * TAU; const pts = [];
+      const ring = 110 + rnd(5) * 50; for (let j = 1; j * ring < R + 90; j++) {      // (every ring that could reach in among the plots a smaller plan keeps: they wander, and their alleys go in)
+        const r0 = sqW * 0.5 + j * ring; const n = Math.max(12, Math.round(TAU * r0 / 14)); const ph = rnd(40 + j) * TAU; const pts = [];
         for (let k = 0; k <= n; k++) { const a = k / n * TAU; const rr = r0 * (1 + 0.12 * Math.sin(a * 2 + ph) + 0.06 * Math.sin(a * 5 + ph)); pts.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
         for (let q = 0; q < 6; q++) { const a = Math.floor(h(i, 88000 + j * 7 + q) * n); const b = Math.min(n, a + Math.floor(n * (0.08 + 0.1 * h(i, 88100 + j * 7 + q)))); if (b - a > 2) addStreet(pts.slice(a, b + 1), 2.2, 1); } }
-      const C = opt.cell || 13; const nC = Math.ceil(R / C);
-      const cells = []; for (let gx = -nC; gx <= nC; gx++) for (let gz = -nC; gz <= nC; gz++) { const u = gx * C + (h(i, 89000 + gx * 977 + gz) - 0.5) * C * 0.25, v = gz * C + (h(i, 89500 + gx * 977 + gz) - 0.5) * C * 0.25; const d = Math.hypot(u, v); if (d > R) continue; cells.push([d + h(i, 90000 + gx * 977 + gz) * 25, u, v, gx, gz]); }
+      // the alleys: off every street, every thirty to fifty metres one side or the other, a lane a few metres wide that winds in
+      // among the houses for a few of their lengths and ends at a door (the derb)
+      for (const s0 of streets.slice()) { const pts = s0.pts; let acc = h(i, 88500 + s0.id) * 30, q = 0;
+        for (let k = 0; k + 1 < pts.length; k++) { const a = pts[k], b = pts[k + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1e-6) continue; acc += L;
+          if (acc < 30 + 20 * h(i, 88600 + s0.id * 101 + q)) continue; acc = 0; q++;
+          const side = h(i, 88700 + s0.id * 101 + q) < 0.5 ? 1 : -1; const tx = (b[0] - a[0]) / L, tz = (b[1] - a[1]) / L; let hd = Math.atan2(tx * side, -tz * side);      // (across the street, to one side)
+          const len = 18 + 40 * h(i, 88800 + s0.id * 101 + q); const ap = []; let x = b[0] + Math.cos(hd) * (s0.hw + 0.5), z = b[1] + Math.sin(hd) * (s0.hw + 0.5);
+          for (let s = 0; s <= len; s += 6) { ap.push([x, z]); hd += (h(i, 88900 + s0.id * 101 + q * 13 + s) - 0.5) * 0.9; x += Math.cos(hd) * 6; z += Math.sin(hd) * 6; }
+          if (ap.length > 2 && Math.hypot(x, z) < R * 1.05) addStreet(ap, 1.2, 2); } }
+      const C = opt.cell || 13, J = 0.32; const nC = Math.ceil(R / C) + 2;
+      const vB = (k) => k * C + (h(i, 89500 + k * 7) - 0.5) * J * C;      // the rows' edges
+      const uB = (k, j) => j * C + h(i, 89300 + k * 13) * C + (h(i, 89000 + j * 977 + k * 31) - 0.5) * J * C;      // the joints along row k
+      const cells = [];
+      for (let k = -nC; k < nC; k++) { const v0 = vB(k), v1 = vB(k + 1);
+        for (let j = -nC - 1; j < nC; j++) {
+          // (two cells one house: a pair is j even and the next, so that whether they are one does not hang on where the rows begin)
+          const pair = (j & 1) === 0 && h(i, 91500 + j * 977 + k * 31) < 0.13; if ((j & 1) === 1 && h(i, 91500 + (j - 1) * 977 + k * 31) < 0.13) continue;
+          const u0 = uB(k, j), u1 = uB(k, j + (pair ? 2 : 1)); const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2; const d = Math.hypot(uc, vc); if (d > R) continue;
+          cells.push([d + h(i, 90000 + j * 977 + k * 31) * 22, u0, u1, v0, v1, j, k]); } }
       cells.sort((a, b) => a[0] - b[0]);
-      for (const [d, u, v, gx, gz] of cells) {
-        if (h(i, 91000 + gx * 977 + gz) < 0.07) continue;      // a lane, a little square, a garden
-        const sz = C * (0.86 + 0.12 * h(i, 92000 + gx * 977 + gz)); const x = u * ca - v * sa, z = u * sa + v * ca;
-        if (occ.rect(x, z, ca, sa, sz / 2 - 0.2, sz / 2 - 0.2, 0, 1)) continue;
-        occ.rect(x, z, ca, sa, sz / 2, sz / 2, 1);
-        // its front to the side the nearest street lies (the door gives on a lane): one of the four, by which neighbour is open
-        let best = 0, bd = -1; for (let q = 0; q < 4; q++) { const a = axis + q * Math.PI / 2; const tx = x + Math.cos(a) * C, tz = z + Math.sin(a) * C; const k = occ.idx(tx, tz); const free = k < 0 ? 0 : occ.a[k] === 2 ? 2 : occ.a[k] === 0 ? 1 : 0; if (free > bd) { bd = free; best = q; } }
+      for (const [d, u0, u1, v0, v1, j, k] of cells) {
+        if (h(i, 91000 + j * 977 + k * 31) < 0.05) continue;      // a little square, a garden, a well
+        // the ground the streets leave it: the whole cell, else the part of it away from the street (the half, or a third)
+        let a0 = u0, a1 = u1, b0 = v0, b1 = v1, ok = false;
+        const fits = (p0, p1, q0, q1) => { const uc = (p0 + p1) / 2, vc = (q0 + q1) / 2; return p1 - p0 > 5 && q1 - q0 > 5 && !occ.rect(uc * ca - vc * sa, uc * sa + vc * ca, ca, sa, (p1 - p0) / 2 - 0.15, (q1 - q0) / 2 - 0.15, 0, 2); };
+        if (fits(a0, a1, b0, b1)) ok = true;
+        else { const r0 = Math.floor(h(i, 92000 + j * 977 + k * 31) * 4);
+          for (const cut of [0.45, 0.65]) { for (let q = 0; q < 4 && !ok; q++) { const s = (r0 + q) & 3; const du = (u1 - u0) * cut, dv = (v1 - v0) * cut;
+            const c = s === 0 ? [u0 + du, u1, v0, v1] : s === 1 ? [u0, u1 - du, v0, v1] : s === 2 ? [u0, u1, v0 + dv, v1] : [u0, u1, v0, v1 - dv];
+            if (fits(c[0], c[1], c[2], c[3])) { [a0, a1, b0, b1] = c; ok = true; } } if (ok) break; } }
+        if (!ok) continue;
+        const uc = (a0 + a1) / 2, vc = (b0 + b1) / 2; const x = uc * ca - vc * sa, z = uc * sa + vc * ca; const hu = (a1 - a0) / 2, hv = (b1 - b0) / 2;
+        occ.rect(x, z, ca, sa, hu, hv, 1);
+        // its door on the side a street or an alley runs by (the nearest such); else on whichever side its dice say
+        let best = Math.floor(h(i, 92500 + j * 977 + k * 31) * 4), bd = 1e9;
+        for (let q = 0; q < 4; q++) { const a = axis + q * Math.PI / 2; const half = q & 1 ? hv : hu; for (const reach of [1.8, 4.5]) { const kk = occ.idx(x + Math.cos(a) * (half + reach), z + Math.sin(a) * (half + reach)); if (kk >= 0 && occ.a[kk] === 2 && reach < bd) { bd = reach; best = q; } } }
         const fa = axis + best * Math.PI / 2; const nx = -Math.cos(fa), nz = -Math.sin(fa);      // n: from the front into the house
-        plots.push({ x: x - nx * sz / 2, z: z - nz * sz / 2, yaw: fa + Math.PI / 2, f: sz, dep: sz, key: d, rank: d < R * 0.25 ? 1 : 2, tx: -nz, tz: nx, nx, nz, cell: 1 });
+        const dep = best & 1 ? hv * 2 : hu * 2, f = best & 1 ? hu * 2 : hv * 2;
+        plots.push({ x: x - nx * dep / 2, z: z - nz * dep / 2, yaw: fa + Math.PI / 2, f, dep, key: d, rank: d < 120 ? 1 : 2, tx: -nz, tz: nx, nx, nz, cell: 1, open: bd < 1e9 ? 1 : 0 });
       }
     } else if (morph === 'compound') {
       // family yards on a sunflower spiral, paths between; each yard its huts round it, the granaries, a fence
@@ -214,7 +253,7 @@
     }
     plots.sort((a, b) => a.key - b.key);
     // only what lies well inside the radius it was made to: past it a plot may yet be taken by one nearer in a larger plan
-    const keep = plots.filter((p) => p.key < R * 0.82);
+    const keep = plots.filter((p) => p.key < Math.min(R * 0.82, R - 70));      // (and short of what a larger plan's new streets and their alleys reach)
     // how far out the first n plots reach (rad[n - 1]: the radius of a disc with their spread, never less than for fewer)
     const rad = new Float32Array(keep.length); let s2 = 0, best = 0;
     for (let k = 0; k < keep.length; k++) { const p = keep[k], d = Math.min(p.dep, 14) * 0.5; const x = p.x + p.nx * d, z = p.z + p.nz * d; s2 += x * x + z * z; best = Math.max(best, Math.sqrt(2 * s2 / (k + 1))); rad[k] = best; }
@@ -246,7 +285,10 @@
       for (let k = 0; k + 1 < pts.length; k++) {
         const a = pts[k], b = pts[k + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
         if (used && st.id !== undefined && lim >= 0) { if (s >= lim) break; const t = Math.min(1, (lim - s) / L); out.push([a[0], a[1], a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, st.hw, st.rank]); }
-        else if (!(used && st.id !== undefined && P.morph === 'organic')) { if (Math.hypot(a[0], a[1]) < R && Math.hypot(b[0], b[1]) < R) out.push([a[0], a[1], b[0], b[1], st.hw, st.rank]); }
+        else if (!(used && st.id !== undefined && P.morph === 'organic')) {      // (the part of it within the town: a grid's street is one long line across the whole plan)
+          const dx = b[0] - a[0], dz = b[1] - a[1], A = dx * dx + dz * dz, B = a[0] * dx + a[1] * dz, Cc = a[0] * a[0] + a[1] * a[1] - R * R, disc = B * B - A * Cc;
+          if (A > 1e-9 && disc > 0) { const sq = Math.sqrt(disc); const t0 = Math.max(0, (-B - sq) / A), t1 = Math.min(1, (-B + sq) / A); if (t1 - t0 > 1e-6) out.push([a[0] + dx * t0, a[1] + dz * t0, a[0] + dx * t1, a[1] + dz * t1, st.hw, st.rank]); }
+        }
         s += L;
       }
     }

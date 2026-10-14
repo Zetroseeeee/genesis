@@ -262,13 +262,14 @@
   function approxR(morph, opt, n) {
     if (n <= 0) return 30;
     if (morph === 'organic') return 14.5 * Math.sqrt(n * (opt.front[0] + opt.front[1]) / 17) + 12;
-    if (morph === 'grid') return 15.5 * Math.sqrt(n * (opt.front[0] + opt.front[1]) / 17) + 22;
-    if (morph === 'medina') return 0.68 * opt.cell * Math.sqrt(n) + 12;
+    if (morph === 'grid') return 12.4 * Math.sqrt(n * (opt.front[0] + opt.front[1]) / 17 * (opt.block || 90) / 100) + 22;
+    if (morph === 'medina') return 0.62 * opt.cell * Math.sqrt(n) + 12;
     if (morph === 'compound') return 0.29 * opt.spacing * Math.sqrt(n) + 6;
     return 0.6 * opt.spacing * Math.sqrt(n) + 6;
   }
   // what a town is now: its place, its record, its kind, its plan's options, how far into its age its people are, how many
   // households, whether it is a city of the machine age (its old town on the plan, the rest by zone), how far out it reaches
+  const SPRAWL = { cluster: 900, compound: 4000 };
   const tpCache = new Map();
   function townPlan(sim, i, c) {
     const people = peopleOf(sim, i); const rec = sim.townRec ? sim.townRec(i) : null; const cul = civCulture(sim, c); const P = progressOf(c);
@@ -279,11 +280,13 @@
     const morph = window.PLOTS.morphOf(st.fam, st.region, cul, foundEra);
     const opt = tp && tp.morph === morph && tp.foundEra === foundEra && tp.cul === cul ? tp.opt : planOpt(i, morph, st, cul, foundEra);
     const nAll = people / PPP; const city = !!(rec && rec[3] > 0) && P >= 6;
-    const n = Math.max(1, Math.round(Math.min(NFINE, city ? bandPeople(rec[3]) / PPP : nAll)));
+    // (a camp of the herders, a village of family yards, grows as it is only so far: a town of thousands about it is a town of lanes)
+    const cap = SPRAWL[morph] && nAll > SPRAWL[morph] ? SPRAWL[morph] : NFINE; const sprawl = cap < NFINE && !city;
+    const n = Math.max(1, Math.round(Math.min(cap, city ? bandPeople(rec[3]) / PPP : nAll)));
     const Rcore = approxR(morph, opt, n); let R = Rcore;
-    if (!city && nAll > NFINE) R = Math.sqrt(Rcore * Rcore + (nAll - NFINE) * AREA_P / Math.PI);
+    if (!city && nAll > cap) R = Math.sqrt(Rcore * Rcore + (nAll - cap) * AREA_P / Math.PI);
     if (city) R = Math.max(Rcore, Rmodern(people, P, cul));
-    tp = { key, st, rec, foundEra, morph, opt, P, city, nAll, n, Rcore, R, cul };
+    tp = { key, st, rec, foundEra, morph, opt, P, city, sprawl, nAll, n, Rcore, R, cul };
     tpCache.set(i, tp); if (tpCache.size > 3000) tpCache.delete(tpCache.keys().next().value);
     return tp;
   }
@@ -502,62 +505,110 @@
           it = push('rubble', cx, cz, Math.min(pl.f * 0.8, 10), 5, Math.min(pl.dep * 0.6, 10), pl.yaw, 0x8f8a80, packStyle(WALL.stone, ROOF.flat, cul, FLAG.ruin)); it.pk = p; continue;
         }
         if (eE < 4) {
-          // the first ages: a house of the people's own (a model where there is one, else the kit's), fitted to its plot
+          // the first ages: a house of the people's own (a model where there is one, else the kit's), fitted to its plot; in a
+          // town of the Near East's kind the houses fill their cells as its mud-brick houses did, two to a cell where they are small
           const sE = styleEra(eE, cul), hb = bandOf(sE); const list = HOUSES[cname][hb]; const pl2 = PAL[cname][hb];
-          let tot = 0; const wts = list.map((e) => { const z = KSZ[e[0]] || [8, 8]; const ok = z[0] * 0.8 <= pl.f - 0.6 && z[1] * 0.8 <= pl.dep - 1; const w = e[1] * (ok ? 1 : 0.04); tot += w; return w; });
+          const packed = pl.cell && morph === 'medina';
+          let tot = 0; const wts = list.map((e) => { const z = KSZ[e[0]] || [8, 8]; const ok = z[0] * 0.8 <= pl.f - 0.6 && z[1] * 0.8 <= pl.dep - 1; let w = e[1] * (ok ? 1 : 0.04);
+            if (packed) { const two = z[0] * 1.9 + 0.6 <= pl.f; const fill = Math.min(1, z[0] * 1.25 * (two ? 2 : 1) / (pl.f - 0.4)) * Math.min(1, z[1] * 1.25 / (pl.dep - 0.4)); w *= fill * fill * fill; }
+            tot += w; return w; });
           let t = r1 * tot, e = list[0]; for (let q = 0; q < list.length; q++) { t -= wts[q]; if (t <= 0) { e = list[q]; break; } }
-          const z = KSZ[e[0]] || [8, 8]; hw = Math.min(z[0], pl.f - 0.8); hd = Math.min(z[1], pl.dep - 1.5);
-          setback = eE === 0 ? 2 + 6 * r2 : eE <= 2 ? 1 + 3 * r2 : morph === 'grid' || ctx !== 'rural' ? 0.3 : 1.5 + 2 * r2;
-          if (setback + hd > pl.dep - 0.5) setback = Math.max(0.2, pl.dep - 0.5 - hd);
-          hx = (r3 - 0.5) * Math.max(0, pl.f - hw - 1) * (eE <= 1 ? 1 : 0.5);
-          const jit = (eE === 0 ? 0.35 : eE <= 2 ? 0.12 : 0) * (hash(i, 7350 + p) - 0.5) * 2;
-          const xd = Math.cos(pl.yaw), zd = Math.sin(pl.yaw); const D0 = setback + hd * 0.5;
-          it = push(e[0], pl.x + pl.nx * D0 + xd * hx, pl.z + pl.nz * D0 + zd * hx, hw, heightOf(e[0], clamp(1 - dC / R, 0, 1)), hd, pl.yaw + jit, colorOfP(pl2, 7400 + p * 3), packStyle(e[2], e[3], cul, 0), 0, prog);
-          it.era = sE; it.pk = p;
+          const z = KSZ[e[0]] || [8, 8];
+          const xd = Math.cos(pl.yaw), zd = Math.sin(pl.yaw);
+          if (packed) {
+            const two = z[0] * 1.9 + 0.6 <= pl.f; const nA = two ? 2 : 1; const fS = pl.f / nA; hd = pl.dep - 0.3; setback = 0.15; hw = pl.f - 0.3; hx = 0;
+            for (let j = 0; j < nA; j++) { const along = (j + 0.5) * fS - pl.f * 0.5; const D0 = setback + hd * 0.5;
+              const q = push(e[0], pl.x + pl.nx * D0 + xd * along, pl.z + pl.nz * D0 + zd * along, fS - 0.3, heightOf(e[0], clamp(1 - dC / R, 0, 1)), hd, pl.yaw, colorOfP(pl2, 7400 + p * 3 + j), packStyle(e[2], e[3], cul, 0), 0, prog);
+              q.era = sE; q.pk = nA > 1 ? p + '.' + j : p; it = q; if (j) nHouses++; }
+          } else {
+            hw = Math.min(z[0], pl.f - 0.8); hd = Math.min(z[1], pl.dep - 1.5);
+            setback = eE === 0 ? 2 + 6 * r2 : eE <= 2 ? 1 + 3 * r2 : morph === 'grid' || ctx !== 'rural' ? 0.3 : 1.5 + 2 * r2;
+            if (setback + hd > pl.dep - 0.5) setback = Math.max(0.2, pl.dep - 0.5 - hd);
+            hx = (r3 - 0.5) * Math.max(0, pl.f - hw - 1) * (eE <= 1 ? 1 : 0.5);
+            const jit = (eE === 0 ? 0.35 : eE <= 2 ? 0.12 : 0) * (hash(i, 7350 + p) - 0.5) * 2;
+            const D0 = setback + hd * 0.5;
+            it = push(e[0], pl.x + pl.nx * D0 + xd * hx, pl.z + pl.nz * D0 + zd * hx, hw, heightOf(e[0], clamp(1 - dC / R, 0, 1)), hd, pl.yaw + jit, colorOfP(pl2, 7400 + p * 3), packStyle(e[2], e[3], cul, 0), 0, prog);
+            it.era = sE; it.pk = p;
+          }
         } else {
           // a house of the place's own type, of the manner it was built in, fitted to the plot. Where people build wall to wall a
-          // town's plot holds a house or two side by side, the frontage shared out among them (each its own type and paint);
-          // where they build apart, one in its yard; a family's yard in Africa, its huts round it or one house of rooms about it
+          // town's plot holds a row of houses side by side, the frontage shared out among them (each its own type and paint, each
+          // as wide as its share: a little wider or narrower than its type); where they build apart, one in its yard; in a medina
+          // a house is its cell, its type stretched to fill it and what it leaves walled in as its garden; a family's yard in
+          // Africa, its huts round it or one house of rooms about it
           const sk = window.VERN.styleAt(st, eE, fE, fam, r1); let types = window.VERN.types(sk, ctx, st, nT);
           const roundish = types[0].plan === 'round' && types[types.length - 1].plan === 'round';
           if (roundish && ctx !== 'rural') types = window.VERN.types(sk, 'rural', st, nT);
-          const attached = !roundish && ctx !== 'rural' && !!ROWS[st.fam] && morph !== 'medina' && morph !== 'compound' && morph !== 'cluster';
+          const rowOK = (gq) => gq.plan !== 'round' && !gq.annex && !(gq.gal && gq.gal.side !== 'front') && !(gq.chim.n && gq.chim.at === 'side');
+          let attached = !roundish && ctx !== 'rural' && !!ROWS[st.fam] && morph !== 'medina' && morph !== 'compound' && morph !== 'cluster';
           let ax = pl.x, az = pl.z, yaw = pl.yaw, F0 = pl.f, D1 = pl.dep, nxx = pl.nx, nzz = pl.nz;
           if (morph === 'compound' && !roundish && pl.comp !== undefined) {      // (one house of rooms about the family's yard)
             if (compDone.has('h' + pl.comp)) continue; compDone.add('h' + pl.comp);
             F0 = D1 = pl.cr * 1.9; ax = pl.cx - pl.nx * pl.cr * 0.95; az = pl.cz - pl.nz * pl.cr * 0.95;
           }
-          const m = attached ? Math.max(1, Math.round(F0 / (ctx === 'rich' ? 13 : 7.5))) : 1; const fS = F0 / m;
           const xd = Math.cos(yaw), zd = Math.sin(yaw); let placed = 0;
-          for (let j = 0; j < m; j++) {
-            const rj = j ? hash(i, 7270 + p * 7 + j) : r3;
-            let sb = attached ? 0 : ctx === 'urban' ? 0.8 + 2 * r2 : (st.fam === 'nam' || st.fam === 'amer') && eE >= 6 ? 5 + 5 * r2 : morph === 'medina' || morph === 'compound' || morph === 'cluster' ? 0.4 : 1.5 + 4 * r2;
-            const gap = attached ? 0 : clamp(fS * 0.12, 1.2, 4); const wMax = fS - gap;
-            let g = null, sc = 1, F = null;
-            for (const tl of ctx === 'rich' ? [types, window.VERN.types(sk, 'urban', st, nT)] : [types]) {
-              const nt = tl.length; const q0 = Math.floor(rj * nt);
-              for (let q = 0; q < nt && !g; q++) {
-                const gq = tl[(q0 + q) % nt]; const Fq = window.VERN.foot(gq); const fw = Fq.x1 - Fq.x0, fd = Fq.z1 - Fq.z0; let s1 = 1;
-                if (attached) { if (gq.plan === 'round' || gq.annex || gq.gal && gq.gal.side !== 'front' || gq.chim.at === 'side') continue; s1 = fS / gq.w; if (s1 < 0.8 || s1 > 1.25) continue; }
-                else if (fw > wMax) { s1 = wMax / fw; if (s1 < 0.8) continue; }
-                const room = D1 - (pl.cell ? 0.3 : 1.5); if (fd * s1 + sb > room) { const sb2 = Math.max(0.3, room - fd * s1); if (sb2 < sb) sb = sb2; if (fd * s1 + sb > room) { const s2 = (room - sb) / fd; if (s2 < 0.8) continue; s1 = Math.min(s1, s2); } }
-                g = gq; sc = s1; F = Fq;
+          const cell = (pl.cell && morph === 'medina' || morph === 'compound' && pl.comp !== undefined) && !roundish;
+          if (cell) {
+            // the type that fills the cell best as it is (or a little larger or smaller), then stretched the rest of the way
+            const nt = types.length, q0 = Math.floor(r3 * nt); let g = null, best = -1;
+            for (let q = 0; q < nt; q++) { const gq = types[(q0 + q) % nt]; const Fq = window.VERN.foot(gq); const fw = Fq.x1 - Fq.x0, fd = Fq.z1 - Fq.z0;
+              const s1 = clamp(Math.min((F0 - 0.2) / fw, (D1 - 0.2) / fd), 0.85, 1.2); const ex = Math.min(1, fw * s1 * 1.25 / (F0 - 0.2)) * Math.min(1, fd * s1 * 1.25 / (D1 - 0.2));
+              const sc = ex * (gq.plan === 'court' ? 1.15 : 1) * (0.9 + 0.2 * hash(i, 7280 + p * 13 + q)); if (sc > best) { best = sc; g = gq; } }
+            const F = window.VERN.foot(g); const fw0 = F.x1 - F.x0, fd0 = F.z1 - F.z0;
+            const sc = clamp(Math.min((F0 - 0.2) / fw0, (D1 - 0.2) / fd0), 0.85, 1.2); const sx = clamp((F0 - 0.2) / (fw0 * sc), 0.8, 1.25), sz = clamp((D1 - 0.2) / (fd0 * sc), 0.8, 1.25);
+            const fw = fw0 * sc * sx, fd = fd0 * sc * sz; const sb = 0.1; const D0 = sb + fd * 0.5;
+            const cols = window.VERN.colours(g, (Math.imul(i, 7919) + Math.imul(p, 104729)) >>> 0);
+            it = push('vh', ax + nxx * D0, az + nzz * D0, fw, window.VERN.heightOf(g) * sc, fd, yaw, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0), 0, prog);
+            it.g = g; it.sc = sc; it.sx = sx; it.sz = sz; it.pal = cols; it.pk = p; it.era = eE; it.u = 1;
+            it.ofx = -(F.x0 + F.x1) * 0.5 * sc * sx; it.ofz = -(F.z0 + F.z1) * 0.5 * sc * sz;
+            hx = 0; hw = fw; hd = fd; setback = sb; placed = 1;
+            // what the house leaves of its cell, walled in: a garden behind it, a strip beside it (a riad's, a court's)
+            const back = D1 - sb - fd, side = F0 - fw; const wc = st.dry > 0.5 || bnd === 'mud' ? 0xb08a5c : 0xa49c90, wsty = packStyle(bnd === 'mud' || st.dry > 0.5 ? WALL.adobe : WALL.stone, ROOF.flat, cul, FLAG.thing);
+            const wall = (along, depth, w, yw) => { const q = push('yardwall', ax + nxx * depth + xd * along, az + nzz * depth + zd * along, w, 2.6, 0.45, yw, wc, wsty); q.u = 1; q.prop = 1; q.pk = 'm' + p + ':' + Math.round(along * 10) + ':' + Math.round(depth * 10); return q; };
+            if (morph !== 'medina') { /* (a family's yard: its wall is the compound's, below) */ }
+            else if (back > 1.6) { wall(0, D1 - 0.25, F0 - 0.3, yaw); for (const sd of [-1, 1]) wall(sd * (F0 * 0.5 - 0.25), sb + fd + back * 0.5, back, yaw + Math.PI / 2); if (back > 3 && !dryL && hash(i, 7290 + p) < 0.6) { const q = push('garden', ax + nxx * (sb + fd + back * 0.5), az + nzz * (sb + fd + back * 0.5), F0 - 2, 0.3, back - 1.4, yaw, 0x5a6a3a, packStyle(WALL.adobe, ROOF.flat, cul, FLAG.garden | FLAG.thing)); q.u = 1; q.prop = 1; q.pk = 'm' + p + 'g'; } }
+            if (side > 1.6 && morph === 'medina') for (const sd of [-1, 1]) wall(sd * (F0 * 0.5 - 0.25), sb + fd * 0.5, fd, yaw + Math.PI / 2);
+          } else {
+            let m = 1;
+            if (attached) { let sw = 0, nw = 0; for (const gq of types) if (rowOK(gq)) { sw += gq.w; nw++; } if (nw) m = clamp(Math.round(F0 / (sw / nw)), 1, 8); else attached = false; }
+            const fS = F0 / m;
+            for (let j = 0; j < m; j++) {
+              const rj = j ? hash(i, 7270 + p * 7 + j) : r3;
+              let sb = attached ? 0 : ctx === 'urban' ? 0.8 + 2 * r2 : (st.fam === 'nam' || st.fam === 'amer') && eE >= 6 ? 5 + 5 * r2 : morph === 'medina' || morph === 'compound' || morph === 'cluster' ? 0.4 : 1.5 + 4 * r2;
+              const gap = attached ? 0 : clamp(fS * 0.12, 1.2, 4); const wMax = fS - gap; const room = D1 - (pl.cell ? 0.3 : 1.5);
+              let g = null, sc = 1, sx = 1, F = null;
+              // a row: the first type whose width is near its share (then any that will stretch to it); apart: the first that fits
+              // its plot (then the smallest, made smaller), so that no plot is left empty for want of a house of its size
+              const tls = ctx === 'rich' ? [types, window.VERN.types(sk, 'urban', st, nT)] : [types];
+              for (const tol of attached ? [[0.86, 1.16], [0.72, 1.38]] : [[0.8, 1]]) {
+                for (const tl of tls) {
+                  const nt = tl.length; const q0 = Math.floor(rj * nt);
+                  for (let q = 0; q < nt && !g; q++) {
+                    const gq = tl[(q0 + q) % nt]; const Fq = window.VERN.foot(gq); const fw = Fq.x1 - Fq.x0, fd = Fq.z1 - Fq.z0; let s1 = 1, x1 = 1;
+                    if (attached) { if (!rowOK(gq)) continue; x1 = fS / gq.w; if (x1 < tol[0] || x1 > tol[1]) continue; s1 = clamp(x1, 0.92, 1.08); x1 /= s1; }
+                    else if (fw > wMax) { s1 = wMax / fw; if (s1 < 0.8) continue; }
+                    if (fd * s1 + sb > room) { const sb2 = Math.max(0.3, room - fd * s1); if (sb2 < sb) sb = sb2; if (fd * s1 + sb > room) { const s2 = (room - sb) / fd; if (s2 < 0.8) continue; if (attached) x1 *= s1 / Math.min(s1, s2); s1 = Math.min(s1, s2); } }
+                    g = gq; sc = s1; sx = x1; F = Fq;
+                  }
+                  if (g) break;
+                }
+                if (g) break;
               }
-              if (g) break;
+              if (!g && !attached) { let bw = 1e9; for (const gq of types) { const Fq = window.VERN.foot(gq); const fw = Fq.x1 - Fq.x0; if (fw < bw) { bw = fw; g = gq; F = Fq; } }
+                const fd = F.z1 - F.z0; sc = Math.min(1, wMax / bw, (room - 0.3) / fd); sb = Math.min(sb, 0.3); if (sc < 0.55) g = null; }
+              if (!g) continue;      // (nothing of the place's would stand on so mean a plot: it stays a yard)
+              const fw = (F.x1 - F.x0) * sc * sx, fd = (F.z1 - F.z0) * sc;
+              const along = (j + 0.5) * fS - F0 * 0.5 + (attached ? 0 : (r2 - 0.5) * Math.max(0, wMax - fw) * 0.8); const D0 = sb + fd * 0.5;
+              const cols = window.VERN.colours(g, (Math.imul(i, 7919) + Math.imul(p, 104729) + j * 7) >>> 0);
+              it = push('vh', ax + nxx * D0 + xd * along, az + nzz * D0 + zd * along, fw, window.VERN.heightOf(g) * sc, fd, yaw, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0), 0, prog);
+              it.g = g; it.sc = sc; if (sx !== 1) it.sx = sx; it.pal = cols; it.pk = m > 1 ? p + '.' + j : p; it.era = eE; it.u = 1;
+              // (the type's own middle is not its footprint's: where its origin lies from the footprint's middle, in its own frame)
+              it.ofx = -(F.x0 + F.x1) * 0.5 * sc * sx; it.ofz = -(F.z0 + F.z1) * 0.5 * sc;
+              if (!placed) { hx = along; hw = fw; hd = fd; setback = sb; } else { hw = Math.abs(along - hx) + fw; hx = (hx + along) * 0.5; hd = Math.max(hd, fd); }
+              placed++; if (placed > 1) nHouses++;
             }
-            if (!g) continue;      // (nothing of the place's would stand on so mean a plot: it stays a yard)
-            const fw = (F.x1 - F.x0) * sc, fd = (F.z1 - F.z0) * sc;
-            const along = (j + 0.5) * fS - F0 * 0.5 + (attached ? 0 : (r2 - 0.5) * Math.max(0, wMax - fw) * 0.8); const D0 = sb + fd * 0.5;
-            const cols = window.VERN.colours(g, (Math.imul(i, 7919) + Math.imul(p, 104729) + j * 7) >>> 0);
-            it = push('vh', ax + nxx * D0 + xd * along, az + nzz * D0 + zd * along, fw, window.VERN.heightOf(g) * sc, fd, yaw, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0), 0, prog);
-            it.g = g; it.sc = sc; it.pal = cols; it.pk = m > 1 ? p + '.' + j : p; it.era = eE; it.u = 1;
-            // (the type's own middle is not its footprint's: where its origin lies from the footprint's middle, in its own frame)
-            it.ofx = -(F.x0 + F.x1) * 0.5 * sc; it.ofz = -(F.z0 + F.z1) * 0.5 * sc;
-            if (!placed) { hx = along; hw = fw; hd = fd; setback = sb; } else { hw = Math.abs(along - hx) + fw; hx = (hx + along) * 0.5; hd = Math.max(hd, fd); }
-            placed++; if (placed > 1) nHouses++;
           }
           if (!placed) continue;
-          if (morph === 'compound' && !roundish) continue;      // (its yard is the house's court)
         }
         nHouses++; if (prog < 1) nSites++;
         // --- the yard: what a household keeps about its house ---
@@ -731,7 +782,7 @@
     // the grid: everything for a far town or one whose plan is still to come; for a city of the machine age, what lies beyond the
     // old town on its plan (and its towers, where they stand in the middle)
     let count = 0; const maxN = coarse ? 2600 : era >= 6 ? 20000 : 12000;      // (a city of millions is some twenty thousand plots: each a block of houses or flats, or a tower)
-    const gridOn = !fine || tp.city;
+    const gridOn = !fine || tp.city || tp.sprawl;
     const slots = [];
     if (gridOn) for (let gy = -n; gy <= n; gy++) for (let gx = -n; gx <= n; gx++) {
       // streets: leave every (blockN+1)-th row/column empty in planned towns; organic towns leave radial lanes
@@ -771,7 +822,13 @@
         push('blockold', x, z, s * 1.7, hh, s * 1.7, axis, colorOf(k + 3), packStyle(houses[0][2], houses[0][3], cul, FLAG.block)); count++; continue;
       }
       // a city's block beyond its old town, by zone
-      const u = urban(x, z, r / R, k); const o = u === OLD ? oldSpec(k) : u; if (!o) continue;
+      const u = urban(x, z, r / R, k); const o = u === OLD ? oldSpec(k) : u;
+      if (!o) {      // (the people's own houses at the edge of a city of the machine age: of the place's manner in the age, as on its plots)
+        const vs = window.VERN.styleAt(tp.st, eraReal, 0.5, window.VERN.CULFAM[cul], hash(i, k + 4)); const vt = window.VERN.types(vs, 'rural', tp.st, window.VERN.nTypes(lvl));
+        const g = vt[Math.floor(hash(i, k + 5) * vt.length) % vt.length]; const F = window.VERN.foot(g); const fw = F.x1 - F.x0, fd = F.z1 - F.z0; const sc = clamp(Math.min(s * 0.78 / fw, s * 0.78 / fd), 0.6, 1.1);
+        const cols = window.VERN.colours(g, (Math.imul(i, 7919) + Math.imul(k, 104729)) >>> 0);
+        const hv = push('vh', x, z, fw * sc, window.VERN.heightOf(g) * sc, fd * sc, yaw, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0)); hv.g = g; hv.sc = sc; hv.pal = cols; hv.era = eraReal; hv.u = 1; hv.ofx = -(F.x0 + F.x1) * 0.5 * sc; hv.ofz = -(F.z0 + F.z1) * 0.5 * sc; count++; continue;
+      }
       const [kind, wm, rm, w, d, h, fl] = o;
       if (quake >= 0 && hash(i, k + 11) < 0.35 * (1 - quake / 3)) { push('rubble', x, z, w, Math.min(h * 0.75, 6), d, yaw, colorOfP(o[7], k + 10), packStyle(wm, ROOF.flat, cul, FLAG.ruin)); count++; continue; }
       const hit = push(kind, x, z, w, h, d, yaw, colorOfP(o[7], k + 10), packStyle(wm, rm, cul, fl)); if (u === OLD) hit.era = 5; count++;

@@ -178,13 +178,15 @@
         if (Rv && Rv.camp && nowS < Rv.camp.until) { L.camp = Rv.camp; if (dKm < 60) this.drawCamp(Rv.camp, L, cLon, cLat, cl, L.k || 1, counts, nowS); } else if (L.camp) L.camp = null;
         const era = L.era === undefined ? c.era : L.era; const seed = (i % 997) / 997; const kRep = L.k || 1; const cul = L.culture || 0;      // the era whose manner the town is built in (TOWN.styleEra: the old ways last)
         const wantCasters = dKm < 40 && !coarse;
+        // (a yard's things only where they are a few pixels or more: about the point looked at, as far as the town's scale lets them be seen)
+        const camE = (cam.lon - cLon) * R_M * cl * GEO.D2R, camN = (cam.lat - cLat) * R_M * GEO.D2R, eye2 = (dist * R_M) * (dist * R_M), propR2 = (kRep * 1500) * (kRep * 1500);
         for (let k = 0; k < n; k++) {
           if (mask && mask[k] === 1) continue;
           const cut = !!(mask && mask[k] === 2);               // a wall that runs into the river: drawn up to the bank
           if (fits && fits[k]) continue;                       // its model would stand in a neighbour's
           if (items[k].off) continue;                          // a harbour with no shore to stand on
           const it = items[k];
-          if (it.prop && (dKm > 30 || coarse)) continue;      // (a yard's things are too small to see from further)
+          if (it.prop && (dKm > 30 || coarse || (it.x - camE) * (it.x - camE) + (it.z - camN) * (it.z - camN) + eye2 > propR2)) continue;      // (a yard's things are too small to see from further)
           const rv = Rv && it.pk !== undefined ? Rv.seen.get(it.pk) : null; const tUp = rv && rv.t0 > nowS - 9 ? rv.t0 : 0;
           if (it.kind === 'vh' || (rv && rv.old && rv.oldEnd > nowS && rv.old.kind === 'vh')) {
             const lon = cLon + it.x / (R_M * cl * GEO.D2R), lat = cLat + it.z / (R_M * GEO.D2R); const hg = hts[k]; if (hg < 0.5) continue;
@@ -327,8 +329,8 @@
       // (a type's finer meshes are made when first wanted: a few milliseconds a pass for them, the rest drawn coarser meanwhile)
       if (lod < 2 && !HOUSES.has(g, lod)) { if (this._geoMs > 14) lod = HOUSES.has(g, 1) ? 1 : 2; else { const t = performance.now(); HOUSES.geometry(g, lod); this._geoMs += performance.now() - t; } }
       const key = g.id + '/' + lod; let r = this.vh.get(key); if (!r) { r = { g, lod, mesh: null, cap: 0, data: [], n: 0 }; this.vh.set(key, r); }
-      const D = r.data, p = it.pal;
-      D.push((cy * Ex + sy * Nx) * kx, (sy * Ny) * kx, (cy * Ez + sy * Nz) * kx, Ux * kx, Uy * kx, Uz * kx, (sy * Ex - cy * Nx) * kx, (-cy * Ny) * kx, (sy * Ez - cy * Nz) * kx, tx, ty, tz,
+      const D = r.data, p = it.pal; const ax = kx * (it.sx || 1), az = kx * (it.sz || 1);      // (a house stretched a little to fill its share of a row or its cell)
+      D.push((cy * Ex + sy * Nx) * ax, (sy * Ny) * ax, (cy * Ez + sy * Nz) * ax, Ux * kx, Uy * kx, Uz * kx, (sy * Ex - cy * Nx) * az, (-cy * Ny) * az, (sy * Ez - cy * Nz) * az, tx, ty, tz,
         ((it.color >> 16) & 255) / 255, ((it.color >> 8) & 255) / 255, (it.color & 255) / 255,
         p ? p[1] : 0xffffff, p ? p[2] : 0x404040, p ? p[3] : 0x503828, p ? p[4] : 0xffffff,
         it.era === undefined ? 4 : it.era, seed, it.style, k, t0, tEnd, prog === undefined ? 1 : prog, H);

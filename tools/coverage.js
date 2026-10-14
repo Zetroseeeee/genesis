@@ -23,7 +23,7 @@ for (const era of eras) {
     const [lon, lat] = SITES[name]; const sim = createSim(wd, 7); const i = Math.floor((90 - lat) / 180 * H) * W + Math.floor((lon + 180) / 360 * W);
     const c = sim.setPlayer(i, 'T', [0.5, 0.5]); if (!c) { console.log(name, 'cannot found here'); continue; }
     c.tech = TECH[era]; c.era = sim.eraOf(c.tech); sim.pop[c.capital] = 6; sim.walls[c.capital] = 2; sim.special[c.capital] |= 1 | 2 | 4 | 8 | 512 | (wonder ? 16 | (era << 5) : 0); { const a = new Uint8Array(sim.IND.length); let plot = 4; sim.IND.forEach((k, q) => { if (!/Not before/.test(sim.cannot(k, c.capital) || '')) a[q] = 1 + (plot++ % 12); }); sim.ind.set(c.capital, a); }      // every workshop the age knows
-    for (let t = 0; t < 3; t++) sim.tick(); c.eraSince = sim.year - 300;
+    for (let t = 0; t < 3; t++) sim.tick(); c.eraSince = sim.year - 300; if (sim.gYear) sim.gYear[c.capital] = -1e9;      // (built long ago: nothing still going up)
     const L = window.TOWN.layout(sim, c.capital, c, {}); const cul = L.culture;
     const real = {}, kit = {};
     let nVh = 0; for (const it of L.items) { if (it.kind === 'vh') { nVh++; continue; } if (it.prop || it.kind === 'stall' && it.pk !== undefined) continue;      // (houses of the place's own are houses.js's, a yard's things the kit's by design)

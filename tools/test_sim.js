@@ -1,7 +1,7 @@
 // GENESIS headless simulation test: runs sim.js in node for thousands of years and checks invariants,
 // every player action and god power, save/load round trips, and memory bounds. Exit code 1 on any failure.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
-require('../dist/geo.js'); require('../dist/town.js');
+require('../dist/geo.js'); require('../dist/vern.js'); require('../dist/plots.js'); require('../dist/town.js'); window.TOWN.budget.on = false;      // (the planner a town at a time, as a page does: here every plan at once)
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8')); (0, eval)(fs.readFileSync('src/climate.js', 'utf8')); (0, eval)(fs.readFileSync('src/migrate.js', 'utf8')); (0, eval)(fs.readFileSync('src/woods.js', 'utf8')); (0, eval)(fs.readFileSync('src/replay.js', 'utf8'));
