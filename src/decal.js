@@ -240,11 +240,11 @@
           const [sx, sy] = site(i); const R = TOWN.radiusM(sim, i, c); const spread = Math.max(R * 1.24, mpp * 3) / R_M;      // the trodden ground of the town itself: all of it within the walls, fading into the fields outside
           const cult = sim.cultivation(i);
           if (cult > 0.03) { const rr = Math.max(TOWN.fieldsM(sim, i, c), mpp * 4) / R_M; disc(sx, sy, rr / r.cl, rr, Math.min(1, 0.4 + cult * 0.6), 2, 24, 0.78); }      // fields all the way out to where the farmsteads stand, thinning beyond
-          { const val = 0.16 + 0.05 * lvl + 0.1 * Math.min(1, c.era / 6);
+          { const se = TOWN.styleEra(c.era, TOWN.civCulture(sim, c)); const val = (0.16 + 0.05 * lvl + 0.1 * Math.min(1, c.era / 6)) * (se < 6 ? 0.55 : 1);      // (a town before the machine age is its streets and yards: the ground between its houses is trodden, not paved over)
             // (a city of the Modern age and after is paved in the middle and green at the edge: its suburbs are houses with
             // gardens, the grass beside the streets - town.js plans them so)
-            if (TOWN.styleEra(c.era, TOWN.civCulture(sim, c)) >= 7) { const core = 0.58 - 0.06 * Math.min(1, (lvl - 1) / 3); disc(sx, sy, spread * core / r.cl, spread * core, val, 1, 20, 0.85); disc(sx, sy, spread / r.cl, spread, 0.1, 1, 20, 0.85); }
-            else disc(sx, sy, spread / r.cl, spread, val, 1, 20, 0.85); }
+            if (se >= 7) { const core = 0.58 - 0.06 * Math.min(1, (lvl - 1) / 3); disc(sx, sy, spread * core / r.cl, spread * core, val, 1, 20, 0.85); disc(sx, sy, spread / r.cl, spread, 0.1, 1, 20, 0.85); }
+            else disc(sx, sy, spread * (se < 6 ? 0.8 : 1) / r.cl, spread * (se < 6 ? 0.8 : 1), val, 1, 20, 0.85); }
           // the town's own streets and square, once we are close enough for them to be more than a pixel
           if (mpp < 420) { // streets are drawn at the town's representational scale, so they show from region height
             const L = TOWN.layout(sim, i, c, { coarse: false }); const mLon = 1 / (R_M * r.cl), mLat = 1 / R_M;

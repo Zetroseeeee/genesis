@@ -152,7 +152,18 @@
     g.mill = merge([box(1, 0.74, 1), box(1.03, 0.04, 1.03, 0, 0.74), box(0.2, 0.2, 0.32, 0.38, 0.78, 0), cyl(0.05, 0.08, 1.35, 8, -0.44, 0, 0.44)]);      // a mill of five floors and its chimney
     { const ms = [cyl(0.46, 0.46, 0.84, 20)]; for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; ms.push(cyl(0.018, 0.022, 1, 4, Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5)); } ms.push(ring(0.52, 0.48, 0.03, 20, 0, 0.97)); g.gasometer = merge(ms); }      // a gasholder in its frame
     g.mall = merge([box(1, 0.66, 1), box(0.42, 0.34, 0.3, 0.2, 0.66, -0.12), box(0.24, 0.12, 0.24, -0.26, 0.66, 0.24)]);
-    g.lawn = merge([box(1, 0.5, 1, 0, -0.48, 0)]);      // a park's grass (its trees are trees.js's): lies just above the ground, reaches down into it
+    g.lawn = merge([box(1, 0.5, 1, 0, -0.48, 0)]);
+    // what a household keeps about its house (town.js: the yard of a plot): its bounds - a fence of boards or wattle, a wall of field
+    // stones or mud, a hedge -, its firewood, a stack of hay, its beds, a shed, and in the first ages a hearth and a rack for hides
+    g.fence = merge([box(1, 0.86, 1), box(1, 0.08, 1.5, 0, 0.86, 0)]);
+    g.yardwall = merge([box(1, 0.92, 1), box(1.0, 0.08, 1.2, 0, 0.92, 0)]);
+    g.hedge = merge([box(1, 0.5, 0.86), cyl(0.5, 0.5, 1, 8).rotateZ(Math.PI / 2).translate(0, 0.5, 0)]);
+    { const ms = [box(1, 0.3, 0.9)]; for (let r = 0; r < 3; r++) for (let k = 0; k < 4 - r; k++) { const c = new THREE.CylinderGeometry(0.13, 0.13, 1, 6); c.rotateZ(Math.PI / 2); c.translate(0, 0.3 + r * 0.22 + 0.11, -0.33 + (k + r * 0.5) * 0.22); ms.push(c); } g.woodpile = merge(ms); }
+    g.haystack = merge([cyl(0.48, 0.5, 0.5, 10), dome(0.5, 0, 0.5, 0, 1.0)]);
+    g.garden = merge([box(1, 1, 1)]);
+    g.shed = merge([box(1, 0.72, 1), gableRoof(1.12, 0.28, 1.14, 0, 0.72)]);
+    g.rack = merge([box(0.06, 1, 0.08, -0.46, 0, 0), box(0.06, 1, 0.08, 0.46, 0, 0), box(1, 0.05, 0.06, 0, 0.93, 0), box(0.36, 0.55, 0.03, -0.2, 0.35, 0), box(0.3, 0.48, 0.03, 0.22, 0.42, 0.04)]);
+    g.firepit = merge([ring(0.5, 0.33, 0.6, 10), box(0.7, 0.12, 0.7), box(0.5, 0.22, 0.08, 0, 0.1, 0).rotateY(0.5), box(0.5, 0.22, 0.08, 0, 0.1, 0).rotateY(-0.6)]);      // a park's grass (its trees are trees.js's): lies just above the ground, reaches down into it
     // What a great city's plot holds where one drawn building stands for many (town.js: a plot of a city of millions is a block of
     // ninety metres): its houses together, each its own size and roof, with the gardens between. They carry the block flag, and
     // the shader gives every house of them a colour of its own.
@@ -212,6 +223,7 @@
   const VERT = `
     attribute vec4 aInfo;                 // era, seed, style (wall + roof*8 + culture*64 + flags*1024), representational scale (drawn size / true size)
     uniform float uMetres;                // scene units -> metres (R_M on the globe, 1 in the kit viewer)
+    uniform float uTime;                  // (the page's clock: a scaffold or a camp's tent with a seed below nought is gone at minus that time)
     varying vec3 vN, vLN, vLocal, vScale, vCol, vInfo, vView; varying float vPick;
     ${AIR_V}
     void main() {
@@ -226,7 +238,7 @@
       vCol = instanceColor; vInfo = aInfo.xyz;
       vec4 mv = modelViewMatrix * im * vec4(position, 1.0); vView = mv.xyz;
       air(mv.xyz, ${AIR_N}, vAirT, vAirL);
-      gl_Position = projectionMatrix * mv;
+      gl_Position = (aInfo.y < -0.5 && uTime > -aInfo.y) || (aInfo.y > 9999.5 && uTime < aInfo.y - 10000.0) ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * mv;      // (and one above ten thousand is not there until that time less ten thousand)
     }`;
   const FRAG = `
     precision highp float;
@@ -352,6 +364,12 @@
       // planted: what lies flat on it is green (beds, lawns, young trees); a farm's glass is lit green from within
       if (isGarden > 0.5) { vec3 leaf = mix(vec3(0.24, 0.36, 0.16), vec3(0.4, 0.52, 0.22), vnoise(fuv * 0.35 + seed * 7.0)) * (0.8 + 0.35 * vnoise(fuv * 1.7 + seed)); rc = mix(rc, leaf, 0.85);
         if (wallMat == 6.0) col = mix(col, vec3(0.36, 0.62, 0.38), 0.35); }
+      // a yard's beds (a thing, planted, of earth): rows of greens in the brown; a hedge (a thing, planted, of plaster): leaves all over
+      if (isGarden > 0.5 && isThing > 0.5) {
+        if (wallMat < 0.5) { float top = smoothstep(0.3, 0.6, vLN.y); float row = smoothstep(0.3, 0.55, abs(fract(fuv.y / 0.85) - 0.5) * 2.0) * (1.0 - smoothstep(0.25, 0.6, px)); vec3 earth = vec3(0.33, 0.25, 0.17) * (0.85 + 0.3 * vnoise(fuv * 2.3 + seed * 3.0));
+          vec3 crop = mix(vec3(0.2, 0.3, 0.12), vec3(0.32, 0.39, 0.16), vnoise(fuv * 1.1 + seed * 5.0)) * (0.8 + 0.4 * vnoise(fuv * 6.0)); col = mix(col * 0.8, mix(crop, earth, row * 0.75 + 0.1), top); }
+        else { col = vCol * (0.62 + 0.55 * vnoise(fuv * 2.6 + seed * 3.0)) * (0.8 + 0.35 * vnoise(fuv * 0.6 + seed)); }
+      }
       col = mix(col, rc, roof);
       // winter where winters are white: snow lies on the roofs
       if (uSnow > 0.01) col = mix(col, vec3(0.9, 0.92, 0.96), uSnow * roof * 0.92 * smoothstep(0.25, 0.55, vnoise(ruv * 0.35 + seed * 9.0) + uSnow * 0.5));
@@ -392,6 +410,6 @@
     }`;
 
   // instance caps: enough for the biggest city in view plus its neighbours
-  const MAXI = { scaffold: 4000, hut: 6000, tipi: 2500, longhouse: 4000, stilt: 4000, adobe: 9000, pueblo: 2500, courtyard: 6000, courtyardc: 5000, domehouse: 2500, gable: 12000, hip: 7000, curved: 7000, halftimber: 5000, townhouse: 6000, mansard: 2500, palazzo: 1500, terrace: 7000, tenement: 6000, block: 12000, blockold: 8000, tower: 4000, skyscraper: 1000, granary: 1200, chimney: 1200, barn: 1500, warehouse: 800, windmill: 400, turbine: 500, lamp: 2500, stall: 800, well: 200, fountain: 200, statue: 300, obelisk: 200, pier: 400, boat: 400, ship: 300, crane: 300, menhirs: 300, ziggurat: 300, pyramid: 200, steppyramid: 300, temple: 500, colosseum: 150, cathedral: 300, church: 500, basilica: 200, mosque: 400, tajmosque: 100, mudmosque: 300, onion: 300, hall: 400, pagoda: 400, stupa: 300, shikhara: 300, stepped: 300, mound: 200, palace: 300, keep: 800, roundtower: 2500, gatehouse: 600, wall: 5000, palisade: 3000, bastion: 500, station: 200, crystal: 100, irontower: 100, stadium: 150, spire: 200, lighthouse: 200, factory: 1200, slab: 6000, podium: 2500, cyltower: 1200, taper: 400, villa: 9000, bungalow: 6000, mill: 600, gasometer: 300, mall: 300, lawn: 1500, homes: 16000, homes4: 6000, rows: 9000, perimold: 6000, perimeter: 6000, compound: 9000, shacks: 8000, walled: 8000, oldtown: 4000, medina: 3000, twist: 300, greentower: 5000, vertfarm: 2000, arcology: 40, elevator: 10, rocket: 60, rocketbody: 4, solar: 400, car: 200, cart: 100, plane: 100, train: 100, rubble: 6000, wallstub: 3000, pillars: 600, tent: 2500, bigtent: 400, catapult: 300, cannon: 400 };
+  const MAXI = { scaffold: 4000, hut: 6000, tipi: 2500, longhouse: 4000, stilt: 4000, adobe: 9000, pueblo: 2500, courtyard: 6000, courtyardc: 5000, domehouse: 2500, gable: 12000, hip: 7000, curved: 7000, halftimber: 5000, townhouse: 6000, mansard: 2500, palazzo: 1500, terrace: 7000, tenement: 6000, block: 12000, blockold: 8000, tower: 4000, skyscraper: 1000, granary: 1200, chimney: 1200, barn: 1500, warehouse: 800, windmill: 400, turbine: 500, lamp: 2500, stall: 800, well: 200, fountain: 200, statue: 300, obelisk: 200, pier: 400, boat: 400, ship: 300, crane: 300, menhirs: 300, ziggurat: 300, pyramid: 200, steppyramid: 300, temple: 500, colosseum: 150, cathedral: 300, church: 500, basilica: 200, mosque: 400, tajmosque: 100, mudmosque: 300, onion: 300, hall: 400, pagoda: 400, stupa: 300, shikhara: 300, stepped: 300, mound: 200, palace: 300, keep: 800, roundtower: 2500, gatehouse: 600, wall: 5000, palisade: 3000, bastion: 500, station: 200, crystal: 100, irontower: 100, stadium: 150, spire: 200, lighthouse: 200, factory: 1200, slab: 6000, podium: 2500, cyltower: 1200, taper: 400, villa: 9000, bungalow: 6000, mill: 600, gasometer: 300, mall: 300, lawn: 1500, homes: 16000, homes4: 6000, rows: 9000, perimold: 6000, perimeter: 6000, compound: 9000, shacks: 8000, walled: 8000, oldtown: 4000, medina: 3000, twist: 300, greentower: 5000, vertfarm: 2000, arcology: 40, elevator: 10, rocket: 60, rocketbody: 4, solar: 400, car: 200, cart: 100, plane: 100, train: 100, rubble: 6000, wallstub: 3000, fence: 24000, yardwall: 20000, hedge: 16000, woodpile: 8000, haystack: 5000, garden: 9000, shed: 8000, rack: 3000, firepit: 5000, pillars: 600, tent: 2500, bigtent: 400, catapult: 300, cannon: 400 };
   window.BKIT = { makeKit, VERT, FRAG, MAXI };
 })();

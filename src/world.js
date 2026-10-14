@@ -42,6 +42,17 @@
       // real 3D models (models.js) share the kit's light uniforms and replace kit archetypes where a model exists
       if (window.MODELS) MODELS.init(this.scene, { uSunV: this.bUniforms.uSunV, uUpV: this.bUniforms.uUpV, uDay: this.bUniforms.uDay, uCamAlt: this.bUniforms.uCamAlt, uTime: this.bUniforms.uTime, uGround: this.bUniforms.uGround, uSnow: this.bUniforms.uSnow, uSunCol: this.bUniforms.uSunCol, uDusk: this.bUniforms.uDusk, uGlow: this.bUniforms.uGlow }, { units: 6371.0 });
       this.modelsOn = true; this._pv = new THREE.Vector3();
+      // the houses of the place's own (vern.js, houses.js): a mesh for each type and level of detail, as many of it as stand near
+      if (window.HOUSES) {
+        this.hUniforms = Object.assign({}, this.bUniforms, { uRiseT: { value: 8 } });
+        this.hMat = new THREE.ShaderMaterial({ uniforms: this.hUniforms, vertexShader: HOUSES.VERT, fragmentShader: HOUSES.FRAG });
+        this.hDepth = new THREE.ShaderMaterial({ uniforms: { uTime: this.bUniforms.uTime, uRiseT: this.hUniforms.uRiseT }, side: THREE.DoubleSide,
+          vertexShader: `attribute vec4 aRise; uniform float uTime, uRiseT; void main() { float p = min(aRise.z, clamp((uTime - aRise.x) / uRiseT, 0.0, 1.0)); vec3 q = position; q.y = min(q.y, p * aRise.w);
+            gl_Position = uTime > aRise.y || p < 0.03 ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * modelViewMatrix * instanceMatrix * vec4(q, 1.0); }`,
+          fragmentShader: `void main() { gl_FragColor = vec4(1.0); }` });
+        this.hDepth.colorWrite = false;
+      }
+      this.vh = new Map(); this.rev = new Map();
       this.initSky();
     }
     setSim(sim) { this.sim = sim; for (let i = 0; i < W * H; i++) this.simData[i * 4 + 3] = Math.min(255, Math.round(sim.fert[i] * 255)); this.refreshTextures(); }
@@ -56,6 +67,7 @@
         u.uTexMix.value = 1; this.bMat.defines = { USE_TEXARR: 1 }; this.textured = true;
       } else { u.uTexMix.value = 0; this.bMat.defines = {}; this.textured = false; }
       this.bMat.needsUpdate = true;
+      if (this.hMat) { for (const k of ['uWallTex', 'uRoofTex', 'uWallM', 'uRoofM', 'uWallMean', 'uRoofMean']) if (u[k]) this.hUniforms[k] = u[k]; this.hMat.defines = this.textured ? { USE_TEXARR: 1 } : {}; this.hMat.needsUpdate = true; }
     }
     refreshTextures() {
       const sim = this.sim; if (!sim) return;
@@ -105,9 +117,13 @@
     // (landmarks, walls and one instance per block); towns beyond ~70 km are only their label and ground decal.
     updateBuildings(cam, force) {
       const sim = this.sim; if (!sim) { return; }
+      // the plans of towns still to be made, a few milliseconds a frame (plots.js); a town that has its plan now is drawn anew
+      // (a share of the frame: five milliseconds at sixty frames a second, more where frames are slow anyway)
+      { const t = performance.now(), dtF = this._pumpT ? t - this._pumpT : 16; this._pumpT = t; if (window.PLOTS && PLOTS.pending()) PLOTS.pump(this.planMs || Math.min(40, Math.max(5, dtF * 0.25))); }
+      if (window.PLOTS && PLOTS.version !== this._plotsV) { this._plotsV = PLOTS.version; force = true; }
       const dist = cam.dist; const now = performance.now();
       const show = dist < 0.12;   // towns are drawn at strategy-map scale, so they read from ~750 km up
-      if (!show) { this.nearTowns = []; if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; this._casterSig = null; if (window.MODELS && MODELS.ready) { MODELS.begin(); MODELS.end(); } } return; }
+      if (!show) { this.nearTowns = []; for (const r of this.vh.values()) if (r.mesh && r.mesh.count) { r.mesh.count = 0; r.mesh.visible = false; } if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; this._casterSig = null; if (window.MODELS && MODELS.ready) { MODELS.begin(); MODELS.end(); } } return; }
       const moved = GEO.distKm(cam.lon, cam.lat, this.lastBuild.lon, this.lastBuild.lat) > Math.max(0.15, dist * 6371 * 0.12);
       const stale = now - this.lastBuild.t > 1500 || this.lastBuild.tex !== this.texVersion;
       const arrived = window.MODELS && MODELS.dirty;       // a model file finished loading: swap it in
@@ -115,6 +131,7 @@
       this.lastBuild = { lon: cam.lon, lat: cam.lat, dist, t: now, tex: this.texVersion };
       const T = this.terrain; const counts = {}; for (const k in this.inst) counts[k] = 0;
       const casters = this.casters = []; this._kitSig = 0;
+      for (const r of this.vh.values()) { r.n = 0; r.data.length = 0; } const nowS = now / 1000; this._geoMs = 0; this._vhSig = 0;
       const rad = Math.max(3, Math.min(12, Math.ceil(dist * 6371 / 55) + 1)); // cells (0.5 deg ~ 55 km)
       const cy0 = Math.floor((90 - cam.lat) / 180 * H), cx0 = Math.floor((cam.lon + 180) / 360 * W);
       const exag = this.exag; const m = this._m; const el = m.elements;
@@ -161,14 +178,36 @@
         const mask = L.mask; const hts = L.hts;
         if (useModels && !coarse && L.fitEra !== c.era + ':' + Object.keys(MODELS.defs).length) { L.fit = this.fitHouses(L, i, L.era === undefined ? c.era : L.era, L.culture || 0); L.fitEra = c.era + ':' + Object.keys(MODELS.defs).length; }
         const fits = useModels && !coarse ? L.fit : null;
+        const Rv = !coarse && L.fine ? this.reveal(i, L, nowS, c) : null;      // (as you look: what has just been built rises, what was pulled down goes)
+        if (Rv && Rv.camp && nowS < Rv.camp.until) { L.camp = Rv.camp; if (dKm < 60) this.drawCamp(Rv.camp, L, cLon, cLat, cl, L.k || 1, counts, nowS); } else if (L.camp) L.camp = null;
         const era = L.era === undefined ? c.era : L.era; const seed = (i % 997) / 997; const kRep = L.k || 1; const cul = L.culture || 0;      // the era whose manner the town is built in (TOWN.styleEra: the old ways last)
         const wantCasters = dKm < 40 && !coarse;
+        // (a yard's things only where they are a few pixels or more: about the point looked at, as far as the town's scale lets them be seen)
+        const camE = (cam.lon - cLon) * R_M * cl * GEO.D2R, camN = (cam.lat - cLat) * R_M * GEO.D2R, eye2 = (dist * R_M) * (dist * R_M), propR2 = (kRep * 1500) * (kRep * 1500);
         for (let k = 0; k < n; k++) {
           if (mask && mask[k] === 1) continue;
           const cut = !!(mask && mask[k] === 2);               // a wall that runs into the river: drawn up to the bank
           if (fits && fits[k]) continue;                       // its model would stand in a neighbour's
           if (items[k].off) continue;                          // a harbour with no shore to stand on
-          const it = items[k]; const im = this.inst[it.kind]; if (!im) continue;
+          const it = items[k];
+          if (it.prop && (dKm > 30 || coarse || (it.x - camE) * (it.x - camE) + (it.z - camN) * (it.z - camN) + eye2 > propR2)) continue;      // (a yard's things are too small to see from further)
+          const rv = Rv && it.pk !== undefined ? Rv.seen.get(it.pk) : null; const tUp = rv && rv.t0 > nowS - 9 ? rv.t0 : 0;
+          if (it.kind === 'vh' || (rv && rv.old && rv.oldEnd > nowS && rv.old.kind === 'vh')) {
+            const lon = cLon + it.x / (R_M * cl * GEO.D2R), lat = cLat + it.z / (R_M * GEO.D2R); const hg = hts[k]; if (hg < 0.5) continue;
+            const sd = hash(i, 3000 + k);
+            if (rv && rv.old && rv.oldEnd > nowS && rv.old.kind === 'vh') { this.pushHouse(rv.old, cLon, cLat, cl, hg, kRep, camPos, pxPerRad, -1e9, rv.oldEnd, sd); total++; }
+            else if (it.kind === 'vh' && rv && rv.old && rv.oldEnd > nowS && useModels) { const o = rv.old; const od = (o.as && MODELS.pick(o.as, o.era !== undefined ? o.era : era, cul, hash(i, 4000 + k))) || MODELS.pick(o.kind, o.era !== undefined ? o.era : era, cul, hash(i, 4000 + k)); if (od && !od.fit) { this._vi = i; this._vk = k; this._cul = cul; this.placeModel(od, o, cLon + o.x / (R_M * cl * GEO.D2R), cLat + o.z / (R_M * GEO.D2R), hg, era, seed + k * 0.013, -(2 + rv.oldEnd), kRep, camPos, pxPerRad, cl, null); } }      // (the old house of the people's own, till the new one is begun)
+            if (it.kind !== 'vh') { if (rv && rv.old && rv.oldEnd > nowS) { /* (and what replaces it is drawn below) */ } else continue; }
+            else {
+              const prog = it.prog === undefined ? 1 : it.prog;
+              this.pushHouse(it, cLon, cLat, cl, hg, kRep, camPos, pxPerRad, tUp || -1e9, 1e9, sd, prog); total++;
+              if (tUp && tUp + 8 > nowS && sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: it.w, d: it.d, k: kRep, prog: 0.5, era });
+              if (tUp && tUp + 8 > nowS) { const sc = this.inst.scaffold; const si = counts.scaffold; if (sc && si < sc.instanceMatrix.count && it.h > 4 * kRep) { this.setInst(sc, si, lon, lat, hg, it.w * 1.08, it.h * 0.85, it.d * 1.08, it.yaw, it.era >= 6 ? 0x8f949a : 0x8a6a44, era, -(tUp + 8.5), TOWN.packStyle(it.era >= 6 ? 5 : 2, 3, 0, 32), kRep); counts.scaffold = si + 1; total++; } this._animUntil = Math.max(this._animUntil || 0, tUp + 9); }
+              if (wantCasters && nCasters < 5000 && !(tUp && tUp + 8 > nowS)) { casters.push(lon, lat, it.w * 0.9, it.h * 0.7, it.d * 0.9, it.yaw); nCasters++; }      // (no shadow on the ground for a house still to rise)
+              continue;
+            }
+          }
+          const im = this.inst[it.kind]; if (!im) continue;
           const idx = counts[it.kind]; if (idx >= im.instanceMatrix.count) continue;
           const lon = cLon + it.x / (R_M * cl * GEO.D2R), lat = cLat + it.z / (R_M * GEO.D2R);
           const hg = hts[k]; if (hg < 0.5 && it.kind !== 'pier' && it.kind !== 'boat' && it.kind !== 'ship') continue;
@@ -181,6 +220,8 @@
             if (def && prog < 1 && def.site && MODELS.defs[def.site]) { staged = true; if (prog < 0.72) { fitTo = def; def = MODELS.defs[def.site]; mprog = Math.min(1, prog / 0.3); } else mprog = 1; }
             if (cut && !(def && (def.fit === 'run' || def.fit === 'gate'))) continue;
             this._cut = cut; this._vi = i; this._vk = k; this._cul = cul;
+            if (rv && rv.old && rv.oldEnd > nowS && rv.old.kind !== 'vh') { const od = (rv.old.as && MODELS.pick(rv.old.as, rv.old.era !== undefined ? rv.old.era : era, cul, hash(i, 4000 + k))) || MODELS.pick(rv.old.kind, rv.old.era !== undefined ? rv.old.era : era, cul, hash(i, 4000 + k)); if (od && !od.fit) this.placeModel(od, rv.old, lon, lat, hg, era, seed + k * 0.013, -(2 + rv.oldEnd), kRep, camPos, pxPerRad, cl, null); }      // (the house pulled down to make way for this one)
+            if (tUp && !staged && !fitTo) { mprog = 2 + tUp; this._animUntil = Math.max(this._animUntil || 0, tUp + 9); }      // (going up as you look)
             const nPut = def ? this.placeModel(def, it, lon, lat, hg, era, seed + k * 0.013, mprog, kRep, camPos, pxPerRad, cl, fitTo) : 0;
             this._cut = false;
             if (nPut) {
@@ -190,7 +231,7 @@
                 if (sites.length < SITE_MAX && dKm < 120) sites.push({ lon, lat, w: md[0], d: md[2], k: kRep, prog, era });
               }
               // a block shadow for now: a model's roof slopes away from its eaves, so the block is lower and narrower than its bounds; open monuments (stone circles) cast none
-              if (wantCasters && nCasters < 5000 && prog > 0.3 && !def.open) { casters.push(lon, lat, md[0] * 0.86, md[1] * 0.6 * Math.min(1, prog + 0.2), md[2] * 0.86, md[3]); nCasters++; }
+              if (wantCasters && nCasters < 5000 && prog > 0.3 && !def.open && !(tUp && tUp + 8 > nowS)) { casters.push(lon, lat, md[0] * 0.86, md[1] * 0.6 * Math.min(1, prog + 0.2), md[2] * 0.86, md[3]); nCasters++; }
               continue;
             }
             if (def && MODELS.pending(def)) continue;      // its files are on their way: bare ground for a moment, not a stand-in
@@ -208,11 +249,15 @@
             }
             continue;
           }
-          this.setInst(im, idx, lon, lat, hg, it.w, it.h, it.d, it.yaw, it.color, era, seed + k * 0.013, it.style, kRep);
+          this.setInst(im, idx, lon, lat, hg, it.w, it.h, it.d, it.yaw, it.color, era, tUp ? 10000 + tUp : seed + k * 0.013, it.style, kRep);      // (a yard's things come with their house: not there till its work begins)
           counts[it.kind] = idx + 1; total++;
           if (wantCasters && nCasters < 5000 && it.h > 3 * kRep && it.kind !== 'lamp' && it.kind !== 'pier') { casters.push(lon, lat, it.w, it.h, it.d, it.yaw); nCasters++; }
         }
       }
+      // what was pulled down (a town that shrank, a plot a great building took): it stands till its time comes
+      for (const [ti, Rv] of this.rev) { if (!Rv.gone.length || Rv.pass !== this.buildPass) continue; const c = sim.civs[sim.owner[ti]]; if (!c) continue; const [cLon, cLat] = this.siteOf(ti); const cl = Math.max(0.15, Math.cos(cLat * GEO.D2R)); const vc = new Map();
+        Rv.gone = Rv.gone.filter((g) => g.t > nowS); for (const g of Rv.gone) { if (g.it.kind !== 'vh') continue; const lon = cLon + g.it.x / (R_M * cl * GEO.D2R), lat = cLat + g.it.z / (R_M * GEO.D2R); const hg = T.meshHeightAt(lon, lat, vc); if (hg < 0.5) continue; this.pushHouse(g.it, cLon, cLat, cl, hg, Rv.k || 1, camPos, pxPerRad, -1e9, g.t, 0.5); total++; } }
+      this.finishHouses();
       // ruins: the dead towns of the region, as long as something still stands
       if (sim.ruins && sim.ruins.size) {
         for (const [i, ru] of sim.ruins) {
@@ -232,9 +277,111 @@
       for (const k in this.inst) { const im = this.inst[k]; im.count = counts[k]; GEO.touch(im.instanceMatrix, counts[k]); GEO.touch(im.instanceColor, counts[k]); GEO.touch(this.info[k], counts[k]); }
       if (useModels) MODELS.end();
       // what throws shadows changed only if something was placed differently: the sun's depth map and the ground shadows are redrawn then, not on every refresh
-      const sig = (this._kitSig ^ Math.imul(total + 1, 2654435761) ^ (useModels ? MODELS.sig : 0)) | 0;
+      const sig = (this._kitSig ^ Math.imul(total + 1, 2654435761) ^ (useModels ? MODELS.sig : 0) ^ this._vhSig ^ (nowS < (this._animUntil || 0) ? Math.floor(nowS / 2) : 0)) | 0;      // (while houses rise, the sun's map of them is drawn again every two seconds)
       if (sig !== this._casterSig) { this._casterSig = sig; this.castersVersion = (this.castersVersion || 0) + 1; }
       this.buildingCount = total;
+    }
+    // As you look, a town that grows or is rebuilt does so before your eyes. What its last plan had not is raised one thing after
+    // another over the next half minute (a house rises from its footings, its timbers first, the roof last; its yard's things come
+    // with it); a house rebuilt in a new manner stands until the work on the new one begins; what is gone is pulled down in its
+    // turn. What it had is simply there, and a town that was not in sight a moment ago is shown as it is. A people's first village
+    // begins as a camp: a fire and shelters, and its houses go up one by one about it.
+    reveal(i, L, now, c) {
+      let R = this.rev.get(i); const fresh = !R || R.pass < this.buildPass - 3;
+      if (fresh) { R = { pass: this.buildPass, key: null, seen: new Map(), gone: [], camp: null, k: L.k || 1 }; this.rev.set(i, R); if (this.rev.size > 160) for (const [j, r] of this.rev) { if (r.pass < this.buildPass - 3) this.rev.delete(j); if (this.rev.size <= 120) break; } }
+      R.pass = this.buildPass; R.k = L.k || 1;
+      if (R.key === L.key) return R;
+      // (a plan made larger, or come at last, is not the town growing: what it adds is simply there)
+      const first = R.key === null || (R.planR !== undefined && R.planR !== L.planR), seen = new Map(), changes = []; R.planR = L.planR;
+      for (const it of L.items) {
+        if (it.pk === undefined) continue;
+        const sig = it.kind + ':' + (it.g ? it.g.id : '') + ':' + (it.era === undefined ? '' : it.era); const o = R.seen.get(it.pk);
+        if (!o) { const r = { sig, t0: -1e9, it }; seen.set(it.pk, r); if (!first) changes.push(r); }
+        else if (o.sig !== sig) { const r = { sig, t0: -1e9, it, old: o.it.kind === 'vh' || !it.prop ? o.it : null, oldEnd: 0 }; seen.set(it.pk, r); if (!first) changes.push(r); }
+        else { o.it = it; seen.set(it.pk, o); }
+      }
+      const sim = this.sim, rec = L.rec;
+      if (first && this.campFor === i && c && sim && c.capital === i) {
+        this.campFor = -1;
+        // the founding: the camp is pitched, then the houses go up one after another about the fire
+        let t = now + 7; R.camp = { t0: now, until: 0, x: 0, z: 0 }; let nh = 0; for (const r of seen.values()) if (!r.it.prop && !r.it.as && !r.it.tag) nh++;
+        const gap = Math.max(0.45, Math.min(6, 80 / Math.max(1, nh)));      // (a minute or so for the whole village, however many households came)
+        const tGreat = t + nh * gap * 0.4; let ng = 0;      // (what they raise together - the stones, the hall - once a few houses stand)
+        for (const r of seen.values()) { if (r.it.kind === 'stall') continue; if (r.it.as || r.it.tag) { r.t0 = tGreat + 3 * ng++; continue; } r.t0 = t; t += r.it.prop ? 0.1 : gap * (0.75 + 0.5 * hash(i, 6100 + nh--)); }
+        R.camp.until = Math.max(t, tGreat + 3 * ng) + 12;
+      } else if (!first) {
+        // one after another, the nearest the middle first: a second or so apart, half a minute for a turn's worth
+        const gap = Math.min(1.3, 26 / Math.max(1, changes.length)); let t = now + 0.6;
+        for (const r of changes) { r.t0 = t; if (r.old) r.oldEnd = t + 0.2; if (!r.it.prop) t += gap * (0.6 + 0.8 * hash(i, 6200 + changes.length)); }
+        for (const [pk, o] of R.seen) if (!seen.has(pk) && o.it.kind === 'vh') { R.gone.push({ it: o.it, t }); t += gap * 0.5; }
+      }
+      R.seen = seen; R.key = L.key;
+      return R;
+    }
+    // a house of the place's own (houses.js): its type at a level of detail by how large it is on the screen, as an instance; t0:
+    // when it began to rise (the page's clock), tEnd: when it is gone
+    pushHouse(it, cLon, cLat, cl, hg, k, camPos, pxPerRad, t0, tEnd, seed, prog) {
+      const g = it.g; if (!g) return;
+      const u = k * (it.sc || 1); const kx = u / R_M; const yaw = it.yaw, cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const ox = it.ofx || 0, oz = it.ofz || 0; const pe = it.x + ox * cy + oz * sy, pn = it.z + ox * sy - oz * cy;      // (its origin: the footprint's middle and the offset in its own frame)
+      const lon = cLon + pe / (R_M * cl * GEO.D2R), lat = cLat + pn / (R_M * GEO.D2R);
+      const lo = lon * GEO.D2R, la = lat * GEO.D2R; const slo = Math.sin(lo), clo = Math.cos(lo), sla = Math.sin(la), cla = Math.cos(la);
+      const Ex = -slo, Ez = -clo; const Nx = -sla * clo, Ny = cla, Nz = sla * slo; const Ux = cla * clo, Uy = sla, Uz = -cla * slo;
+      const rr = 1 + (Math.max(hg, 0) * this.exag - 0.12 * u) / R_M;
+      const tx = Ux * rr, ty = Uy * rr, tz = Uz * rr;
+      const H = VERN.heightOf(g); const dx = camPos.x - tx, dy = camPos.y - ty, dz = camPos.z - tz;
+      const px = H * kx / Math.max(1e-9, Math.sqrt(dx * dx + dy * dy + dz * dz)) * pxPerRad;
+      let lod = px > 85 ? 0 : px > 20 ? 1 : 2;
+      // (a type's finer meshes are made when first wanted: a few milliseconds a pass for them, the rest drawn coarser meanwhile)
+      if (lod < 2 && !HOUSES.has(g, lod)) { if (this._geoMs > 14) lod = HOUSES.has(g, 1) ? 1 : 2; else { const t = performance.now(); HOUSES.geometry(g, lod); this._geoMs += performance.now() - t; } }
+      const key = g.id + '/' + lod; let r = this.vh.get(key); if (!r) { r = { g, lod, mesh: null, cap: 0, data: [], n: 0 }; this.vh.set(key, r); }
+      const D = r.data, p = it.pal; const ax = kx * (it.sx || 1), az = kx * (it.sz || 1);      // (a house stretched a little to fill its share of a row or its cell)
+      D.push((cy * Ex + sy * Nx) * ax, (sy * Ny) * ax, (cy * Ez + sy * Nz) * ax, Ux * kx, Uy * kx, Uz * kx, (sy * Ex - cy * Nx) * az, (-cy * Ny) * az, (sy * Ez - cy * Nz) * az, tx, ty, tz,
+        ((it.color >> 16) & 255) / 255, ((it.color >> 8) & 255) / 255, (it.color & 255) / 255,
+        p ? p[1] : 0xffffff, p ? p[2] : 0x404040, p ? p[3] : 0x503828, p ? p[4] : 0xffffff,
+        it.era === undefined ? 4 : it.era, seed, it.style, k, t0, tEnd, prog === undefined ? 1 : prog, H);
+      r.n++; this._vhSig = Math.imul(this._vhSig ^ ((tx * 1e9) | 0), 16777619) ^ ((tz * 1e9) | 0) ^ (lod << 3);
+    }
+    // the instances of every type and level of detail, into their meshes (a mesh made, or made larger, as it needs)
+    finishHouses() {
+      const STRIDE = 27;      // (12 of the matrix, 3 of the paint, 4 each of the trim and the rest, the instance, the rising)
+      for (const r of this.vh.values()) {
+        if (!r.n) { if (r.mesh && r.mesh.count) { r.mesh.count = 0; r.mesh.visible = false; } continue; }
+        if (!r.mesh || r.cap < r.n) {
+          const cap = Math.max(16, 1 << Math.ceil(Math.log2(r.n * 1.3))); const geo = HOUSES.geometry(r.g, r.lod);
+          if (r.mesh) this.buildingGroup.remove(r.mesh);
+          const m = new THREE.InstancedMesh(geo, this.hMat, cap); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
+          const att = (n) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(n, a); return a; };
+          m.userData.a = { pal: att('aPal'), info: att('aInfo'), rise: att('aRise') }; m.userData.kind = 'vh';
+          if (window.SHADOWS) SHADOWS.caster(m, this.hDepth);
+          this.buildingGroup.add(m); r.mesh = m; r.cap = cap;
+        }
+        const m = r.mesh, A = m.userData.a, M = m.instanceMatrix.array, C = m.instanceColor.array, Pa = A.pal.array, In = A.info.array, Ri = A.rise.array, D = r.data;
+        for (let q = 0; q < r.n; q++) {
+          const o = q * STRIDE, j = q * 16;
+          M[j] = D[o]; M[j + 1] = D[o + 1]; M[j + 2] = D[o + 2]; M[j + 3] = 0; M[j + 4] = D[o + 3]; M[j + 5] = D[o + 4]; M[j + 6] = D[o + 5]; M[j + 7] = 0;
+          M[j + 8] = D[o + 6]; M[j + 9] = D[o + 7]; M[j + 10] = D[o + 8]; M[j + 11] = 0; M[j + 12] = D[o + 9]; M[j + 13] = D[o + 10]; M[j + 14] = D[o + 11]; M[j + 15] = 1;
+          C[q * 3] = D[o + 12]; C[q * 3 + 1] = D[o + 13]; C[q * 3 + 2] = D[o + 14];
+          Pa[q * 4] = D[o + 15]; Pa[q * 4 + 1] = D[o + 16]; Pa[q * 4 + 2] = D[o + 17]; Pa[q * 4 + 3] = D[o + 18];
+          In[q * 4] = D[o + 19]; In[q * 4 + 1] = D[o + 20]; In[q * 4 + 2] = D[o + 21]; In[q * 4 + 3] = D[o + 22];
+          Ri[q * 4] = D[o + 23]; Ri[q * 4 + 1] = D[o + 24]; Ri[q * 4 + 2] = D[o + 25]; Ri[q * 4 + 3] = D[o + 26];
+        }
+        m.count = r.n; m.visible = true;
+        GEO.touch(m.instanceMatrix, r.n); GEO.touch(m.instanceColor, r.n); GEO.touch(A.pal, r.n); GEO.touch(A.info, r.n); GEO.touch(A.rise, r.n);
+      }
+    }
+    // a people's first night: the fire, the shelters about it, the firewood, a rack for hides; gone when the houses stand
+    drawCamp(camp, L, cLon, cLat, cl, k, counts, now) {
+      const T = this.terrain; const put = (kind, x, z, w, h, d, yaw, col, style) => { const im = this.inst[kind]; if (!im) return; const idx = counts[kind]; if (idx >= im.instanceMatrix.count) return;
+        const lon = cLon + x * k / (R_M * cl * GEO.D2R), lat = cLat + z * k / (R_M * GEO.D2R); const hg = T.meshHeightAt(lon, lat); if (hg < 0.5) return;
+        this.setInst(im, idx, lon, lat, hg, w * k, h * k, d * k, yaw, col, 0, -camp.until, style, k); counts[kind] = idx + 1; };
+      const st = TOWN.packStyle(7, 0, L.culture || 0, 64), hide = TOWN.packStyle(1, 0, L.culture || 0, 64);
+      const a0 = (L.axis || 0) + 0.4;
+      for (let q = 0; q < 5; q++) { const a = a0 + q * 1.26 + 0.2 * Math.sin(q * 3.1), r = 11 + 3 * ((q * 7) % 3); put('tent', Math.cos(a) * r, Math.sin(a) * r, q === 0 ? 6 : 4.2, q === 0 ? 3.6 : 3, q === 0 ? 5 : 4, a + Math.PI / 2, [0x9a8466, 0x8a7458, 0xa58f6c, 0x7f6a4e, 0x96805e][q], hide); }
+      put('firepit', 0, 0, 2.2, 0.5, 2.2, 0, 0x6f6a62, TOWN.packStyle(3, 3, L.culture || 0, 64));
+      put('woodpile', Math.cos(a0 + 0.7) * 6, Math.sin(a0 + 0.7) * 6, 2.6, 1.3, 1.1, a0, 0x6e5238, st);
+      put('rack', Math.cos(a0 + 3.3) * 8, Math.sin(a0 + 3.3) * 8, 3.2, 2.1, 0.8, a0 + 1.2, 0x7a6248, st);
     }
     // one model instance at lon/lat: sx, sy, sz are drawn metres per model metre along the model's own axes.
     // false = none of its files has loaded yet.
@@ -333,9 +480,10 @@
       const add = (R) => { const id = rects.length; rects.push(R); cells(R, (key) => { let a = grid.get(key); if (!a) grid.set(key, a = []); a.push(id); return false; }); };
       const defOf = (it, k) => { const mEra = it.era !== undefined ? it.era : era; return (it.as && MODELS.pick(it.as, mEra, cul, hash(i, 4000 + k))) || MODELS.pick(it.kind, mEra, cul, hash(i, 4000 + k)); };
       const great = (it) => { const flags = Math.floor(it.style / 1024); return (flags & 1) || it.as || it.tag; };
+      for (let k = 0; k < n; k++) { const it = items[k]; if (it.kind !== 'vh') continue; const hw = it.w * 0.45, hd = it.d * 0.45; add({ x: it.x, z: it.z, ax: Math.cos(it.yaw), az: Math.sin(it.yaw), hw, hd, r: Math.hypot(hw, hd) }); }      // (the houses of the place's own stand where their plots are)
       for (let k = 0; k < n; k++) { const it = items[k]; if (!great(it)) continue; const def = defOf(it, k); if (!def || def.fit === 'run' || def.fit === 'gate') continue; add(rectOf(def, it, Math.floor(it.style / 1024))); }
       for (let k = 0; k < n; k++) {
-        const it = items[k]; if (great(it)) continue; const flags = Math.floor(it.style / 1024); if (flags & (2 | 16)) continue;       // far-town blocks and ruins are the kit's
+        const it = items[k]; if (great(it) || it.kind === 'vh' || it.prop) continue; const flags = Math.floor(it.style / 1024); if (flags & (2 | 16)) continue;       // far-town blocks and ruins are the kit's
         const def = defOf(it, k); if (!def || def.fit) continue;
         const R = rectOf(def, it, flags);
         if (cells(R, (key) => { const a = grid.get(key); if (a) for (let j = 0; j < a.length; j++) if (overlap(R, rects[a[j]])) return true; return false; })) { skip[k] = 1; continue; }

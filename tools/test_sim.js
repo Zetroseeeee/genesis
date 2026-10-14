@@ -1,7 +1,7 @@
 // GENESIS headless simulation test: runs sim.js in node for thousands of years and checks invariants,
 // every player action and god power, save/load round trips, and memory bounds. Exit code 1 on any failure.
 global.window = {}; global.atob = (s) => Buffer.from(s, 'base64').toString('binary'); global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
-require('../dist/geo.js'); require('../dist/town.js');
+require('../dist/geo.js'); require('../dist/vern.js'); require('../dist/plots.js'); require('../dist/town.js'); window.TOWN.budget.on = false;      // (the planner a town at a time, as a page does: here every plan at once)
 const fs = require('fs'); const PNG = require('pngjs').PNG;
 (0, eval)(fs.readFileSync('src/econ.js', 'utf8'));
 (0, eval)(fs.readFileSync('src/know.js', 'utf8')); (0, eval)(fs.readFileSync('src/rule.js', 'utf8')); (0, eval)(fs.readFileSync('src/diplo.js', 'utf8')); (0, eval)(fs.readFileSync('src/army.js', 'utf8')); (0, eval)(fs.readFileSync('src/people.js', 'utf8')); (0, eval)(fs.readFileSync('src/faith.js', 'utf8')); (0, eval)(fs.readFileSync('src/culture.js', 'utf8')); (0, eval)(fs.readFileSync('src/finance.js', 'utf8')); (0, eval)(fs.readFileSync('src/dynasty.js', 'utf8')); (0, eval)(fs.readFileSync('src/story.js', 'utf8')); (0, eval)(fs.readFileSync('src/legacy.js', 'utf8')); (0, eval)(fs.readFileSync('src/intrigue.js', 'utf8')); (0, eval)(fs.readFileSync('src/disease.js', 'utf8')); (0, eval)(fs.readFileSync('src/land.js', 'utf8')); (0, eval)(fs.readFileSync('src/climate.js', 'utf8')); (0, eval)(fs.readFileSync('src/migrate.js', 'utf8')); (0, eval)(fs.readFileSync('src/woods.js', 'utf8')); (0, eval)(fs.readFileSync('src/replay.js', 'utf8'));
@@ -271,6 +271,16 @@ log('7. construction, growth and the planner');
   let sitesSeen = 0, kinds = new Set(); for (let y = 0; y < 600; y++) { sim.tick(); for (const [i, l] of sim.works) if (sim.owner[i] !== c.id) { sitesSeen++; for (const w of l) kinds.add(w.k); } }
   check(sitesSeen > 0, `AI realms raise works through construction sites (${sitesSeen} site-years, kinds ${[...kinds].join('/')})`);
   let built = 0; for (const i of sim.LI) if (sim.owner[i] >= 0 && sim.owner[i] !== c.id && (sim.special[i] & 15 || sim.walls[i] || sim.infra[i])) built++; check(built > 0, `AI works get finished (${built} cells with works)`);
+  // a town's plan is fixed for its life: a larger plan holds the very plots of a smaller one, in the same order; and the plan a
+  // page makes a few milliseconds a frame is the plan made at once
+  { const P = window.PLOTS; const key = (p) => Math.round(p.x * 10) + ',' + Math.round(p.z * 10) + ',' + Math.round(p.f * 10); let tot = 0, kept = 0, same = 0, made = 0;
+    for (const morph of ['organic', 'grid', 'medina', 'compound', 'cluster']) for (const i of [1000, 1007]) {
+      const opt = { axis: (i % 7) * 0.4, sig: 'test', front: [6, 11], sq: [50, 36], block: 96, cell: 13, spacing: morph === 'compound' ? 42 : 22 };
+      P.clear(); const big = new Set(P.plan(i, morph, Object.assign({ need: 1500 }, opt)).plots.slice(0, 1500).map(key));
+      for (const n of [60, 400]) { P.clear(); for (const p of P.plan(i, morph, Object.assign({ need: n }, opt)).plots.slice(0, n)) { tot++; if (big.has(key(p))) kept++; } }
+      P.clear(); P.request(i, morph, Object.assign({ need: 700 }, opt)); let frames = 0; while (P.pending() && frames < 5000) { P.pump(2); frames++; } const A = P.cached(i, morph, opt.sig);
+      P.clear(); const B = P.plan(i, morph, Object.assign({ need: 700 }, opt)); made++; if (A && A.plots.length === B.plots.length && A.plots.every((p, k) => p.x === B.plots[k].x && p.z === B.plots[k].z && p.f === B.plots[k].f)) same++; }
+    P.clear(); check(kept === tot, `a town's plan only ever grows (${kept} of ${tot} plots of smaller plans stand in the larger)`); check(same === made, `a plan made a few milliseconds at a time is the plan made at once (${same} of ${made})`); }
   // drawn scale: villages big, metropolises bounded
   const k1 = T.scaleOf(100), k2 = T.scaleOf(1000), k3 = T.scaleOf(9000); check(k1 > 15 && k2 > 8 && k2 < 12 && k3 > 2 && k3 < 3, `representational scale tapers (${k1.toFixed(1)}, ${k2.toFixed(1)}, ${k3.toFixed(1)})`);
   check(T.radiusM(sim, i0, c) < 26000, `no town is drawn wider than its region (${(T.radiusM(sim, i0, c) / 1000).toFixed(1)} km)`);
