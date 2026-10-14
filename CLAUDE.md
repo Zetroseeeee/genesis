@@ -458,7 +458,9 @@ Conventions that matter:
 - **Houses of the place's own** (`vern.js`, `houses.js`; since 0.57). From the Middle Ages (a plot's own era 4) a house is a type
   of its place and age: the building region (`VERN.regionOf`), its timeline of styles (`T`: a style gives way to the next some
   share into an age), the style's ranges drawn into ten to twenty-four types for a town (more in a city), the place's snow,
-  rain, heat, hills and woods worked into them (`MODS`), each house its own paint (`colours`). Before that a house is one of its
+  rain, heat, hills and woods worked into them (`MODS`), each house its own paint (`colours`). A material is not laid before its
+  age (`SINCE_R`, `SINCE_W`: roofing iron and zinc with the machine age, concrete and plate glass with the modern one): a style
+  that runs on through several ages has its types drawn again for the age (`types(..., era)`). Before that a house is one of its
   people's models (`HOUSES` in `town.js`, `KSZ` their sizes). A town passes into a new manner house by house: every plot was
   last built some way behind the town's own progress (`progressOf`: the era and how far into it; the plot's lag, `LAGM`, the
   newest fifth of the plots of late; never older than the town: `P1`). Fitting a type to a plot: where people build wall to

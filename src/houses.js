@@ -625,7 +625,9 @@
         { int li = int(layer + 0.5); rc = texture(uRoofTex, vec3(uv / uRoofM[li], layer)).rgb; }
         #endif
         rc *= vRoofT;
-        if (mod(aux, 2.0) > 0.5) { float gr = vnoise(uv * 0.9 + seed * 3.0); rc = mix(rc, mix(vec3(0.32, 0.42, 0.2), vec3(0.45, 0.52, 0.26), gr), 0.75); }
+        if (mod(aux, 2.0) > 0.5) {      // (turf: a dark, mossy olive, browner where it has dried, never the green of a lawn)
+          float gr = vnoise(uv * 0.9 + seed * 3.0), dry = smoothstep(0.45, 0.8, vnoise(uv * 0.35 + seed * 5.0));
+          rc = mix(rc, mix(mix(vec3(0.2, 0.24, 0.12), vec3(0.3, 0.33, 0.17), gr), vec3(0.36, 0.31, 0.2), dry * 0.6), 0.8); }
         rc *= 0.9 + 0.2 * vnoise(uv * 0.15 + seed * 11.0);      // weather in patches
         col = abs(part - 11.0) < 0.5 ? rc * 0.72 : rc;
       } else if (abs(part - 3.0) < 0.5) { col = vTrim * (0.94 + 0.08 * vnoise(uv * 2.0)); }
