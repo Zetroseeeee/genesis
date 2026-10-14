@@ -239,6 +239,7 @@ function createSim(world, seed) {
   let disease = null;    // (its sicknesses: disease.js)
   let mig = null;    // (its people on the move: migrate.js)
   let woods = null;    // (its woods: woods.js)
+  let learn = null;    // (what the world learns of the player, and his court of his choices: learn.js)
   const useA = new Uint8Array(N);      // (how far each region's people use its land: people against what it feeds, x 255 - the woods are cleared by it)
   let storiesOn = true;      // (the player's: the page's setting)
   function fullName(c) { return rule ? rule.fullName(c) : c.name; }
@@ -369,7 +370,8 @@ function createSim(world, seed) {
   const eff = new Float32Array(MAXC * 8).fill(1), keep = new Float32Array(MAXC).fill(1), hold = new Float32Array(MAXC).fill(1);
   // ---------- knowledge: what each realm has discovered (know.js), and the edges it gives ----------
   const know = KNOW.create({ MAXC, civs, goods: GOODS, goodId: GOOD_ID, recipes: ECON.RECIPES, held, seed, start: -10000, year: () => year, nameOf: (cv) => fullName(cv),
-    coastal: (c) => ports[c] > 0 || (civs[c] && civs[c].capital >= 0 && !!(flags[civs[c].capital] & 4)), shortOf: (c, g) => market.shortOf(c, g), onLearn });
+    coastal: (c) => ports[c] > 0 || (civs[c] && civs[c].capital >= 0 && !!(flags[civs[c].capital] & 4)), shortOf: (c, g) => market.shortOf(c, g), onLearn,
+    taste: (branch) => (learn ? learn.taste(branch, KNOW.BRANCHES.length) : 1), studied: (branch) => { if (learn) learn.studied(branch); } });      // (the player's scholars choose as he has: learn.js)
   const KF = know.f, KK = know.K, NKF = know.NK, gmask = know.gmask;
   const kf = (c, k) => KF[c * NKF + k];
   // how many wars a realm is in: counted when first asked, kept until a war begins or ends (and no longer than the year: a tool may write one in by hand)
@@ -477,7 +479,14 @@ function createSim(world, seed) {
     faithLaw: (cv) => rule.ruleOf(cv).laws.faith, tradeLaw: (cv) => rule.ruleOf(cv).laws.trade, covets: (a, b) => { const g = covetOf(a, b); return g ? GOODS[g].name : ''; }, absorb, formFor,
     setForm: (cv, key) => { const F = RULE.FORM[key]; if (!F) return; if (!rule.known(cv.id, F)) rule.ruleOf(cv).brought = key; rule.setForm(cv.id, cv, F, 'imposed'); },
     alarm: () => {}, trait: (cv) => cv.ruler ? cv.ruler.trait : '', aggression: (cv) => cv.player ? (cv.policy.stance === 'aggressive' ? 0.9 : cv.policy.stance === 'consolidate' ? 0.25 : 0.5) : cv.aggression,      /* (the player's appetite is what his stance says, not a number he cannot see) */ ruler: (cv) => cv.ruler ? `${cv.ruler.title} ${cv.ruler.name}` : fullName(cv), nameOf: (cv) => fullName(cv), income: (cv) => cv.income || 0, fmtYear,
-    married: (a, b) => { if (dynasty) dynasty.married(a, b); } });      // (a royal marriage weds two of the houses' people: dynasty.js)
+    married: (a, b) => { if (dynasty) dynasty.married(a, b); }, learn: () => learn });      // (a royal marriage weds two of the houses' people: dynasty.js; what the world learns of the player: learn.js)
+  // what the world learns of the player (learn.js): from diplomacy's own reckonings
+  learn = window.LEARN ? LEARN.create({ MAXC, civs, year: () => year, player: () => playerCiv(), ratio: (a, b) => diplo.ratio(a, b), bound: (a, b) => diplo.bound(a, b), claimed: (a, b) => diplo.holds(a, b.id) > year,
+    wronged: (a, b) => diplo.memOf(a, b.id), touches: (a, b) => diplo.touches(a, b.id), faith: (cv) => (faith ? faith.faithOf(cv) : cv.religion || 0), folk: (cv) => (people && people.ruling[cv.id]) || 0,
+    covets: (a, b) => !!covetOf(a, b), busy: (b, a) => { for (const k in b.wars) if (+k !== a.id) return true; return false; }, eligible: (a, b) => !diplo.cannotFight(a, b), reach: (cv) => diplo.reach(cv.id),
+    nb: (cv) => nearNb[cv.id] || lastNb[cv.id] || [], atWar: (a, bid) => a.wars[bid] !== undefined, sworn: (a, b) => diplo.anyPact(a, b.id) || diplo.D(a).lord === b.id || diplo.D(b).lord === a.id,
+    partner: (a, b) => diplo.tradeShare(a, b.id) > 0.002,
+    pacts: (cv) => { const d = diplo.D(cv); let n = d.lord >= 0 ? 1 : 0; for (const k in d.pact) for (const kind of ['nap', 'defence', 'alliance', 'marriage']) if (diplo.has(cv, +k, kind)) n++; return n; } }) : null;
   army = ARMY.create({ W, H, N, land, owner, level, walls, pop, flags, special, civs, nbOf, cellDist, elev, year: () => year, seed, isAtWar: (c, o) => c.wars[o] !== undefined, diplo,
     strengthOf, mightOf, popOf, cellsOf, ports, portCells, battles, cellName, fullName, logEvent, conquer, neighbours: (c) => lastNb[c] || nearNb[c],
     KF: (c, key) => KF[c * NKF + KK[key]], knows: (c, key) => know.has[c * know.ND + KNOW.ID[key]] === 1 });
@@ -631,7 +640,8 @@ function createSim(world, seed) {
     quarantine: (cv, q, years) => { if (disease) disease.quarantine(cv, q, years); }, cure: (cv, id, f) => { if (disease) disease.cure(cv, id, f); },
     // (the weather: a realm's harvest this year, a drought of the year's own or a great one, the bread a court gives out for some years: climate.js)
     harvest: (c) => (hvPop[c] > 0 ? hvSum[c] / hvPop[c] : 1), spellOf: (id) => (climate ? climate.spells.find((q) => q.id === id) || null : null), climEvent: (key) => (CLIMATE && CLIMATE.EV[key]) || null,
-    relief: (cv, years, f) => { cv.clim = { until: year + years, f }; } }) : null;
+    relief: (cv, years, f) => { cv.clim = { until: year + years, f }; },
+    chose: (phi, i) => { if (learn) learn.chose(phi, i); }, expect: (phi) => (learn ? learn.expect(phi) : null) }) : null;      // (the player's court learns his choices: learn.js)
   // what each realm will be remembered for (legacy.js): what a realm has, as its ambitions ask it; what costs a pass over a long
   // list (the workshops, the market's links, the faiths kept, great people and masterpieces) is counted for every realm at once,
   // once in five years when asked (a realm's ambitions are looked at once in five)
@@ -694,7 +704,8 @@ function createSim(world, seed) {
       const by = Math.max(1, Math.round(x.w.dur / 2)); x.w.start += by; return `the ${(x.w.k === 'mine' ? workName(x.i) : BUILD[x.w.k].name).toLowerCase()} at ${cellName.get(x.i) || 'the capital'} is set back ${by} year${by === 1 ? '' : 's'}`; },
     rise: (b) => { const e = angriestOf(b); if (e < 0) return false; rule.rising(b.id, b, e); return true; },
     murderHeir: (b) => { const p = heirOfRealm(b); return p && dynasty.kill(p.id) ? p.n : ''; },
-    rivals: rivalsOf, atWar: (a, b) => !!a.wars && a.wars[b.id] !== undefined }) : null;
+    rivals: rivalsOf, atWar: (a, b) => !!a.wars && a.wars[b.id] !== undefined,
+    watch: (b) => (learn ? learn.watchOf(b) : 0), plotCaught: (a, b) => { if (learn) learn.plot(b); } }) : null;      // (the courts learn to watch for the player's agents: learn.js)
   // sickness (disease.js): how crowded a realm is and how many of its people live in towns, what medicine it has against its age,
   // the roads a sickness travels; the dead are taken from its settlements
   const urbanOf = (c) => (civs[c] && popOf[c] > 0 ? Math.min(1, urban[c] / popOf[c]) : 0);      // (the share of its people in towns, as the year's pass counted them)
@@ -1211,6 +1222,8 @@ function createSim(world, seed) {
     if (legacy) legacy.step();
     // spies and schemes: what the agents of every realm are about (intrigue.js)
     if (intrigue) intrigue.step();
+    // what the world learns of the player: once a turn of his age the courts reckon again from all they remember (learn.js)
+    if (learn) learn.step();
     // sickness: new outbreaks where people live crowded, and where the old ones go next (disease.js)
     if (disease) disease.step();
     // diplomacy every 10 ticks (staggered)
@@ -1587,7 +1600,7 @@ function createSim(world, seed) {
       works: [...works.entries()].map(([i, l]) => [i, l.map(w => [w.k, w.slot, w.start, w.dur])]), grow: (() => { const g = []; for (let i = 0; i < N; i++) if (gBand[i] && year - gYear[i] < 80) g.push(i, gBand[i], gPrev[i], gYear[i]); return g; })(),
       ruins: [...ruins.entries()].slice(-600), volc: volcanoes.map(v => [v.last, v.erupting]), comet,
       civs: civs.map(c => c ? { ...c, events: c.events.slice(c.player ? -30 : cellsOf[c.id] > 20 ? -15 : -6), rulers: c.rulers.slice(-3) } : null), fallen: fallen ? { ...fallen, events: [], rulers: (fallen.rulers || []).slice(-3) } : undefined, /* (the reigns of a realm are its houses' lines now: dynasty.js; a save is better small) */ worldEvents: worldEvents.slice(-200), history: history.filter((h, i) => i % 2 === 0 || i > history.length - 40),
-      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, woods: woods && landOn ? woods.save() : undefined, climate: climate && landOn ? climate.save() : undefined, replay: replay ? replay.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : foodTab === FOOD_039 ? 39 : undefined, land: landOn ? 1 : undefined,
+      econ: market.save(), ind: [...ind.entries()].map(([i, a]) => [i, Array.from(a)]), know: know.save(), armies: army.save(), peoples: people.save(), faiths: faith.save(), culture: culture.save(), finance: finance.save(), dynasty: dynasty.save(), story: story ? story.save() : undefined, legacy: legacy ? legacy.save() : undefined, intrigue: intrigue ? intrigue.save() : undefined, disease: disease ? disease.save() : undefined, mig: mig ? mig.save() : undefined, woods: woods && landOn ? woods.save() : undefined, climate: climate && landOn ? climate.save() : undefined, replay: replay ? replay.save() : undefined, learn: learn ? learn.save() : undefined, cal: calShift, heard: { press: rule.abroad.press, peoples: rule.abroad.peoples }, food: foodTab === FOOD_015 ? 15 : foodTab === FOOD_039 ? 39 : undefined, land: landOn ? 1 : undefined,
     };
   }
   function load(s) {
@@ -1633,7 +1646,8 @@ function createSim(world, seed) {
     finance.load(s.finance);      // (a world saved before finance owes nothing, and has no houses yet)
     if (!dynasty.load(s.dynasty)) dynasty.settle();      // (a world saved before dynasties: its rulers become people, of houses of their names where they rule by blood)
     if (story) story.load(s.story);
-    if (intrigue) intrigue.load(s.intrigue);      // (the schemes under way are on the realms: civ.intrigue; a world saved before them has none)
+    if (intrigue) intrigue.load(s.intrigue);
+    if (learn) learn.load(s.learn);      // (a world saved before the courts learned has heard nothing of the player yet)      // (the schemes under way are on the realms: civ.intrigue; a world saved before them has none)
     if (disease) disease.load(s.disease);      // (a world saved before sickness travelled has none under way, and its peoples have had nothing yet)
     if (mig) mig.load(s.mig);      // (a world saved before people moved between realms has no flows yet; its realms' borders are open)
     if (woods && landOn) { fillUse(); if (!woods.load(s.woods)) woods.settle(); }      // (a world saved before the woods: as much wood as its fields leave, nature's where nobody farms)
@@ -1695,7 +1709,7 @@ function createSim(world, seed) {
     // the discovery the player's realm lacks to raise this work here (null: none, whatever else may stand in the way)
     needFor(kind, i) { const c = playerCiv(); if (!c) return null; if (kind === 'farm') return i >= 0 && infra[i] < 5 ? know.lacks(c.id, 'farm', infra[i] + 1) : null; if (kind === 'walls') return i >= 0 && walls[i] < 3 ? know.lacks(c.id, 'walls', walls[i] + 1) : null; if (kind === 'mine') return i >= 0 && goods[i] ? know.estate(c.id, goods[i]) : null; return know.lacks(c.id, kind); },
     tick, st, get year() { return year; }, get player() { return player; }, get evSeq() { return evSeq; }, playerCiv, setPlayer, costOf, reachOf, spawnTribe, act, playerWar, renamePlayer, faithCosts, faithAct, faithNews, cultureNews, financeNews, financeAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = finance.act(c.id, what, a, b); financeNews(); return r; }, dynastyNews, rulerDies, courtAct: (what, a, b) => { const c = playerCiv(); if (!c) return 'No realm'; const r = dynasty.act(c.id, what, a, b); dynastyNews(); return r; },
-    get story() { return story; }, get legacy() { return legacy; }, get intrigue() { return intrigue; }, get disease() { return disease; }, get fallen() { return fallen; }, replay,
+    get story() { return story; }, get legacy() { return legacy; }, get intrigue() { return intrigue; }, get learn() { return learn; }, get disease() { return disease; }, get fallen() { return fallen; }, replay,
     // the story of the player's realm, living or fallen (epilogue.js): its annals and moments, what it is remembered for and where that
     // stands among every realm that lived (the great legacies of the fallen too)
     epilogue: () => {

@@ -79,8 +79,10 @@ window.INTRIGUE = (function () {
     // how likely to succeed and to be found out: the scheme's own, then the two networks against each other, a shared border
     function oddsOf(a, b, key, dn) {
       const S = SK[key], d = dn === undefined ? netOf(a) - netOf(b) : dn, near = h.touches(a, b) ? 1 : 0;
-      const odds = clamp(S.odds * (1 + 0.18 * d) + 0.06 * near, 0.05, 0.9), risk = clamp(S.risk * (1 - 0.15 * d) - 0.04 * near, 0.04, 0.9);
-      return { odds, risk, years: Math.max(2, Math.round(S.turns * turnOf(a))), cost: costOf(a, key) };
+      // (a court that has learned to watch for the player's agents - his caught there lately, or many caught anywhere: learn.js)
+      const wv = a.player && h.watch ? h.watch(b) : 0;
+      const odds = clamp((S.odds * (1 + 0.18 * d) + 0.06 * near) * (1 - 0.35 * wv), 0.05, 0.9), risk = clamp((S.risk * (1 - 0.15 * d) - 0.04 * near) * (1 + 0.8 * wv), 0.04, 0.9);
+      return { odds, risk, watch: wv, years: Math.max(2, Math.round(S.turns * turnOf(a))), cost: costOf(a, key) };
     }
     // a scheme begun: paid at once, under way for its years; every year a chance that it is found out
     function begin(a, b, key, pre, dn) {
@@ -96,6 +98,7 @@ window.INTRIGUE = (function () {
       const S = SK[s.k]; stats.caught++; count(s.k, 2); I(a).s = null; busy[a.id] = 0;
       h.remember(b, a.id, -S.mind); h.word(a, -Math.round(S.mind / 6));
       const F = I(b).found; F.push([yr, a.id, s.k]); if (F.length > 8) F.shift();
+      if (a.player && h.plotCaught) h.plotCaught(a, b);      // (the world learns to watch for the player's agents: learn.js)
       if (b.player || a.player || h.cells(a.id) + h.cells(b.id) > 160) h.log(b, `Agents of ${h.name(a)} are caught in ${h.name(b)} ${S.at}`, b.player || a.player);
       if (a.player) { news.push({ kind: 'caught', key: s.k, on: b.id, year: yr, text: `Your agents are caught in ${h.name(b)}` }); if (h.tell) h.tell(a, 'spies_ours', { o: b.id, k: s.k }); }
       if (b.player) { news.push({ kind: 'foiled', key: s.k, by: a.id, year: yr, text: `Agents of ${h.name(a)} are caught in your realm` }); if (h.tell) h.tell(b, 'spies', Object.assign({ o: a.id, k: s.k }, h.detail ? h.detail(b, s.k) : {})); }
@@ -164,7 +167,7 @@ window.INTRIGUE = (function () {
       return { net: netOf(a), parts: partsOf(a), s,
         found: g.found.slice().reverse().map(([y, o, k]) => ({ year: y, by: o, name: civs[o] ? h.name(civs[o]) : 'a realm that is gone', scheme: SK[k] ? SK[k].name : k, at: SK[k] ? SK[k].at.replace(/\bits\b/g, 'your') : '', war: !!(SK[k] && SK[k].war), open: civs[o] && SK[k] && SK[k].war && yr - y <= WAR_TURNS * turnOf(a) ? y + WAR_TURNS * turnOf(a) : 0 })),
         schemes: b ? SCHEMES.map((S) => Object.assign({ key: S.key, name: S.name, text: S.text, need: S.need, why: cannot(a, b, S.key), war: S.war, mind: S.mind }, oddsOf(a, b, S.key))) : [],
-        theirs: b ? netOf(b) : 0 };
+        theirs: b ? netOf(b) : 0, watch: b && a.player && h.watch ? h.watch(b) : 0 };
     }
     function save() { return { v: 1, rs, stats: { begun: stats.begun, done: stats.done, failed: stats.failed, caught: stats.caught, by: stats.by, out: stats.out } }; }
     function load(s) { sync(); if (!s || s.v !== 1) return false; if (s.rs !== undefined) rs = s.rs >>> 0; if (s.stats) Object.assign(stats, s.stats); return true; }
