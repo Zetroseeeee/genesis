@@ -958,7 +958,7 @@ Conventions that matter:
   his neighbour, sworn to him or trading with him it hears most, within its envoys' reach a little, more once books are printed
   and more again with the wireless; beyond its reach it forgets). What it changes, only toward the player (`diplo.js`): their dread
   in what they think of him (`fear`: the chance he falls on them within a turn against what they would reckon of anyone in his
-  place: 'They fear you will fall on them', or 'They count you a peaceful neighbour'), whom they dread (`threatTo`, by how much more
+  place: 'They fear you will fall on them', or 'They count you a peaceful neighbour'; neither while they are at war with him), whom they dread (`threatTo`, by how much more
   or less than anyone), what they will swear with him (`judge`: 'Your oaths are worth little to them', 'You stand by your
   friends', 'They would have your oath against your appetite', 'They know what becomes of those you beat'), *leagues* (a court that
   dreads him as it would nobody else - or much, whatever it would think of anyone - swears to defend one another with another that

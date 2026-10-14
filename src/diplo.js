@@ -199,7 +199,8 @@ window.DIPLO = (function () {
       if (wb) { let w = 0; for (const k in b.wars) { const e = civs[+k]; if (e && e !== a && (has(a, e.id, 'alliance') || has(a, e.id, 'defence') || D(e).lord === a.id || da.lord === e.id)) { w = 1; break; } } if (w) put('You are at war with their friends', -14); }
       const t = host.trait(a); if (t === 'conqueror' && near) put('A conqueror\'s eye', -6); else if (t === 'steward') put('A ruler who keeps the peace', 4); else if (t === 'tyrant') put('A ruler who trusts nobody', -4);
       // (what they have learned of the player: their dread that he falls on them, against what they would dread of anyone in his place)
-      if (b.player && !a.player) { const L = LR(), f = L && L.fear(a); if (f) { const fv = f[0], r = fv / Math.max(1e-4, f[1]);      // (by how many times more or less than of anyone: the same in every age)
+      // (not while they are at war with him: the war speaks for itself, and an enemy does not count him a peaceful neighbour)
+      if (b.player && !a.player && !host.atWar(a, b.id)) { const L = LR(), f = L && L.fear(a); if (f) { const fv = f[0], r = fv / Math.max(1e-4, f[1]);      // (by how many times more or less than of anyone: the same in every age)
         if (r > 1.3 && fv > L.floor()) put('They fear you will fall on them', -Math.round(Math.min(30, 12 * Math.log2(r))));
         else if (near && r < 0.7 && L.heardOf(a) > 0.4) put('They count you a peaceful neighbour', Math.max(1, Math.round(Math.min(6, 4 * Math.log2(1 / r))))); } }
       return o > 100 ? 100 : o < -100 ? -100 : o;

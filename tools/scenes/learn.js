@@ -1,5 +1,5 @@
 // What the courts have learned of the player, as the diplomacy screen shows it (learn.js). After tools/scenes/dip.js: a history laid
-// down by hand - twenty turns watched, in which the player fell on the small realm three times and on the foe once, broke two oaths,
+// down by hand - twenty turns watched, in which the player fell on the small realm five times and on the foe once, broke two oaths,
 // answered two calls to arms of three, made the beaten his vassals and joined one to his crown; his court saw him take coin and quiet
 // when stories came, and chose war and the land for his scholars - then the screen opens at Your name, or at a realm's page.
 // Options in window.__scene: tab ('name' by default), pick (dip.js's names: 'war', 'vassal', 'cold', 'asker' ...: that realm's page).
@@ -10,7 +10,7 @@
   // twenty turns watched
   for (let t = 0; t < 20; t++) {
     L.st.next = -1e12; L.step();
-    if ((t === 2 || t === 7 || t === 12) && small) L.declared(c, small);
+    if ((t === 2 || t === 5 || t === 8 || t === 11 || t === 14) && small) L.declared(c, small);
     if (t === 16 && foe) L.declared(c, foe);
   }
   L.st.next = -1e12; L.step();

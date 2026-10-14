@@ -171,7 +171,8 @@ window.ENVOYS = (function () {
     const L = LRN(); if (!L) return ''; const f = L.fear(b); if (!f) return ''; const B = L.belief(b), T = L.profile().tot, hd = B.heard;
     const out = []; const line = (icon, cls, text, sub) => out.push(`<div class="dp-line ${cls}">${svg(ICON[icon])}<span>${text}${sub ? `<small>${sub}</small>` : ''}</span></div>`);
     const rel = f[0] / Math.max(0.005, f[1]); const ws = L.why(b).slice(0, 3);
-    line('war', rel > 1.5 ? 'warn' : '', `They reckon you fall on them within a turn: <b>${pct(f[0])}</b>`, `${rel > 1.25 ? 'More than' : rel < 0.8 ? 'Less than' : 'As'} they would reckon of any realm in your place (${pct(f[1])})${ws.length ? ': ' + ws.map(([k, v]) => pattern(k, v)).join('; ') : ''}`);
+    if (S().isAtWar(c, b.id)) line('war', 'warn', 'At war with you', 'What they reckon of your appetite will count again at the peace');      // (at war, the war speaks for itself)
+    else line('war', rel > 1.5 ? 'warn' : '', `They reckon you fall on them within a turn: <b>${pct(f[0])}</b>`, `${rel > 1.25 ? 'More than' : rel < 0.8 ? 'Less than' : 'As'} they would reckon of any realm in your place (${pct(f[1])})${ws.length ? ': ' + ws.map(([k, v]) => pattern(k, v)).join('; ') : ''}`);
     { const k = B.keep(4); line('word', k < 0.8 ? 'warn' : '', `A pact sworn with you, they reckon, holds to its end: <b>${pct(k)}</b>`, T.oaths ? `You have broken ${T.oaths} oath${T.oaths === 1 ? '' : 's'}` : 'You have broken no oath'); }
     if (T.called) line('alliance', B.ally < 0.7 ? 'warn' : '', `You stand by your friends: <b>${pct(B.ally)}</b>`, `You answered ${T.answered} of ${T.called} call${T.called === 1 ? '' : 's'} to arms`);
     if (T.asked) line('lord', '', `You give in when pressed: <b>${pct(B.gives)}</b>`, `You bent the knee ${T.gave} time${T.gave === 1 ? '' : 's'} of ${T.asked}`);
