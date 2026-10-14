@@ -1742,9 +1742,10 @@ log('28. what the world learns of the player');
     const truce = new Map(); const nb = () => civs.filter((c) => c && c.id > 0 && c.id <= 12).map((c) => c.id); let pacts = 0;
     const h = { MAXC, civs, year: () => year, player: () => P, ratio: (a, b) => a.might / b.might, bound: () => false, claimed: () => false, wronged: () => 0, touches: (a, b) => b.id <= 12, faith: (cv) => cv.faith, folk: () => 0, covets: () => false, busy: () => false,
       eligible: (a, b) => !(truce.get(b.id) > year), reach: () => civs.filter((c) => c && c.id > 0).map((c) => c.id), nb, atWar: () => false, sworn: () => false, partner: () => false, pacts: () => pacts };
+    const told = []; h.news = (t) => told.push(t);
     const L = LR.create(h); let wars = 0;
     for (let t = 0; t < turns; t++) { L.step(); const v = policy(civs.filter((c) => c && c.id > 0 && c.id <= 12 && h.eligible(P, c)), P, rnd, t, L, (n) => { pacts = n; }); if (v) { L.declared(P, v); truce.set(v.id, year + 100); wars++; } year += 50; }
-    L.step(); for (let i = 1; i < 30; i++) L.st.heard[i] = 255; return { L, civs, P, wars, h, step: () => { year += 50; L.step(); } };
+    L.step(); for (let i = 1; i < 30; i++) L.st.heard[i] = 255; return { L, civs, P, wars, h, told, step: () => { year += 50; L.step(); } };
   };
   const rel = (L, b) => { const f = L.fear(b); return f[0] / f[1]; };
   // one who falls on the weaker realms of another faith, again and again
@@ -1754,19 +1755,23 @@ log('28. what the world learns of the player');
     check(rel(W.L, strong) < 1, `a strong realm of his own faith fears him less than it would anyone (${rel(W.L, strong).toFixed(2)})`);
     const P = W.L.profile(), o = (k) => P.odds.find((x) => x.key === k).x; check(o('again') > 2 && o('faith') > 1.2 && o('weak') > 1.2, `the world has learned his ways: again ×${o('again').toFixed(1)}, another faith ×${o('faith').toFixed(1)}, weaker ×${o('weak').toFixed(1)}`);
     check(W.L.why(prey).length > 0 && W.L.why(prey)[0][1] > 0, `and its envoys can say why: ${W.L.why(prey).map(([k, v]) => k + ' ' + v.toFixed(2)).join(', ')}`);
-    check(W.L.fearful(0.1).some(([b]) => b === prey), 'his prey is among those who fear him'); }
+    check(W.L.fearful().some(([b]) => b === prey), 'his prey is among those who fear him'); }
   // one who never fights: every court fears him less than it would anyone; and a conqueror who mends his ways is believed in time
-  { const W = world(() => null, 40); check(W.civs.slice(1, 13).every((c) => rel(W.L, c) < 0.6), `a peaceful neighbour is dreaded less than anyone (${W.civs.slice(1, 13).map((c) => rel(W.L, c).toFixed(2)).join(' ')})`); check(W.L.fearful(0.1).length === 0, 'and nobody fears him'); }
+  { const W = world(() => null, 40); check(W.civs.slice(1, 13).every((c) => rel(W.L, c) < 0.6), `a peaceful neighbour is dreaded less than anyone (${W.civs.slice(1, 13).map((c) => rel(W.L, c).toFixed(2)).join(' ')})`); check(W.L.fearful().length === 0, 'and nobody fears him');
+    check(W.told.length === 1 && /peaceful neighbour/.test(W.told[0]), `and his chronicle hears it, once (${W.told.join(' | ')})`); }
   { const W = world((av, P, r, t) => { if (t >= 20) return null; const c = av.filter((c) => c.might < P.might).sort((a, b) => a.might - b.might); return c.length && r() < 0.8 ? c[Math.floor(r() * Math.min(3, c.length))] : null; }, 50);
-    check(W.wars > 8 && W.civs.slice(1, 13).every((c) => rel(W.L, c) < 1.2), `thirty turns of peace after twenty of conquest, and the courts believe it (${W.wars} wars; ${W.civs.slice(1, 13).map((c) => rel(W.L, c).toFixed(2)).join(' ')})`); }
+    check(W.wars > 8 && W.civs.slice(1, 13).every((c) => rel(W.L, c) < 1.2), `thirty turns of peace after twenty of conquest, and the courts believe it (${W.wars} wars; ${W.civs.slice(1, 13).map((c) => rel(W.L, c).toFixed(2)).join(' ')})`);
+    check(W.told.some((t) => /hungry for land|conqueror/.test(t)) && /peaceful neighbour|no longer single you out/.test(W.told[W.told.length - 1]), `and his chronicle heard each turn of it (${W.told.map((t) => t.split(':')[0]).join(' | ')})`); }
   // his word, his friendship, when he is pressed, what becomes of the beaten
   { const W = world((av, P, r, t, L, setP) => { setP(3); return null; }, 12); const k0 = W.L.belief(null).keep(4); check(k0 > 0.9, `oaths kept twelve turns: a pact with him holds (${(k0 * 100).toFixed(0)}%)`);
     for (let n = 0; n < 4; n++) W.L.oath(1); const k1 = W.L.belief(null).keep(4); check(k1 < 0.7, `four oaths broken, and nobody trusts a pact with him (${(k1 * 100).toFixed(0)}%)`);
+    W.step(); check(W.told.some((t) => /doubt your word|worth little/.test(t)), `and his chronicle hears that his word is doubted (${W.told.slice(-1)[0] || 'nothing'})`);
     const a0 = W.L.belief(null).ally; for (let n = 0; n < 3; n++) W.L.called(false, 1); const a1 = W.L.belief(null).ally; check(a0 >= 0.79 && a1 < 0.6, `three calls to arms refused (${(a0 * 100).toFixed(0)}% -> ${(a1 * 100).toFixed(0)}%)`);
     const g0 = W.L.belief(null).gives; for (let n = 0; n < 3; n++) W.L.pressed(true, 1); check(W.L.belief(null).gives > g0 + 0.3, 'one who bends the knee when pressed is known for it');
     for (let n = 0; n < 3; n++) W.L.annexed(); check(W.L.belief(null).harsh > 1.8, `one who joins his vassals to his crown is known for it (${W.L.belief(null).harsh.toFixed(2)})`);
     const B = W.L.belief(W.civs[20]); W.L.st.heard[20] = 0; const B0 = W.L.belief(W.civs[20]); check(Math.abs(B0.keep(4) - Math.exp(-4 * LR.OATH0[0] / LR.OATH0[1])) < 1e-9 && B.keep(4) < B0.keep(4) + 1e-9, 'a court that has heard nothing of him believes of him what it would of anyone');
-    W.L.plot(W.civs[3]); check(W.L.watchOf(W.civs[3]) > 0.5 && W.L.watchOf(W.civs[4]) < W.L.watchOf(W.civs[3]), 'a court that caught his agents watches for them'); }
+    W.L.plot(W.civs[3]); check(W.L.watchOf(W.civs[3]) > 0.5 && W.L.watchOf(W.civs[4]) < W.L.watchOf(W.civs[3]), 'a court that caught his agents watches for them');
+    for (let n = 0; n < 4; n++) { W.L.answered('trade', false, 1); W.L.answered('alliance', true, 1); } check(W.L.takes('trade') < 0.25 && W.L.takes('alliance') > 0.75 && Math.abs(W.L.takes('nap') - 0.5) < 1e-9, `the courts learn what he turns away and what he takes (trade ${W.L.takes('trade').toFixed(2)}, alliance ${W.L.takes('alliance').toFixed(2)})`); }
   // his court: which way he leans when a story comes before him; which branches his scholars know him for
   { const W = world(() => null, 2); const phi = () => [[0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0, 0, 0], [0, -0.5, 0, 0, 1, 0, 0, 0, 0, 0]];
     check(W.L.expect(phi()) === null, 'his court says nothing of his leanings before it has seen any');
@@ -1798,7 +1803,8 @@ log('28. what the world learns of the player');
   // a league: a court that dreads him swears with another that does to defend one another
   { for (const x of [A, B]) teach(sim, x, 2, ['envoys', 'embassies']); A.dip.ask = {}; B.dip.ask = {}; let made = false; for (let n = 0; n < 40 && !made; n++) { A.dip.ask = {}; dp.think(A.id, A); made = dp.has(A, B.id, 'defence'); }
     check(made && c.events.some((e) => /Fearing .* swear to defend one another/.test(e.text)), `those who dread him band together, and he hears of it (${(c.events.filter((e) => /Fearing/.test(e.text)).pop() || {}).text || 'no league'})`);
-    const q = c.story && c.story.q; check(!!q && q.k === 'league' && sim.storyView() && /league against you/i.test(sim.storyView().title), `and his court is told of the league (${q ? q.k : (c.story ? JSON.stringify(c.story.f) : 'no stories')})`); }
+    const q = c.story && c.story.q; const told = !!q && q.k === 'league' && sim.storyView() && /league against you/i.test(sim.storyView().title), after = !!c.story && c.story.f.some((f) => f[0] === 'league');
+    check(told || after, `and his court is told of the league${after ? ', when the story before it is answered' : ''} (${q ? q.k : 'nothing waits'})`); }
   // his agents: a court that caught them watches for them, and his schemes there are the harder
   { const X = sim.intrigue; if (X) { teach(sim, c, 2, ['writing', 'envoys']); const o0 = X.oddsOf(c, E, 'discord'); L.plot(E); const o1 = X.oddsOf(c, E, 'discord'); check(o1.odds < o0.odds && o1.risk > o0.risk && o1.watch > 0.5, `a court that caught his agents watches for them (odds ${(o0.odds * 100).toFixed(0)}% -> ${(o1.odds * 100).toFixed(0)}%, risk ${(o0.risk * 100).toFixed(0)}% -> ${(o1.risk * 100).toFixed(0)}%)`); } }
   // a story he answers is a choice his court learns
@@ -1808,7 +1814,8 @@ log('28. what the world learns of the player');
     check(!why && !!v && L.st.habit.n === n0 + 1 && L.st.habit.sets[L.st.habit.sets.length - 1].phi.length >= 2, `a story he answers is a choice his court learns (${why || v.k}: ${L.st.habit.n - n0} choice, ${v ? v.opts.length : 0} ways)`); }
   // saved with the world, and a world saved before has heard nothing of him
   { const sv = JSON.parse(JSON.stringify(sim.save())); const s2 = createSim(wd, 1); s2.load(sv); const L2 = s2.learn; const b2 = s2.civs[B.id];
-    check(!!sv.learn && JSON.stringify(sv.learn).length < 60000 && L2.st.T === L.st.T && L2.st.n === L.st.n && Math.abs(L2.fear(b2)[0] - L.fear(B)[0]) < 0.01 && L2.profile().tot.oaths === L.profile().tot.oaths, `saved and loaded, the world remembers him (${(JSON.stringify(sv.learn).length / 1024).toFixed(1)} KB)`);
+    const same = L2.st.T === L.st.T && L2.st.n === L.st.n && L2.st.w.every((v, k) => Math.abs(v - L.st.w[k]) < 0.002) && L2.st.heard[B.id] === L.st.heard[B.id] && L2.profile().tot.oaths === L.profile().tot.oaths && L2.st.E[L2.st.n - 1] === L.st.E[L.st.n - 1];
+    check(!!sv.learn && JSON.stringify(sv.learn).length < 60000 && same && L2.fear(b2)[0] > 0.1, `saved and loaded, the world remembers him (${(JSON.stringify(sv.learn).length / 1024).toFixed(1)} KB; their dread ${(L2.fear(b2)[0] * 100).toFixed(0)}%)`);
     const old = JSON.parse(JSON.stringify(sv)); delete old.learn; const s3 = createSim(wd, 1); s3.load(old); check(s3.learn.st.n === 0 && s3.learn.profile().tot.wars === 0, 'a world saved before the courts learned has heard nothing of him'); }
   // a world without a player: nothing is watched
   { const s4 = createSim(wd, 5); for (let y = 0; y < 30; y++) s4.tick(); check(s4.learn.st.T === 0 && s4.learn.st.n === 0, 'a world without a player watches nobody'); }

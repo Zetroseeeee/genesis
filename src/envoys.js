@@ -104,6 +104,7 @@ window.ENVOYS = (function () {
     const d = DK(), P = DP(); const out = []; const put = (k, t) => out.push(`<span class="dp-bd ${k}" title="${esc(t)}">${svg(ICON[k])}</span>`);
     if (S().isAtWar(c, b.id)) put('war', 'At war'); if (d.D(b).lord === c.id) put('vassal', 'Your vassal'); if (d.D(c).lord === b.id) put('lord', 'Your lord');
     for (const p of P.PACTS) if (d.has(c, b.id, p.key)) put(p.key, p.name); if (d.D(c).ban[b.id] || d.D(b).ban[c.id]) put('ban', 'Markets closed');
+    { const L = S().learn, f = L && L.fear(b); if (f && L.dreads(b)) put('eye', `They dread you: they reckon you fall on them within a turn at ${pct(f[0])}, ${(f[0] / Math.max(1e-4, f[1])).toFixed(1)} times what they would of anyone`); }      // (what they have learned of you: learn.js)
     return out.join('');
   }
   function renderList(c) {
@@ -187,7 +188,7 @@ window.ENVOYS = (function () {
     const stat = (icon, title, word, v, cls, note) => `<div class="dp-stat"><span class="ic">${svg(ICON[icon])}</span><div><span class="micro">${title}</span><b>${word}</b>${v === null ? '' : meter(v, cls)}<p class="gv-note">${note}</p></div></div>`;
     const relB = P.base / Math.max(0.005, P.base0);
     let h = stat('war', 'Your appetite, as they reckon it', relB > 2.5 ? 'a conqueror' : relB > 1.4 ? 'a hungry neighbour' : relB < 0.6 ? 'a peaceful neighbour' : 'as any realm', Math.min(1, P.base * 4), relB > 1.4 ? 'neg' : relB < 0.6 ? 'pos' : '',
-      `A neighbour of your own weight, they reckon, you fall on within a turn at ${pct(P.base)}; of any realm in your place they would reckon ${pct(P.base0)}. ${T.turns ? `They have watched you ${T.turns} turn${T.turns === 1 ? '' : 's'}, and seen you begin ${T.wars} war${T.wars === 1 ? '' : 's'}.` : 'They have not watched you a turn yet.'}`);
+      `On the whole, a realm about you reckons you fall on it within a turn at ${pct(P.base)}; of any realm in your place it would reckon ${pct(P.base0)}. ${T.turns ? `They have watched you ${T.turns} turn${T.turns === 1 ? '' : 's'}, and seen you begin ${T.wars} war${T.wars === 1 ? '' : 's'}.` : 'They have not watched you a turn yet.'}`);
     const pats = P.odds.filter((o) => o.key !== 'bias' && Math.abs(Math.log(o.x)) >= 0.25).sort((x, y) => Math.abs(Math.log(y.x)) - Math.abs(Math.log(x.x)));
     h += `<div class="gv-sect"><span class="micro">What they have learned of your wars</span>${pats.length ? pats.map((o) => { const up = o.x > 1;
       return `<div class="dp-line ${up ? 'warn' : ''}">${svg(ICON[up ? 'war' : 'peace'])}<span>${cap(pattern(o.key, up ? 1 : -1))}<small>${up ? `${o.x >= 10 ? Math.round(o.x) : o.x.toFixed(1)} times as likely as they would think of anyone` : `${(1 / o.x) >= 10 ? Math.round(1 / o.x) : (1 / o.x).toFixed(1)} times less likely than they would think of anyone`}</small></span></div>`; }).join('') : '<div class="gv-note">Nothing yet: they think of your wars as they would of anyone\'s.</div>'}</div>`;
@@ -195,12 +196,14 @@ window.ENVOYS = (function () {
       `A pact of four turns sworn with you, they reckon, holds to its end: ${pct(P.keep4)}. You have broken ${T.oaths} oath${T.oaths === 1 ? '' : 's'}; your oaths have stood ${Math.round(T.kept)} pact-turn${Math.round(T.kept) === 1 ? '' : 's'}.`);
     h += stat('alliance', 'Your friendship', T.called ? (P.ally >= 0.85 ? 'steadfast' : P.ally >= 0.7 ? 'mostly true' : 'fickle') : 'untried', T.called ? P.ally : null, P.ally >= 0.8 ? 'pos' : 'neg',
       T.called ? `You answered ${T.answered} of ${T.called} calls to arms. Courts swear alliances with those who come when called.` : 'Nobody has called you to war yet. Courts swear alliances with those who come when called.');
+    if (T.offered) { const Pn = (k) => (DP().PACT[k] ? DP().PACT[k].name.toLowerCase() : k), few = Object.entries(P.takes).filter(([, v]) => v < 0.34).map(([k]) => Pn(k));
+      h += stat('envoy', 'What envoys bring you', `${T.took} taken of ${T.offered}`, T.took / T.offered, '', `Courts send fewer of the pacts you turn away${few.length ? ' (' + few.join(', ') + ')' : ''}, and more of those you take.`); }
     if (T.asked) h += stat('lord', 'When pressed', P.gives >= 0.5 ? 'you give in' : 'you stand firm', P.gives, P.gives >= 0.5 ? 'neg' : 'pos', `You bent the knee ${T.gave} time${T.gave === 1 ? '' : 's'} of ${T.asked}. Strong neighbours press sooner and harder a realm known to give in.`);
     if (T.peaces || T.annexed) h += stat('vassal', 'The beaten', P.harsh >= 2.3 ? 'swallowed' : P.harsh >= 1.5 ? 'remade' : P.harsh >= 0.6 ? 'made to pay' : 'let go', Math.min(1, P.harsh / 3), P.harsh >= 2 ? 'neg' : '',
       `${cap(harshWord(P.harsh))}${T.annexed ? `; you have joined ${T.annexed} vassal${T.annexed === 1 ? '' : 's'} to your crown` : ''}. Realms asked to bend the knee to you remember what became of the others.`);
     if (T.plots) h += stat('spy', 'Your agents', T.plots >= 4 ? 'notorious' : 'known', Math.min(1, T.plots / 6), 'neg', `${T.plots} of your schemes ${T.plots === 1 ? 'was' : 'were'} found out. Courts that have caught your agents, or heard of many, watch for them.`);
     // who fears you, and who has sworn with whom against you; your own court
-    const F = L.fearful(0.1).filter(([b]) => b !== c); const inF = new Set(F.map(([b]) => b.id)); const leagues = [];
+    const F = L.fearful().filter(([b]) => b !== c); const inF = new Set(F.map(([b]) => b.id)); const leagues = [];
     for (const [b] of F) for (const k in d.D(b).pact) { const o = s.civs[+k]; if (o && o.id > b.id && inF.has(o.id) && d.has(b, o.id, 'defence')) leagues.push([b, o]); }
     let r = `<div class="gv-sect"><span class="micro">Who fears you most</span>${F.length ? F.slice(0, 7).map(([b, fv, f0]) => `<div class="dp-line warn">${sw(b)}<span>${link(b)}<small>Reckons you fall on it within a turn: ${pct(fv)} (of anyone in your place: ${pct(f0)})</small></span></div>`).join('') : '<div class="gv-note">Nobody fears you more than they would any realm in your place.</div>'}</div>`;
     r += `<div class="gv-sect"><span class="micro">Leagues against you</span>${leagues.length ? leagues.slice(0, 8).map(([a, b]) => `<div class="dp-line warn">${svg(ICON.league)}<span>${link(a)} and ${link(b)}<small>sworn to defend one another</small></span></div>`).join('') : '<div class="gv-note">None. Courts that dread you as they would dread nobody else look for others who do, and swear to defend one another.</div>'}</div>`;

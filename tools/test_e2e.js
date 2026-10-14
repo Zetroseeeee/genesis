@@ -998,7 +998,7 @@ server.listen(0, async () => {
       if (!t) return { made: false }; t.tech = c.tech; t.era = c.era; t.aggression = 0; t.dip.think = 1e12; for (const k of Object.keys(c.wars)) { const e = S.civs[+k]; if (e) S.diplo.conclude(c, e, 'white'); }
       S.recount(); S.touchAll(); __G.run(1); const T0 = L.st.T; const why = S.diplo.declare(c, t); const watched = L.st.cand.some((e) => e.b === t.id && e.y === 1); S.diplo.conclude(c, t, 'white');
       window.__prey = t.id; L.st.next = -1e12; __G.run(1); return { made: true, why, watched, T: L.st.T - T0, n: L.st.n, prey: L.st.prey[t.id] }; });
-    check(!r.none && r.made && !r.why && r.watched && r.T >= 1 && r.n >= 1 && r.prey >= 1, `a war he begins is watched, and the courts reckon again (${JSON.stringify(r)})`);
+    check(!r.none && r.made && !r.why && r.watched && r.T >= 1 && r.n >= 1 && r.prey > 0.9, `a war he begins is watched, and the courts reckon again (${JSON.stringify(r)})`);
     // the world's picture: as if it had seen him fall on the weak again and again
     await ev(() => { const L = __G.sim.learn, FK = LEARN.FK; L.st.w[FK.weak] = 4; L.st.w[FK.again] = 3; L.st.w[FK.bias] = -2.2; for (let k = 0; k < L.st.heard.length; k++) if (__G.sim.civs[k]) L.st.heard[k] = 230; L.oath(1); L.called(false, 1); });
     await ev(() => ENVOYS.open('name')); await frames(2);

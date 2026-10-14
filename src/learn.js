@@ -36,10 +36,10 @@ window.LEARN = (function () {
 
   // ---------- whom he falls on ----------
   // [key, the realms it describes (the envoys say "you fall on ..." or "you spare ..."), what a court assumes of any realm: the prior's
-  // weight in the log-odds of a war begun on such a realm within a turn]. The bias: some four in a hundred a turn for a neighbour of
-  // one's own weight. Every feature is between 0 and 1.
+  // weight in the log-odds of a war begun on such a realm within a turn]. The bias is what he does beyond what realms of the age do
+  // (`BASE`): every feature is between 0 and 1.
   const WAR = [
-    ['bias', 'your neighbours', -3.1],
+    ['bias', 'your neighbours', 0],
     ['weak', 'realms weaker than you', 1.3],
     ['strong', 'realms stronger than you', -1.2],
     ['faith', 'realms of another faith', 0.3],
@@ -54,6 +54,10 @@ window.LEARN = (function () {
     ['far', 'realms beyond your borders', -1.6],
   ];
   const NF = WAR.length, FK = {}; WAR.forEach((f, k) => { FK[f[0]] = k; });
+  // what realms of each age do: the log-odds that a realm begins a war of its own on a neighbour of its own weight within a turn
+  // (the war-and-peace probe's wars begun in a century, half of them beside a friend from the Iron Age on, by the turn's years, over
+  // some five neighbours: nine in a hundred a turn in the Stone Age's turns of two centuries, two in a thousand in our own day's of five years)
+  const BASE = [-2.3, -2.9, -4.4, -4.5, -4.4, -4.9, -5.5, -6.1, -6.1, -6.1];
   const W0 = Float64Array.from(WAR.map((f) => f[2]));
   const HALF = 12;          // turns in which what a court remembers of him counts for half
   const LAM = 1;            // how hard the prior holds: an example's worth on each weight
@@ -88,12 +92,12 @@ window.LEARN = (function () {
 
   // Newton's method on a weighted, penalised logistic log-likelihood (iteratively reweighted least squares): from w, toward the
   // weights that best explain y by X, each example counted c times, the whole pulled toward w0 with strength lam
-  function newton(X, Y, C, n, F, w, w0, lam, iters) {
+  function newton(X, Y, C, n, F, w, w0, lam, iters, O) {
     const H = new Float64Array(F * F), g = new Float64Array(F), dw = new Float64Array(F), L = new Float64Array(F * F), t = new Float64Array(F);
     for (let it = 0; it < iters; it++) {
       H.fill(0); g.fill(0);
       for (let i = 0; i < n; i++) {
-        const o = i * F; let z = 0; for (let k = 0; k < F; k++) z += w[k] * X[o + k];
+        const o = i * F; let z = O ? O[i] : 0; for (let k = 0; k < F; k++) z += w[k] * X[o + k];
         const p = sig(z), c = C[i]; if (!(c > 0)) continue; const r = c * (p - Y[i]), s = c * p * (1 - p);
         for (let k = 0; k < F; k++) { const xk = X[o + k]; if (!xk) continue; g[k] += r * xk; const sk = s * xk; for (let j = k; j < F; j++) H[k * F + j] += sk * X[o + j]; }
       }
@@ -146,9 +150,9 @@ window.LEARN = (function () {
     const st = fresh();
     function fresh() {
       return { T: 0, next: -1e12, w: Float64Array.from(W0), X: new Uint8Array(MAXEX * NF), Y: new Uint8Array(MAXEX), C: new Float32Array(MAXEX), TT: new Int32Array(MAXEX), n: 0,
-        cand: [], oath: [0, 0], ally: [0, 0], give: [0, 0], harsh: [0, 0], plot: [0, 0],
+        E: new Uint8Array(MAXEX), cand: [], oath: [0, 0], ally: [0, 0], give: [0, 0], harsh: [0, 0], plot: [0, 0], acc: { nap: [0, 0], trade: [0, 0], defence: [0, 0], alliance: [0, 0], marriage: [0, 0] },
         tot: { wars: 0, oaths: 0, kept: 0, called: 0, answered: 0, asked: 0, gave: 0, peaces: 0, harsh: 0, annexed: 0, plots: 0, turns: 0 },
-        heard: new Uint8Array(MAXC), caught: new Float64Array(MAXC).fill(-1e9), prey: new Float32Array(MAXC), seen: -1,
+        heard: new Uint8Array(MAXC), caught: new Float64Array(MAXC).fill(-1e9), prey: new Float32Array(MAXC), seen: -1, told: { a: 'anyone', w: 'holds' },
         habit: { th: Float64Array.from(TH0), sets: [], n: 0, kb: new Float64Array(8), kn: 0 }, ms: 0 };
     }
     let ver = 1;      // (what is believed changes: the caches below are of one version)
@@ -171,22 +175,22 @@ window.LEARN = (function () {
     // ----- the turn's watch: every realm he could fall on (his neighbours, and a few further off for all of them) -----
     function watch(p) {
       const nb = h.nb(p) || [], far = []; const out = [];
-      for (const bid of nb) { const b = civs[bid]; if (b && b !== p && h.eligible(p, b)) out.push({ b: bid, x: q8(feats(p, b, xf)), s: 1, y: 0 }); }
+      const e = eraOf(p); for (const bid of nb) { const b = civs[bid]; if (b && b !== p && h.eligible(p, b)) out.push({ b: bid, x: q8(feats(p, b, xf)), s: 1, y: 0, e }); }
       for (const bid of h.reach(p)) { if (nb.indexOf(bid) >= 0) continue; const b = civs[bid]; if (b && b !== p && h.eligible(p, b)) far.push(bid); }
       if (far.length) { const k = Math.min(FAR_N, far.length), s = Math.min(FAR_S, far.length / k), o = (Math.imul(st.T + 1, 2654435761) >>> 0) % far.length;
-        for (let i = 0; i < k; i++) { const bid = far[(o + Math.floor(i * far.length / k)) % far.length]; out.push({ b: bid, x: q8(feats(p, civs[bid], xf)), s, y: 0 }); } }
+        for (let i = 0; i < k; i++) { const bid = far[(o + Math.floor(i * far.length / k)) % far.length]; out.push({ b: bid, x: q8(feats(p, civs[bid], xf)), s, y: 0, e }); } }
       st.cand = out;
     }
     function keep(e) {
-      if (st.n >= MAXEX) { const d = 100; st.X.copyWithin(0, d * NF, st.n * NF); st.Y.copyWithin(0, d, st.n); st.C.copyWithin(0, d, st.n); st.TT.copyWithin(0, d, st.n); st.n -= d; }
-      const i = st.n++; st.X.set(e.x, i * NF); st.Y[i] = e.y; st.C[i] = e.s; st.TT[i] = st.T;
+      if (st.n >= MAXEX) { const d = 100; st.X.copyWithin(0, d * NF, st.n * NF); st.Y.copyWithin(0, d, st.n); st.C.copyWithin(0, d, st.n); st.TT.copyWithin(0, d, st.n); st.E.copyWithin(0, d, st.n); st.n -= d; }
+      const i = st.n++; st.X.set(e.x, i * NF); st.Y[i] = e.y; st.C[i] = e.s; st.TT[i] = st.T; st.E[i] = e.e === undefined ? 2 : e.e;
     }
     // the reckoning: the model of his wars fitted again to all that is remembered
     function fit() {
       const n = st.n; if (!n) { st.w.set(W0); return; }
-      const X = new Float64Array(n * NF), Y = new Float64Array(n), C = new Float64Array(n);
-      for (let i = 0; i < n; i++) { for (let k = 0; k < NF; k++) X[i * NF + k] = st.X[i * NF + k] / Q; Y[i] = st.Y[i]; C[i] = st.C[i] * Math.pow(0.5, (st.T - st.TT[i]) / HALF); }
-      newton(X, Y, C, n, NF, st.w, W0, LAM, 10);
+      const X = new Float64Array(n * NF), Y = new Float64Array(n), C = new Float64Array(n), O = new Float64Array(n);
+      for (let i = 0; i < n; i++) { for (let k = 0; k < NF; k++) X[i * NF + k] = st.X[i * NF + k] / Q; Y[i] = st.Y[i]; C[i] = st.C[i] * Math.pow(0.5, (st.T - st.TT[i]) / HALF); O[i] = BASE[st.E[i]]; }
+      newton(X, Y, C, n, NF, st.w, W0, LAM, 10, O);
       for (let k = 0; k < NF; k++) if (!Number.isFinite(st.w[k])) { st.w.set(W0); break; }
     }
     // who has heard of him, and how much (a byte a realm)
@@ -209,18 +213,31 @@ window.LEARN = (function () {
       if (y < st.next) return;
       const t0 = Date.now();
       for (const e of st.cand) keep(e);      // (the last turn's watch is done: what he did, and did not do)
-      const f = Math.pow(0.5, 1 / HALF); for (const a of [st.oath, st.ally, st.give, st.harsh, st.plot]) { a[0] *= f; a[1] *= f; } for (let c = 0; c < MAXC; c++) if (st.prey[c]) st.prey[c] = st.prey[c] * f < 0.02 ? 0 : st.prey[c] * f;
+      const f = Math.pow(0.5, 1 / HALF); for (const a of [st.oath, st.ally, st.give, st.harsh, st.plot, ...Object.values(st.acc)]) { a[0] *= f; a[1] *= f; } for (let c = 0; c < MAXC; c++) if (st.prey[c]) st.prey[c] = st.prey[c] * f < 0.02 ? 0 : st.prey[c] * f;
       const pn = h.pacts(p); st.oath[1] += pn; st.tot.kept += pn; st.plot[1] += 1;
       st.T++; st.tot.turns++; fit(); hear(p); watch(p);
       st.next = y + PACE[eraOf(p)]; ver++; fearY.fill(-2147483648);
+      tell();
       st.ms = Date.now() - t0;
+    }
+
+    // ----- what he hears of it: when the world's picture of him turns, his chronicle says so (calm news) -----
+    const APP = { conqueror: 'Abroad they call you a conqueror: the courts reckon you fall on your neighbours far oftener than any realm would',
+      hungry: 'The courts abroad have come to watch your borders: they reckon you hungry for land', peaceful: 'Abroad you are counted a peaceful neighbour',
+      anyone: 'The courts abroad no longer single you out: they reckon of you as they would of anyone' };
+    const WRD = { little: 'Your word is worth little abroad: the courts reckon your pacts will not hold', doubted: 'The courts abroad have begun to doubt your word', holds: 'Your word is trusted abroad again' };
+    function tell() {
+      if (st.T < 4 || !h.news) return; const A = appetite(), r = A[0] / Math.max(0.002, A[1]), B = belief(null), k = B.keep(4);
+      const a = r > 2.5 ? 'conqueror' : r > 1.5 ? 'hungry' : r < 0.55 ? 'peaceful' : (st.told.a === 'peaceful' && r < 0.7) || ((st.told.a === 'hungry' || st.told.a === 'conqueror') && r > 1.25) ? st.told.a : 'anyone';
+      const w = k < 0.6 ? 'little' : k < 0.8 ? 'doubted' : (st.told.w !== 'holds' && k < 0.86) ? st.told.w : 'holds';
+      if (a !== st.told.a) { st.told.a = a; h.news(APP[a]); } if (w !== st.told.w) { st.told.w = w; h.news(WRD[w]); }
     }
 
     // ----- what he does (diplomacy and intrigue tell it) -----
     // a war he begins: a turn of the watch that ends in yes (what the realm was to him at that moment)
     function declared(p, b) {
       if (!p || !b || !p.player) return; const x = q8(feats(p, b, xf)); st.tot.wars++;
-      const e = st.cand.find((q) => q.b === b.id && !q.y); if (e) { e.y = 1; e.x = x; e.s = 1; } else st.cand.push({ b: b.id, x, s: 1, y: 1 });
+      const e = st.cand.find((q) => q.b === b.id && !q.y); if (e) { e.y = 1; e.x = x; e.s = 1; e.e = eraOf(p); } else st.cand.push({ b: b.id, x, s: 1, y: 1, e: eraOf(p) });
       st.prey[b.id] += 1;      // (and the next time they look at that realm, he has fallen on it before)
       ver++; fearY.fill(-2147483648);
     }
@@ -230,6 +247,9 @@ window.LEARN = (function () {
     const terms = (rank, by) => { st.harsh[0] += rank * by; st.harsh[1] += by; if (by >= 1) { st.tot.peaces++; st.tot.harsh += rank; } ver++; };
     const annexed = () => { terms(3, 0.7); st.tot.annexed++; };
     const plot = (b) => { st.plot[0] += 1; st.tot.plots++; if (b) st.caught[b.id] = year(); ver++; };
+    // what he answers to what envoys propose: the courts send less of what he turns away, and more of what he takes
+    const answered = (kind, yes, by) => { const a = st.acc[kind]; if (!a) return; if (yes) a[0] += by; else a[1] += by; st.tot.offered = (st.tot.offered || 0) + 1; if (yes) st.tot.took = (st.tot.took || 0) + 1; };
+    const takes = (kind) => { const a = st.acc[kind]; return a ? (1 + a[0]) / (2 + a[0] + a[1]) : 0.5; };
     // a new realm: one cut from his own has heard everything; anyone else, nothing yet
     function born(c, from) { const p = h.player(); st.heard[c] = p && from === p.id ? 255 : 0; st.caught[c] = -1e9; st.prey[c] = 0; }
 
@@ -247,11 +267,15 @@ window.LEARN = (function () {
     const fearY = new Int32Array(MAXC).fill(-2147483648), fearV = new Float32Array(MAXC), baseV = new Float32Array(MAXC);
     function fear(b) {
       const p = h.player(); if (!p || !b || b === p || !civs[b.id]) return null; const y = year();
-      if (fearY[b.id] !== y) { feats(p, b, xf); const pm = sig(dot(st.w, xf)), p0 = sig(dot(W0, xf)), hd = heardOf(b); fearV[b.id] = p0 + hd * (pm - p0); baseV[b.id] = p0; fearY[b.id] = y; }
+      if (fearY[b.id] !== y) { feats(p, b, xf); const B0 = BASE[eraOf(p)], pm = sig(B0 + dot(st.w, xf)), p0 = sig(B0 + dot(W0, xf)), hd = heardOf(b); fearV[b.id] = p0 + hd * (pm - p0); baseV[b.id] = p0; fearY[b.id] = y; }
       return [fearV[b.id], baseV[b.id]];
     }
     // how much more than they would of anyone (1: as anyone)
-    const fearRel = (b) => { const f = fear(b); return f ? f[0] / Math.max(0.005, f[1]) : 1; };
+    const fearRel = (b) => { const f = fear(b); return f ? f[0] / Math.max(1e-4, f[1]) : 1; };
+    // the least dread that counts in his age (half again what realms of the age give a neighbour: in our own day's short turns a
+    // chance of a few in a thousand a turn is a great one), and whether b dreads him: much more than it would anyone, and enough to count
+    const floor = () => { const p = h.player(); return 1.5 * sig(BASE[p ? eraOf(p) : 2]); };
+    const dreads = (b, rel) => { const f = fear(b); if (!f) return false; const r = f[0] / Math.max(1e-4, f[1]); return (r > (rel || 1.5) && f[0] > floor()) || f[0] > 0.25; };
     // why b fears him more or less than anyone: what in the model moves its dread, most first ([feature, by how much in log-odds])
     function why(b) {
       const p = h.player(); if (!p || !b || b === p) return []; feats(p, b, xf); const hd = heardOf(b), out = [];
@@ -264,20 +288,27 @@ window.LEARN = (function () {
       const own = Math.max(0, 1 - (year() - st.caught[b.id]) / (3 * P));
       return clamp(Math.max(own * 0.8, 4 * (B.plots - PLOT0[0] / PLOT0[1])), 0, 1);
     }
+    // his appetite as the realms about him reckon it: what each he could fall on dreads, on the whole, against what it would dread of
+    // anyone in his place ([mean, usual]; with nobody about him, a neighbour of his own weight)
+    function appetite() {
+      const p = h.player(), B0 = BASE[p ? eraOf(p) : 2]; let m = 0, m0 = 0, n = 0;
+      for (const e of st.cand) { if (e.s !== 1) continue; let z = B0, z0 = B0; for (let k = 0; k < NF; k++) { const x = e.x[k] / Q; z += st.w[k] * x; z0 += W0[k] * x; } m += sig(z); m0 += sig(z0); n++; }
+      return n ? [m / n, m0 / n] : [sig(B0 + st.w[0]), sig(B0)];
+    }
     // the world's picture of him, for the page: what the model makes of each feature (how many times likelier than of anyone), the
     // rest of what is believed, and the counts it rests on
     function profile() {
       const B = belief(null); const odds = WAR.map((f, k) => ({ key: f[0], what: f[1], x: Math.exp(st.w[k] - W0[k]), w: st.w[k] }));
-      return { odds, base: sig(st.w[0]), base0: sig(W0[0]), keep4: B.keep(4), ally: B.ally, gives: B.gives, harsh: B.harsh, plots: B.plots, tot: Object.assign({}, st.tot), T: st.T };
+      const A = appetite(); return { odds, base: A[0], base0: A[1], keep4: B.keep(4), ally: B.ally, gives: B.gives, harsh: B.harsh, plots: B.plots, takes: Object.fromEntries(Object.keys(st.acc).map((k) => [k, takes(k)])), tot: Object.assign({}, st.tot), T: st.T };
     }
     // those who fear him more than they would anyone (or fear him much whatever they would think of anyone), and know enough of him to
     // say so: [realm, fear, usual], most first
     let fearList = null, fearKey = '';
-    function fearful(min) {
-      const p = h.player(); if (!p) return []; const key = year() + ':' + ver + ':' + (min || 0.1);
+    function fearful(rel) {
+      const p = h.player(); if (!p) return []; const key = year() + ':' + ver + ':' + (rel || 1.4);
       if (key === fearKey && fearList) return fearList; const out = [];
-      for (let c = 0; c < MAXC; c++) { const b = civs[c]; if (!b || b === p || st.heard[c] < 64) continue; const f = fear(b); if (f && f[0] >= (min || 0.1) && (f[0] > 1.4 * f[1] || f[0] > 0.25)) out.push([b, f[0], f[1]]); }
-      fearKey = key; fearList = out.sort((x, y) => y[1] - x[1]); return fearList;
+      for (let c = 0; c < MAXC; c++) { const b = civs[c]; if (!b || b === p || st.heard[c] < 64 || !dreads(b, rel || 1.4)) continue; const f = fear(b); out.push([b, f[0], f[1]]); }
+      fearKey = key; fearList = out.sort((x, y) => y[1] / y[2] - x[1] / x[2]); return fearList;
     }
 
     // ----- his court: what it learns of his choices -----
@@ -304,8 +335,8 @@ window.LEARN = (function () {
     // ----- saved with the world -----
     function save() {
       const H = st.habit;
-      return { v: 1, T: st.T, next: st.next, seen: st.seen, w: Array.from(st.w, r3), n: st.n, X: b64(st.X.subarray(0, st.n * NF)), Y: b64(st.Y.subarray(0, st.n)), C: Array.from(st.C.subarray(0, st.n), (v) => Math.round(v * 100) / 100), TT: Array.from(st.TT.subarray(0, st.n)),
-        cand: st.cand.map((e) => [e.b, b64(e.x), Math.round(e.s * 100) / 100, e.y]), oath: st.oath.map(r3), ally: st.ally.map(r3), give: st.give.map(r3), harsh: st.harsh.map(r3), plot: st.plot.map(r3), tot: st.tot,
+      return { v: 1, nf: NF, T: st.T, next: st.next, seen: st.seen, told: st.told, w: Array.from(st.w, r3), n: st.n, X: b64(st.X.subarray(0, st.n * NF)), Y: b64(st.Y.subarray(0, st.n)), E: b64(st.E.subarray(0, st.n)), C: Array.from(st.C.subarray(0, st.n), (v) => Math.round(v * 100) / 100), TT: Array.from(st.TT.subarray(0, st.n)),
+        cand: st.cand.map((e) => [e.b, b64(e.x), Math.round(e.s * 100) / 100, e.y, e.e]), acc: Object.fromEntries(Object.entries(st.acc).map(([k, a]) => [k, a.map(r3)])), oath: st.oath.map(r3), ally: st.ally.map(r3), give: st.give.map(r3), harsh: st.harsh.map(r3), plot: st.plot.map(r3), tot: st.tot,
         heard: b64(st.heard), prey: Array.from(st.prey).map((v, c) => (v ? [c, r3(v)] : null)).filter(Boolean), caught: Array.from(st.caught).map((y, c) => (y > -1e8 ? [c, y] : null)).filter(Boolean),
         habit: { th: Array.from(H.th, r3), sets: H.sets.map((S) => [S.phi, S.i, S.n]), n: H.n, kb: Array.from(H.kb, r3), kn: H.kn } };
     }
@@ -313,10 +344,12 @@ window.LEARN = (function () {
       const f = fresh(); Object.assign(st, f); ver++; fearY.fill(-2147483648);
       if (!s || s.v !== 1) return false;
       try {
-        st.T = s.T | 0; st.next = s.next; st.seen = s.seen === undefined ? -1 : s.seen; if (Array.isArray(s.w) && s.w.length === NF) st.w = Float64Array.from(s.w);
-        const X = unb64(s.X), Y = unb64(s.Y); const n = Math.min(MAXEX, s.n | 0, Y.length, Math.floor(X.length / NF)); st.X.set(X.subarray(0, n * NF)); st.Y.set(Y.subarray(0, n)); st.C.set((s.C || []).slice(0, n)); st.TT.set((s.TT || []).slice(0, n)); st.n = n;
-        st.cand = (s.cand || []).map(([b, x, sv, y]) => ({ b, x: unb64(x), s: sv, y }));
+        st.T = s.T | 0; st.next = s.next; st.seen = s.seen === undefined ? -1 : s.seen; if (s.told && s.told.a && s.told.w) st.told = { a: s.told.a, w: s.told.w }; const same = (s.nf || NF) === NF;      // (what a court weighs of a war may grow: a save of another shape keeps all but its examples)
+        if (same && Array.isArray(s.w) && s.w.length === NF) st.w = Float64Array.from(s.w);
+        if (same) { const X = unb64(s.X), Y = unb64(s.Y); const n = Math.min(MAXEX, s.n | 0, Y.length, Math.floor(X.length / NF)); st.X.set(X.subarray(0, n * NF)); st.Y.set(Y.subarray(0, n)); st.C.set((s.C || []).slice(0, n)); st.TT.set((s.TT || []).slice(0, n)); st.E.set(unb64(s.E).subarray(0, n)); st.n = n;
+          st.cand = (s.cand || []).map(([b, x, sv, y, e]) => ({ b, x: unb64(x), s: sv, y, e: e === undefined ? 2 : e })).filter((e) => e.x.length === NF); }
         for (const k of ['oath', 'ally', 'give', 'harsh', 'plot']) if (Array.isArray(s[k])) st[k] = s[k].slice(0, 2);
+        if (s.acc) for (const k in st.acc) if (Array.isArray(s.acc[k])) st.acc[k] = s.acc[k].slice(0, 2);
         if (s.tot) Object.assign(st.tot, s.tot);
         const hd = unb64(s.heard); st.heard.set(hd.subarray(0, MAXC)); for (const [c, y] of s.caught || []) if (c >= 0 && c < MAXC) st.caught[c] = y; for (const [c, v] of s.prey || []) if (c >= 0 && c < MAXC) st.prey[c] = v;
         const H = s.habit; if (H) { if (Array.isArray(H.th) && H.th.length === NH) st.habit.th = Float64Array.from(H.th); st.habit.sets = (H.sets || []).map(([phi, i, n2]) => ({ phi, i, n: n2 })); st.habit.n = H.n | 0; if (H.kb) st.habit.kb.set(H.kb.slice(0, 8)); st.habit.kn = H.kn | 0; }
@@ -324,8 +357,8 @@ window.LEARN = (function () {
       } catch (e) { Object.assign(st, fresh()); return false; }
       return true;
     }
-    return { st, player: () => h.player(), step, declared, oath, called, pressed, terms, annexed, plot, born, belief, fear, fearRel, why, watchOf, profile, fearful, chose, expect, leanings, studied, taste, tastes, save, load,
+    return { st, player: () => h.player(), floor, dreads, step, declared, oath, called, pressed, terms, annexed, plot, answered, takes, born, belief, fear, fearRel, why, watchOf, profile, fearful, chose, expect, leanings, studied, taste, tastes, save, load,
       feats: (p, b) => Array.from(feats(p, b, new Float64Array(NF))), get ver() { return ver; }, heardOf };
   }
-  return { WAR, NF, FK, W0, HAB, NH, TH0, HALF, OATH0, ALLY0, GIVE0, HARSH0, PLOT0, newton, chol, softmaxFit, probs, sig, create };
+  return { WAR, NF, FK, W0, BASE, HAB, NH, TH0, HALF, OATH0, ALLY0, GIVE0, HARSH0, PLOT0, newton, chol, softmaxFit, probs, sig, create };
 })();

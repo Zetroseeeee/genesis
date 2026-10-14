@@ -492,7 +492,7 @@ function createSim(world, seed) {
     wronged: (a, b) => diplo.memOf(a, b.id), touches: (a, b) => diplo.touches(a, b.id), faith: (cv) => (faith ? faith.faithOf(cv) : cv.religion || 0), folk: (cv) => (people && people.ruling[cv.id]) || 0,
     covets: (a, b) => !!covetOf(a, b), busy: (b, a) => { for (const k in b.wars) if (+k !== a.id) return true; return false; }, eligible: (a, b) => !diplo.cannotFight(a, b), reach: (cv) => diplo.reach(cv.id),
     nb: (cv) => nearNb[cv.id] || lastNb[cv.id] || [], atWar: (a, bid) => a.wars[bid] !== undefined, sworn: (a, b) => diplo.anyPact(a, b.id) || diplo.D(a).lord === b.id || diplo.D(b).lord === a.id,
-    partner: (a, b) => diplo.tradeShare(a, b.id) > 0.002,
+    partner: (a, b) => diplo.tradeShare(a, b.id) > 0.002, news: (text) => { const c = playerCiv(); if (c) logEvent(c, text, false, 'pact'); },      // (when the world's picture of him turns: calm news)
     pacts: (cv) => { const d = diplo.D(cv); let n = d.lord >= 0 ? 1 : 0; for (const k in d.pact) for (const kind of ['nap', 'defence', 'alliance', 'marriage']) if (diplo.has(cv, +k, kind)) n++; return n; } }) : null;
   army = ARMY.create({ W, H, N, land, owner, level, walls, pop, flags, special, civs, nbOf, cellDist, elev, year: () => year, seed, isAtWar: (c, o) => c.wars[o] !== undefined, diplo,
     strengthOf, mightOf, popOf, cellsOf, ports, portCells, battles, cellName, fullName, logEvent, conquer, neighbours: (c) => lastNb[c] || nearNb[c],

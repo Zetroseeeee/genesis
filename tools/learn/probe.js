@@ -46,7 +46,7 @@ for (const kind of kinds) {
     const y0 = s.year; while (s.year < y0 + P() && s.playerCiv()) { const a = Date.now(); s.tick(); slow = Math.max(slow, Date.now() - a); }
     if ((t + 1) % 5 === 0 || t === turns - 1) {
       let heard = 0, n = 0; for (const b of s.civs) { if (!b || b === c) continue; n++; if (L.heardOf(b) > 0.5) heard++; }
-      const F = L.fearful(0.1); const inF = new Set(F.map(([b]) => b.id)); let leagues = 0; for (const [b] of F) for (const k in D.D(b).pact) { if (+k > b.id && inF.has(+k) && D.has(b, +k, 'defence')) leagues++; }
+      const F = L.fearful(); const inF = new Set(F.map(([b]) => b.id)); let leagues = 0; for (const [b] of F) for (const k in D.D(b).pact) { if (+k > b.id && inF.has(+k) && D.has(b, +k, 'defence')) leagues++; }
       const ns = nbs(s, c); const op = ns.length ? ns.reduce((t2, b) => t2 + D.opinion(s.civs[b], c), 0) / ns.length : 0; const B = L.belief(null); const pr = L.profile();
       const lines = c.events.filter((e) => /^Fearing /.test(e.text)).length;
       console.log(`  ${s.fmtYear(s.year).padEnd(9)} turn ${String(t + 1).padStart(2)}: ${heard} of ${n} courts know much of him; ${F.length} fear him${F.length ? ` (most: ${pct(F[0][1])} a turn, of anyone ${pct(F[0][2])})` : ''}; leagues ${leagues} (told ${lines}); neighbours think ${op.toFixed(0)}; pacts hold ${pct(B.keep(4))}, friends ${pct(B.ally)}; appetite ${pct(pr.base)} (anyone ${pct(pr.base0)}); wars begun ${warsBegun}, oaths broken ${broke}; offers ${Object.entries(got).map(([k, v]) => k + ' ' + v).join(', ') || 'none'}; reckoning ${L.st.ms} ms, slowest year ${slow} ms`);

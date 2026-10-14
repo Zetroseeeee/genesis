@@ -21,9 +21,9 @@
   for (let k = 0; k < 6; k++) L.chose(phi, k % 3 === 2 ? 0 : 1);
   const KB = window.KNOW.BRANCHES.map((b) => b.key); for (let k = 0; k < 6; k++) L.studied(KB.indexOf('war')); for (let k = 0; k < 3; k++) L.studied(KB.indexOf('land'));
   // a league against him: the two that dread him most (besides those at war with him or sworn to him) swear to defend one another
-  const D = S.diplo; const F = L.fearful(0.05).map(([b]) => b).filter((b) => !S.isAtWar(b, c.id) && D.D(b).lord < 0 && b !== c);
+  const D = S.diplo; const F = L.fearful(1.2).map(([b]) => b).filter((b) => !S.isAtWar(b, c.id) && D.D(b).lord < 0 && b !== c);
   if (F.length >= 2 && !D.bound(F[0], F[1])) { D.seal(F[0], F[1], 'defence'); S.logEvent(c, `Fearing ${S.fullName(c)}, ${S.fullName(F[0])} and ${S.fullName(F[1])} swear to defend one another`, false, 'pact'); }
   setTimeout(() => { if (P.pick && who(P.pick)) ENVOYS.open('realms', who(P.pick).id); else ENVOYS.open(P.tab); }, 3500);
-  const out = { T: L.st.T, n: L.st.n, fearful: L.fearful(0.05).map(([b, f, f0]) => [S.fullName(b), +f.toFixed(3), +f0.toFixed(3)]), profile: L.profile() };
+  const out = { T: L.st.T, n: L.st.n, fearful: L.fearful(1.2).map(([b, f, f0]) => [S.fullName(b), +f.toFixed(3), +f0.toFixed(3)]), profile: L.profile() };
   window.__learnScene = out; return out;
 })();

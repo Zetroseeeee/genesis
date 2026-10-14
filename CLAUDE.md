@@ -943,8 +943,10 @@ Conventions that matter:
   it was, and the autopilot's realms deal with one another by the rules every world was fitted to. Once a turn of his age
   (`step`, from the simulation's year) they reckon again from everything they remember of him. *Whom he falls on* is a logistic
   model (`WAR`: weaker, stronger, another faith, a claim held, at war elsewhere, in turmoil, sworn to him, his own people, holding
-  what he lacks, a realm that wronged him, one he has fallen on before, beyond his borders - each between 0 and 1 - and the bias),
-  fitted by Newton's method (`newton`, a Cholesky solve) to the examples of every turn watched: each realm he could have fallen on
+  what he lacks, a realm that wronged him, one he has fallen on before, beyond his borders - each between 0 and 1 - and the bias:
+  what he does beyond what realms of the age do, `BASE`, the log-odds that a realm begins a war of its own on a neighbour within a
+  turn of its age, from nine in a hundred in the Stone Age's turns of two centuries to two in a thousand in our own day's of five
+  years; every example keeps the age it was watched in), fitted by Newton's method (`newton`, a Cholesky solve) to the examples of every turn watched: each realm he could have fallen on
   (`eligible`: diplomacy's `cannotFight`), and whether he did (`declared`, from `declare`); his neighbours all, four realms further
   off standing for the rest. What is old counts for half in `HALF` (12) turns, and the model is pulled toward what a court assumes
   of any realm (the prior weights, `LAM` an example's worth each): with little to go on it says what they would say of anyone, and a
@@ -960,14 +962,19 @@ Conventions that matter:
   or less than anyone), what they will swear with him (`judge`: 'Your oaths are worth little to them', 'You stand by your
   friends', 'They would have your oath against your appetite', 'They know what becomes of those you beat'), *leagues* (a court that
   dreads him as it would nobody else - or much, whatever it would think of anyone - swears to defend one another with another that
-  does: `fearful`, 'You both dread ...', and the player's chronicle hears of it), and how readily the strong demand his submission
-  (one who gives in is pressed sooner); intrigue's odds against a court that watches for his agents (`watchOf`: his caught there
+  does: `fearful`, 'You both dread ...'; the player's chronicle hears of it, the tracker shows it, and his court is told it as a
+  story, `league` in `story.js`, no oftener than once in three turns), and how readily the strong demand his submission
+  (one who gives in is pressed sooner); what envoys bring him (`answered`, `takes`: the courts send fewer of the pacts he turns
+  away and more of those he takes - one who refuses every trade agreement is not asked every turn); intrigue's odds against a
+  court that watches for his agents (`watchOf`: his caught there
   within three turns, or many anywhere). *His own court* learns his choices (`habit`): a story's choices as vectors of what each
   does (`phiOf` in `story.js`: quiet at home, coin, authority, the estates, learning, renown, people, friends abroad, the bold
   course, arms), fitted as a softmax to his choices (`chose`, `softmaxFit`, the prior the autopilot's own weighing); when stories
   are off the court decides as he would (`habit` in `story.js`), and a story's page marks the choice it expects ('As you are
   wont', `tales.js`); his scholars, left to choose, lean to the branches he chose himself (`studied`, `taste`, in `know.js`). The
-  page: a realm's page says what that court has learned of him and why it dreads him (`why`: what in the model moves its dread);
+  page: his chronicle hears it, calmly, when the world's picture of him turns (`tell`: his appetite over the realms about him -
+  a conqueror, hungry for land, as anyone, a peaceful neighbour - and his word); a realm's page says what that court has learned
+  of him and why it dreads him (`why`: what in the model moves its dread);
   the Your name tab the world's picture (`profile`: how many times likelier than of anyone each kind of realm is to be fallen on,
   his oaths, his friendship, the beaten, his agents), who fears him most, the leagues against him and what his court has learned.
   Saved with the world (`save().learn`: the examples as bytes, the weights, the evidence, who has heard what; a few tens of KB in a

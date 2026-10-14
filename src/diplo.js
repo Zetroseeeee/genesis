@@ -199,9 +199,9 @@ window.DIPLO = (function () {
       if (wb) { let w = 0; for (const k in b.wars) { const e = civs[+k]; if (e && e !== a && (has(a, e.id, 'alliance') || has(a, e.id, 'defence') || D(e).lord === a.id || da.lord === e.id)) { w = 1; break; } } if (w) put('You are at war with their friends', -14); }
       const t = host.trait(a); if (t === 'conqueror' && near) put('A conqueror\'s eye', -6); else if (t === 'steward') put('A ruler who keeps the peace', 4); else if (t === 'tyrant') put('A ruler who trusts nobody', -4);
       // (what they have learned of the player: their dread that he falls on them, against what they would dread of anyone in his place)
-      if (b.player && !a.player) { const L = LR(), f = L && L.fear(a); if (f) { const fv = f[0], f0 = f[1];
-        if (fv > 0.1 && fv > 1.25 * f0) put('They fear you will fall on them', -Math.round(Math.min(30, 80 * (fv - Math.max(0.05, f0)))));
-        else if (near && fv < 0.7 * f0 && L.heardOf(a) > 0.4) put('They count you a peaceful neighbour', Math.max(1, Math.round(Math.min(6, 60 * (f0 - fv))))); } }
+      if (b.player && !a.player) { const L = LR(), f = L && L.fear(a); if (f) { const fv = f[0], r = fv / Math.max(1e-4, f[1]);      // (by how many times more or less than of anyone: the same in every age)
+        if (r > 1.3 && fv > L.floor()) put('They fear you will fall on them', -Math.round(Math.min(30, 12 * Math.log2(r))));
+        else if (near && r < 0.7 && L.heardOf(a) > 0.4) put('They count you a peaceful neighbour', Math.max(1, Math.round(Math.min(6, 4 * Math.log2(1 / r))))); } }
       return o > 100 ? 100 : o < -100 ? -100 : o;
     }
     const reasons = (a, b) => { const out = []; const o = opinion(a, b, out); out.sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])); return { o, why: out }; };
@@ -242,7 +242,7 @@ window.DIPLO = (function () {
       { const L = LR(); if (L) {
         if (a.player && !b.player) { const B = L.belief(b);
           if (PACT[kind] && kind !== 'trade') { const k = B.keep(PACT[kind].turns); if (k < 0.8) put('Your oaths are worth little to them', -Math.round(Math.min(40, 90 * (0.8 - k)))); else if (k > 0.93 && B.heard > 0.4) put('Your oaths hold', 4); }
-          if (kind === 'nap') { const f = L.fear(b); if (f && f[0] > 0.1 && f[0] > 1.25 * f[1]) put('They would have your oath against your appetite', Math.round(Math.min(20, 50 * (f[0] - f[1])))); }
+          if (kind === 'nap') { const f = L.fear(b), r = f ? f[0] / Math.max(1e-4, f[1]) : 1; if (r > 1.3 && f[0] > L.floor()) put('They would have your oath against your appetite', Math.round(Math.min(20, 8 * Math.log2(r)))); }
           if (kind === 'defence' || kind === 'alliance') { const v = B.ally - 0.8; if (Math.abs(v) >= 0.05 && B.heard > 0.2) put(v > 0 ? 'You stand by your friends' : 'You have left friends to fight alone', Math.round(Math.max(-35, Math.min(10, 60 * v)))); }
           if (kind === 'vassal' && B.harsh > 1.6) put('They know what becomes of those you beat', -Math.round(Math.min(25, 20 * (B.harsh - 1.6)))); }
         else if (!a.player && !b.player && (kind === 'defence' || kind === 'alliance')) { const pl = L.player(); if (pl && pl !== a && pl !== b) { const ra = L.fearRel(a), rb = L.fearRel(b); if (ra > 1.5 && rb > 1.5) put('You both dread ' + nameOf(pl), Math.round(Math.min(30, 10 * Math.min(ra, rb)))); } } } }
@@ -299,11 +299,11 @@ window.DIPLO = (function () {
       if (o.kind === 'call') { const e = civs[o.vs]; if (!e || !host.atWar(a, e.id)) return 'The war is over'; if (host.atWar(p, e.id)) return null; join(p, a, e); { const L = LR(); if (L) L.called(true, 1); } return null; }
       if (o.kind === 'submit') { if (lordOf(p)) return 'You have a lord already'; if (host.atWar(p, a.id)) return 'You are at war'; subject(a, p, `${cap(nameOf(p))} bends the knee to ${nameOf(a)}`); { const L = LR(); if (L) L.pressed(true, 1); } return null; }
       if (o.kind === 'protect') { if (lordOf(p)) return 'A vassal takes no vassals'; if (host.atWar(p, a.id)) return 'You are at war'; subject(p, a, `${cap(nameOf(a))} puts itself under the protection of ${nameOf(p)}`); return null; }
-      const no = cannot(a, p, o.kind); if (no) return no; seal(a, p, o.kind); return null;
+      const no = cannot(a, p, o.kind); if (no) return no; seal(a, p, o.kind); { const L = LR(); if (L && PACT[o.kind]) L.answered(o.kind, true, 1); } return null;
     }
     // the player says no, or says nothing until the envoys go home (lapsed): a friend left to fight alone remembers it either way
     function turnDown(p, a, o, lapsed) {
-      { const L = p.player ? LR() : null; if (L) { if (o.kind === 'call') { L.called(false, lapsed ? 0.6 : 1); if (!lapsed) L.oath(0.6); } else if (o.kind === 'submit') L.pressed(false, lapsed ? 0.5 : 1); } }
+      { const L = p.player ? LR() : null; if (L) { if (o.kind === 'call') { L.called(false, lapsed ? 0.6 : 1); if (!lapsed) L.oath(0.6); } else if (o.kind === 'submit') L.pressed(false, lapsed ? 0.5 : 1); else if (PACT[o.kind]) L.answered(o.kind, false, lapsed ? 0.5 : 1); } }
       if (o.kind === 'call') { remember(a, p.id, lapsed ? -10 : -20); if (!lapsed) { dropPact(a, p, 'alliance'); dropPact(a, p, 'defence'); D(p).rep = Math.max(0, D(p).rep - 10); host.event(p, `${cap(nameOf(p))} leaves ${nameOf(a)} to fight alone`, true, a); } }
       else if (o.kind === 'submit') { remember(a, p.id, -6); setClaim(a, p.id * 4 + 2, year() + CLAIM_TURNS * pace(a)); }
       else if (o.kind === 'peace') { if (lapsed && o.terms === 'white' && host.atWar(p, a.id) && (year() - p.wars[a.id]) > 2 * pace(p)) conclude(p, a, 'white'); }      // (a long war nobody will end: the envoys settle it as things stand)
@@ -508,7 +508,8 @@ window.DIPLO = (function () {
       // (ask: a realm that rules itself answers at once; the player has it laid before him, if the asker would itself agree to it)
       const go = (b, kind) => {
         da.ask[b.id * 8 + ASK[kind]] = y;
-        if (b.player) { if (kind === 'vassal' || kind === 'protect' || judge(a, b, kind).ok) offer(b, { from: a.id, kind: kind === 'vassal' ? 'submit' : kind }); return true; }
+        if (b.player) { if (PACT[kind] && L && host.rnd() > 0.25 + 0.75 * L.takes(kind)) return false;      // (the courts send less of what he turns away: learn.js)
+          if (kind === 'vassal' || kind === 'protect' || judge(a, b, kind).ok) offer(b, { from: a.id, kind: kind === 'vassal' ? 'submit' : kind }); return true; }
         const j = judge(b, a, kind, t); if (j.ok) { seal(a, b, kind); return true; } stats.refused++; if (kind === 'vassal') { remember(b, a.id, -10); setClaim(a, b.id * 4 + 2, y + CLAIM_TURNS * P); } return false;
       };
       // (a handful of those it can deal with: two of those it touches, one of those its merchants reach, its vassals, and with wireless one from anywhere)
@@ -518,9 +519,9 @@ window.DIPLO = (function () {
       let dread; const held = vassalsOf(c).length;
       // a court that dreads the player as it would dread nobody else looks for others who dread him, and swears with one of them to
       // defend one another: a league against him (learn.js)
-      if (pl && pl !== a && !host.atWar(a, pl.id) && host.knows(c, PACT.defence.need) && host.rnd() < 0.5) { const f = L.fear(a);
-        if (f && f[0] > 0.12 && (f[0] > 1.5 * f[1] || f[0] > 0.25)) { const R = reach(c);
-          for (const [b] of L.fearful(0.1)) { if (b === a || b.player || lordOf(b) || bound(a, b) || host.atWar(a, b.id) || R.indexOf(b.id) < 0 || !ok(b, 'defence')) continue;
+      if (pl && pl !== a && !host.atWar(a, pl.id) && host.knows(c, PACT.defence.need) && host.rnd() < 0.5) {
+        if (L.dreads(a, 1.5)) { const R = reach(c);
+          for (const [b] of L.fearful()) { if (b === a || b.player || lordOf(b) || bound(a, b) || host.atWar(a, b.id) || R.indexOf(b.id) < 0 || !ok(b, 'defence')) continue;
             if (go(b, 'defence')) { host.event(pl, `Fearing ${nameOf(pl)}, ${nameOf(a)} and ${nameOf(b)} swear to defend one another`, false, a); if (host.tell) host.tell(pl, 'league', { a: a.id, b: b.id }); return; } break; } } }
       for (const bid of order) {
         const b = civs[bid]; if (!b || host.atWar(a, bid)) continue; const o = opinion(a, b), near = nb.indexOf(bid) >= 0, r = ratio(a, b);
