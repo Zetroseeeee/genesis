@@ -1386,7 +1386,15 @@ Conventions that matter:
   distance, because a crown has a size as grass has not), except in settled country, which is cleared to pasture
   with trees standing in it. What people have made of the ground (crops in their rows, paving) is laid at the size
   the game draws a village at (`ltex`); between the houses of a town that is not paved the beaten ways are pale and
-  grass holds on beside them. The farmland keeps the year outside the tropics (`fieldYear`, `uYearPh` = `seasonPhase`,
+  grass holds on beside them. A town's heart (`decal.js`: a second disc about the middle, four tenths of the town and more in a
+  great one, below a road's 0.4) is worn bare by its feet and carts, and from the Classical age flagged in good part: the
+  yards and gardens about it keep their green in patches. What a town's ground is goes by how large the town is (its true
+  radius, `Rt`: a heart from 250 m), never by its level, which is how full its region is for the age (a town of fifteen
+  thousand is a level 1 in the Renaissance, and had no heart). Its earth is lighter than the grass about it, as trodden earth
+  is from the air, and lies over most of it, with gardens in patches the size of a few of its plots as it is drawn (the noise
+  of a hundred and fifty metres; of the finest sizes alone the gardens were a speckle that the eye made one colour of), fewer
+  in its heart, none in true desert (at 0.72 of a dark earth over the grass, the ground between the houses of Florence and
+  Kyoto was an olive lawn; laid whole, a plain of dust). The farmland keeps the year outside the tropics (`fieldYear`, `uYearPh` = `seasonPhase`,
   the south half a year on, the warm south a few weeks ahead): half its grain is sown in the autumn (the winter's young
   green, green ears, ripe gold in high summer, stubble, ploughed earth and sown again), half in the spring (ploughed
   earth through the winter, young rows, ripe some weeks later); every field keeps its own days (the field's dice), so
