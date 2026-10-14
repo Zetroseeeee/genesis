@@ -518,4 +518,4 @@ ind_easia    | tools/scenes/town.js | {lon:113,lat:35,tech:0.7,pop:40,walls:0,sp
 # what the courts have learned of the player (learn.js): the diplomacy screen's Your name, a realm's page that dreads him, a story his court expects
 dip_name     | tools/scenes/dip.js tools/scenes/learn.js | {tab:'name'} | | 20
 dip_learned  | tools/scenes/dip.js tools/scenes/learn.js | {pick:'cold'} | | 20
-tale_wont    | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'raid',wont:'stab'} | | 170
+tale_wont    | tools/scenes/tale.js | {years:11250,lon:2.35,lat:48.85,k:'raid',wont:'stab'} | | 260
