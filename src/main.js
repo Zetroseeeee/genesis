@@ -1723,7 +1723,7 @@
     if (sim && mode === 'play') pumpFeed(now);
     terrain.dispOn = settings.quality === 'high' && mapcam.alt < 0.06;
     terrain.update(camera, stage.clientHeight);
-    if (decal) decal.update(mapcam, sim, now, sim ? sim.year + ':' + world.texVersion : 0, globals.uSun.value, world, trees);
+    if (decal) decal.update(mapcam, sim, now, sim ? sim.year + ':' + world.texVersion + ':' + (window.PLOTS ? PLOTS.version : 0) : 0, globals.uSun.value, world, trees);      // (a town's plan come: its streets)
     if (trees) trees.update(mapcam, sim, now);
     globals.uGndK.value.w = GND_PX * Math.sqrt(renderer.getPixelRatio());      // (the ground's materials: a repeat is so many device pixels across; on a screen of twice the pixels a little more of them, so that what the materials show is neither half the size nor half as sharp there)
     const devH = stage.clientHeight * renderer.getPixelRatio();      // point sprites are sized in device pixels

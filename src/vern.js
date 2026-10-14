@@ -16,7 +16,7 @@
   function rng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const pickT = (t, r) => { if (!t || typeof t !== 'object' || Array.isArray(t)) return t; let s = 0; for (const k in t) s += t[k]; let x = r * s; for (const k in t) { x -= t[k]; if (x <= 0) return k; } return Object.keys(t)[0]; };
   const inR = (a, r) => Array.isArray(a) ? a[0] + (a[1] - a[0]) * r : a;
-  const hexN = (s) => parseInt(s.slice(1), 16);
+  const HEXN = new Map(); const hexN = (s) => { let v = HEXN.get(s); if (v === undefined) { v = parseInt(s.slice(1), 16); HEXN.set(s, v); } return v; };      // (a town asks for its colours thousands of times)
 
   // ---------- materials: what a wall or roof is made of, and the generated material it is drawn with ----------
   // L: layer of the wall (or roof) texture array; R: a wall drawn with the roof array's layer (reed, palm, turf); p: takes the

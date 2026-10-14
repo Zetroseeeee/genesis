@@ -117,6 +117,9 @@
     // (landmarks, walls and one instance per block); towns beyond ~70 km are only their label and ground decal.
     updateBuildings(cam, force) {
       const sim = this.sim; if (!sim) { return; }
+      // the plans of towns still to be made, a few milliseconds a frame (plots.js); a town that has its plan now is drawn anew
+      if (window.PLOTS && PLOTS.pending()) PLOTS.pump(this.planMs || 5);
+      if (window.PLOTS && PLOTS.version !== this._plotsV) { this._plotsV = PLOTS.version; force = true; }
       const dist = cam.dist; const now = performance.now();
       const show = dist < 0.12;   // towns are drawn at strategy-map scale, so they read from ~750 km up
       if (!show) { this.nearTowns = []; for (const r of this.vh.values()) if (r.mesh && r.mesh.count) { r.mesh.count = 0; r.mesh.visible = false; } if (this.buildingCount) { for (const k in this.inst) this.inst[k].count = 0; this.buildingCount = 0; this.casters = []; this.castersVersion = (this.castersVersion || 0) + 1; this._casterSig = null; if (window.MODELS && MODELS.ready) { MODELS.begin(); MODELS.end(); } } return; }
@@ -287,7 +290,8 @@
       if (fresh) { R = { pass: this.buildPass, key: null, seen: new Map(), gone: [], camp: null, k: L.k || 1 }; this.rev.set(i, R); if (this.rev.size > 160) for (const [j, r] of this.rev) { if (r.pass < this.buildPass - 3) this.rev.delete(j); if (this.rev.size <= 120) break; } }
       R.pass = this.buildPass; R.k = L.k || 1;
       if (R.key === L.key) return R;
-      const first = R.key === null, seen = new Map(), changes = [];
+      // (a plan made larger, or come at last, is not the town growing: what it adds is simply there)
+      const first = R.key === null || (R.planR !== undefined && R.planR !== L.planR), seen = new Map(), changes = []; R.planR = L.planR;
       for (const it of L.items) {
         if (it.pk === undefined) continue;
         const sig = it.kind + ':' + (it.g ? it.g.id : '') + ':' + (it.era === undefined ? '' : it.era); const o = R.seen.get(it.pk);

@@ -38,9 +38,18 @@ hold back for phones or weak GPUs); a lighter web build may be published as a pr
   sides as the game has it (`shots/models/<id>.png`; front is +Z, the side a plan turns to its street or square): look
   at it before believing a new model's facing, and set `yaw` (degrees) in the manifest where it is wrong.
 - `node tools/towns/census.js [eras] [peoples] [sizes in thousands]` — what a town of each people, age and size is made of,
-  from the planner alone (seconds): how many buildings of each kind, its parks, the tallest thing in it, how long its plan took
-  (a city of millions some tens of milliseconds: keep it under a tenth of a second). Run it after touching how cities are laid
-  out, then look at the `city_*` pictures on the Mac.
+  from the planner alone (seconds): its kind of plan, its houses of the place's own and in how many manners, the things in its
+  yards, how many buildings of each other kind, its parks, the tallest thing in it, how long its plan and layout took (a great
+  city's plan is some hundreds of milliseconds, made a few a frame in a page; its layout, made again as it changes, keep under
+  a fifth of a second for twelve thousand households). Run it after touching how towns are laid out, then look at the `tw_*`
+  and `city_*` pictures on the Mac.
+- `node tools/towns/plan.js [places] [eras] [sizes in thousands] [--found <era>]` — towns from above as the planner lays them
+  out (seconds): streets, the houses in the colours of their roofs, the yards' things, the walls and the great buildings, one
+  picture each (`shots/towns/plan_<place>_e<era>_<k>k.png`) and a sheet of them all (`plan_sheet.png`). Look here first after
+  touching `plots.js` or how `town.js` fits houses to plots: a medina must be packed, a row of houses must fill its frontage,
+  no plot may stand empty for want of a house of its size.
+- `node tools/houses/sheet.cjs <style[:ctx[:lod]]> ...` — a dozen house types of a style as the game draws them (houses.js with
+  the generated materials; `npm run build` first): `shots/houses/<style>_<ctx>.png`. Region timelines: `<region>@<era>[.<f>]`.
 - `node tools/dbg3.js "<script>" "<probe>" <wait>` — run a script in the page and print a probe object.
 - `node tools/live.js "<setup script>" [wait ms]` — a page that stays up, to look again and again without starting the
   game each time (run it with `nohup ... &`; it answers on 127.0.0.1:8791): `curl -s localhost:8791/eval --data-binary
@@ -289,6 +298,9 @@ Details and the debug hooks (`window.__G`, `window.__T`) are in `docs/TESTING.md
 | `src/sim.js` | `SIM` | World simulation on a 720×360 grid: civilisations, growth, war, tech/eras, works, disasters (steps the market and each realm's learning once a year) |
 | `src/terrain.js` | `TERRAIN` | Quadtree globe tiles, elevation, the picture of the Earth, the ground's shader: its materials at a ladder of sizes, fields/roads/urban ground |
 | `src/town.js` | `TOWN` | Pure-data settlement plans in true metres: which building stands where, for a culture, era, size |
+| `src/plots.js` | `PLOTS` | A town's plan, fixed for its life: its streets and the plots along them, taken in one order for ever (organic, grid, medina, compound, cluster); made in slices of a few milliseconds a frame (`request`, `pump`); pure data |
+| `src/vern.js` | `VERN` | The vernacular: 70 building regions, what each built age by age (111 styles), what the place does to a style (snow, rain, heat, the hills' stone, the wood left), house types (genomes) a town is built from, 100 palettes; pure data |
+| `src/houses.js` | `HOUSES` | A house type as a mesh at three levels of detail (walls with their openings, roofs, chimneys, galleries, timbers), its shader (paint, trim, shutters, roof tint by instance; rising as it is built, going when pulled down) |
 | `src/buildings.js` | `BKIT` | Procedural building kit (unit archetypes) and its material shader |
 | `src/models.js` | `MODELS` | Real 3D model library: manifest, loading, LODs, instancing (replaces kit archetypes when a model exists) |
 | `src/shadows.js` | `SHADOWS` | Sun depth map of everything standing near the camera; terrain and models read it (true shadows) |
@@ -427,6 +439,44 @@ Conventions that matter:
   shrine of the old kind - all models. `L.era` is the style era, `L.eraReal` the civilisation's; the world picks
   models by `it.era` if set (old houses in a new age, a wonder of an earlier one), else by `L.era`. A model's `eras`
   in the manifest therefore only cover the ages that really build that way.
+- **Towns are planned once and grow** (`plots.js`; since 0.57). A town's streets are laid out by its place (the seed) and the
+  kind of town it was founded as (`PLOTS.morphOf`, from the town's record: kept for its life): *organic* (roads out of the
+  square or green, lanes round it, plots along them all: Europe, Russia, the Ottoman lands, India's market towns), *grid*
+  (blocks with a lane down the middle: the colonies of the Greeks and Romans, the cities of China, the Americas from their
+  conquest), *medina* (houses round their courts packed in rows of cells, a few winding streets, alleys that end at a door: the
+  Near East, North Africa, the Sahel, the old cities of India and Central Asia), *compound* (family yards ringed by a fence or a
+  wall, the huts or one house of rooms inside: Africa south of the Sahara), *cluster* (houses loosely about a middle: the first
+  villages, the steppe's camps, the Arctic, the Pacific). The plots are taken in one order for ever and a town of n households
+  is the first n: growth only ever adds (a larger plan holds the very plots of a smaller one, in the same order: test_sim's
+  section 7 checks it, and that a plan made in slices is the plan made at once - any change to `plots.js` must keep both, which
+  is why nothing is laid out beyond what can matter to the plots a plan keeps, and the occupancy grid is reckoned from the
+  middle). A camp or a village of yards
+  grows as it is only so far (`SPRAWL`: 900 and 4,000 households); a greater town, and a town beyond `NFINE` (12,000), is a
+  town of lanes about it (the zone grid, of the place's own houses). In a page a plan is asked for and made a few milliseconds a
+  frame (`world.updateBuildings` drives `PLOTS.pump`; `PLOTS.version` makes the towns and the decal be drawn again); the tools
+  and tests make it at once (`TOWN.budget.on = false`). `node tools/towns/plan.js` draws plans from above.
+- **Houses of the place's own** (`vern.js`, `houses.js`; since 0.57). From the Middle Ages (a plot's own era 4) a house is a type
+  of its place and age: the building region (`VERN.regionOf`), its timeline of styles (`T`: a style gives way to the next some
+  share into an age), the style's ranges drawn into ten to twenty-four types for a town (more in a city), the place's snow,
+  rain, heat, hills and woods worked into them (`MODS`), each house its own paint (`colours`). Before that a house is one of its
+  people's models (`HOUSES` in `town.js`, `KSZ` their sizes). A town passes into a new manner house by house: every plot was
+  last built some way behind the town's own progress (`progressOf`: the era and how far into it; the plot's lag, `LAGM`, the
+  newest fifth of the plots of late; never older than the town: `P1`). Fitting a type to a plot: where people build wall to
+  wall (`ROWS`) a town's plot holds a row, its frontage shared out and every house stretched a little to its share (`it.sx`,
+  up to a quarter either way: `pushHouse` stretches the instance); in a medina or a compound a house is its cell, stretched to
+  fill it (`it.sx`, `it.sz`) and what it leaves walled in as its garden; elsewhere one house in its yard, the yard fenced as
+  the place fences (`boundOf`), its woodpile, beds, haystack, shed and cart (props: `it.prop`, drawn only within some
+  kilometres of the point looked at, by the town's scale: `propR2` in `world.js`). No plot is left empty for want of a type of
+  its size. What stands on the plots is made again only when what it hangs on changes (`baseCache`: not as works in hand go
+  on). `tools/coverage.js` counts the houses of the place's own apart from the models; `tools/towns/census.js` says in how
+  many manners a town is built.
+- **As you look** (`world.js`, `reveal`; since 0.57). A town that grows or is rebuilt does so before the eye: what its last
+  plan had not is raised one thing after another over the next half minute (a house rises from its footings, timbers first,
+  roof last: `aRise` in `houses.js`; a model rises the same way, `prog` 2 + its time; a yard's things come with their house),
+  a house rebuilt in a new manner stands until the work on the new one begins, what is gone is pulled down in its turn. A
+  plan made larger is not growth: what it adds is simply there (`planR`). A people's first village begins as a camp (`campFor`,
+  set as the player founds it: a fire burning by day, shelters, a woodpile, a rack; `drawCamp`), and its houses go up one by
+  one about it over a minute or so. `tw_camp_*` in the tour.
 - **Cities of the machine age and after** (`town.js`, from "how a city of the machine age and after is laid out"; the kit's
   clusters in `buildings.js`; since 0.42). Every people's cities grew their own way (`CK`, by culture). The old cities of Europe
   and the Middle East keep their old towns in the middle (`oldTown`, within `oldR` of the radius: nine old houses wall to wall to

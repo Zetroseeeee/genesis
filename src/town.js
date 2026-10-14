@@ -290,16 +290,17 @@
     tpCache.set(i, tp); if (tpCache.size > 3000) tpCache.delete(tpCache.keys().next().value);
     return tp;
   }
-  // the plan itself: made once, and again larger as the town outgrows it. A few a moment, so that flying in over a country of
-  // towns does not stall the picture; a town whose plan is still to come is drawn as from afar until it has it
-  const budget = { on: true, last: -1e9, gap: 90 };
+  // the plan itself: made once, and again larger as the town outgrows it. In a page it is asked for and made a few milliseconds
+  // a frame (PLOTS.pump: the world drives it), so that flying in over a country of towns, or to a great city, does not stall the
+  // picture; a town whose plan is still to come is drawn as from afar until it has it, or with the smaller plan it had.
+  // budget.on: false makes it at once (the tools and the tests)
+  const budget = { on: true };
   function getPlan(i, tp) {
     const have = window.PLOTS.cached(i, tp.morph, tp.opt.sig);
     if (have && (have.plots.length >= tp.n || have.full)) return have;
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    if (budget.on && now - budget.last < budget.gap) return have && have.plots.length ? have : null;
-    budget.last = now;
-    return window.PLOTS.plan(i, tp.morph, Object.assign({ need: Math.ceil(tp.n * 1.3) + 8, r0: approxR(tp.morph, tp.opt, tp.n * 1.3) * 1.35 + 40 }, tp.opt));
+    const opt = Object.assign({ need: Math.ceil(tp.n * 1.3) + 8, r0: approxR(tp.morph, tp.opt, tp.n * 1.3) * 1.35 + 40 }, tp.opt);
+    if (!budget.on) return window.PLOTS.plan(i, tp.morph, opt);
+    return window.PLOTS.request(i, tp.morph, opt) || (have && have.plots.length ? have : null);
   }
   function radiusTrue(sim, i, c) { return c ? townPlan(sim, i, c).R : clamp(Math.sqrt(peopleOf(sim, i) * APC[0] / Math.PI), 60, 9000); }
   function radiusM(sim, i, c) { const Rt = radiusTrue(sim, i, c); return Rt * scaleOf(Rt); }   // the radius as drawn, metres
@@ -337,15 +338,16 @@
   }
 
   // ---------- layout ----------
-  const cache = new Map();
+  const cache = new Map(), baseCache = new Map();
   function worksOf(sim, i) { return sim.works ? sim.works.get(i) || null : null; }
-  function keyOf(sim, i, c, coarse) {
+  // (base: what the houses on the plots hang on - not how far the works in hand have gone, nor the farms')
+  function keyOf(sim, i, c, coarse, base) {
     const p = sim.pop[i]; const band = Math.round(Math.log2(p * 1000 + 1) * 3); const year = sim.year;
     const q = sim.rubble && sim.rubble.has(i) ? Math.min(3, Math.floor((year - sim.rubble.get(i)) / 10)) : -1;
-    const wl = worksOf(sim, i); const wsig = wl ? wl.map(w => w.k + w.slot + ':' + Math.min(8, Math.floor((year - w.start) / w.dur * 8))).join(',') : '';
+    const wl = worksOf(sim, i); const wsig = wl ? wl.map(w => w.k + w.slot + (base ? '' : ':' + Math.min(8, Math.floor((year - w.start) / w.dur * 8)))).join(',') : '';
     const gY = sim.gYear ? sim.gYear[i] : -1e9; const age = year - gY; const T = BUILD_T[c.era]; const gsig = !coarse && age < T * 1.3 && sim.gPrev[i] < sim.gBand[i] ? `${sim.gPrev[i]}:${Math.floor(age / 1.5)}` : '';
     const rec = sim.townRec ? sim.townRec(i) : null;
-    return `${sim.level[i]}|${c.era}|${sim.walls[i]}|${sim.special[i]}|${civCulture(sim, c)}|${c.capital === i ? 1 : 0}|${band}|${sim.infra[i]}|${coarse ? 'c' : 'f'}|${q}|${wsig}|${sim.slotA ? sim.slotA[i] : 0}|${sim.slotB ? sim.slotB[i] : 0}|${gsig}|${rec ? rec.join(',') : ''}|${sim.ind && sim.ind.has(i) ? Array.from(sim.ind.get(i)).join('.') : ''}`;
+    return `${sim.level[i]}|${c.era}|${sim.walls[i]}|${sim.special[i]}|${civCulture(sim, c)}|${c.capital === i ? 1 : 0}|${band}|${base ? '' : sim.infra[i]}|${coarse ? 'c' : 'f'}|${q}|${wsig}|${sim.slotA ? sim.slotA[i] : 0}|${sim.slotB ? sim.slotB[i] : 0}|${gsig}|${rec ? rec.join(',') : ''}|${sim.ind && sim.ind.has(i) ? Array.from(sim.ind.get(i)).join('.') : ''}`;
   }
   function pickW(list, r) { let s = 0; for (const e of list) s += e[1]; let t = r * s; for (const e of list) { t -= e[1]; if (t <= 0) return e; } return list[list.length - 1]; }
 
@@ -472,6 +474,7 @@
       return Math.min(cap, h);
     };
     let nSites = 0, nHouses = 0;
+    const tmemo = new Map(); const typesOf = (sk, ctx, n) => { const k = sk + ctx + n; let t = tmemo.get(k); if (!t) { t = window.VERN.types(sk, ctx, tp.st, n); tmemo.set(k, t); } return t; };      // (the town's place is one: asked a thousand times, the types of a style are found once)
 
     // --- the houses on the town's plots (plots.js), each of its place and of when it was last built (vern.js) ---
     // A plot's house was last built some way behind the town's own day (its lag: most a little, a few a long way, the newest
@@ -479,7 +482,12 @@
     // its people's models (or the kit's); from then on a type of the place's own, fitted to its plot: wall to wall in a town
     // where people build so, in its yard elsewhere, the yard fenced as the place fences, its woodpile, its stack of hay, its
     // beds, its shed; a village of the first ages its fires and racks.
-    if (fine) {
+    // (made again only when what they hang on changes - not as a work in hand goes on - and else taken as they were: a great city's
+    // plots are some tens of thousands of things, and a turn moves its works on many times)
+    const bk = fine ? keyOf(sim, i, c, false, true) + '|' + Math.floor(tp.P * 50) + '|' + nPlots + '|' + Pp.R : null;
+    const bc = fine ? baseCache.get(i) : null; let reused = 0;
+    if (bc && bc.key === bk) { for (let q = 0; q < bc.items.length; q++) items.push(bc.items[q]); nHouses = bc.nHouses; nSites = bc.nSites; reused = bc.items.length; }
+    else if (fine) {
       const st = tp.st, fam = window.VERN.CULFAM[cul], P0 = tp.P, nT = window.VERN.nTypes(lvl), town = lvl >= 2 || isCap, morph = Pp.morph;
       const P1 = Math.min(tp.foundEra, P0);      // (no house older than its town)
       const bnd = boundOf(st, era); const cold = st.snow > 0.3, dryL = st.dry > 0.5;
@@ -536,9 +544,9 @@
           // as wide as its share: a little wider or narrower than its type); where they build apart, one in its yard; in a medina
           // a house is its cell, its type stretched to fill it and what it leaves walled in as its garden; a family's yard in
           // Africa, its huts round it or one house of rooms about it
-          const sk = window.VERN.styleAt(st, eE, fE, fam, r1); let types = window.VERN.types(sk, ctx, st, nT);
+          const sk = window.VERN.styleAt(st, eE, fE, fam, r1); let types = typesOf(sk, ctx, nT);
           const roundish = types[0].plan === 'round' && types[types.length - 1].plan === 'round';
-          if (roundish && ctx !== 'rural') types = window.VERN.types(sk, 'rural', st, nT);
+          if (roundish && ctx !== 'rural') types = typesOf(sk, 'rural', nT);
           const rowOK = (gq) => gq.plan !== 'round' && !gq.annex && !(gq.gal && gq.gal.side !== 'front') && !(gq.chim.n && gq.chim.at === 'side');
           let attached = !roundish && ctx !== 'rural' && !!ROWS[st.fam] && morph !== 'medina' && morph !== 'compound' && morph !== 'cluster';
           let ax = pl.x, az = pl.z, yaw = pl.yaw, F0 = pl.f, D1 = pl.dep, nxx = pl.nx, nzz = pl.nz;
@@ -579,7 +587,7 @@
               let g = null, sc = 1, sx = 1, F = null;
               // a row: the first type whose width is near its share (then any that will stretch to it); apart: the first that fits
               // its plot (then the smallest, made smaller), so that no plot is left empty for want of a house of its size
-              const tls = ctx === 'rich' ? [types, window.VERN.types(sk, 'urban', st, nT)] : [types];
+              const tls = ctx === 'rich' ? [types, typesOf(sk, 'urban', nT)] : [types];
               for (const tol of attached ? [[0.86, 1.16], [0.72, 1.38]] : [[0.8, 1]]) {
                 for (const tl of tls) {
                   const nt = tl.length; const q0 = Math.floor(rj * nt);
@@ -662,6 +670,8 @@
         if (rural && eR >= 1 && eR <= 6 && ye(28) < 0.12) prop('cart', (ye(29) - 0.5) * (pl.f - 3), back0 + 1.5, 1.6, 1.4, 3, pl.yaw + 0.3, 0x6e5537, packStyle(WALL.wood, ROOF.flat, cul, FLAG.thing));
       }
     }
+
+    if (fine && !reused) { baseCache.set(i, { key: bk, items: items.slice(), nHouses, nSites }); if (baseCache.size > 400) baseCache.delete(baseCache.keys().next().value); }
 
     // --- a far town, a town whose plan is still to come, and a city's zones beyond its old town: drawn on a grid ---
     // The mud-brick towns of the old world (the Mediterranean, the Near East, India) were built wall to wall: houses
@@ -824,7 +834,7 @@
       // a city's block beyond its old town, by zone
       const u = urban(x, z, r / R, k); const o = u === OLD ? oldSpec(k) : u;
       if (!o) {      // (the people's own houses at the edge of a city of the machine age: of the place's manner in the age, as on its plots)
-        const vs = window.VERN.styleAt(tp.st, eraReal, 0.5, window.VERN.CULFAM[cul], hash(i, k + 4)); const vt = window.VERN.types(vs, 'rural', tp.st, window.VERN.nTypes(lvl));
+        const vs = window.VERN.styleAt(tp.st, eraReal, 0.5, window.VERN.CULFAM[cul], hash(i, k + 4)); const vt = typesOf(vs, 'rural', window.VERN.nTypes(lvl));
         const g = vt[Math.floor(hash(i, k + 5) * vt.length) % vt.length]; const F = window.VERN.foot(g); const fw = F.x1 - F.x0, fd = F.z1 - F.z0; const sc = clamp(Math.min(s * 0.78 / fw, s * 0.78 / fd), 0.6, 1.1);
         const cols = window.VERN.colours(g, (Math.imul(i, 7919) + Math.imul(k, 104729)) >>> 0);
         const hv = push('vh', x, z, fw * sc, window.VERN.heightOf(g) * sc, fd * sc, yaw, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0)); hv.g = g; hv.sc = sc; hv.pal = cols; hv.era = eraReal; hv.u = 1; hv.ofx = -(F.x0 + F.x1) * 0.5 * sc; hv.ofz = -(F.z0 + F.z1) * 0.5 * sc; count++; continue;
@@ -969,7 +979,7 @@
         const fx = Math.cos(a) * rr, fz = Math.sin(a) * rr; const pp = got >= nDone ? clamp(farmProg * 1.3 - (got - nDone) * 0.3, 0.05, 1) : 1; got++;
         // the yard: the house, its barn across the yard from the long side, a granary past one gable end, a mill on the far side
         const fy = rnd(980 + k) * 3, ux = Math.cos(fy), uz = Math.sin(fy);
-        if (era >= 4 && fine) { const st = tp.st; const sk = window.VERN.styleAt(st, era, tp.P - era, window.VERN.CULFAM[cul], rnd(985 + k)); const ty = window.VERN.types(sk, 'rural', st, window.VERN.nTypes(lvl)); const g = ty[Math.floor(rnd(986 + k) * ty.length) % ty.length]; const F = window.VERN.foot(g);
+        if (era >= 4 && fine) { const st = tp.st; const sk = window.VERN.styleAt(st, era, tp.P - era, window.VERN.CULFAM[cul], rnd(985 + k)); const ty = typesOf(sk, 'rural', window.VERN.nTypes(lvl)); const g = ty[Math.floor(rnd(986 + k) * ty.length) % ty.length]; const F = window.VERN.foot(g);
           const cols = window.VERN.colours(g, (Math.imul(i, 31) + k * 977) >>> 0); const it = push('vh', fx, fz, F.x1 - F.x0, window.VERN.heightOf(g), F.z1 - F.z0, fy, cols[0], packStyle(WALL.plaster, ROOF.tile, cul, 0), 0, pp); it.g = g; it.sc = 1; it.pal = cols; it.pk = 'farm' + k; it.era = era; it.u = 1; it.ofx = -(F.x0 + F.x1) * 0.5; it.ofz = -(F.z0 + F.z1) * 0.5; }
         else { const e = pickW(houses, rnd(970 + k)); push(e[0] === 'block' || e[0] === 'tower' || e[0] === 'skyscraper' || e[0] === 'tenement' ? 'gable' : e[0], fx, fz, 9, 6, 7, fy, colorOf(990 + k), packStyle(e[2], e[3], cul, 0), 0, pp).pk = 'farm' + k; }
         if (era >= 1) push('barn', fx - uz * 21, fz + ux * 21, 14, 6.5, 8, fy + (rnd(981 + k) < 0.5 ? 0 : Math.PI / 2), era >= 5 ? 0x8a3f33 : 0x7a6247, packStyle(WALL.wood, era >= 5 ? ROOF.metal : ROOF.thatch, cul, 0), 0, pp).pk = 'farmb' + k;
@@ -1008,11 +1018,11 @@
     // the plots a player can build on (drawn radius), with what already stands there
     const plots = []; for (let sl = 0; sl < SLOT_N; sl++) { const a = slotAngle(i, axis, sl); plots.push({ slot: sl, x: Math.cos(a) * distR * kS, z: Math.sin(a) * distR * kS, used: used.has(sl) }); }
     // --- to drawn scale ---
-    for (const it of items) { it.x *= kS; it.z *= kS; it.w *= kS; it.d *= kS; it.h *= it.u ? kS : kH; if (it.ofx !== undefined) { it.ofx *= kS; it.ofz *= kS; } }      // (a house of the place's own, and what stands in its yard, at the same scale every way: as the models are)
+    for (let q = reused; q < items.length; q++) { const it = items[q]; it.x *= kS; it.z *= kS; it.w *= kS; it.d *= kS; it.h *= it.u ? kS : kH; if (it.ofx !== undefined) { it.ofx *= kS; it.ofz *= kS; } }      // (a house of the place's own, and what stands in its yard, at the same scale every way: as the models are; what was taken as it was is drawn so already)
     for (const st of streets) { st[0] *= kS; st[1] *= kS; st[2] *= kS; st[3] *= kS; st[4] *= kS; }
     for (const wv of walls) { wv.x *= kS; wv.z *= kS; }
     for (const pk of parks) { pk[0] *= kS; pk[1] *= kS; pk[2] *= kS; }
-    const out = { key, R: R * kS, Rt: R, k: kS, kh: kH, plaza: plaza * kS, axis, lmAngle, gates, items, walls, wallR: wallStyle !== 'none' ? wallR * kS : 0, culture: cul, era, eraReal, coast, harbour, streets, streetCls: cls, plots, sites: nSites, growing: !!growing, parks, suburb: era >= 7 ? subR : 0, morph: tp.morph, fine, n: nPlots, houses: nHouses, P: tp.P, rec: tp.rec };
+    const out = { key, R: R * kS, Rt: R, k: kS, kh: kH, plaza: plaza * kS, axis, lmAngle, gates, items, walls, wallR: wallStyle !== 'none' ? wallR * kS : 0, culture: cul, era, eraReal, coast, harbour, streets, streetCls: cls, plots, sites: nSites, growing: !!growing, parks, suburb: era >= 7 ? subR : 0, morph: tp.morph, fine, n: nPlots, houses: nHouses, P: tp.P, rec: tp.rec, planR: Pp ? Pp.R : 0 };
     cache.set(ck, out);
     if (cache.size > 400) { const first = cache.keys().next().value; cache.delete(first); }
     return out;
@@ -1068,5 +1078,5 @@
     for (const it of items) { it.x *= kS; it.z *= kS; it.w *= kS; it.d *= kS; it.h *= kH; }
     const out = { key, items, R: R * kS, k: kS }; ruinCache.set(i, out); if (ruinCache.size > 300) ruinCache.delete(ruinCache.keys().next().value); return out;
   }
-  window.TOWN = { siteOf, gateToward, ruinLayout, styleEra, CULTURES, WALL, ROOF, FLAG, cultureOf, civCulture, radiusM, radiusTrue, scaleOf, fieldsM, layout, packStyle, SLOT_N, townPlan, approxR, budget, PPP, NFINE, cacheSize: () => cache.size, clearCache: () => { cache.clear(); tpCache.clear(); exitCache.clear(); } };
+  window.TOWN = { siteOf, gateToward, ruinLayout, styleEra, CULTURES, WALL, ROOF, FLAG, cultureOf, civCulture, radiusM, radiusTrue, scaleOf, fieldsM, layout, packStyle, SLOT_N, townPlan, approxR, budget, PPP, NFINE, cacheSize: () => cache.size, clearCache: () => { cache.clear(); baseCache.clear(); tpCache.clear(); exitCache.clear(); } };
 })();
