@@ -110,6 +110,8 @@ window.DIPLO = (function () {
     const nameOf = (cv) => host.nameOf(cv);
     const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
     const pick = (l) => l[Math.floor(host.rnd() * l.length)];
+    // what the world learns of the player (learn.js): told what he does, asked what is believed of him; null without it
+    const LR = () => (host.learn ? host.learn() : null);
 
     // ----- memory: what a realm holds against another, or owes it; it fades by half in three turns -----
     function memOf(a, bid) { const m = D(a).mem[bid]; if (!m) return 0; return m[0] * Math.pow(0.5, (year() - m[1]) / (3 * pace(a))); }
@@ -196,6 +198,11 @@ window.DIPLO = (function () {
       const wb = host.warsN(b); if (wb && host.warsN(a)) for (const k in a.wars) if (b.wars[k] !== undefined && +k !== a.id && +k !== b.id) { put('A common enemy', 12); break; }
       if (wb) { let w = 0; for (const k in b.wars) { const e = civs[+k]; if (e && e !== a && (has(a, e.id, 'alliance') || has(a, e.id, 'defence') || D(e).lord === a.id || da.lord === e.id)) { w = 1; break; } } if (w) put('You are at war with their friends', -14); }
       const t = host.trait(a); if (t === 'conqueror' && near) put('A conqueror\'s eye', -6); else if (t === 'steward') put('A ruler who keeps the peace', 4); else if (t === 'tyrant') put('A ruler who trusts nobody', -4);
+      // (what they have learned of the player: their dread that he falls on them, against what they would dread of anyone in his place)
+      // (not while they are at war with him: the war speaks for itself, and an enemy does not count him a peaceful neighbour)
+      if (b.player && !a.player && !host.atWar(a, b.id)) { const L = LR(), f = L && L.fear(a); if (f) { const fv = f[0], r = fv / Math.max(1e-4, f[1]);      // (by how many times more or less than of anyone: the same in every age)
+        if (r > 1.3 && fv > L.floor()) put('They fear you will fall on them', -Math.round(Math.min(30, 12 * Math.log2(r))));
+        else if (near && r < 0.7 && L.heardOf(a) > 0.4) put('They count you a peaceful neighbour', Math.max(1, Math.round(Math.min(6, 4 * Math.log2(1 / r))))); } }
       return o > 100 ? 100 : o < -100 ? -100 : o;
     }
     const reasons = (a, b) => { const out = []; const o = opinion(a, b, out); out.sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])); return { o, why: out }; };
@@ -203,7 +210,9 @@ window.DIPLO = (function () {
     // ----- whom a realm fears: the strongest of those it touches that it has cause to dread -----
     function threatTo(a) {
       const nb = host.nbOf(a.id); if (!nb) return null; let best = null, bs = 1.25;
-      for (const bid of nb) { const b = civs[bid]; if (!b || bound(a, b)) continue; const s = ratio(b, a) * (1 + D(b).inf / 30) * (host.atWar(a, bid) ? 1.5 : 1) * (host.aggression(b) > 0.7 ? 1.15 : 1); if (s > bs) { bs = s; best = b; } }
+      for (const bid of nb) { const b = civs[bid]; if (!b || bound(a, b)) continue; let s = ratio(b, a) * (1 + D(b).inf / 30) * (host.atWar(a, bid) ? 1.5 : 1) * (host.aggression(b) > 0.7 ? 1.15 : 1);
+        if (b.player) { const L = LR(); if (L) { const r = L.fearRel(a); s *= r < 0.6 ? 0.6 : r > 3 ? 3 : r; } }      // (the player: as much more, or less, as they have learned to dread him)
+        if (s > bs) { bs = s; best = b; } }
       return best;
     }
 
@@ -229,6 +238,15 @@ window.DIPLO = (function () {
           if (lordOf(b) || lordOf(a)) put('A vassal follows its lord', -100);
         } else if (kind === 'marriage') { put('A match takes thought', -5); if (!host.blood(a) || !host.blood(b)) put('Both realms must be ruled by blood', -200); { const fa = faithOf(a), fb = faithOf(b); if (fa && fb) put(fa === fb ? 'The same faith' : 'Another faith', fa === fb ? 8 : -12); } }
       }
+      // (what they have learned of the player: whether his oaths hold, whether he stands by his friends, his appetite, what becomes of
+      // those he beats; and between two courts that dread him as they would dread nobody else, that dread: learn.js)
+      { const L = LR(); if (L) {
+        if (a.player && !b.player) { const B = L.belief(b);
+          if (PACT[kind] && kind !== 'trade') { const k = B.keep(PACT[kind].turns); if (k < 0.8) put('Your oaths are worth little to them', -Math.round(Math.min(40, 90 * (0.8 - k)))); else if (k > 0.93 && B.heard > 0.4) put('Your oaths hold', 4); }
+          if (kind === 'nap') { const f = L.fear(b), r = f ? f[0] / Math.max(1e-4, f[1]) : 1; if (r > 1.3 && f[0] > L.floor()) put('They would have your oath against your appetite', Math.round(Math.min(20, 8 * Math.log2(r)))); }
+          if (kind === 'defence' || kind === 'alliance') { const v = B.ally - 0.8; if (Math.abs(v) >= 0.05 && B.heard > 0.2) put(v > 0 ? 'You stand by your friends' : 'You have left friends to fight alone', Math.round(Math.max(-35, Math.min(10, 60 * v)))); }
+          if (kind === 'vassal' && B.harsh > 1.6) put('They know what becomes of those you beat', -Math.round(Math.min(25, 20 * (B.harsh - 1.6)))); }
+        else if (!a.player && !b.player && (kind === 'defence' || kind === 'alliance')) { const pl = L.player(); if (pl && pl !== a && pl !== b) { const ra = L.fearRel(a), rb = L.fearRel(b); if (ra > 1.5 && rb > 1.5) put('You both dread ' + nameOf(pl), Math.round(Math.min(30, 10 * Math.min(ra, rb)))); } } } }
       return { ok: s >= 0, score: Math.round(s), why: why.sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])) };
     }
     // why a cannot propose this to b now (null: it can)
@@ -279,13 +297,14 @@ window.DIPLO = (function () {
       const d = D(p), i = d.offers.findIndex((x) => x.id === id); if (i < 0) return 'That has lapsed'; const o = d.offers[i]; d.offers.splice(i, 1); const a = civs[o.from]; if (!a) return 'They are no more';
       if (!yes) return turnDown(p, a, o, false);
       if (o.kind === 'peace') { if (!host.atWar(p, a.id)) return 'The war is over'; conclude(o.winner === p.id ? p : a, o.winner === p.id ? a : p, o.terms); return null; }
-      if (o.kind === 'call') { const e = civs[o.vs]; if (!e || !host.atWar(a, e.id)) return 'The war is over'; if (host.atWar(p, e.id)) return null; join(p, a, e); return null; }
-      if (o.kind === 'submit') { if (lordOf(p)) return 'You have a lord already'; if (host.atWar(p, a.id)) return 'You are at war'; subject(a, p, `${cap(nameOf(p))} bends the knee to ${nameOf(a)}`); return null; }
+      if (o.kind === 'call') { const e = civs[o.vs]; if (!e || !host.atWar(a, e.id)) return 'The war is over'; if (host.atWar(p, e.id)) return null; join(p, a, e); { const L = LR(); if (L) L.called(true, 1); } return null; }
+      if (o.kind === 'submit') { if (lordOf(p)) return 'You have a lord already'; if (host.atWar(p, a.id)) return 'You are at war'; subject(a, p, `${cap(nameOf(p))} bends the knee to ${nameOf(a)}`); { const L = LR(); if (L) L.pressed(true, 1); } return null; }
       if (o.kind === 'protect') { if (lordOf(p)) return 'A vassal takes no vassals'; if (host.atWar(p, a.id)) return 'You are at war'; subject(p, a, `${cap(nameOf(a))} puts itself under the protection of ${nameOf(p)}`); return null; }
-      const no = cannot(a, p, o.kind); if (no) return no; seal(a, p, o.kind); return null;
+      const no = cannot(a, p, o.kind); if (no) return no; seal(a, p, o.kind); { const L = LR(); if (L && PACT[o.kind]) L.answered(o.kind, true, 1); } return null;
     }
     // the player says no, or says nothing until the envoys go home (lapsed): a friend left to fight alone remembers it either way
     function turnDown(p, a, o, lapsed) {
+      { const L = p.player ? LR() : null; if (L) { if (o.kind === 'call') { L.called(false, lapsed ? 0.6 : 1); if (!lapsed) L.oath(0.6); } else if (o.kind === 'submit') L.pressed(false, lapsed ? 0.5 : 1); else if (PACT[o.kind]) L.answered(o.kind, false, lapsed ? 0.5 : 1); } }
       if (o.kind === 'call') { remember(a, p.id, lapsed ? -10 : -20); if (!lapsed) { dropPact(a, p, 'alliance'); dropPact(a, p, 'defence'); D(p).rep = Math.max(0, D(p).rep - 10); host.event(p, `${cap(nameOf(p))} leaves ${nameOf(a)} to fight alone`, true, a); } }
       else if (o.kind === 'submit') { remember(a, p.id, -6); setClaim(a, p.id * 4 + 2, year() + CLAIM_TURNS * pace(a)); }
       else if (o.kind === 'peace') { if (lapsed && o.terms === 'white' && host.atWar(p, a.id) && (year() - p.wars[a.id]) > 2 * pace(p)) conclude(p, a, 'white'); }      // (a long war nobody will end: the envoys settle it as things stand)
@@ -296,18 +315,19 @@ window.DIPLO = (function () {
     function breakPact(a, b, kind) {
       if (kind === 'vassal') { if (D(b).lord !== a.id) return 'Not your vassal'; release(a, b); return null; }
       if (!has(a, b.id, kind)) return 'Not in force'; dropPact(a, b, kind); stats.broken++;
+      if (a.player) { const L = LR(); if (L) L.oath(kind === 'trade' ? 0.3 : kind === 'marriage' ? 0.8 : 1); }
       const cost = kind === 'trade' ? 6 : kind === 'marriage' ? 10 : 18; D(a).rep = Math.max(0, D(a).rep - cost); remember(b, a.id, kind === 'trade' ? -10 : -25);
       host.event(a, `${cap(nameOf(a))} throws over its ${PACT[kind].name.toLowerCase()} with ${nameOf(b)}`, a.player || b.player || host.cellsOf[a.id] > 150, b); return null;
     }
     // a vassal let go by its lord; or one that walks away (and is a rebel in its lord's eyes)
     function release(lord, v) { setLord(v, -1); stats.freed++; remember(v, lord.id, 15); D(lord).rep = Math.min(100, D(lord).rep + 3); host.event(lord, `${cap(nameOf(lord))} releases ${nameOf(v)} from its oath`, lord.player || v.player, v); }
-    function rebel(v) { const lord = lordOf(v); if (!lord) return 'You have no lord'; setLord(v, -1); stats.freed++; remember(lord, v.id, -30); setClaim(lord, v.id * 4 + 3, year() + CLAIM_TURNS * pace(lord)); D(v).rep = Math.max(0, D(v).rep - 8); host.event(v, `${cap(nameOf(v))} throws off the yoke of ${nameOf(lord)}`, true, lord); return null; }
+    function rebel(v) { const lord = lordOf(v); if (!lord) return 'You have no lord'; if (v.player) { const L = LR(); if (L) L.oath(1); } setLord(v, -1); stats.freed++; remember(lord, v.id, -30); setClaim(lord, v.id * 4 + 3, year() + CLAIM_TURNS * pace(lord)); D(v).rep = Math.max(0, D(v).rep - 8); host.event(v, `${cap(nameOf(v))} throws off the yoke of ${nameOf(lord)}`, true, lord); return null; }
     // a vassal long held and well disposed is joined to the crown: why it cannot be yet (null: it can)
     function cannotJoin(lord, v) {
       if (D(v).lord !== lord.id) return 'Not your vassal'; const left = D(v).since + UNION_TURNS * pace(lord) - year(); if (left > 0) return `Not before ${host.fmtYear(year() + left)}: an oath must grow old first`;
       if (opinion(v, lord) < 25) return 'They would not have it: they must think well of you'; if (ratio(lord, v) < 2) return 'They are too strong to be swallowed'; return null;
     }
-    function annex(lord, v) { const no = cannotJoin(lord, v); if (no) return no; union(lord, v, `${cap(nameOf(v))} is joined to ${nameOf(lord)}, whose vassal it long was`); return null; }
+    function annex(lord, v) { const no = cannotJoin(lord, v); if (no) return no; if (lord.player) { const L = LR(); if (L) L.annexed(); } union(lord, v, `${cap(nameOf(v))} is joined to ${nameOf(lord)}, whose vassal it long was`); return null; }
     // coin sent with fair words: it buys goodwill by what it is to the one who gets it (a turn of their income, or more, is a great gift)
     function giftWorth(b, coin) { const turn = Math.max(20, Math.abs(host.income(b)) * pace(b)); return Math.round(22 * Math.pow(Math.min(1, coin / turn), 0.6)); }
     function gift(a, b, coin) {
@@ -354,6 +374,7 @@ window.DIPLO = (function () {
     // war: sworn peace and friendship between the two are broken (and remembered), friends are called, and an unjust war is paid for
     function declare(a, b, key) {
       const no = cannotFight(a, b); if (no) return no; const W = warCost(a, b, key), C = W.cause, da = D(a);
+      if (a.player) { const L = LR(); if (L) { L.declared(a, b); if (W.broke) L.oath(1); } }      // (what the realm was to him, before its oaths are dropped)
       if (W.broke) { stats.broken++; for (const x of reach(b.id)) if (civs[x] && x !== a.id) remember(civs[x], a.id, -8); }
       dropPact(a, b);
       if (W.stab) host.shake(a, W.stab); if (W.rep) da.rep = Math.max(0, da.rep - W.rep);
@@ -383,6 +404,7 @@ window.DIPLO = (function () {
     function abandon(x, enemy) {
       const fid = D(x).side[enemy.id]; if (fid === undefined) return 'This war is your own'; if (!host.atWar(x, enemy.id)) return 'You are not at war'; const f = civs[fid];
       delete D(x).side[enemy.id]; host.makePeace(x, enemy, `${cap(nameOf(x))} makes a peace of its own with ${nameOf(enemy)}`);
+      if (x.player) { const L = LR(); if (L) { L.called(false, 0.5); L.oath(0.5); } }
       if (f) { remember(f, x.id, -25); D(x).rep = Math.max(0, D(x).rep - 12); if (D(x).lord !== f.id && D(f).lord !== x.id) { dropPact(x, f, 'alliance'); dropPact(x, f, 'defence'); } }
       return null;
     }
@@ -420,6 +442,7 @@ window.DIPLO = (function () {
       delete D(w).goal[l.id]; delete D(l).goal[w.id]; remember(w, l.id, -6); remember(l, w.id, lost > 3 ? -18 : -8);
       // the land taken makes others wary (less for a war with a reason); what was lost may be claimed back
       const real = s >= 0 ? w : l, other = s >= 0 ? l : w, got = s >= 0 ? taken : Math.max(0, host.cellsOf[l.id] - (l.warStart[w.id] || host.cellsOf[l.id]));
+      if (real.player) { const L = LR(); if (L) L.terms(RANK[terms] + (got > 20 ? 0.5 : 0), 1); }      // (what the player asked of those he beat)
       if (got > 0) { const just = goal !== 'none' && goal !== 'ally'; D(real).inf = Math.min(80, D(real).inf + Math.min(30, got / 5) * (just ? 0.6 : 1)); for (const k of [0, 1, 3]) delete D(real).claim[other.id * 4 + k]; if (got > 3) setClaim(other, real.id * 4 + 1, y + CLAIM_TURNS * pace(other)); }
       delete D(w).claim[l.id * 4 + 2];
       if (Math.abs(s) > 0.1 || terms !== 'white') host.won(s >= 0 || terms !== 'white' ? w : l, s >= 0 || terms !== 'white' ? l : w);
@@ -482,10 +505,12 @@ window.DIPLO = (function () {
       const nb = host.nbOf(c) || NONE, np = pStart[c + 1] - pStart[c]; if (!nb.length && !np && a.era < 7) return;
       const t = threatTo(a); const agg = host.aggression(a) * (host.trait(a) === 'conqueror' ? 1.8 : host.trait(a) === 'steward' ? 0.4 : 1);
       const ok = (b, kind) => { const v = da.ask[b.id * 8 + ASK[kind]]; return !(v !== undefined && y - v < 2 * P) && !cannot(a, b, kind); };
+      const L = LR(), pl = L ? L.player() : null;
       // (ask: a realm that rules itself answers at once; the player has it laid before him, if the asker would itself agree to it)
       const go = (b, kind) => {
         da.ask[b.id * 8 + ASK[kind]] = y;
-        if (b.player) { if (kind === 'vassal' || kind === 'protect' || judge(a, b, kind).ok) offer(b, { from: a.id, kind: kind === 'vassal' ? 'submit' : kind }); return true; }
+        if (b.player) { if (PACT[kind] && L && host.rnd() > 0.25 + 0.75 * L.takes(kind)) return false;      // (the courts send less of what he turns away: learn.js)
+          if (kind === 'vassal' || kind === 'protect' || judge(a, b, kind).ok) offer(b, { from: a.id, kind: kind === 'vassal' ? 'submit' : kind }); return true; }
         const j = judge(b, a, kind, t); if (j.ok) { seal(a, b, kind); return true; } stats.refused++; if (kind === 'vassal') { remember(b, a.id, -10); setClaim(a, b.id * 4 + 2, y + CLAIM_TURNS * P); } return false;
       };
       // (a handful of those it can deal with: two of those it touches, one of those its merchants reach, its vassals, and with wireless one from anywhere)
@@ -493,6 +518,12 @@ window.DIPLO = (function () {
       { const n = nb.length, o0 = n ? Math.floor(host.rnd() * n) : 0; for (let i = 0; i < n && i < 2; i++) add(nb[(o0 + i) % n]); if (np) add(pIds[pStart[c] + Math.floor(host.rnd() * np)]); }
       for (const v of vassalsOf(c)) add(v.id); for (const k in da.ban) add(+k); if (a.era >= 7 || host.knows(c, 'radio')) add(Math.floor(host.rnd() * MAXC));
       let dread; const held = vassalsOf(c).length;
+      // a court that dreads the player as it would dread nobody else looks for others who dread him, and swears with one of them to
+      // defend one another: a league against him (learn.js)
+      if (pl && pl !== a && !host.atWar(a, pl.id) && host.knows(c, PACT.defence.need) && host.rnd() < 0.5) {
+        if (L.dreads(a, 1.5)) { const R = reach(c);
+          for (const [b] of L.fearful()) { if (b === a || b.player || lordOf(b) || bound(a, b) || host.atWar(a, b.id) || R.indexOf(b.id) < 0 || !ok(b, 'defence')) continue;
+            if (go(b, 'defence')) { host.event(pl, `Fearing ${nameOf(pl)}, ${nameOf(a)} and ${nameOf(b)} swear to defend one another`, false, a); if (host.tell) host.tell(pl, 'league', { a: a.id, b: b.id }); return; } break; } } }
       for (const bid of order) {
         const b = civs[bid]; if (!b || host.atWar(a, bid)) continue; const o = opinion(a, b), near = nb.indexOf(bid) >= 0, r = ratio(a, b);
         if (D(b).lord === c) {      // its own vassal: in time, and where there is goodwill, joined to the crown
@@ -508,7 +539,8 @@ window.DIPLO = (function () {
         if (near && r < 0.8 && o > -20 && agg < 1 && ok(b, 'nap') && host.rnd() < 0.8 && go(b, 'nap')) return;
         if (tradeShare(a, bid) > 0.02 && o > 0 && ok(b, 'trade') && host.rnd() < 0.5 && go(b, 'trade')) return;
         if (o > 12 && host.blood(a) && host.blood(b) && ok(b, 'marriage') && host.rnd() < 0.35 && go(b, 'marriage')) return;
-        if (near && r > 6 && agg > 0.7 && held < HOLD && !anyPact(a, bid) && ok(b, 'vassal') && host.rnd() < 0.3) { go(b, 'vassal'); return; }      // (a realm that rules itself is content with a few vassals)
+        { const gv = b.player && L ? Math.max(0, L.belief(a).gives - 0.25) : 0;      // (a player known to give in when pressed is pressed sooner)
+          if (near && r > 6 - 8 * gv && r > 3 && agg > 0.7 && held < HOLD && !anyPact(a, bid) && ok(b, 'vassal') && host.rnd() < 0.3 + 0.6 * gv) { go(b, 'vassal'); return; } }      // (a realm that rules itself is content with a few vassals)
         if (near && agg > 0.7 && o < -15 && r > 1.1 && !bound(a, b) && !(da.claim[bid * 4] > y) && host.knows(c, 'laws') && a.wealth > claimCost(a, b) * 2 && host.rnd() < 0.35) { claim(a, b); return; }
       }
     }
@@ -564,6 +596,7 @@ window.DIPLO = (function () {
     // a new realm: one cut from another is a rebel in its parent's eyes for a while; a number may have been a dead realm's
     function born(c, cv, from) {
       died(c); cv.dip = fresh(); trIn[c] = trOut[c] = 0; pays[c] = 0; ver[c]++; stale = true; const p = from >= 0 ? civs[from] : null;
+      { const L = LR(); if (L) L.born(c, from); }
       if (p) { remember(p, c, -20); remember(cv, from, -12); setClaim(p, c * 4 + 1, year() + CLAIM_TURNS * pace(p)); }
     }
     // a realm is gone: nobody is bound to it, owes it or follows it any longer

@@ -457,7 +457,8 @@
   // reform, the works nearest done, the hosts in the field, the wars and how they stand, a golden age, debts. Each line opens its page.
   const TK_ICON = { mig: '<path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3 2.5-5 5-5s5 2 5 5M14 9h7M18 6l3 3-3 3"/>', work: '<path d="M14.5 4.5l5 5-2 2-5-5zM12.5 6.5l-8.5 8.5v4h4l8.5-8.5"/>', host: '<path d="M6 21V3.5M6 4.5h11l-2.5 3.5L17 11.5H6"/>', war: '<path d="M4 4l11 11M15.5 4L4.5 15M3 21l3.5-3.5M21 21l-3.5-3.5M14 14l7 7M10 14l-7 7"/>', gold: '<path d="M7 20c-3.5-3-4.500-8.500-2-13M17 20c3.5-3 4.500-8.500 2-13M5.5 11.5c1.5 0 2.500 1 3 2.500M18.5 11.5c-1.5 0-2.500 1-3 2.500M6 7.500c1.200.300 2 1.200 2.300 2.300M18 7.500c-1.200.300-2 1.200-2.300 2.300M12 6l1.100 2.300 2.400.300-1.800 1.600.500 2.400L12 11.400 9.800 12.600l.500-2.400L8.500 8.600l2.400-.300z"/>', reform: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>', sick: '<path d="M12 7.500a4.500 4.500 0 1 0 0 9a4.500 4.500 0 1 0 0-9M12 3v4.500M12 16.500V21M3 12h4.500M16.500 12H21M5.600 5.600l2.900 2.900M15.500 15.500l2.900 2.900M5.600 18.400l2.900-2.900M15.500 8.500l2.900-2.900"/>', spy: '<path d="M2.500 12s3.500-6.500 9.500-6.500S21.500 12 21.500 12 18 18.500 12 18.500 2.500 12 2.500 12zM12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6"/>',
     dry: '<path d="M12 2.5v2M5.300 5.300l1.400 1.400M18.700 5.300l-1.400 1.400M2.500 12h2M19.500 12h2M8 12a4 4 0 0 1 8 0M3 15.500h18M6.500 21l2-5.500M12.500 21l-1-5.500M17.500 21l-1.500-5.500"/>',
-    cold: '<path d="M12 2.500v19M3.800 7.250l16.400 9.500M3.800 16.750l16.400-9.500M9.500 4l2.500 2.500L14.500 4M9.500 20l2.500-2.500 2.500 2.500"/>' };
+    cold: '<path d="M12 2.500v19M3.800 7.250l16.400 9.500M3.800 16.750l16.400-9.500M9.500 4l2.500 2.500L14.500 4M9.500 20l2.500-2.500 2.500 2.500"/>',
+    league: '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6zM9 10h6M9 13.500h6"/>' };
   // (the weather of a place, in a line: the ice, a drought and its year, a great drought or cold, a good year, the green lands: climate.js)
   function weatherOf(w) {
     if (!w) return null; const hv = Math.round(w.hv * 100);
@@ -491,6 +492,9 @@
     { const X = sim.intrigueView ? sim.intrigueView() : null, q = X && X.s; if (q) rows.push({ k: 'spy', t: `${q.scheme} · ${q.realm}`, n: q.left + ' yrs', bar: q.p, act: 'intrigue', tip: `Your agents in ${q.realm}: ${Math.round(q.odds * 100)}% to succeed, ${Math.round(q.risk * 100)}% to be found out on the way` }); }
     { const m = c.mig, P0 = Math.max(1, sim.popOf[c.id]); if (sim.mig && m && ((m.li || 0) > 0.02 * P0 || (m.lo || 0) > 0.02 * P0)) rows.push({ k: 'mig', t: (m.li || 0) >= (m.lo || 0) ? 'Newcomers' : 'Your people leaving', n: Math.round(100 * Math.max(m.li || 0, m.lo || 0) / P0) + '%', s: `${m.li > 0 ? fmtPop(m.li) + ' came' : ''}${m.li > 0 && m.lo > 0 ? ' · ' : ''}${m.lo > 0 ? fmtPop(m.lo) + ' left' : ''} in ten years`, act: 'folk', tip: 'Who came, who left, and what your borders say: the Peoples tab of the laws.' }); }
     const K = sim.culture; if (K && K.isGolden(c.id)) rows.push({ k: 'gold', cls: 'good', t: 'A golden age', n: '', s: 'Until ' + sim.fmtYear(K.goldenNeed(c.id).until), act: 'cult' });
+    // (those who dread the player have sworn to defend one another against him: learn.js)
+    { const L = sim.learn; if (L && L.st.T) { const fr = L.fearful(); if (fr.length) { const ids = new Set(fr.map(([b]) => b.id)); let n = 0; for (const [b] of fr) for (const k in sim.diplo.D(b).pact) if (+k > b.id && ids.has(+k) && sim.diplo.has(b, +k, 'defence')) n++;
+      if (n) rows.push({ k: 'league', cls: 'warn', t: n === 1 ? 'A league against you' : `${n} leagues against you`, n: '', s: `${fr.length} court${fr.length === 1 ? '' : 's'} dread${fr.length === 1 ? 's' : ''} you`, act: 'name', tip: 'Courts that dread you as they would nobody else have sworn to defend one another. What they have learned of you: Diplomacy, Your name' }); } } }
     const F = sim.finance; if (F && F.debt[c.id] > 0.5) rows.push({ k: 'debt', cls: c.wealth < 0 ? 'warn' : '', t: 'Debts of ' + fmtInt(F.debt[c.id]), n: (100 * F.rateOf[c.id]).toFixed(1) + '%', s: 'Interest ' + fmtInt(F.debt[c.id] * F.rateOf[c.id]) + ' a year', act: 'fin' });
     const key = rows.map((r) => [r.k, r.cls, r.t, r.n, r.s, r.bar === undefined ? '' : Math.round(r.bar * 40)].join('|')).join('/') + ':' + (settings.trackerFolded ? 1 : 0);
     el.hidden = !rows.length; el.classList.toggle('folded', !!settings.trackerFolded); $('tk-fold').setAttribute('aria-expanded', String(!settings.trackerFolded));
@@ -513,6 +517,7 @@
       case 'fin': MARKET.open('fin'); break;
       case 'legacy': openChronicle('legacy'); break;
       case 'intrigue': ENVOYS.open('intrigue'); break;
+      case 'name': ENVOYS.open('name'); break;
       case 'sick': if (!view.sick) setLens('sick'); break;
       case 'hrv': if (!view.hrv) setLens('hrv'); if (r.i >= 0) { const [lon, lat] = placeOf(r.i); mapcam.flyTo(lon, lat, Math.max(mapcam.dist, 0.25), { duration: 1.4 }); } break;
     }

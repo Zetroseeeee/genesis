@@ -246,7 +246,7 @@ server.listen(0, async () => {
     // a disaster counts once the turn's first year has run: it is struck from inside the page, on the first frame after
     // that year (asked for from out here it sometimes arrived after the whole turn had run, and interrupted nothing)
     // (nothing may wait on the button first: it would open that and the turn would never run - the year never comes, and the page waited for ever)
-    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (window.TALES && TALES.isOpen()) TALES.close(); }); await frames(2);
+    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (window.TALES && TALES.isOpen()) TALES.close(); }); await frames(2);
     await ev(() => new Promise((res) => { const S = __G.sim; const y0 = S.year; const t0 = performance.now(); document.getElementById('turn').click(); const f = () => { if (S.year > y0) { const c = S.playerCiv(); S.logEvent(c, 'An earthquake shakes the land in ' + S.fullName(c), true, 'disaster', c.capital); S.quakes.push({ i: c.capital, year: S.year, mag: 7.5 }); S.rubble.set(c.capital, S.year); res(); } else if (performance.now() - t0 > 90000) res(); else requestAnimationFrame(f); }; requestAnimationFrame(f); }));      // (and gives up after a minute and a half: the checks below then say what went wrong)
     await page.waitForFunction(() => !__G.turnRun.active, null, { timeout: 60000 }); await frames(2);
     const s = await state(); check(/state-warn/.test(s.turn) && s.t1 === 'Disaster', 'amber Disaster state: ' + s.turn + ' ' + s.t1);
@@ -608,7 +608,7 @@ server.listen(0, async () => {
     // the screen: F opens it; the realms, what they think and why
     await page.keyboard.press('f'); await frames(3);
     r = await ev(() => { const rows = [...document.querySelectorAll('#dp-list .dp-row')]; return { open: document.getElementById('dip').open, rows: rows.length, mine: window.__dip.every(id => rows.some(b => +b.dataset.dsel === id)), word: document.getElementById('dp-word').textContent, tabs: [...document.querySelectorAll('#dp-tabs button')].map(b => b.textContent.trim()).join('|'), groups: [...document.querySelectorAll('#dp-list .dp-grp')].map(b => b.textContent).join('|'), filters: document.querySelectorAll('#dp-list [data-dfilter]').length }; });
-    check(r.open && r.rows >= 2 && r.mine, `F opens Diplomacy with the realms within reach (${r.rows} rows)`); check(/^50/.test(r.word) && /ordinary/.test(r.word), 'the player\'s word is shown: ' + r.word); check(r.tabs === 'Realms|Envoys|Wars|Intrigue|Your standing' && r.filters === 5 && /On your borders/.test(r.groups), `tabs, filters and groups (${r.tabs}; ${r.groups})`);
+    check(r.open && r.rows >= 2 && r.mine, `F opens Diplomacy with the realms within reach (${r.rows} rows)`); check(/^50/.test(r.word) && /ordinary/.test(r.word), 'the player\'s word is shown: ' + r.word); check(r.tabs === 'Realms|Envoys|Wars|Intrigue|Your name|Your standing' && r.filters === 5 && /On your borders/.test(r.groups), `tabs, filters and groups (${r.tabs}; ${r.groups})`);
     await ev(() => document.querySelector(`#dp-list .dp-row[data-dsel="${window.__dip[0]}"]`).click()); await frames(2);
     r = await ev(() => { const S = __G.sim, c = S.playerCiv(), a = S.civs[window.__dip[0]]; const info = document.getElementById('dp-info'); const props = [...info.querySelectorAll('.dp-prop')].map(p => ({ name: p.querySelector('b').textContent, st: p.querySelector('.st').textContent, off: p.classList.contains('off'), dis: p.querySelector('button').disabled }));
       return { name: info.querySelector('h3').textContent, full: S.fullName(a), mood: info.querySelector('.dp-mood b').textContent, o: S.diplo.opinion(a, c), why: [...info.querySelectorAll('.gv-sect .gv-why span')].slice(0, 9).map(x => x.textContent).join('; '), props, gifts: info.querySelectorAll('[data-dact="gift"]').length, war: !!info.querySelector('[data-dact="war"]'), causes: [...info.querySelectorAll('.dp-cause b')].map(x => x.textContent).join('|'), none: /Nothing is sworn/.test(info.textContent) }; });
@@ -883,7 +883,7 @@ server.listen(0, async () => {
       S.setStories(true); c.story = { n: S.year + 1, q: null, m: [], f: [], s: {} }; c.wealth = 8000; S.rule.ruleOf(c).auth = 120; return { year: S.year, on: document.getElementById('opt-stories').checked }; });
     check(r.on, 'the menu has stories switched on');
     // (the new age is news that waits on the turn button: dealt with first, so that the button runs the turn)
-    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
+    await ev(() => { for (let n = 0; n < 10; n++) { const q = __G.attention(); if (!q.length) break; if (q[0].act) q[0].act(); else break; } for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
     await ev(() => document.getElementById('turn').click());
     await page.waitForFunction(() => TALES.isOpen(), null, { timeout: 60000 }).catch(() => {});
     let q = await ev(() => { const S = __G.sim, c = S.playerCiv(); return { open: TALES.isOpen(), active: __G.turnRun ? __G.turnRun.active : null, title: document.getElementById('tl-title').textContent, text: document.getElementById('tl-text').textContent, n: document.querySelectorAll('#tl-choices .tl-choice').length, chips: document.querySelectorAll('#tl-choices .tl-chip').length, foot: document.getElementById('tl-foot').textContent, q: !!(c.story && c.story.q), why: document.getElementById('report-why').textContent }; });
@@ -915,7 +915,7 @@ server.listen(0, async () => {
     await ev(() => { const el = document.getElementById('opt-stories'); el.checked = true; el.dispatchEvent(new Event('change')); __T.quiet(); });
   });
   await scenario('legacy: the ambitions of the age and how far each has come, one fulfilled and told, the tracker opens the Legacy tab; a new age asks what the last one leaves', async (check) => {
-    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
     // the Legacy tab: six ambitions of the realm's age, how far each has come, what the realm is remembered for in each path
     await ev(() => __G.openChronicle('legacy')); await frames(2);
     let q = await ev(() => ({ open: document.getElementById('chron').open, cards: document.querySelectorAll('#legacy .lg-card').length, paths: document.querySelectorAll('#legacy .lg-path').length, score: (document.querySelector('#legacy .lg-score b') || {}).textContent, h: (document.querySelector('#legacy h3') || {}).textContent }));
@@ -948,7 +948,7 @@ server.listen(0, async () => {
     await ev(() => { document.getElementById('chron').close(); __T.quiet(); });
   });
   await scenario('intrigue: a realm\'s page says what your agents could do there and how likely it is; a scheme begun, on the tracker, called home; the Intrigue tab; foreign agents caught and the court asked', async (check) => {
-    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
     // a neighbour set down beside the player's land, who knows its age and keeps still; the player's people can write and send envoys (this scenario can run by itself)
     let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), W = S.W; const mine = (i) => S.owner[i] === c.id; let t = null;
       for (const i of S.LI) { if (t) break; const o = S.owner[i]; if (!S.land[i] || (S.flags[i] & 8) || S.fert[i] <= 0.05 || ![i - 1, i + 1, i - W, i + W].some(mine)) continue; if (o >= 0 && (o === c.id || S.civs[o].capital === i)) continue; S.owner[i] = -1; t = S.spawnTribe(i, {}); if (!t) S.owner[i] = o; }
@@ -990,8 +990,35 @@ server.listen(0, async () => {
     r = await ev(() => [...document.querySelectorAll('#log .fe')].map((e) => e.textContent).join(' | ')); check(/caught in/.test(r), 'the chronicle keeps it, under Intrigue: ' + r.slice(0, 120));
     await ev(() => { document.querySelector('#logfilters [data-f="all"]').click(); document.getElementById('chron').close(); __T.quiet(); });
   });
+  await scenario('the world learns your ways: a war begun is watched; the courts reckon each turn; Your name tells what they learned, who fears you, the leagues; a realm\'s page says what it learned; a story marks the choice your court expects', async (check) => {
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    // a weak neighbour set down beside the player's land (this scenario can run by itself), and a war on it begun and ended
+    let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), W = S.W, L = S.learn; if (!L) return { none: true }; const mine = (i) => S.owner[i] === c.id; let t = null;
+      for (const i of S.LI) { if (t) break; const o = S.owner[i]; if (!S.land[i] || (S.flags[i] & 8) || S.fert[i] <= 0.05 || ![i - 1, i + 1, i - W, i + W].some(mine)) continue; if (o >= 0 && (o === c.id || S.civs[o].capital === i)) continue; S.owner[i] = -1; t = S.spawnTribe(i, {}); if (!t) S.owner[i] = o; }
+      if (!t) return { made: false }; t.tech = c.tech; t.era = c.era; t.aggression = 0; t.dip.think = 1e12; for (const k of Object.keys(c.wars)) { const e = S.civs[+k]; if (e) S.diplo.conclude(c, e, 'white'); }
+      S.recount(); S.touchAll(); __G.run(1); const T0 = L.st.T; const why = S.diplo.declare(c, t); const watched = L.st.cand.some((e) => e.b === t.id && e.y === 1); S.diplo.conclude(c, t, 'white');
+      window.__prey = t.id; L.st.next = -1e12; __G.run(1); return { made: true, why, watched, T: L.st.T - T0, n: L.st.n, prey: L.st.prey[t.id] }; });
+    check(!r.none && r.made && !r.why && r.watched && r.T >= 1 && r.n >= 1 && r.prey > 0.9, `a war he begins is watched, and the courts reckon again (${JSON.stringify(r)})`);
+    // the world's picture: as if it had seen him fall on the weak again and again
+    await ev(() => { const L = __G.sim.learn, FK = LEARN.FK; L.st.w[FK.weak] = 4; L.st.w[FK.again] = 3; L.st.w[FK.bias] = -2.2; for (let k = 0; k < L.st.heard.length; k++) if (__G.sim.civs[k]) L.st.heard[k] = 230; L.oath(1); L.called(false, 1); });
+    await ev(() => ENVOYS.open('name')); await frames(2);
+    r = await ev(() => { const el = document.getElementById('dp-name'); return { tab: (document.querySelector('#dp-tabs button.on') || {}).textContent, text: el.textContent, stats: el.querySelectorAll('.dp-stat').length, lines: el.querySelectorAll('.dp-line').length }; });
+    check(r.tab === 'Your name' && /Your appetite/.test(r.text) && /What they have learned of your wars/.test(r.text) && /times as likely/.test(r.text) && /Your oaths/.test(r.text) && /Who fears you most/.test(r.text) && /Leagues against you/.test(r.text) && /What your court has learned of you/.test(r.text) && r.stats >= 3,
+      `Your name: what they learned of your wars, your oaths, who fears you, the leagues, your court (${r.stats} panels, ${r.lines} lines)`);
+    await ev(() => ENVOYS.open('realms', window.__prey)); await frames(2);
+    r = await ev(() => { const el = document.getElementById('dp-info'); const t = el.textContent; return { learned: /What they have learned of you/.test(t), fear: /They reckon you fall on them within a turn/.test(t), word: /holds to its end/.test(t), why: [...el.querySelectorAll('.gv-why span')].map((x) => x.textContent).join(' | ') }; });
+    check(r.learned && r.fear && r.word && /fear you will fall on them/.test(r.why), `a realm's page: what that court has learned, and its dread among its reasons (${r.why.slice(0, 140)})`);
+    await ev(() => ENVOYS.close());
+    // a story: once his court has seen him choose, it marks the choice it expects of him
+    r = await ev(() => { const S = __G.sim, c = S.playerCiv(), H = S.learn.st.habit; S.setStories(true); if (c.story) { c.story.q = null; c.story.s = {}; } H.n = 8; H.th[LEARN.HAB.findIndex((f) => f[0] === 'stab')] += 5;
+      let why = 'none'; for (const k of ['omen', 'festival', 'petition', 'bandits', 'monument', 'fair', 'raid']) { why = S.storyTell(k); if (!why) break; } const v = S.storyView(); return { why, wont: v && v.wont ? v.wont.i : -1, k: v ? v.k : '' }; });
+    if (!r.why) { await ev(() => TALES.open()); await frames(2); }
+    const tag = await ev(() => { const b = document.querySelector('#tl-choices .tl-wont'); return b ? { text: b.textContent, i: +b.closest('.tl-choice').dataset.tl } : null; });
+    check(!r.why && r.wont >= 0 && !!tag && tag.text === 'As you are wont' && tag.i === r.wont, `the story's page marks the choice his court expects (${r.k}: ${JSON.stringify(tag)})`);
+    await ev(() => { if (TALES.isOpen()) TALES.close(); const c = __G.sim.playerCiv(); if (c.story) c.story.q = null; __T.quiet(); });
+  });
   await scenario('pestilence: an outbreak reaches the realm and the court is asked; the tracker opens the lens of sickness, its key shuts and opens the realm; the realm\'s panel names it', async (check) => {
-    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
     // smallpox begun in the player's capital, with stories on (this scenario can run by itself)
     let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), X = S.disease; S.setStories(true); if (c.story) { c.story.q = null; c.story.s = {}; } X.out.length = 0; for (let k = 0; k < DISEASE.NK; k++) X.imm[c.id * DISEASE.NK + k] = -1e9; if (c.sick) c.sick.q = 0;
       const why = X.seed(c.capital, 'pox'); __G.run(0); const o = X.out[0]; return { why, name: o ? o.name : '', q: c.story && c.story.q ? c.story.q.k : '' }; });
@@ -1020,7 +1047,7 @@ server.listen(0, async () => {
     check(/Land/.test(r.realm) && /%/.test(r.realm), 'the realm\'s panel names its land by kind');
   });
   await scenario('the weather: a drought over the realm, the court asked and the granaries opened; the inspector, the realm\'s panel and the tracker name it, the tracker opens the lens of the harvest with its key; the date names the age\'s climate', async (check) => {
-    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } if (TALES.isOpen()) TALES.close(); });
     // a deep drought laid over the capital for three years, with stories on (this scenario can run by itself)
     let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), CL = S.climate; if (!CL) return { none: 1 }; S.setStories(true); if (c.story) { c.story.q = null; c.story.s = {}; }
       const sp = CL.force('drought', c.capital, 900, -0.45, 3); __G.run(1); return { reach: sp.realms.includes(c.id), q: c.story && c.story.q ? c.story.q.k : '', hv: +S.harvestOf(c.id).toFixed(3) }; });
@@ -1047,7 +1074,7 @@ server.listen(0, async () => {
     await ev(() => { const S = __G.sim; for (const sp of S.climate.spells.slice()) if (sp.kind === 'drought') sp.y1 = S.year; __G.run(1); S.playerCiv().clim = null; S.setStories(true); __T.quiet(); });
   });
   await scenario('people on the move: the Peoples tab (who lives in the realm, who came and left, the world\'s migrations), the borders and the leaving set there, the streams under the lens of peoples, the realm\'s panel', async (check) => {
-    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
     // a decade's flows laid by hand: some of the player's people gone to a neighbour, some of another realm's come to his
     let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), M = S.mig; if (!M) return { none: 1 }; const o = S.civs.find((x) => x && x !== c && x.capital >= 0); if (!o) return { none: 2 };
       M.load({ rot: 0, flows: [[c.id, o.id, 40], [o.id, c.id, 25]] }); c.mig = { b: 'open', l: 'free', o: 0, i: 0, y: S.year, li: 25, lo: 40 }; return { o: o.id, name: S.fullName(o) }; });
@@ -1072,7 +1099,7 @@ server.listen(0, async () => {
     await ev(() => { __G.sim.playerCiv().mig = { b: 'open', l: 'free', o: 0, i: 0, y: __G.sim.year }; __G.sim.mig.load({ rot: 0, flows: [] }); __T.quiet(); });
   });
   await scenario('the woods: the Land tab (the realm\'s woods by how much stands, its land, the harvest, timber, the world\'s woods), royal forests set there, the lens of the woods with its key and its word, the inspector and the realm\'s panel', async (check) => {
-    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
+    await ev(() => { const r = document.getElementById('report-close'); if (r) r.click(); for (const id of ['chron', 'know', 'gov', 'dip', 'market', 'cult', 'menu', 'news', 'dawn']) { const d = document.getElementById(id); if (d && d.open) d.close(); } });
     // the realm's woods felled by hand to two fifths of nature's, so that there is something to see
     let r = await ev(() => { const S = __G.sim, c = S.playerCiv(), X = S.woods; if (!X) return { none: 1 }; const cells = S.LI.filter((i) => S.owner[i] === c.id && X.pot[i] >= 25); for (const i of cells) X.cover[i] = Math.round(X.pot[i] * 0.4);
       const w = X.of(c.id); return { n: cells.length, share: +w.share.toFixed(2), era: c.era }; });
